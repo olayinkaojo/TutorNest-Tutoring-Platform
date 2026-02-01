@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fix User Role - TutorNest Admin Tool</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background: linear-gradient(135deg, #f5f3ff 0%, #ffffff 50%, #f0fdf4 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+
+        .container {
+            background: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+            max-width: 500px;
+            width: 100%;
+            padding: 32px;
+        }
+
+        h1 {
+            color: #625d9c;
+            font-size: 24px;
+            font-weight: 700;
+            margin-bottom: 8px;
+        }
+
+        .description {
+            color: #6b7280;
+            font-size: 14px;
+            margin-bottom: 24px;
+        }
+
+        .form-group {
+            margin-bottom: 20px;
+        }
+
+        label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            color: #374151;
+            margin-bottom: 6px;
+        }
+
+        input, select {
+            width: 100%;
+            padding: 10px 12px;
+            border: 1px solid #d1d5db;
+            border-radius: 6px;
+            font-size: 14px;
+            transition: border-color 0.2s;
+        }
+
+        input:focus, select:focus {
+            outline: none;
+            border-color: #625d9c;
+            box-shadow: 0 0 0 3px rgba(98, 93, 156, 0.1);
+        }
+
+        button {
+            width: 100%;
+            padding: 12px;
+            background: #625d9c;
+            color: white;
+            border: none;
+            border-radius: 6px;
+            font-size: 14px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: background-color 0.2s;
+        }
+
+        button:hover:not(:disabled) {
+            background: #524d85;
+        }
+
+        button:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        .alert {
+            padding: 12px;
+            border-radius: 6px;
+            margin-bottom: 20px;
+            font-size: 14px;
+        }
+
+        .alert-error {
+            background: #fef2f2;
+            border: 1px solid #fecaca;
+            color: #991b1b;
+        }
+
+        .alert-success {
+            background: #f0fdf4;
+            border: 1px solid #bbf7d0;
+            color: #166534;
+        }
+
+        .alert-info {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        .logo {
+            text-align: center;
+            margin-bottom: 24px;
+        }
+
+        .logo h2 {
+            color: #625d9c;
+            font-size: 28px;
+            font-weight: 700;
+        }
+
+        .logo span {
+            color: #5d9827;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="logo">
+            <h2>Tutor<span>Nest</span></h2>
+        </div>
+        
+        <h1>Fix User Role</h1>
+        <p class="description">Correct user role assignment for accounts with incorrect roles</p>
+
+        <div id="errorAlert" class="alert alert-error hidden"></div>
+        <div id="successAlert" class="alert alert-success hidden"></div>
+
+        <div class="form-group">
+            <label for="email">User Email</label>
+            <input 
+                type="email" 
+                id="email" 
+                placeholder="user@example.com"
+                autocomplete="email"
+            />
+        </div>
+
+        <div class="form-group">
+            <label for="role">Correct Role</label>
+            <select id="role">
+                <option value="">Select role...</option>
+                <option value="parent">Parent</option>
+                <option value="tutor">Tutor</option>
+                <option value="student">Student</option>
+                <option value="admin">Admin</option>
+            </select>
+        </div>
+
+        <button id="fixButton" onclick="fixUserRole()">Fix User Role</button>
+
+        <div class="alert alert-info" style="margin-top: 20px;">
+            <strong>Note:</strong> This will update the user's role and delete their old role-specific profile.
+            The user may need to sign out and sign in again to see the changes.
+        </div>
+    </div>
+
+    <script>
+        const projectId = 'wevmvbskunhnhuxzaqoz';
+        const publicAnonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indldm12YnNrdW5obmh1eHphcW96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjQzNDcsImV4cCI6MjA3ODcwMDM0N30.L_N8kMAOitpFO28SJx_OpS7uAb7NYwMCOo5RiRBvx5c';
+
+        function showError(message) {
+            const errorAlert = document.getElementById('errorAlert');
+            const successAlert = document.getElementById('successAlert');
+            errorAlert.textContent = message;
+            errorAlert.classList.remove('hidden');
+            successAlert.classList.add('hidden');
+        }
+
+        function showSuccess(message) {
+            const errorAlert = document.getElementById('errorAlert');
+            const successAlert = document.getElementById('successAlert');
+            successAlert.textContent = message;
+            successAlert.classList.remove('hidden');
+            errorAlert.classList.add('hidden');
+        }
+
+        async function fixUserRole() {
+            const email = document.getElementById('email').value.trim();
+            const role = document.getElementById('role').value;
+            const button = document.getElementById('fixButton');
+
+            // Hide previous alerts
+            document.getElementById('errorAlert').classList.add('hidden');
+            document.getElementById('successAlert').classList.add('hidden');
+
+            // Validation
+            if (!email) {
+                showError('Please enter a user email');
+                return;
+            }
+
+            if (!role) {
+                showError('Please select a role');
+                return;
+            }
+
+            // Disable button
+            button.disabled = true;
+            button.textContent = 'Fixing...';
+
+            try {
+                const response = await fetch(
+                    `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/fix-user-role`,
+                    {
+                        method: 'POST',
+                        headers: {
+                            'Content-Type': 'application/json',
+                            'Authorization': `Bearer ${publicAnonKey}`
+                        },
+                        body: JSON.stringify({
+                            userEmail: email,
+                            correctRole: role
+                        })
+                    }
+                );
+
+                const data = await response.json();
+                console.log('Response:', data);
+
+                if (response.ok && data.success) {
+                    showSuccess(data.message || 'User role fixed successfully! The user should sign out and sign in again.');
+                    // Clear form
+                    document.getElementById('email').value = '';
+                    document.getElementById('role').value = '';
+                } else {
+                    showError(data.error || 'Failed to fix user role');
+                }
+            } catch (error) {
+                console.error('Error:', error);
+                showError('Network error: ' + error.message);
+            } finally {
+                button.disabled = false;
+                button.textContent = 'Fix User Role';
+            }
+        }
+
+        // Allow Enter key to submit
+        document.getElementById('email').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fixUserRole();
+            }
+        });
+
+        document.getElementById('role').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                fixUserRole();
+            }
+        });
+    </script>
+</body>
+</html>

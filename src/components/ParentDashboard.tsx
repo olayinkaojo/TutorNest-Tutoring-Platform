@@ -1,0 +1,1291 @@
+import { Users, Calendar, BookOpen, LogOut, Plus, TrendingUp, Search, Pencil, Trash2, CreditCard, ShoppingBag, GraduationCap, ArrowRight, CheckCircle, Filter, Library, FileText, MessageSquare } from 'lucide-react';
+import TutorNestLogo from './TutorNestLogo';
+import { TutorSearch } from './TutorSearch';
+import { NairaIcon } from './icons/NairaIcon';
+import { formatNaira } from '../utils/currency';
+import { MultiSelectFilter, SelectedFilterBadges } from './MultiSelectFilter';
+import { SessionReportsViewer } from './SessionReportsViewer';
+import { NotificationCenter } from './NotificationCenter';
+import { ProgressDashboard } from './ProgressDashboard';
+import { MobileNavigation } from './MobileNavigation';
+import { UpcomingLessonsCard } from './UpcomingLessonsCard';
+import { CurriculumPDFViewer } from './CurriculumPDFViewer';
+import { ParentContentLibrary } from './ParentContentLibrary';
+import { AddChildDialog } from './AddChildDialog';
+import { EditChildDialog } from './EditChildDialog';
+import { ChildProfileSwitcher } from './parent/ChildProfileSwitcher';
+import { SessionBookingCalendar } from './SessionBookingCalendar';
+import { BookingManager } from './BookingManager';
+import { Chatroom } from './Chatroom';
+import { DocumentManager } from './DocumentManager';
+import { ResourcesHub } from './ResourcesHub';
+import { useState, useEffect } from 'react';
+import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { getSupabaseClient } from '../utils/supabase/client';
+import { ParentReviewsTab } from './ParentReviewsTab';
+import { StudentLoginManager } from './StudentLoginManager';
+import { PendingLinkRequests } from './PendingLinkRequests';
+import { RoleSwitcher } from './RoleSwitcher';
+import { Alert, AlertDescription } from './ui/alert';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { Badge } from './ui/badge';
+import { Bookshop } from './Bookshop';
+import { ContentLibrary } from './ContentLibrary';
+import { CreditsManager } from './CreditsManager';
+import { InvoiceManager } from './InvoiceManager';
+import { SubscriptionsPage } from './SubscriptionsPage';
+import { PaymentMethodManager } from './PaymentMethodManager';
+
+interface UserProfile {
+  id: string;
+  email: string;
+  role: string;
+  full_name?: string;
+  [key: string]: any;
+}
+
+interface ParentDashboardProps {
+  profile: UserProfile;
+  onSignOut: () => void;
+  availableRoles?: string[];
+  onRoleSwitch?: (role: string) => void;
+  onBecomeTutor?: () => void; // Add callback for becoming a tutor
+}
+
+export function ParentDashboard({ profile, onSignOut, availableRoles = [], onRoleSwitch, onBecomeTutor }: ParentDashboardProps) {
+  const [activeTab, setActiveTab] = useState('overview');
+  const supabase = getSupabaseClient();
+  const [session, setSession] = useState<any>(null);
+  const [showAddChildDialog, setShowAddChildDialog] = useState(false);
+  const [showEditChildDialog, setShowEditChildDialog] = useState(false);
+  const [children, setChildren] = useState<any[]>([]);
+  const [loadingChildren, setLoadingChildren] = useState(true);
+  const [activeChildId, setActiveChildId] = useState<string | null>(null);
+  const [subscriptionTier, setSubscriptionTier] = useState('basic');
+  const [isAddingTutorRole, setIsAddingTutorRole] = useState(false);
+  const [tutorRoleError, setTutorRoleError] = useState<string | null>(null);
+  const [tutorRoleSuccess, setTutorRoleSuccess] = useState(false);
+  const [selectedYears, setSelectedYears] = useState<number[]>([new Date().getFullYear()]);
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([new Date().getMonth() + 1]);
+  const [showRoleCongrats, setShowRoleCongrats] = useState(false);
+  const [stats, setStats] = useState({
+    totalChildren: 0,
+    lessonsScheduled: 0,
+    completedLessons: 0,
+    totalSpent: 0
+  });
+
+  // Check if user can become a tutor (doesn't already have tutor role)
+  const canBecomeTutor = !availableRoles.includes('tutor');
+
+  // Check if this is the first time seeing multi-role congratulations
+  useEffect(() => {
+    // Use user-specific key to track if they've seen the congratulations message
+    const userCongratsKey = `tutornest_role_congrats_${profile.id || profile.userId}`;
+    const hasSeenCongrats = localStorage.getItem(userCongratsKey);
+    
+    // Show congratulations if:
+    // 1. User hasn't seen it before for this account
+    // 2. User has multiple roles (not just parent)
+    // 3. User can't become a tutor (meaning they already are one)
+    if (!hasSeenCongrats && !canBecomeTutor && availableRoles.length > 1) {
+      setShowRoleCongrats(true);
+    }
+  }, [availableRoles, canBecomeTutor, profile.id, profile.userId]);
+
+  // Handler to dismiss the congratulations message
+  const handleDismissCongrats = () => {
+    setShowRoleCongrats(false);
+    const userCongratsKey = `tutornest_role_congrats_${profile.id || profile.userId}`;
+    localStorage.setItem(userCongratsKey, 'true');
+  };
+
+  // Debug log for available roles
+  useEffect(() => {
+    console.log('ParentDashboard - availableRoles:', availableRoles);
+    console.log('ParentDashboard - Should show RoleSwitcher?', availableRoles.length > 1);
+  }, [availableRoles]);
+
+  // Get session for TutorSearch
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+  }, [supabase]);
+
+  // Load children when session is available
+  useEffect(() => {
+    if (session?.access_token) {
+      loadChildren();
+      loadSubscription();
+    }
+  }, [session]);
+
+  // Set active child when children load
+  useEffect(() => {
+    if (children.length > 0 && !activeChildId) {
+      setActiveChildId(children[0].id);
+    }
+  }, [children]);
+
+  // Calculate stats when children data or filter changes
+  useEffect(() => {
+    if (session?.access_token) {
+      calculateStats();
+    }
+  }, [children, selectedYears, selectedMonths, session]);
+
+  const calculateStats = async () => {
+    if (!session?.access_token) return;
+
+    try {
+      // Fetch all bookings for all children
+      const parentId = profile.id || profile.userId;
+      const bookingsPromises = children.map(child =>
+        fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings?studentId=${child.id}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+          }
+        ).then(res => res.ok ? res.json() : { bookings: [] })
+      );
+
+      const allBookingsData = await Promise.all(bookingsPromises);
+      const allBookings = allBookingsData.flatMap(data => data.bookings || []);
+
+      // Filter bookings by selected years and months
+      const filteredBookings = allBookings.filter((b: any) => {
+        const bookingDate = new Date(b.date);
+        return selectedYears.includes(bookingDate.getFullYear()) &&
+               selectedMonths.includes(bookingDate.getMonth() + 1);
+      });
+
+      // Calculate stats
+      const lessonsScheduled = filteredBookings.filter((b: any) => 
+        b.status === 'confirmed' || b.status === 'pending'
+      ).length;
+
+      const completedLessons = filteredBookings.filter((b: any) => 
+        b.status === 'completed'
+      ).length;
+
+      const totalSpent = filteredBookings
+        .filter((b: any) => b.status === 'completed')
+        .reduce((sum: number, b: any) => sum + (parseFloat(b.price) || 0), 0);
+
+      setStats({
+        totalChildren: children.length,
+        lessonsScheduled,
+        completedLessons,
+        totalSpent
+      });
+    } catch (error) {
+      console.error('Error calculating stats:', error);
+    }
+  };
+
+  const loadChildren = async () => {
+    if (!session?.access_token) return;
+    
+    setLoadingChildren(true);
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/parent/children/${profile.id || profile.userId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+      if (response.ok) {
+        setChildren(data.children || []);
+      } else {
+        console.error('Error loading children:', data.error);
+      }
+    } catch (error) {
+      console.error('Error loading children:', error);
+    } finally {
+      setLoadingChildren(false);
+    }
+  };
+
+  const loadSubscription = async () => {
+    if (!session?.access_token) return;
+    
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/subscription/${profile.id || profile.userId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        if (data.subscription) {
+          setSubscriptionTier(data.subscription.tierName || 'basic');
+        } else {
+          // No active subscription, set defaults
+          setSubscriptionTier('basic');
+        }
+      } else {
+        // Error response, set defaults
+        console.error('Error loading subscription:', response.status, response.statusText);
+        setSubscriptionTier('basic');
+      }
+    } catch (error) {
+      console.error('Error loading subscription:', error);
+      // Set defaults if error
+      setSubscriptionTier('basic');
+    }
+  };
+
+  const handleChildAdded = () => {
+    loadChildren();
+  };
+
+  const handleSwitchChild = (childId: string) => {
+    setActiveChildId(childId);
+  };
+
+  const handleAddChild = () => {
+    setShowAddChildDialog(true);
+  };
+
+  const handleEditChild = (childId: string) => {
+    setActiveChildId(childId);
+    setShowEditChildDialog(true);
+  };
+
+  // Transform children data for ChildProfileSwitcher component
+  const childProfilesForSwitcher = children.map(child => ({
+    id: child.id,
+    firstName: child.firstName,
+    lastName: child.lastName,
+    age: child.age || calculateAge(child.dateOfBirth),
+    yearGroup: child.gradeLevel?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+    upcomingSessions: child.upcomingSessions || 0,
+    completedSessions: child.completedLessons || 0,
+    currentProgress: child.progress || 0
+  }));
+
+  // Helper function to calculate age
+  const calculateAge = (dateOfBirth: string): number => {
+    if (!dateOfBirth) return 0;
+    const today = new Date();
+    const birthDate = new Date(dateOfBirth);
+    let age = today.getFullYear() - birthDate.getFullYear();
+    const monthDiff = today.getMonth() - birthDate.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birthDate.getDate())) {
+      age--;
+    }
+    return age;
+  };
+
+  // Helper function to format grade level to UK + Nigerian system
+  const formatGradeLevel = (gradeLevel: string): string => {
+    if (!gradeLevel) return '';
+    
+    // Map grade level codes to UK + Nigerian names
+    const gradeMap: Record<string, string> = {
+      'nursery_1': 'Reception (Nursery 1)',
+      'nursery_2': 'Year 1 (Nursery 2)',
+      'nursery_3': 'Year 2 (Nursery 3)',
+      'primary_1': 'Year 3 (Primary 1)',
+      'primary_2': 'Year 4 (Primary 2)',
+      'primary_3': 'Year 5 (Primary 3)',
+      'primary_4': 'Year 6 (Primary 4)',
+      'primary_5': 'Year 7 (Primary 5)',
+      'primary_6': 'Year 8 (Primary 6)',
+      'secondary_7': 'Year 9 (JSS 1)',
+      'secondary_8': 'Year 10 (JSS 2)',
+      'secondary_9': 'Year 11 (JSS 3)',
+      'secondary_10': 'Year 12 (SS 1)',
+      'secondary_11': 'Year 13 (SS 2)',
+      'sixth_form_12': 'A-Level Year 1 (SS 3)',
+      'sixth_form_13': 'A-Level Year 2 (Post-Secondary)',
+    };
+    
+    return gradeMap[gradeLevel] || gradeLevel.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+  };
+
+  const activeChild = children.find(c => c.id === activeChildId);
+
+  // Map activeTab to parent navigation items
+  const mapTabToNav = (tab: string): string => {
+    const mapping: Record<string, string> = {
+      'overview': 'home',
+      'find-tutors': 'tutors',
+      'bookings': 'bookings',
+      'progress': 'reports',
+      'subscription': 'subscription',
+      'bookshop': 'bookshop',
+      'payments': 'payments',
+      'reviews': 'reviews',
+      'credits': 'credits',
+      'invoices': 'invoices',
+    };
+    return mapping[tab] || 'home';
+  };
+
+  const handleNavChange = (navId: string) => {
+    const reverseMapping: Record<string, string> = {
+      'home': 'overview',
+      'tutors': 'find-tutors',
+      'bookings': 'bookings',
+      'reports': 'progress',
+      'subscription': 'subscription',
+      'bookshop': 'bookshop',
+      'payments': 'payments',
+      'reviews': 'reviews',
+      'credits': 'credits',
+      'invoices': 'invoices',
+    };
+    const tabValue = reverseMapping[navId] || 'overview';
+    setActiveTab(tabValue);
+  };
+
+  // Handle adding tutor role
+  const handleBecomeTutor = async () => {
+    if (!session?.access_token) return;
+    
+    setIsAddingTutorRole(true);
+    setTutorRoleError(null);
+    setTutorRoleSuccess(false);
+
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/role-management/add-role`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: profile.id || profile.userId,
+            newRole: 'tutor',
+            roleData: {
+              name: '',
+              createdVia: 'add_role_feature',
+            },
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setTutorRoleSuccess(true);
+        setTimeout(() => {
+          // Instead of redirecting to signup, switch to the tutor role
+          // This will show the TutorDashboard where they can complete their profile
+          if (onRoleSwitch) {
+            onRoleSwitch('tutor');
+          } else {
+            // Fallback: refresh the page to update the user's role
+            window.location.reload();
+          }
+        }, 1500);
+      } else {
+        setTutorRoleError(data.error || 'Failed to add tutor role');
+      }
+    } catch (err) {
+      console.error('Error adding tutor role:', err);
+      setTutorRoleError('An error occurred while adding the tutor role');
+    } finally {
+      setIsAddingTutorRole(false);
+    }
+  };
+
+  // Debug logging
+  useEffect(() => {
+    console.log('ParentDashboard - Become Tutor Check:');
+    console.log('  availableRoles:', availableRoles);
+    console.log('  canBecomeTutor:', canBecomeTutor);
+    console.log('  session exists:', !!session);
+    console.log('  Show button?', session && canBecomeTutor);
+  }, [availableRoles, canBecomeTutor, session]);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Navigation */}
+      <MobileNavigation 
+        userType="parent"
+        activeTab={mapTabToNav(activeTab)}
+        onTabChange={handleNavChange}
+        notificationCount={0}
+        messageCount={0}
+      />
+
+      {/* Header - Hidden on mobile */}
+      <header className="hidden lg:block bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
+          <TutorNestLogo />
+          <div className="flex items-center gap-4">
+            {/* Bookshop Button - Prominent */}
+            <Button
+              onClick={() => setActiveTab('bookshop')}
+              className="text-white h-10 px-6 shadow-md hover:shadow-lg transition-shadow"
+              style={{ backgroundColor: '#5d9827' }}
+            >
+              <ShoppingBag className="w-4 h-4 mr-2" />
+              Bookshop
+            </Button>
+            {/* Resources Button - Prominent */}
+            <Button
+              onClick={() => setActiveTab('resources')}
+              className="text-white h-10 px-6 shadow-md hover:shadow-lg transition-shadow"
+              style={{ backgroundColor: '#5d9827' }}
+            >
+              <Library className="w-4 h-4 mr-2" />
+              Resources
+            </Button>
+            {session && (
+              <NotificationCenter session={session} userId={profile.id || profile.userId} />
+            )}
+            {availableRoles && availableRoles.length > 1 && onRoleSwitch && (
+              <RoleSwitcher
+                currentRole={profile.role}
+                availableRoles={availableRoles}
+                onRoleSwitch={onRoleSwitch}
+                userName={profile.full_name || profile.name || 'User'}
+              />
+            )}
+            <span className="text-sm text-gray-600">
+              Welcome, {(profile.full_name || profile.name || 'Parent').split(' ')[0]}
+            </span>
+            
+            {/* Account Type Badge */}
+            <Badge className="text-white" style={{ backgroundColor: '#625d9c' }}>
+              Parent Account
+            </Badge>
+            
+            <Button variant="ghost" size="sm" onClick={onSignOut}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-8 pb-20 lg:pb-8">
+        <div className="mb-4 lg:mb-8">
+          <div className="flex items-center justify-between gap-4 mb-2">
+            <h1 className="text-2xl lg:text-3xl">Parent Dashboard</h1>
+            {/* Bookshop and Resources Buttons - Mobile/Tablet */}
+            <div className="lg:hidden flex gap-2">
+              <Button
+                onClick={() => setActiveTab('bookshop')}
+                className="text-white h-10 px-4 shadow-md"
+                style={{ backgroundColor: '#5d9827' }}
+              >
+                <ShoppingBag className="w-4 h-4 mr-2" />
+                Bookshop
+              </Button>
+              <Button
+                onClick={() => setActiveTab('resources')}
+                className="text-white h-10 px-4 shadow-md"
+                style={{ backgroundColor: '#5d9827' }}
+              >
+                <Library className="w-4 h-4 mr-2" />
+                Resources
+              </Button>
+            </div>
+          </div>
+          <p className="text-gray-600 text-sm lg:text-base">
+            Manage your children's learning journey and track their progress
+          </p>
+        </div>
+
+        {/* Child Profile Switcher - only show if children exist */}
+        {!loadingChildren && children.length > 0 && (
+          <div className="mb-4 lg:mb-8">
+            <ChildProfileSwitcher
+              children={childProfilesForSwitcher}
+              activeChildId={activeChildId}
+              onSwitchChild={handleSwitchChild}
+              onAddChild={handleAddChild}
+              subscriptionTier={subscriptionTier}
+            />
+          </div>
+        )}
+
+        {/* Become a Tutor Card - Prominent at top */}
+        {session && canBecomeTutor && (
+          <Card className="mb-6 border-green-200 border-2 bg-green-50 shadow-lg">
+            <CardContent className="pt-6">
+              {tutorRoleSuccess && (
+                <Alert className="mb-4 bg-green-50 border-green-200">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-800">
+                    <strong>Role added successfully!</strong> Redirecting you to complete your profile...
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {tutorRoleError && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{tutorRoleError}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                <div 
+                  className="p-4 rounded-lg flex-shrink-0"
+                  style={{ backgroundColor: '#5d982720' }}
+                >
+                  <GraduationCap className="w-10 h-10 md:w-12 md:h-12" style={{ color: '#5d9827' }} />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl md:text-2xl mb-2" style={{ color: '#5d9827' }}>
+                    Become a Tutor on TutorNest
+                  </h2>
+                  <p className="text-sm md:text-base text-gray-700 mb-4">
+                    Share your knowledge and earn by teaching students globally
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-2 mb-4">
+                    {[
+                      'Set your own schedule and rates',
+                      'Connect with students globally',
+                      'Track your earnings and performance',
+                      'Access teaching resources and tools',
+                    ].map((benefit, index) => (
+                      <div key={index} className="flex items-start gap-2 text-sm">
+                        <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#5d9827' }} />
+                        <span className="text-gray-700">{benefit}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  onClick={onBecomeTutor || handleBecomeTutor}
+                  disabled={isAddingTutorRole || tutorRoleSuccess}
+                  className="w-full md:w-auto text-white h-12 px-8 text-base flex-shrink-0"
+                  style={{ backgroundColor: '#5d9827' }}
+                >
+                  {isAddingTutorRole ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      Adding Role...
+                    </>
+                  ) : tutorRoleSuccess ? (
+                    <>
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      Tutor Role Added
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-5 h-5 mr-2" />
+                      Become a Tutor
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Role Switcher Info Card - Show when user has multiple roles */}
+        {session && !canBecomeTutor && availableRoles.length > 1 && showRoleCongrats && (
+          <Alert className="mb-6 bg-gradient-to-r from-green-50 to-emerald-50 border-2 border-green-300">
+            <CheckCircle className="h-5 w-5 text-green-600" />
+            <AlertDescription>
+              <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                <div className="flex-1">
+                  <h3 className="text-lg mb-1" style={{ color: '#5d9827' }}>
+                    🎉 Congratulations! You now have both Parent and Tutor roles!
+                  </h3>
+                  <p className="text-sm text-gray-700">
+                    Switch between your Parent and Tutor dashboards anytime using the <strong>Role Switcher</strong> in the top-right corner of your screen.
+                  </p>
+                </div>
+                <Button
+                  onClick={handleDismissCongrats}
+                  variant="ghost"
+                  size="sm"
+                  className="self-start md:self-center"
+                >
+                  Dismiss
+                </Button>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
+
+        {/* Stats with Date Filter */}
+        <Card className="mb-8">
+          <CardContent className="pt-6">
+            {/* Date Filter - Multi-Select */}
+            <div className="pb-3 mb-4 border-b border-gray-200">
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <div className="flex items-center gap-1.5">
+                  <Filter className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">Filter by:</span>
+                </div>
+                
+                <MultiSelectFilter
+                  options={[
+                    { value: 1, label: 'January' },
+                    { value: 2, label: 'February' },
+                    { value: 3, label: 'March' },
+                    { value: 4, label: 'April' },
+                    { value: 5, label: 'May' },
+                    { value: 6, label: 'June' },
+                    { value: 7, label: 'July' },
+                    { value: 8, label: 'August' },
+                    { value: 9, label: 'September' },
+                    { value: 10, label: 'October' },
+                    { value: 11, label: 'November' },
+                    { value: 12, label: 'December' }
+                  ]}
+                  selectedValues={selectedMonths}
+                  onChange={setSelectedMonths}
+                  placeholder="Select Months"
+                  allLabel="All Months"
+                />
+                
+                <MultiSelectFilter
+                  options={[2023, 2024, 2025, 2026, 2027].map(year => ({ value: year, label: year.toString() }))}
+                  selectedValues={selectedYears}
+                  onChange={setSelectedYears}
+                  placeholder="Select Years"
+                  allLabel="All Years"
+                />
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="h-8 text-sm px-3"
+                  onClick={() => {
+                    const now = new Date();
+                    setSelectedYears([now.getFullYear()]);
+                    setSelectedMonths([now.getMonth() + 1]);
+                  }}
+                >
+                  Reset to Current
+                </Button>
+              </div>
+              
+              {/* Selected filters badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                <SelectedFilterBadges
+                  options={[
+                    { value: 1, label: 'Jan' },
+                    { value: 2, label: 'Feb' },
+                    { value: 3, label: 'Mar' },
+                    { value: 4, label: 'Apr' },
+                    { value: 5, label: 'May' },
+                    { value: 6, label: 'Jun' },
+                    { value: 7, label: 'Jul' },
+                    { value: 8, label: 'Aug' },
+                    { value: 9, label: 'Sep' },
+                    { value: 10, label: 'Oct' },
+                    { value: 11, label: 'Nov' },
+                    { value: 12, label: 'Dec' }
+                  ]}
+                  selectedValues={selectedMonths}
+                  onRemove={(month) => setSelectedMonths(selectedMonths.filter(m => m !== month))}
+                  onClearAll={() => setSelectedMonths([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])}
+                />
+                <SelectedFilterBadges
+                  options={[2023, 2024, 2025, 2026, 2027].map(year => ({ value: year, label: year.toString() }))}
+                  selectedValues={selectedYears}
+                  onRemove={(year) => setSelectedYears(selectedYears.filter(y => y !== year))}
+                  onClearAll={() => setSelectedYears([2023, 2024, 2025, 2026, 2027])}
+                />
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <button 
+                onClick={() => setActiveTab('overview')}
+                className="bg-purple-50 p-4 rounded-lg border border-purple-100 hover:border-purple-300 hover:shadow-md transition-all text-left w-full"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Total Children</p>
+                    <h2 className="text-2xl">{stats.totalChildren}</h2>
+                  </div>
+                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <Users className="w-5 h-5 text-purple-600" />
+                  </div>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('bookings')}
+                className="bg-blue-50 p-4 rounded-lg border border-blue-100 hover:border-blue-300 hover:shadow-md transition-all text-left w-full"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Lessons Scheduled</p>
+                    <h2 className="text-2xl">{stats.lessonsScheduled}</h2>
+                  </div>
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                  </div>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('progress')}
+                className="bg-green-50 p-4 rounded-lg border border-green-100 hover:border-green-300 hover:shadow-md transition-all text-left w-full"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Completed Lessons</p>
+                    <h2 className="text-2xl">{stats.completedLessons}</h2>
+                  </div>
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <BookOpen className="w-5 h-5 text-green-600" />
+                  </div>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('credits')}
+                className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 hover:border-yellow-300 hover:shadow-md transition-all text-left w-full"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Total Spent</p>
+                    <h2 className="text-2xl">{formatNaira(stats.totalSpent, false)}</h2>
+                  </div>
+                  <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <NairaIcon className="w-5 h-5 text-yellow-600" />
+                  </div>
+                </div>
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Quick Actions */}
+        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveTab('overview')}>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
+                  <Plus className="w-6 h-6 text-purple-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm">Add Child</h3>
+                  <p className="text-xs text-gray-600">Create student profile</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveTab('bookings')}>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
+                  <Calendar className="w-6 h-6 text-green-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm">Book Lesson</h3>
+                  <p className="text-xs text-gray-600">Schedule tutoring</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveTab('progress')}>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
+                  <TrendingUp className="w-6 h-6 text-blue-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm">Progress</h3>
+                  <p className="text-xs text-gray-600">Track development</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveTab('find-tutors')}>
+            <CardContent className="pt-6">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
+                  <Users className="w-6 h-6 text-orange-600" />
+                </div>
+                <div>
+                  <h3 className="text-sm">Find Tutors</h3>
+                  <p className="text-xs text-gray-600">Browse tutors</p>
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-4 hidden lg:inline-flex overflow-x-auto">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="find-tutors">Find Tutors</TabsTrigger>
+            <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="progress">Progress</TabsTrigger>
+            <TabsTrigger value="session-reports">Session Reports</TabsTrigger>
+            <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
+            <TabsTrigger value="messages">Messages</TabsTrigger>
+            <TabsTrigger value="documents">Documents</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="reviews">Reviews</TabsTrigger>
+            <TabsTrigger value="credits">Credits</TabsTrigger>
+            <TabsTrigger value="invoices">Invoices</TabsTrigger>
+          </TabsList>
+
+          {/* Overview Tab */}
+          <TabsContent value="overview">
+            {/* Children Overview */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>Your Children</CardTitle>
+                <CardDescription>Manage student profiles</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loadingChildren ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="mb-4">Loading children...</p>
+                  </div>
+                ) : children.length > 0 ? (
+                  <div className="space-y-4">
+                    <div className="flex justify-end mb-4">
+                      <Button 
+                        className="text-white"
+                        style={{ backgroundColor: '#625d9c' }}
+                        onClick={() => setShowAddChildDialog(true)}
+                      >
+                        <Plus className="w-4 h-4 mr-2" />
+                        Add Another Child
+                      </Button>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {children.map((child) => (
+                        <Card key={child.id} className="hover:shadow-lg transition-shadow">
+                          <CardContent className="pt-6">
+                            <div className="flex items-start justify-between mb-4">
+                              <div>
+                                <h3 className="mb-1">{child.firstName} {child.lastName}</h3>
+                                <p className="text-sm text-gray-600">{formatGradeLevel(child.gradeLevel)}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Button variant="ghost" size="sm" onClick={() => handleEditChild(child.id)}>
+                                  <Pencil className="w-4 h-4 text-gray-500" />
+                                </Button>
+                              </div>
+                            </div>
+                            <div className="space-y-2">
+                              <div>
+                                <p className="text-xs text-gray-500">Subjects</p>
+                                <p className="text-sm">{child.subjects?.join(', ') || 'None'}</p>
+                              </div>
+                              {child.learningGoals && (
+                                <div>
+                                  <p className="text-xs text-gray-500">Learning Goals</p>
+                                  <p className="text-sm line-clamp-2">{child.learningGoals}</p>
+                                </div>
+                              )}
+                              <div className="flex items-center justify-between mt-4 pt-4 border-t">
+                                <div className="text-center">
+                                  <p className="text-lg">{child.completedLessons || 0}</p>
+                                  <p className="text-xs text-gray-500">Lessons</p>
+                                </div>
+                                <div className="text-center">
+                                  <p className="text-lg">{child.achievements?.length || 0}</p>
+                                  <p className="text-xs text-gray-500">Achievements</p>
+                                </div>
+                              </div>
+                              {/* Student Login Management */}
+                              {session && (
+                                <div className="mt-4 pt-4 border-t">
+                                  <StudentLoginManager
+                                    child={child}
+                                    accessToken={session.access_token}
+                                    onUpdate={loadChildren}
+                                  />
+                                </div>
+                              )}
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                    
+                    {/* Pending Link Requests */}
+                    {session && (
+                      <div className="mt-6">
+                        <PendingLinkRequests
+                          accessToken={session.access_token}
+                          onAccept={loadChildren}
+                        />
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="mb-4">No children added yet</p>
+                    <Button 
+                      className="text-white"
+                      style={{ backgroundColor: '#625d9c' }}
+                      onClick={() => setShowAddChildDialog(true)}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Your First Child
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
+            {/* Upcoming Lessons */}
+            {session && (
+              <UpcomingLessonsCard
+                session={session}
+                activeChildId={activeChildId}
+                userRole="parent"
+                onViewBookings={() => setActiveTab('bookings')}
+              />
+            )}
+          </TabsContent>
+
+          {/* Tutors Tab */}
+          <TabsContent value="find-tutors">
+            {!loadingChildren && children.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="mb-4">Add a child profile before searching for tutors</p>
+                  <Button 
+                    className="text-white"
+                    style={{ backgroundColor: '#625d9c' }}
+                    onClick={() => {
+                      setActiveTab('overview');
+                      setShowAddChildDialog(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Child
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : session && activeChildId ? (
+              <div className="space-y-4">
+                {activeChild && (
+                  <Card className="bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
+                    <CardContent className="pt-6">
+                      <div className="flex items-center gap-3">
+                        <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white">
+                          {activeChild.firstName?.[0]}{activeChild.lastName?.[0]}
+                        </div>
+                        <div>
+                          <p className="text-sm text-gray-600">Searching tutors for:</p>
+                          <p className="font-medium">{activeChild.firstName} {activeChild.lastName}</p>
+                          <p className="text-xs text-gray-500">
+                            {formatGradeLevel(activeChild.gradeLevel)} • 
+                            {activeChild.subjects?.length > 0 ? ` ${activeChild.subjects.join(', ')}` : ' No subjects yet'}
+                          </p>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                <TutorSearch session={session} activeChildId={activeChildId} />
+              </div>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Loading...</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Bookings Tab */}
+          <TabsContent value="bookings">
+            {!loadingChildren && children.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="mb-4">Add a child profile before booking sessions</p>
+                  <Button 
+                    className="text-white"
+                    style={{ backgroundColor: '#625d9c' }}
+                    onClick={() => {
+                      setActiveTab('overview');
+                      setShowAddChildDialog(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Child
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : session && activeChildId ? (
+              <Tabs defaultValue="book-session">
+                <TabsList className="mb-4">
+                  <TabsTrigger value="book-session">Book New Session</TabsTrigger>
+                  <TabsTrigger value="my-bookings">My Bookings</TabsTrigger>
+                </TabsList>
+
+                <TabsContent value="book-session">
+                  <SessionBookingCalendar 
+                    session={session} 
+                    activeChildId={activeChildId}
+                    childName={activeChild ? `${activeChild.firstName} ${activeChild.lastName}` : undefined}
+                  />
+                </TabsContent>
+
+                <TabsContent value="my-bookings">
+                  <BookingManager session={session} userRole="parent" userId={profile.id || profile.userId} />
+                </TabsContent>
+              </Tabs>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Loading...</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Progress Tab */}
+          <TabsContent value="progress">
+            {session && children.length > 0 && activeChild ? (
+              <ProgressDashboard 
+                session={session} 
+                studentId={activeChild.id}
+                studentName={`${activeChild.firstName} ${activeChild.lastName}`}
+              />
+            ) : session && children.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <TrendingUp className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="mb-4">Add a child profile to view progress</p>
+                  <Button 
+                    className="text-white"
+                    style={{ backgroundColor: '#625d9c' }}
+                    onClick={() => {
+                      setActiveTab('overview');
+                      setShowAddChildDialog(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Child
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <TrendingUp className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Loading...</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Session Reports Tab */}
+          <TabsContent value="session-reports">
+            {session && children.length > 0 ? (
+              <SessionReportsViewer 
+                userId={profile.id || profile.userId}
+                accessToken={session.access_token}
+                viewType="parent"
+                studentId={activeChildId || undefined}
+                children={children}
+              />
+            ) : session && children.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="mb-4">Add a child profile to view session reports</p>
+                  <Button 
+                    className="text-white"
+                    style={{ backgroundColor: '#625d9c' }}
+                    onClick={() => {
+                      setActiveTab('overview');
+                      setShowAddChildDialog(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Child
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Loading...</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Curriculum Tab */}
+          <TabsContent value="curriculum">
+            {session && children.length > 0 && activeChild ? (
+              <CurriculumPDFViewer 
+                gradeLevel={activeChild.gradeLevel}
+                accessToken={session.access_token}
+                studentName={`${activeChild.firstName} ${activeChild.lastName}`}
+              />
+            ) : session && children.length === 0 ? (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="mb-4">Add a child profile to view curriculum</p>
+                  <Button 
+                    className="text-white"
+                    style={{ backgroundColor: '#625d9c' }}
+                    onClick={() => {
+                      setActiveTab('overview');
+                      setShowAddChildDialog(true);
+                    }}
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Add Your First Child
+                  </Button>
+                </CardContent>
+              </Card>
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Loading...</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Messages Tab */}
+          <TabsContent value="messages">
+            {session ? (
+              <Chatroom 
+                session={session}
+                userId={profile.id || profile.userId}
+                userName={profile.full_name || profile.name || 'Parent'}
+                userRole="parent"
+              />
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <MessageSquare className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Loading...</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Documents Tab */}
+          <TabsContent value="documents">
+            {session ? (
+              <DocumentManager 
+                session={session}
+                userId={profile.id || profile.userId}
+                userRole="parent"
+              />
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Loading...</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Bookshop Tab */}
+          <TabsContent value="bookshop">
+            {session && (
+              <Bookshop session={session} subscriptionTier={subscriptionTier} />
+            )}
+          </TabsContent>
+
+          {/* Resources Tab */}
+          <TabsContent value="resources">
+            {session ? (
+              <ResourcesHub
+                session={session}
+                userId={profile.id || profile.userId}
+                userRole="parent"
+                gradeLevel={activeChild?.gradeLevel}
+              />
+            ) : (
+              <Card>
+                <CardContent className="py-12 text-center text-gray-500">
+                  <Library className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p>Loading...</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
+          {/* Payments Tab */}
+          <TabsContent value="payments">
+            {session && (
+              <PaymentMethodManager session={session} />
+            )}
+          </TabsContent>
+
+          {/* Reviews Tab */}
+          <TabsContent value="reviews">
+            {session && (
+              <ParentReviewsTab 
+                accessToken={session.access_token} 
+                parentId={profile.id || profile.userId}
+              />
+            )}
+          </TabsContent>
+
+          {/* Credits Tab */}
+          <TabsContent value="credits">
+            <CreditsManager userId={profile.id || profile.userId} />
+          </TabsContent>
+
+          {/* Invoices Tab */}
+          <TabsContent value="invoices">
+            <InvoiceManager userId={profile.id || profile.userId} />
+          </TabsContent>
+        </Tabs>
+      </main>
+
+      {/* Add Child Dialog */}
+      <AddChildDialog
+        open={showAddChildDialog}
+        onOpenChange={setShowAddChildDialog}
+        parentId={profile.id || profile.userId}
+        accessToken={session?.access_token || ''}
+        onChildAdded={handleChildAdded}
+      />
+
+      {/* Edit Child Dialog */}
+      <EditChildDialog
+        open={showEditChildDialog}
+        onOpenChange={setShowEditChildDialog}
+        child={activeChild}
+        accessToken={session?.access_token || ''}
+        onChildUpdated={handleChildAdded}
+      />
+    </div>
+  );
+}

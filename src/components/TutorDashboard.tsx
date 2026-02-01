@@ -1,0 +1,1242 @@
+import { useState, useEffect } from 'react';
+import { UpcomingLessonsCard } from './UpcomingLessonsCard';
+import { MultiSelectFilter, SelectedFilterBadges } from './MultiSelectFilter';
+import { StudentAssessmentForm } from './StudentAssessmentForm';
+import { getSupabaseClient } from '../utils/supabase/client';
+import { Bookshop } from './Bookshop';
+import { RoleSwitcher } from './RoleSwitcher';
+import { AddRoleCard } from './AddRoleCard';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Button } from './ui/button';
+import { Badge } from './ui/badge';
+import { Alert, AlertDescription } from './ui/alert';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { 
+  Users, 
+  Star, 
+  Calendar, 
+  BookOpen, 
+  Filter, 
+  History,
+  Clock, 
+  CheckCircle, 
+  LogOut,
+  MessageSquare,
+  Shield,
+  FileText,
+  TrendingUp,
+  ShoppingBag,
+  Library,
+  GraduationCap,
+  Plus,
+  ArrowRight,
+  User,
+  XCircle,
+  AlertTriangle
+} from 'lucide-react';
+import { NairaIcon } from './icons/NairaIcon';
+import { formatNaira } from '../utils/currency';
+import TutorNestLogo from './TutorNestLogo';
+import { MobileNavigation } from './MobileNavigation';
+import { NotificationCenter } from './NotificationCenter';
+import { TutorProfileEditor } from './TutorProfileEditor';
+import { TutorInvitations } from './TutorInvitations';
+import { TutorAvailabilityManager } from './TutorAvailabilityManager';
+import { BookingManager } from './BookingManager';
+import { TutorPerformanceDashboard } from './TutorPerformanceDashboard';
+import { TutorPayoutDashboard } from './TutorPayoutDashboard';
+import { GamificationSystem } from './GamificationSystem';
+import { AdvancedReporting } from './AdvancedReporting';
+import { TutorReviewsTab } from './TutorReviewsTab';
+import { TutorSessionReports } from './TutorSessionReports';
+
+interface UserProfile {
+  id: string;
+  email: string;
+  role: string;
+  full_name?: string;
+  verificationStatus?: string;
+  [key: string]: any;
+}
+
+interface TutorDashboardProps {
+  profile: UserProfile;
+  onSignOut: () => void;
+  availableRoles?: string[];
+  onRoleSwitch?: (role: string) => void;
+  onRoleAdded?: () => void;
+}
+
+export function TutorDashboard({ profile, onSignOut, availableRoles, onRoleSwitch, onRoleAdded }: TutorDashboardProps) {
+  const [activeTab, setActiveTab] = useState('overview');
+  const supabase = getSupabaseClient();
+  const [session, setSession] = useState<any>(null);
+  const [students, setStudents] = useState<any[]>([]);
+  const [pastStudents, setPastStudents] = useState<any[]>([]);
+  const [lessonHistory, setLessonHistory] = useState<any[]>([]);
+  const [selectedYears, setSelectedYears] = useState<number[]>([new Date().getFullYear()]);
+  const [selectedMonths, setSelectedMonths] = useState<number[]>([new Date().getMonth() + 1]);
+  const [stats, setStats] = useState({
+    activeStudents: 0,
+    lessonsThisWeek: 0,
+    totalLessons: 0,
+    earnings: 0
+  });
+  const [loading, setLoading] = useState(true);
+  const [notificationCount, setNotificationCount] = useState(0);
+  const [subscriptionTier, setSubscriptionTier] = useState('basic');
+  const [isAddingParentRole, setIsAddingParentRole] = useState(false);
+  const [parentRoleError, setParentRoleError] = useState<string | null>(null);
+  const [parentRoleSuccess, setParentRoleSuccess] = useState(false);
+
+  // Assessment form state
+  const [showAssessmentForm, setShowAssessmentForm] = useState(false);
+  const [assessmentBooking, setAssessmentBooking] = useState<any>(null);
+
+  // Debug log for available roles
+  useEffect(() => {
+    console.log('TutorDashboard - availableRoles:', availableRoles);
+    console.log('TutorDashboard - Should show RoleSwitcher?', availableRoles && availableRoles.length > 1);
+  }, [availableRoles]);
+
+  // Get session for TutorInvitations
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (session) {
+        fetchDashboardData(session.access_token);
+        fetchNotifications(session.access_token);
+        fetchSubscriptionTier(session.access_token);
+      }
+    });
+  }, []);
+
+  // Refetch data when year or month filter changes
+  useEffect(() => {
+    if (session?.access_token) {
+      fetchDashboardData(session.access_token);
+    }
+  }, [selectedYears, selectedMonths]);
+
+  const fetchNotifications = async (accessToken: string) => {
+    try {
+      const userId = profile.id || profile.userId;
+      if (!userId) {
+        console.warn('No userId available for notifications');
+        return;
+      }
+      
+      if (!accessToken) {
+        console.warn('No access token available for notifications');
+        return;
+      }
+      
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/notifications/${userId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+          signal: AbortSignal.timeout(10000), // 10 second timeout
+        }
+      );
+      
+      if (response.ok) {
+        const data = await response.json();
+        const unreadCount = data.notifications?.filter((n: any) => !n.read).length || 0;
+        setNotificationCount(unreadCount);
+      } else if (response.status === 404) {
+        console.warn('Notifications endpoint not found - using 0 count');
+        setNotificationCount(0);
+      } else if (response.status === 401) {
+        // Authentication issue - token might be expired, try to refresh
+        console.warn('Authentication issue - token might be expired, attempting to refresh session');
+        const { data: { session: newSession } } = await supabase.auth.refreshSession();
+        if (newSession?.access_token) {
+          // Retry with new token
+          const retryResponse = await fetch(
+            `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/notifications/${userId}`,
+            {
+              headers: {
+                'Authorization': `Bearer ${newSession.access_token}`,
+              },
+              signal: AbortSignal.timeout(10000),
+            }
+          );
+          if (retryResponse.ok) {
+            const data = await retryResponse.json();
+            const unreadCount = data.notifications?.filter((n: any) => !n.read).length || 0;
+            setNotificationCount(unreadCount);
+            // Update session
+            setSession(newSession);
+          } else {
+            console.warn('Failed to fetch notifications after token refresh');
+            setNotificationCount(0);
+          }
+        } else {
+          console.warn('Unable to refresh session - user may need to re-login');
+          setNotificationCount(0);
+        }
+      } else {
+        console.error('Failed to fetch notifications:', response.status);
+        setNotificationCount(0);
+      }
+    } catch (error: any) {
+      // Check if it's a timeout or network error
+      if (error.name === 'TimeoutError' || error.name === 'AbortError') {
+        // Silent - server may be starting up
+      } else if (error.message === 'Failed to fetch') {
+        // Silent - Edge Function may not be deployed yet or network issue
+      } else {
+        console.error('Error fetching notifications:', error);
+      }
+      setNotificationCount(0);
+    }
+  };
+
+  const fetchDashboardData = async (accessToken: string) => {
+    try {
+      setLoading(true);
+      const tutorId = profile.id || profile.userId;
+
+      // Fetch bookings
+      const bookingsResponse = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings?tutorId=${tutorId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (bookingsResponse.ok) {
+        const bookingsData = await bookingsResponse.json();
+        let bookings = bookingsData.bookings || [];
+
+        // Apply year/month filter to bookings
+        bookings = bookings.filter((b: any) => {
+          const bookingDate = new Date(b.date);
+          return selectedYears.includes(bookingDate.getFullYear()) && 
+                 selectedMonths.includes(bookingDate.getMonth() + 1);
+        });
+
+        // Calculate stats
+        const now = new Date();
+        const startOfWeek = new Date(now);
+        startOfWeek.setDate(now.getDate() - now.getDay());
+        startOfWeek.setHours(0, 0, 0, 0);
+        
+        const endOfWeek = new Date(startOfWeek);
+        endOfWeek.setDate(startOfWeek.getDate() + 7);
+
+        // Count lessons this week
+        const lessonsThisWeek = bookings.filter((b: any) => {
+          const bookingDate = new Date(b.date);
+          return bookingDate >= startOfWeek && bookingDate < endOfWeek && b.status === 'confirmed';
+        }).length;
+
+        // Count total completed lessons (in selected period)
+        const totalLessons = bookings.filter((b: any) => b.status === 'completed').length;
+
+        // Set lesson history (completed bookings with details)
+        const completedBookings = bookings.filter((b: any) => b.status === 'completed')
+          .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        setLessonHistory(completedBookings);
+
+        // Get unique students from confirmed or completed bookings
+        const relevantBookings = bookings.filter((b: any) => 
+          b.status === 'confirmed' || b.status === 'completed'
+        );
+        const uniqueStudentIds = new Set(relevantBookings.map((b: any) => b.studentId));
+        
+        // Fetch all student subscription data to determine who is a paid subscriber
+        const studentSubscriptions = await Promise.all(
+          Array.from(uniqueStudentIds).map(async (studentId) => {
+            try {
+              const subResponse = await fetch(
+                `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/subscription/${studentId}`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                  },
+                }
+              );
+              if (subResponse.ok) {
+                const subData = await subResponse.json();
+                return { studentId, hasActiveSubscription: subData.tier !== 'basic' && subData.status === 'active' };
+              }
+            } catch (error) {
+              console.error(`Error fetching subscription for student ${studentId}:`, error);
+            }
+            return { studentId, hasActiveSubscription: false };
+          })
+        );
+
+        // Count only students with active paid subscriptions as "Active Students"
+        const paidStudentIds = studentSubscriptions
+          .filter(s => s.hasActiveSubscription)
+          .map(s => s.studentId);
+        const activeStudentsCount = paidStudentIds.length;
+
+        // Calculate total earnings from completed lessons
+        const earnings = bookings
+          .filter((b: any) => b.status === 'completed')
+          .reduce((sum: number, b: any) => sum + (parseFloat(b.price) || 0), 0);
+
+        setStats({
+          activeStudents: activeStudentsCount,
+          lessonsThisWeek,
+          totalLessons,
+          earnings
+        });
+
+        // Fetch student details for active (paid) students
+        const studentDetails = await Promise.all(
+          paidStudentIds.map(async (studentId) => {
+            try {
+              const response = await fetch(
+                `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profiles/${studentId}`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                  },
+                }
+              );
+              if (response.ok) {
+                const data = await response.json();
+                const studentBookings = bookings.filter((b: any) => b.studentId === studentId);
+                return {
+                  ...data.profile,
+                  id: studentId,
+                  totalLessons: studentBookings.filter((b: any) => b.status === 'completed').length,
+                  upcomingLessons: studentBookings.filter((b: any) => 
+                    b.status === 'confirmed' && new Date(b.date) > new Date()
+                  ).length
+                };
+              }
+            } catch (error) {
+              console.error(`Error fetching student ${studentId}:`, error);
+            }
+            return null;
+          })
+        );
+
+        setStudents(studentDetails.filter(Boolean));
+
+        // Fetch past students (students with completed sessions but no upcoming sessions)
+        const allStudentIds = Array.from(uniqueStudentIds);
+        const pastStudentIds = allStudentIds.filter(studentId => {
+          const studentBookings = bookings.filter((b: any) => b.studentId === studentId);
+          const hasCompleted = studentBookings.some((b: any) => b.status === 'completed');
+          const hasUpcoming = studentBookings.some((b: any) => 
+            b.status === 'confirmed' && new Date(b.date) > new Date()
+          );
+          return hasCompleted && !hasUpcoming;
+        });
+
+        const pastStudentDetails = await Promise.all(
+          pastStudentIds.map(async (studentId) => {
+            try {
+              const response = await fetch(
+                `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profiles/${studentId}`,
+                {
+                  headers: {
+                    'Authorization': `Bearer ${accessToken}`,
+                  },
+                }
+              );
+              if (response.ok) {
+                const data = await response.json();
+                const studentBookings = bookings.filter((b: any) => b.studentId === studentId);
+                const completedCount = studentBookings.filter((b: any) => b.status === 'completed').length;
+                const lastSession = studentBookings
+                  .filter((b: any) => b.status === 'completed')
+                  .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime())[0];
+                
+                return {
+                  ...data.profile,
+                  id: studentId,
+                  totalLessons: completedCount,
+                  lastSessionDate: lastSession?.date
+                };
+              }
+            } catch (error) {
+              console.error(`Error fetching past student ${studentId}:`, error);
+            }
+            return null;
+          })
+        );
+
+        setPastStudents(pastStudentDetails.filter(Boolean));
+      }
+    } catch (error) {
+      console.error('Error fetching dashboard data:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const fetchSubscriptionTier = async (accessToken: string) => {
+    try {
+      const tutorId = profile.id || profile.userId;
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/subscription/${tutorId}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setSubscriptionTier(data.tier || 'basic');
+      } else {
+        console.error('Failed to fetch subscription tier:', response.status, response.statusText);
+        setSubscriptionTier('basic'); // Set default on error
+      }
+    } catch (error) {
+      console.error('Error fetching subscription tier:', error);
+      setSubscriptionTier('basic'); // Set default on error
+    }
+  };
+
+  const getVerificationStatusInfo = () => {
+    const status = profile.verificationStatus;
+    
+    switch (status) {
+      case 'pending':
+        return {
+          icon: Clock,
+          color: 'text-amber-600',
+          bgColor: 'bg-amber-50',
+          borderColor: 'border-amber-200',
+          badge: 'Pending Verification',
+          badgeVariant: 'secondary' as const,
+          title: 'Verification In Progress',
+          message: 'Your profile is being reviewed by our team. This typically takes 2-3 business days.',
+        };
+      case 'verified':
+        return {
+          icon: CheckCircle,
+          color: 'text-green-600',
+          bgColor: 'bg-green-50',
+          borderColor: 'border-green-200',
+          badge: 'Verified',
+          badgeVariant: 'default' as const,
+          title: 'Profile Verified!',
+          message: 'You can now accept bookings and connect with students.',
+        };
+      case 'rejected':
+        return {
+          icon: XCircle,
+          color: 'text-red-600',
+          bgColor: 'bg-red-50',
+          borderColor: 'border-red-200',
+          badge: 'Rejected',
+          badgeVariant: 'destructive' as const,
+          title: 'Verification Rejected',
+          message: profile.rejectionReason || 'Your application needs additional review.',
+        };
+      case 'under_appeal':
+        return {
+          icon: AlertTriangle,
+          color: 'text-blue-600',
+          bgColor: 'bg-blue-50',
+          borderColor: 'border-blue-200',
+          badge: 'Under Appeal',
+          badgeVariant: 'secondary' as const,
+          title: 'Appeal Under Review',
+          message: 'Your appeal is being reviewed by our team.',
+        };
+      default:
+        return null;
+    }
+  };
+
+  const verificationInfo = getVerificationStatusInfo();
+  const isVerified = profile.verificationStatus === 'verified';
+
+  // Map activeTab to tutor navigation items
+  const mapTabToNav = (tab: string): string => {
+    const mapping: Record<string, string> = {
+      'overview': 'home',
+      'profile': 'home',
+      'invitations': 'home',
+      'availability': 'schedule',
+      'bookings': 'sessions',
+      'content': 'resources',
+      'bookshop': 'resources',
+      'performance': 'students',
+      'payouts': 'earnings',
+      'gamification': 'home',
+      'reporting': 'students',
+      'reviews': 'home',
+    };
+    return mapping[tab] || 'home';
+  };
+
+  const handleNavChange = (navId: string) => {
+    const reverseMapping: Record<string, string> = {
+      'home': 'overview',
+      'schedule': 'availability',
+      'sessions': 'bookings',
+      'resources': 'content',
+      'students': 'performance',
+      'earnings': 'payouts',
+    };
+    const tabValue = reverseMapping[navId] || 'overview';
+    setActiveTab(tabValue);
+  };
+
+  // Handle adding parent role
+  const handleBecomeParent = async () => {
+    if (!session?.access_token) return;
+    
+    setIsAddingParentRole(true);
+    setParentRoleError(null);
+    setParentRoleSuccess(false);
+
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/role-management/add-role`,
+        {
+          method: 'POST',
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            userId: profile.id || profile.userId,
+            newRole: 'parent',
+            roleData: {
+              name: '',
+              createdVia: 'add_role_feature',
+            },
+          }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setParentRoleSuccess(true);
+        
+        // Wait a bit for backend to process, then refresh
+        setTimeout(() => {
+          if (onRoleAdded) {
+            // Use callback to refresh data without full page reload
+            onRoleAdded();
+          } else {
+            // Fallback to page reload if no callback provided
+            window.location.href = window.location.pathname + window.location.search;
+          }
+        }, 1500);
+      } else {
+        setParentRoleError(data.error || 'Failed to add parent role');
+      }
+    } catch (err) {
+      console.error('Error adding parent role:', err);
+      setParentRoleError('An error occurred while adding the parent role');
+    } finally {
+      setIsAddingParentRole(false);
+    }
+  };
+
+  // Check if user can become a parent (doesn't already have parent role)
+  const canBecomeParent = !availableRoles?.includes('parent');
+
+  // Debug logging
+  useEffect(() => {
+    console.log('TutorDashboard - Become Parent Check:');
+    console.log('  availableRoles:', availableRoles);
+    console.log('  canBecomeParent:', canBecomeParent);
+    console.log('  session exists:', !!session);
+    console.log('  Show button?', session && canBecomeParent);
+  }, [availableRoles, canBecomeParent, session]);
+
+  return (
+    <div className="min-h-screen bg-gray-50">
+      {/* Mobile Navigation */}
+      <MobileNavigation 
+        userType="tutor"
+        activeTab={mapTabToNav(activeTab)}
+        onTabChange={handleNavChange}
+        notificationCount={notificationCount}
+        messageCount={0}
+      />
+
+      {/* Header - Hidden on mobile */}
+      <header className="hidden lg:block bg-white border-b">
+        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
+          <TutorNestLogo />
+          <div className="flex items-center gap-4">
+            {/* Bookshop Button - Prominent */}
+            <Button
+              onClick={() => setActiveTab('bookshop')}
+              className="text-white h-10 px-6 shadow-md hover:shadow-lg transition-shadow"
+              style={{ backgroundColor: '#5d9827' }}
+            >
+              <ShoppingBag className="w-4 h-4 mr-2" />
+              Bookshop
+            </Button>
+            {/* Resources Button - Prominent */}
+            <Button
+              onClick={() => setActiveTab('content')}
+              className="text-white h-10 px-6 shadow-md hover:shadow-lg transition-shadow"
+              style={{ backgroundColor: '#5d9827' }}
+            >
+              <Library className="w-4 h-4 mr-2" />
+              Resources
+            </Button>
+            {session && (
+              <NotificationCenter session={session} userId={profile.id || profile.userId} />
+            )}
+            {availableRoles && availableRoles.length > 1 && onRoleSwitch && (
+              <RoleSwitcher
+                currentRole={profile.role}
+                availableRoles={availableRoles}
+                onRoleSwitch={onRoleSwitch}
+                userName={profile.full_name || profile.firstName || profile.name || 'User'}
+              />
+            )}
+            <span className="text-sm text-gray-600">Welcome, {profile.full_name || profile.firstName || profile.name || 'Tutor'}</span>
+            {verificationInfo && (
+              <Badge variant={verificationInfo.badgeVariant}>
+                {verificationInfo.badge}
+              </Badge>
+            )}
+            <Button variant="ghost" size="sm" onClick={onSignOut}>
+              <LogOut className="w-4 h-4 mr-2" />
+              Sign Out
+            </Button>
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content */}
+      <main className="max-w-7xl mx-auto px-4 py-4 lg:py-8 pb-20 lg:pb-8">
+        {/* Verification Status Alert */}
+        {verificationInfo && (
+          <Alert className={`mb-4 lg:mb-6 ${verificationInfo.bgColor} ${verificationInfo.borderColor}`}>
+            <verificationInfo.icon className={`h-4 w-4 ${verificationInfo.color}`} />
+            <AlertDescription className="text-gray-800">
+              <strong>{verificationInfo.title}</strong>
+              <p className="mt-1">{verificationInfo.message}</p>
+              {profile.verificationStatus === 'pending' && (
+                <p className="mt-2 text-sm">
+                  You'll receive an email notification once your profile is reviewed.
+                </p>
+              )}
+            </AlertDescription>
+          </Alert>
+        )}
+
+        <div className="mb-4 lg:mb-8">
+          <div className="flex items-center justify-between gap-4 mb-2">
+            <h1 className="text-2xl lg:text-3xl">Tutor Dashboard</h1>
+            {/* Bookshop and Resources Buttons - Mobile/Tablet */}
+            <div className="lg:hidden flex gap-2">
+              <Button
+                onClick={() => setActiveTab('bookshop')}
+                className="text-white h-10 px-4 shadow-md"
+                style={{ backgroundColor: '#5d9827' }}
+              >
+                <ShoppingBag className="w-4 h-4 mr-2" />
+                Bookshop
+              </Button>
+              <Button
+                onClick={() => setActiveTab('content')}
+                className="text-white h-10 px-4 shadow-md"
+                style={{ backgroundColor: '#5d9827' }}
+              >
+                <Library className="w-4 h-4 mr-2" />
+                Resources
+              </Button>
+            </div>
+          </div>
+          <p className="text-gray-600 text-sm lg:text-base">
+            Manage your students, schedule lessons, and track teaching outcomes
+          </p>
+        </div>
+
+
+
+        {/* Become a Parent Card - Prominent at top */}
+        {session && canBecomeParent && (
+          <Card className="mb-6 border-purple-200 border-2 bg-purple-50 shadow-lg">
+            <CardContent className="pt-6">
+              {parentRoleSuccess && (
+                <Alert className="mb-4 bg-green-50 border-green-200">
+                  <CheckCircle className="h-4 w-4 text-green-600" />
+                  <AlertDescription className="text-green-800">
+                    <strong>Role added successfully!</strong> Refreshing your dashboard...
+                  </AlertDescription>
+                </Alert>
+              )}
+
+              {parentRoleError && (
+                <Alert variant="destructive" className="mb-4">
+                  <AlertDescription>{parentRoleError}</AlertDescription>
+                </Alert>
+              )}
+
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                <div 
+                  className="p-4 rounded-lg flex-shrink-0"
+                  style={{ backgroundColor: '#625d9c20' }}
+                >
+                  <User className="w-10 h-10 md:w-12 md:h-12" style={{ color: '#625d9c' }} />
+                </div>
+                <div className="flex-1">
+                  <h2 className="text-xl md:text-2xl mb-2" style={{ color: '#625d9c' }}>
+                    Become a Parent on TutorNest
+                  </h2>
+                  <p className="text-sm md:text-base text-gray-700 mb-4">
+                    Manage your children's learning and book tutoring sessions
+                  </p>
+                  <div className="grid sm:grid-cols-2 gap-2 mb-4">
+                    {[
+                      'Add and manage child profiles',
+                      'Book tutoring sessions easily',
+                      'Track your children\'s progress',
+                      'Access learning resources',
+                    ].map((benefit, index) => (
+                      <div key={index} className="flex items-start gap-2 text-sm">
+                        <CheckCircle className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: '#625d9c' }} />
+                        <span className="text-gray-700">{benefit}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <Button
+                  onClick={handleBecomeParent}
+                  disabled={isAddingParentRole || parentRoleSuccess}
+                  className="w-full md:w-auto text-white h-12 px-8 text-base flex-shrink-0"
+                  style={{ backgroundColor: '#625d9c' }}
+                >
+                  {isAddingParentRole ? (
+                    <>
+                      <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin mr-2" />
+                      Adding Role...
+                    </>
+                  ) : parentRoleSuccess ? (
+                    <>
+                      <CheckCircle className="w-5 h-5 mr-2" />
+                      Parent Role Added
+                    </>
+                  ) : (
+                    <>
+                      <Plus className="w-5 h-5 mr-2" />
+                      Become a Parent
+                      <ArrowRight className="w-5 h-5 ml-2" />
+                    </>
+                  )}
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Role Switcher Info Card - Show when user has multiple roles */}
+        {session && !canBecomeParent && availableRoles && availableRoles.length > 1 && (
+          <Card className="mb-6 border-blue-200 bg-blue-50">
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                <div 
+                  className="p-3 rounded-lg flex-shrink-0"
+                  style={{ backgroundColor: '#3b82f620' }}
+                >
+                  <User className="w-8 h-8" style={{ color: '#3b82f6' }} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg mb-1" style={{ color: '#3b82f6' }}>
+                    You have both Tutor and Parent roles! 🎉
+                  </h3>
+                  <p className="text-sm text-gray-700">
+                    Switch between your Tutor and Parent dashboards anytime using the <strong>Role Switcher</strong> in the top-right corner of your screen.
+                  </p>
+                </div>
+                {onRoleSwitch && (
+                  <Button
+                    onClick={() => onRoleSwitch('parent')}
+                    className="w-full md:w-auto text-white h-10 px-6"
+                    style={{ backgroundColor: '#625d9c' }}
+                  >
+                    <User className="w-4 h-4 mr-2" />
+                    Switch to Parent Dashboard
+                    <ArrowRight className="w-4 h-4 ml-2" />
+                  </Button>
+                )}
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Stats with Date Filter */}
+        <Card className="mb-8">
+          <CardContent className="pt-6">
+            {/* Date Filter - Multi-Select */}
+            <div className="pb-3 mb-4 border-b border-gray-200">
+              <div className="flex flex-wrap items-center gap-2 mb-3">
+                <div className="flex items-center gap-1.5">
+                  <Filter className="w-4 h-4 text-gray-500" />
+                  <span className="text-sm text-gray-600">Filter by:</span>
+                </div>
+                
+                <MultiSelectFilter
+                  options={[
+                    { value: 1, label: 'January' },
+                    { value: 2, label: 'February' },
+                    { value: 3, label: 'March' },
+                    { value: 4, label: 'April' },
+                    { value: 5, label: 'May' },
+                    { value: 6, label: 'June' },
+                    { value: 7, label: 'July' },
+                    { value: 8, label: 'August' },
+                    { value: 9, label: 'September' },
+                    { value: 10, label: 'October' },
+                    { value: 11, label: 'November' },
+                    { value: 12, label: 'December' }
+                  ]}
+                  selectedValues={selectedMonths}
+                  onChange={setSelectedMonths}
+                  placeholder="Select Months"
+                  allLabel="All Months"
+                />
+                
+                <MultiSelectFilter
+                  options={[2023, 2024, 2025, 2026, 2027].map(year => ({ value: year, label: year.toString() }))}
+                  selectedValues={selectedYears}
+                  onChange={setSelectedYears}
+                  placeholder="Select Years"
+                  allLabel="All Years"
+                />
+                
+                <Button 
+                  variant="outline" 
+                  size="sm"
+                  className="h-8 text-sm px-3"
+                  onClick={() => {
+                    const now = new Date();
+                    setSelectedYears([now.getFullYear()]);
+                    setSelectedMonths([now.getMonth() + 1]);
+                  }}
+                >
+                  Reset to Current
+                </Button>
+              </div>
+              
+              {/* Selected filters badges */}
+              <div className="flex flex-wrap items-center gap-2">
+                <SelectedFilterBadges
+                  options={[
+                    { value: 1, label: 'Jan' },
+                    { value: 2, label: 'Feb' },
+                    { value: 3, label: 'Mar' },
+                    { value: 4, label: 'Apr' },
+                    { value: 5, label: 'May' },
+                    { value: 6, label: 'Jun' },
+                    { value: 7, label: 'Jul' },
+                    { value: 8, label: 'Aug' },
+                    { value: 9, label: 'Sep' },
+                    { value: 10, label: 'Oct' },
+                    { value: 11, label: 'Nov' },
+                    { value: 12, label: 'Dec' }
+                  ]}
+                  selectedValues={selectedMonths}
+                  onRemove={(month) => setSelectedMonths(selectedMonths.filter(m => m !== month))}
+                  onClearAll={() => setSelectedMonths([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])}
+                />
+                <SelectedFilterBadges
+                  options={[2023, 2024, 2025, 2026, 2027].map(year => ({ value: year, label: year.toString() }))}
+                  selectedValues={selectedYears}
+                  onRemove={(year) => setSelectedYears(selectedYears.filter(y => y !== year))}
+                  onClearAll={() => setSelectedYears([2023, 2024, 2025, 2026, 2027])}
+                />
+              </div>
+            </div>
+
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <button 
+                onClick={() => setActiveTab('performance')}
+                className="bg-purple-50 p-4 rounded-lg border border-purple-100 hover:border-purple-300 hover:shadow-md transition-all text-left w-full"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Active Students</p>
+                    <h2 className="text-2xl">{stats.activeStudents}</h2>
+                  </div>
+                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
+                    <Users className="w-5 h-5 text-purple-600" />
+                  </div>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('bookings')}
+                className="bg-blue-50 p-4 rounded-lg border border-blue-100 hover:border-blue-300 hover:shadow-md transition-all text-left w-full"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Lessons This Week</p>
+                    <h2 className="text-2xl">{stats.lessonsThisWeek}</h2>
+                  </div>
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                  </div>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('history')}
+                className="bg-green-50 p-4 rounded-lg border border-green-100 hover:border-green-300 hover:shadow-md transition-all text-left w-full"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Total Lessons</p>
+                    <h2 className="text-2xl">{stats.totalLessons}</h2>
+                  </div>
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <BookOpen className="w-5 h-5 text-green-600" />
+                  </div>
+                </div>
+              </button>
+
+              <button 
+                onClick={() => setActiveTab('payouts')}
+                className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 hover:border-yellow-300 hover:shadow-md transition-all text-left w-full"
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Earnings</p>
+                    <h2 className="text-2xl">{formatNaira(stats.earnings, false)}</h2>
+                  </div>
+                  <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
+                    <NairaIcon className="w-5 h-5 text-yellow-600" />
+                  </div>
+                </div>
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Tabs */}
+        <Tabs value={activeTab} onValueChange={setActiveTab}>
+          <TabsList className="mb-4 hidden lg:inline-flex overflow-x-auto">
+            <TabsTrigger value="overview">Overview</TabsTrigger>
+            <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="invitations">Invitations</TabsTrigger>
+            <TabsTrigger value="availability">Availability</TabsTrigger>
+            <TabsTrigger value="bookings">Bookings</TabsTrigger>
+            <TabsTrigger value="history">History</TabsTrigger>
+            <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="payouts">Payouts</TabsTrigger>
+            <TabsTrigger value="gamification">Gamification</TabsTrigger>
+            <TabsTrigger value="reporting">Reporting</TabsTrigger>
+            <TabsTrigger value="reviews">Reviews</TabsTrigger>
+          </TabsList>
+
+          <TabsContent value="overview">
+            {/* Upcoming Lessons */}
+            {session && (
+              <div className="mb-8">
+                <UpcomingLessonsCard
+                  session={session}
+                  activeChildId={null}
+                  userRole="tutor"
+                  onViewBookings={() => setActiveTab('bookings')}
+                />
+              </div>
+            )}
+
+            {/* Students */}
+            <Card className="mb-8">
+              <CardHeader>
+                <CardTitle>My Students</CardTitle>
+                <CardDescription>Manage your students and track their progress</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {loading ? (
+                  <div className="text-center py-12 text-gray-500">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="mb-4">Loading students...</p>
+                  </div>
+                ) : students.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {students.map((student: any) => (
+                      <div key={student.id} className="bg-white p-4 rounded-lg shadow-md">
+                        <div className="flex items-center">
+                          <Users className="w-8 h-8 mr-2 text-gray-500" />
+                          <div>
+                            <p className="text-sm font-bold">{student.full_name}</p>
+                            <p className="text-xs text-gray-500">Lessons: {student.totalLessons}</p>
+                            <p className="text-xs text-gray-500">Upcoming: {student.upcomingLessons}</p>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="mb-4">No students yet</p>
+                    <Button 
+                      className="text-white"
+                      style={{ backgroundColor: '#625d9c' }}
+                      onClick={() => setActiveTab('availability')}
+                    >
+                      Update Your Availability
+                    </Button>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="profile">
+            {session && (
+              <TutorProfileEditor 
+                session={session}
+                tutorId={profile.id || profile.userId}
+                currentProfile={profile}
+                onProfileUpdated={fetchDashboardData}
+              />
+            )}
+          </TabsContent>
+
+          <TabsContent value="invitations">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invitations</CardTitle>
+                <CardDescription>Manage your invitations and accept or decline them</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <TutorInvitations session={session} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="availability">
+            {session && (
+              <TutorAvailabilityManager session={session} tutorId={profile.id || profile.userId} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="bookings">
+            {session && (
+              <BookingManager session={session} userRole="tutor" userId={profile.id || profile.userId} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="history">
+            <div className="space-y-6">
+              {/* Lesson History */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <History className="w-5 h-5" />
+                    <CardTitle>Lesson History</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Completed lessons for {new Date(selectedYears[0], selectedMonths[0] - 1).toLocaleDateString('en-US', { month: 'long', year: 'numeric' })}
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <History className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p>Loading history...</p>
+                    </div>
+                  ) : lessonHistory.length > 0 ? (
+                    <div className="space-y-3">
+                      {lessonHistory.map((lesson: any, index: number) => (
+                        <div key={index} className="p-4 border rounded-lg hover:bg-gray-50 transition-colors">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                                <BookOpen className="w-4 h-4 text-green-600" />
+                                <span className="text-sm">{lesson.subject || 'Lesson'}</span>
+                                <Badge variant="outline" className="text-xs bg-green-50 text-green-700 border-green-200">
+                                  Completed
+                                </Badge>
+                                {lesson.assessed && (
+                                  <Badge variant="outline" className="text-xs bg-purple-50 text-purple-700 border-purple-200">
+                                    Assessed
+                                  </Badge>
+                                )}
+                              </div>
+                              <p className="text-xs text-gray-500">
+                                Student: {lesson.studentName || `ID: ${lesson.studentId || 'N/A'}`}
+                              </p>
+                              <p className="text-xs text-gray-500">
+                                Date: {new Date(lesson.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                {lesson.startTime && ` at ${lesson.startTime}`}
+                              </p>
+                            </div>
+                            <div className="text-right flex flex-col items-end gap-2">
+                              <p className="text-sm">£{parseFloat(lesson.price || 0).toFixed(2)}</p>
+                              {!lesson.assessed && (
+                                <Button
+                                  size="sm"
+                                  onClick={() => {
+                                    setAssessmentBooking(lesson);
+                                    setShowAssessmentForm(true);
+                                  }}
+                                  className="text-white text-xs"
+                                  style={{ backgroundColor: '#625d9c' }}
+                                >
+                                  <Star className="w-3 h-3 mr-1" />
+                                  Assess Student
+                                </Button>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <History className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p>No lesson history for the selected period</p>
+                      <p className="text-sm mt-2">Try selecting a different month or year</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
+              {/* Past Students */}
+              <Card>
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <Users className="w-5 h-5" />
+                    <CardTitle>Past Students</CardTitle>
+                  </div>
+                  <CardDescription>
+                    Students with completed lessons but no upcoming sessions
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  {loading ? (
+                    <div className="text-center py-12 text-gray-500">
+                      <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p>Loading past students...</p>
+                    </div>
+                  ) : pastStudents.length > 0 ? (
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {pastStudents.map((student: any) => (
+                        <div key={student.id} className="bg-white p-4 rounded-lg border hover:border-purple-300 transition-colors">
+                          <div className="flex items-start gap-3">
+                            <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
+                              <Users className="w-5 h-5 text-gray-500" />
+                            </div>
+                            <div className="flex-1">
+                              <p className="text-sm">{student.full_name || 'Unknown Student'}</p>
+                              <p className="text-xs text-gray-500 mt-1">
+                                {student.totalLessons} lesson{student.totalLessons !== 1 ? 's' : ''} completed
+                              </p>
+                              {student.lastSessionDate && (
+                                <p className="text-xs text-gray-400 mt-1">
+                                  Last session: {new Date(student.lastSessionDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                </p>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <div className="text-center py-12 text-gray-500">
+                      <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                      <p>No past students for the selected period</p>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          </TabsContent>
+
+          <TabsContent value="performance">
+            {session && (
+              <TutorPerformanceDashboard session={session} tutorId={profile.id || profile.userId} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="payouts">
+            {session && (
+              <TutorPayoutDashboard session={session} tutorId={profile.id || profile.userId} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="gamification">
+            <GamificationSystem userId={profile.id || profile.userId} userType="tutor" />
+          </TabsContent>
+
+          <TabsContent value="reporting">
+            <Tabs defaultValue="session-reports" className="space-y-6">
+              <TabsList>
+                <TabsTrigger value="session-reports">Session Reports</TabsTrigger>
+                <TabsTrigger value="analytics">Analytics & Insights</TabsTrigger>
+              </TabsList>
+
+              <TabsContent value="session-reports">
+                {session && (
+                  <TutorSessionReports 
+                    tutorId={profile.id || profile.userId}
+                    accessToken={session.access_token}
+                  />
+                )}
+              </TabsContent>
+
+              <TabsContent value="analytics">
+                <AdvancedReporting userId={profile.id || profile.userId} userType="tutor" />
+              </TabsContent>
+            </Tabs>
+          </TabsContent>
+
+          <TabsContent value="reviews">
+            {session && (
+              <TutorReviewsTab 
+                accessToken={session.access_token} 
+                tutorId={profile.id || profile.userId}
+              />
+            )}
+          </TabsContent>
+        </Tabs>
+
+        {/* Assessment Modal */}
+        {showAssessmentForm && assessmentBooking && session && (
+          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+            <div className="bg-white rounded-lg max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+              <div className="p-6">
+                <StudentAssessmentForm
+                  bookingId={assessmentBooking.id}
+                  studentId={assessmentBooking.studentId}
+                  studentName={assessmentBooking.studentName || 'Student'}
+                  subject={assessmentBooking.subject || 'Lesson'}
+                  sessionDate={assessmentBooking.date}
+                  tutorId={profile.id || profile.userId}
+                  accessToken={session.access_token}
+                  onComplete={() => {
+                    setShowAssessmentForm(false);
+                    setAssessmentBooking(null);
+                    // Refresh dashboard data
+                    if (session?.access_token) {
+                      fetchDashboardData(session.access_token);
+                    }
+                  }}
+                  onCancel={() => {
+                    setShowAssessmentForm(false);
+                    setAssessmentBooking(null);
+                  }}
+                />
+              </div>
+            </div>
+          </div>
+        )}
+      </main>
+    </div>
+  );
+}
