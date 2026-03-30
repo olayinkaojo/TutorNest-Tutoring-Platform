@@ -40,7 +40,6 @@
     "input-otp": "^1.4.2",
     "lucide-react": "*",
     "next-themes": "^0.4.6",
-    "node:crypto": "*",
     "react": "^18.3.1",
     "react-day-picker": "^8.10.1",
     "react-dom": "^18.3.1",

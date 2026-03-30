@@ -50,6 +50,8 @@ import { GamificationSystem } from './GamificationSystem';
 import { AdvancedReporting } from './AdvancedReporting';
 import { TutorReviewsTab } from './TutorReviewsTab';
 import { TutorSessionReports } from './TutorSessionReports';
+import { TutorStatsSection } from './tutor/TutorStatsSection';
+import { TutorOverviewTab } from './tutor/TutorOverviewTab';
 
 interface UserProfile {
   id: string;
@@ -858,68 +860,7 @@ export function TutorDashboard({ profile, onSignOut, availableRoles, onRoleSwitc
               </div>
             </div>
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <button 
-                onClick={() => setActiveTab('performance')}
-                className="bg-purple-50 p-4 rounded-lg border border-purple-100 hover:border-purple-300 hover:shadow-md transition-all text-left w-full"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">Active Students</p>
-                    <h2 className="text-2xl">{stats.activeStudents}</h2>
-                  </div>
-                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <Users className="w-5 h-5 text-purple-600" />
-                  </div>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('bookings')}
-                className="bg-blue-50 p-4 rounded-lg border border-blue-100 hover:border-blue-300 hover:shadow-md transition-all text-left w-full"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">Lessons This Week</p>
-                    <h2 className="text-2xl">{stats.lessonsThisWeek}</h2>
-                  </div>
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-blue-600" />
-                  </div>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('history')}
-                className="bg-green-50 p-4 rounded-lg border border-green-100 hover:border-green-300 hover:shadow-md transition-all text-left w-full"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">Total Lessons</p>
-                    <h2 className="text-2xl">{stats.totalLessons}</h2>
-                  </div>
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <BookOpen className="w-5 h-5 text-green-600" />
-                  </div>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('payouts')}
-                className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 hover:border-yellow-300 hover:shadow-md transition-all text-left w-full"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">Earnings</p>
-                    <h2 className="text-2xl">{formatNaira(stats.earnings, false)}</h2>
-                  </div>
-                  <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <NairaIcon className="w-5 h-5 text-yellow-600" />
-                  </div>
-                </div>
-              </button>
-            </div>
+            <TutorStatsSection stats={stats} setActiveTab={setActiveTab} />
           </CardContent>
         </Card>
 
@@ -940,60 +881,13 @@ export function TutorDashboard({ profile, onSignOut, availableRoles, onRoleSwitc
           </TabsList>
 
           <TabsContent value="overview">
-            {/* Upcoming Lessons */}
-            {session && (
-              <div className="mb-8">
-                <UpcomingLessonsCard
-                  session={session}
-                  activeChildId={null}
-                  userRole="tutor"
-                  onViewBookings={() => setActiveTab('bookings')}
-                />
-              </div>
-            )}
-
-            {/* Students */}
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>My Students</CardTitle>
-                <CardDescription>Manage your students and track their progress</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loading ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="mb-4">Loading students...</p>
-                  </div>
-                ) : students.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    {students.map((student: any) => (
-                      <div key={student.id} className="bg-white p-4 rounded-lg shadow-md">
-                        <div className="flex items-center">
-                          <Users className="w-8 h-8 mr-2 text-gray-500" />
-                          <div>
-                            <p className="text-sm font-bold">{student.full_name}</p>
-                            <p className="text-xs text-gray-500">Lessons: {student.totalLessons}</p>
-                            <p className="text-xs text-gray-500">Upcoming: {student.upcomingLessons}</p>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-gray-500">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="mb-4">No students yet</p>
-                    <Button 
-                      className="text-white"
-                      style={{ backgroundColor: '#625d9c' }}
-                      onClick={() => setActiveTab('availability')}
-                    >
-                      Update Your Availability
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
+            <TutorOverviewTab
+              session={session}
+              students={students}
+              loading={loading}
+              onViewBookings={() => setActiveTab('bookings')}
+              onUpdateAvailability={() => setActiveTab('availability')}
+            />
           </TabsContent>
 
           <TabsContent value="profile">

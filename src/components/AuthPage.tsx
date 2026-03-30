@@ -1,12 +1,10 @@
 import { useState } from 'react';
 import { getSupabaseClient } from '../utils/supabase/client';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { Mail, Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Alert, AlertDescription } from './ui/alert';
 import TutorNestLogo from './TutorNestLogo';
-import { AuthDebugger } from './AuthDebugger';
 
 const supabase = getSupabaseClient();
 
@@ -30,7 +28,6 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
   const [showAdminInfo, setShowAdminInfo] = useState(false);
-  const [showDebugger, setShowDebugger] = useState(false);
 
   const validateEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -469,21 +466,7 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
           By continuing, you agree to TutorNest's Terms of Service and Privacy Policy
         </p>
         
-        {/* Debug Button - Only show when there's an error */}
-        {error && mode === 'signin' && (
-          <div className="text-center mt-4">
-            <button
-              onClick={() => setShowDebugger(!showDebugger)}
-              className="text-xs text-gray-500 hover:text-gray-700 underline"
-            >
-              {showDebugger ? 'Hide' : 'Show'} Sign-In Diagnostic Tool
-            </button>
-          </div>
-        )}
       </div>
-      
-      {/* Auth Debugger - Floating Panel */}
-      {showDebugger && <AuthDebugger />}
     </div>
   );
 }

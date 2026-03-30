@@ -1,4 +1,7 @@
-import { Users, Calendar, BookOpen, LogOut, Plus, TrendingUp, Search, Pencil, Trash2, CreditCard, ShoppingBag, GraduationCap, ArrowRight, CheckCircle, Filter, Library, FileText, MessageSquare } from 'lucide-react';
+import { Users, Calendar, BookOpen, LogOut, Plus, TrendingUp, Search, Pencil, Trash2, CreditCard, ShoppingBag, GraduationCap, ArrowRight, CheckCircle, Library, FileText, MessageSquare } from 'lucide-react';
+import { ParentStatsSection } from './parent/ParentStatsSection';
+import { ParentQuickActions } from './parent/ParentQuickActions';
+import { ParentOverviewTab } from './parent/ParentOverviewTab';
 import TutorNestLogo from './TutorNestLogo';
 import { TutorSearch } from './TutorSearch';
 import { NairaIcon } from './icons/NairaIcon';
@@ -625,212 +628,16 @@ export function ParentDashboard({ profile, onSignOut, availableRoles = [], onRol
         )}
 
         {/* Stats with Date Filter */}
-        <Card className="mb-8">
-          <CardContent className="pt-6">
-            {/* Date Filter - Multi-Select */}
-            <div className="pb-3 mb-4 border-b border-gray-200">
-              <div className="flex flex-wrap items-center gap-2 mb-3">
-                <div className="flex items-center gap-1.5">
-                  <Filter className="w-4 h-4 text-gray-500" />
-                  <span className="text-sm text-gray-600">Filter by:</span>
-                </div>
-                
-                <MultiSelectFilter
-                  options={[
-                    { value: 1, label: 'January' },
-                    { value: 2, label: 'February' },
-                    { value: 3, label: 'March' },
-                    { value: 4, label: 'April' },
-                    { value: 5, label: 'May' },
-                    { value: 6, label: 'June' },
-                    { value: 7, label: 'July' },
-                    { value: 8, label: 'August' },
-                    { value: 9, label: 'September' },
-                    { value: 10, label: 'October' },
-                    { value: 11, label: 'November' },
-                    { value: 12, label: 'December' }
-                  ]}
-                  selectedValues={selectedMonths}
-                  onChange={setSelectedMonths}
-                  placeholder="Select Months"
-                  allLabel="All Months"
-                />
-                
-                <MultiSelectFilter
-                  options={[2023, 2024, 2025, 2026, 2027].map(year => ({ value: year, label: year.toString() }))}
-                  selectedValues={selectedYears}
-                  onChange={setSelectedYears}
-                  placeholder="Select Years"
-                  allLabel="All Years"
-                />
-                
-                <Button 
-                  variant="outline" 
-                  size="sm"
-                  className="h-8 text-sm px-3"
-                  onClick={() => {
-                    const now = new Date();
-                    setSelectedYears([now.getFullYear()]);
-                    setSelectedMonths([now.getMonth() + 1]);
-                  }}
-                >
-                  Reset to Current
-                </Button>
-              </div>
-              
-              {/* Selected filters badges */}
-              <div className="flex flex-wrap items-center gap-2">
-                <SelectedFilterBadges
-                  options={[
-                    { value: 1, label: 'Jan' },
-                    { value: 2, label: 'Feb' },
-                    { value: 3, label: 'Mar' },
-                    { value: 4, label: 'Apr' },
-                    { value: 5, label: 'May' },
-                    { value: 6, label: 'Jun' },
-                    { value: 7, label: 'Jul' },
-                    { value: 8, label: 'Aug' },
-                    { value: 9, label: 'Sep' },
-                    { value: 10, label: 'Oct' },
-                    { value: 11, label: 'Nov' },
-                    { value: 12, label: 'Dec' }
-                  ]}
-                  selectedValues={selectedMonths}
-                  onRemove={(month) => setSelectedMonths(selectedMonths.filter(m => m !== month))}
-                  onClearAll={() => setSelectedMonths([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])}
-                />
-                <SelectedFilterBadges
-                  options={[2023, 2024, 2025, 2026, 2027].map(year => ({ value: year, label: year.toString() }))}
-                  selectedValues={selectedYears}
-                  onRemove={(year) => setSelectedYears(selectedYears.filter(y => y !== year))}
-                  onClearAll={() => setSelectedYears([2023, 2024, 2025, 2026, 2027])}
-                />
-              </div>
-            </div>
+        <ParentStatsSection
+          stats={stats}
+          selectedMonths={selectedMonths}
+          selectedYears={selectedYears}
+          setSelectedMonths={setSelectedMonths}
+          setSelectedYears={setSelectedYears}
+          setActiveTab={setActiveTab}
+        />
 
-            {/* Stats Grid */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              <button 
-                onClick={() => setActiveTab('overview')}
-                className="bg-purple-50 p-4 rounded-lg border border-purple-100 hover:border-purple-300 hover:shadow-md transition-all text-left w-full"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">Total Children</p>
-                    <h2 className="text-2xl">{stats.totalChildren}</h2>
-                  </div>
-                  <div className="w-10 h-10 bg-purple-100 rounded-lg flex items-center justify-center">
-                    <Users className="w-5 h-5 text-purple-600" />
-                  </div>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('bookings')}
-                className="bg-blue-50 p-4 rounded-lg border border-blue-100 hover:border-blue-300 hover:shadow-md transition-all text-left w-full"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">Lessons Scheduled</p>
-                    <h2 className="text-2xl">{stats.lessonsScheduled}</h2>
-                  </div>
-                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                    <Calendar className="w-5 h-5 text-blue-600" />
-                  </div>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('progress')}
-                className="bg-green-50 p-4 rounded-lg border border-green-100 hover:border-green-300 hover:shadow-md transition-all text-left w-full"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">Completed Lessons</p>
-                    <h2 className="text-2xl">{stats.completedLessons}</h2>
-                  </div>
-                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                    <BookOpen className="w-5 h-5 text-green-600" />
-                  </div>
-                </div>
-              </button>
-
-              <button 
-                onClick={() => setActiveTab('credits')}
-                className="bg-yellow-50 p-4 rounded-lg border border-yellow-100 hover:border-yellow-300 hover:shadow-md transition-all text-left w-full"
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-xs text-gray-600 mb-1">Total Spent</p>
-                    <h2 className="text-2xl">{formatNaira(stats.totalSpent, false)}</h2>
-                  </div>
-                  <div className="w-10 h-10 bg-yellow-100 rounded-lg flex items-center justify-center">
-                    <NairaIcon className="w-5 h-5 text-yellow-600" />
-                  </div>
-                </div>
-              </button>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Quick Actions */}
-        <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveTab('overview')}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center">
-                  <Plus className="w-6 h-6 text-purple-600" />
-                </div>
-                <div>
-                  <h3 className="text-sm">Add Child</h3>
-                  <p className="text-xs text-gray-600">Create student profile</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveTab('bookings')}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center">
-                  <Calendar className="w-6 h-6 text-green-600" />
-                </div>
-                <div>
-                  <h3 className="text-sm">Book Lesson</h3>
-                  <p className="text-xs text-gray-600">Schedule tutoring</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveTab('progress')}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center">
-                  <TrendingUp className="w-6 h-6 text-blue-600" />
-                </div>
-                <div>
-                  <h3 className="text-sm">Progress</h3>
-                  <p className="text-xs text-gray-600">Track development</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card className="cursor-pointer hover:shadow-lg transition-shadow" onClick={() => setActiveTab('find-tutors')}>
-            <CardContent className="pt-6">
-              <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-orange-100 rounded-xl flex items-center justify-center">
-                  <Users className="w-6 h-6 text-orange-600" />
-                </div>
-                <div>
-                  <h3 className="text-sm">Find Tutors</h3>
-                  <p className="text-xs text-gray-600">Browse tutors</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
+        <ParentQuickActions setActiveTab={setActiveTab} />
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -851,118 +658,16 @@ export function ParentDashboard({ profile, onSignOut, availableRoles = [], onRol
 
           {/* Overview Tab */}
           <TabsContent value="overview">
-            {/* Children Overview */}
-            <Card className="mb-8">
-              <CardHeader>
-                <CardTitle>Your Children</CardTitle>
-                <CardDescription>Manage student profiles</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {loadingChildren ? (
-                  <div className="text-center py-12 text-gray-500">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="mb-4">Loading children...</p>
-                  </div>
-                ) : children.length > 0 ? (
-                  <div className="space-y-4">
-                    <div className="flex justify-end mb-4">
-                      <Button 
-                        className="text-white"
-                        style={{ backgroundColor: '#625d9c' }}
-                        onClick={() => setShowAddChildDialog(true)}
-                      >
-                        <Plus className="w-4 h-4 mr-2" />
-                        Add Another Child
-                      </Button>
-                    </div>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                      {children.map((child) => (
-                        <Card key={child.id} className="hover:shadow-lg transition-shadow">
-                          <CardContent className="pt-6">
-                            <div className="flex items-start justify-between mb-4">
-                              <div>
-                                <h3 className="mb-1">{child.firstName} {child.lastName}</h3>
-                                <p className="text-sm text-gray-600">{formatGradeLevel(child.gradeLevel)}</p>
-                              </div>
-                              <div className="flex items-center gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => handleEditChild(child.id)}>
-                                  <Pencil className="w-4 h-4 text-gray-500" />
-                                </Button>
-                              </div>
-                            </div>
-                            <div className="space-y-2">
-                              <div>
-                                <p className="text-xs text-gray-500">Subjects</p>
-                                <p className="text-sm">{child.subjects?.join(', ') || 'None'}</p>
-                              </div>
-                              {child.learningGoals && (
-                                <div>
-                                  <p className="text-xs text-gray-500">Learning Goals</p>
-                                  <p className="text-sm line-clamp-2">{child.learningGoals}</p>
-                                </div>
-                              )}
-                              <div className="flex items-center justify-between mt-4 pt-4 border-t">
-                                <div className="text-center">
-                                  <p className="text-lg">{child.completedLessons || 0}</p>
-                                  <p className="text-xs text-gray-500">Lessons</p>
-                                </div>
-                                <div className="text-center">
-                                  <p className="text-lg">{child.achievements?.length || 0}</p>
-                                  <p className="text-xs text-gray-500">Achievements</p>
-                                </div>
-                              </div>
-                              {/* Student Login Management */}
-                              {session && (
-                                <div className="mt-4 pt-4 border-t">
-                                  <StudentLoginManager
-                                    child={child}
-                                    accessToken={session.access_token}
-                                    onUpdate={loadChildren}
-                                  />
-                                </div>
-                              )}
-                            </div>
-                          </CardContent>
-                        </Card>
-                      ))}
-                    </div>
-                    
-                    {/* Pending Link Requests */}
-                    {session && (
-                      <div className="mt-6">
-                        <PendingLinkRequests
-                          accessToken={session.access_token}
-                          onAccept={loadChildren}
-                        />
-                      </div>
-                    )}
-                  </div>
-                ) : (
-                  <div className="text-center py-12 text-gray-500">
-                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="mb-4">No children added yet</p>
-                    <Button 
-                      className="text-white"
-                      style={{ backgroundColor: '#625d9c' }}
-                      onClick={() => setShowAddChildDialog(true)}
-                    >
-                      <Plus className="w-4 h-4 mr-2" />
-                      Add Your First Child
-                    </Button>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-
-            {/* Upcoming Lessons */}
-            {session && (
-              <UpcomingLessonsCard
-                session={session}
-                activeChildId={activeChildId}
-                userRole="parent"
-                onViewBookings={() => setActiveTab('bookings')}
-              />
-            )}
+            <ParentOverviewTab
+              children={children}
+              loadingChildren={loadingChildren}
+              session={session}
+              activeChildId={activeChildId}
+              setShowAddChildDialog={setShowAddChildDialog}
+              handleEditChild={handleEditChild}
+              loadChildren={loadChildren}
+              onViewBookings={() => setActiveTab('bookings')}
+            />
           </TabsContent>
 
           {/* Tutors Tab */}

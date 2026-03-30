@@ -39,8 +39,15 @@ import paymentPlansRoutes from './payment-plans-routes.tsx';
 const app = new Hono();
 
 // Middleware
-app.use('*', cors());
-app.use('*', logger(console.log));
+const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') ?? 'http://localhost:3000').split(',').map(o => o.trim());
+
+app.use('*', cors({
+  origin: (origin) => allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
+app.use('*', logger());
 
 // Initialize Supabase client with service role (for admin operations)
 const getSupabaseClient = () => {
@@ -65,44 +72,18 @@ const getUserClient = (accessToken: string) => {
   );
 };
 
-// Helper to get user ID from access token
+// Helper to get user ID from access token — verifies the JWT via Supabase auth
 const getUserId = async (accessToken: string | null): Promise<string | null> => {
-  if (!accessToken) {
-    console.log('getUserId: No access token provided');
-    return null;
-  }
+  if (!accessToken) return null;
 
   try {
-    // Decode JWT to extract user ID (JWT format: header.payload.signature)
-    const parts = accessToken.split('.');
-    if (parts.length !== 3) {
-      console.log('getUserId: Invalid JWT token format - expected 3 parts, got', parts.length);
-      return null;
-    }
-
-    // Decode the payload (second part of JWT)
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    
-    // Extract user ID from payload (Supabase uses 'sub' claim for user ID)
-    const userId = payload.sub;
-    
-    if (!userId) {
-      console.log('getUserId: No user ID (sub) found in token payload');
-      return null;
-    }
-
-    // Verify the token is valid by checking expiration
-    const exp = payload.exp;
-    if (exp && Date.now() >= exp * 1000) {
-      const expiryDate = new Date(exp * 1000);
-      console.log(`getUserId: Token expired at ${expiryDate.toISOString()}`);
-      return null;
-    }
-
-    // Token is valid
-    return userId;
-  } catch (err: any) {
-    console.log('getUserId: Exception parsing token:', err?.message || err);
+    const supabase = getSupabaseClient();
+    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    if (error || !user) return null;
+    return user.id;
+  } catch (err: unknown) {
+    const msg = err instanceof Error ? err.message : String(err);
+    console.error('getUserId: token verification failed:', msg);
     return null;
   }
 };

@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react';
-import { CreateTestTutor } from './CreateTestTutor';
 import { AdminUserManagement } from './AdminUserManagement';
 import { AdminVerificationDashboard } from './AdminVerificationDashboard';
 import { AdminAnalytics } from './AdminAnalytics';
@@ -38,10 +37,8 @@ import TutorNestLogo from './TutorNestLogo';
 import { NotificationCenter } from './NotificationCenter';
 import { AdminDashboardHealthCheck } from './AdminDashboardHealthCheck';
 import { PlatformOverview } from './admin/PlatformOverview';
-import { TestDataSetup } from './TestDataSetup';
 import { SystemAlertsPanel } from './SystemAlertsPanel';
 import { ChildProfileManagement } from './admin/ChildProfileManagement';
-import { AdminFixUserRole } from './AdminFixUserRole';
 
 interface UserProfile {
   id?: string;
@@ -336,7 +333,6 @@ export function AdminDashboard({ profile, onSignOut, availableRoles, onRoleSwitc
             <TabsTrigger value="childprofiles">Child Profiles</TabsTrigger>
             <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
-            <TabsTrigger value="fixrole">Fix User Role</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -347,9 +343,6 @@ export function AdminDashboard({ profile, onSignOut, availableRoles, onRoleSwitc
               {/* Platform Overview with Key Metrics */}
               {session && <PlatformOverview session={session} onTabChange={setActiveTab} />}
 
-              {/* Test Data Creation Tools */}
-              <CreateTestTutor />
-              {session && <TestDataSetup session={session} />}
             </div>
           </TabsContent>
 
@@ -431,9 +424,6 @@ export function AdminDashboard({ profile, onSignOut, availableRoles, onRoleSwitc
             )}
           </TabsContent>
 
-          <TabsContent value="fixrole">
-            <AdminFixUserRole />
-          </TabsContent>
         </Tabs>
       </main>
     </div>

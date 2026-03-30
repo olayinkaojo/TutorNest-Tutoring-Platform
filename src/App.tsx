@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import type { Session } from '@supabase/supabase-js';
 import { AdminDashboard } from './components/AdminDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
 import { Button } from './components/ui/button';
@@ -11,24 +12,24 @@ import { TutorDashboard } from './components/TutorDashboard';
 import { TutorSignup } from './components/TutorSignup';
 import { StudentSignup } from './components/StudentSignup';
 import { ParentSignup } from './components/ParentSignup';
-import { AdminFixUserRole } from './components/AdminFixUserRole';
 import { getSupabaseClient } from './utils/supabase/client';
 import { projectId } from './utils/supabase/info';
+import { logger } from './utils/logger';
 import wallpaperBg from 'figma:asset/c2a495c4aec3903270b747684d5b5dd5d609b3da.png';
 
 interface UserProfile {
   id: string;
+  userId?: string;
   email: string;
   role: string;
   full_name?: string;
   availableRoles?: string[];
-  [key: string]: any;
 }
 
 const supabase = getSupabaseClient();
 
 export default function App() {
-  const [session, setSession] = useState<any>(null);
+  const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
   const [showTutorSignup, setShowTutorSignup] = useState(false);
@@ -39,16 +40,9 @@ export default function App() {
   const [signupData, setSignupData] = useState<{ email: string; password: string; name: string; phone?: string } | null>(null);
 
   useEffect(() => {
-    // Check URL params for special pages
+    // Check URL params for signup routing
     const urlParams = new URLSearchParams(window.location.search);
-    
-    // Admin fix tool
-    if (urlParams.get('admin') === 'fix-role') {
-      // Show fix tool (will be rendered below)
-      setLoading(false);
-      return;
-    }
-    
+
     // Check URL params for tutor signup
     if (urlParams.get('signup') === 'tutor') {
       setShowTutorSignup(true);
@@ -70,7 +64,7 @@ export default function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, session) => {
-      console.log('Auth state changed:', _event, !!session);
+      logger.debug('Auth state changed', { event: _event, hasSession: !!session });
       setSession(session);
       if (session) {
         fetchProfile(session.access_token);
@@ -97,7 +91,7 @@ export default function App() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Profile data:', data.profile);
+        logger.debug('Profile loaded', { role: data.profile?.role });
         setProfile(data.profile);
         
         // Fetch available roles for this user
@@ -105,19 +99,17 @@ export default function App() {
           fetchAvailableRoles(accessToken, data.profile.id || data.profile.userId);
         }
       } else {
-        console.warn('Failed to fetch profile from server:', response.status, response.statusText);
-        
-        // If backend profile doesn't exist, try to get user data from Supabase Auth
+        logger.warn('Profile fetch failed, using fallback', { status: response.status });
         await useFallbackProfile(accessToken);
       }
-    } catch (error: any) {
-      // Check if it's a timeout or network error
-      if (error.name === 'TimeoutError' || error.name === 'AbortError') {
-        console.log('Profile fetch timed out, using fallback authentication...');
-      } else if (error.message === 'Failed to fetch') {
-        console.log('Network issue, using fallback authentication...');
+    } catch (error: unknown) {
+      const e = error as Error;
+      if (e.name === 'TimeoutError' || e.name === 'AbortError') {
+        logger.warn('Profile fetch timed out, using fallback');
+      } else if (e.message === 'Failed to fetch') {
+        logger.warn('Network error fetching profile, using fallback');
       } else {
-        console.error('Error fetching profile:', error);
+        logger.error('Unexpected error fetching profile', { message: e.message });
       }
       
       // Try fallback to auth user metadata
@@ -131,7 +123,7 @@ export default function App() {
     try {
       const { data: { user }, error: userError } = await supabase.auth.getUser(accessToken);
       if (user && user.user_metadata) {
-        console.log('Using fallback profile from auth user metadata:', user.user_metadata);
+        logger.info('Using fallback profile from auth metadata');
         // Create a basic profile from user metadata
         const fallbackProfile = {
           id: user.id,
@@ -146,8 +138,8 @@ export default function App() {
           fetchAvailableRoles(accessToken, fallbackProfile.id);
         }
       }
-    } catch (fallbackError) {
-      console.error('Error fetching fallback profile:', fallbackError);
+    } catch (fallbackError: unknown) {
+      logger.error('Fallback profile fetch failed', { message: (fallbackError as Error).message });
     }
   };
 
@@ -164,30 +156,26 @@ export default function App() {
 
       if (response.ok) {
         const data = await response.json();
-        console.log('Available roles fetched:', data.roles);
         setAvailableRoles(data.roles || []);
       } else if (response.status === 401) {
-        console.log('Token expired, attempting to refresh session...');
-        // Try to get a fresh session
         const { data: { session: freshSession } } = await supabase.auth.getSession();
         if (freshSession && freshSession.access_token !== accessToken) {
-          console.log('Got fresh token, retrying...');
           fetchAvailableRoles(freshSession.access_token, userId);
         } else {
-          console.error('Failed to refresh token, user may need to sign in again');
+          logger.warn('Token expired and refresh failed — user must re-authenticate');
         }
       } else {
-        console.error('Failed to fetch available roles:', response.status, response.statusText);
+        logger.warn('Failed to fetch available roles', { status: response.status });
       }
-    } catch (error) {
-      console.error('Error fetching available roles:', error);
+    } catch (error: unknown) {
+      logger.error('Error fetching available roles', { message: (error as Error).message });
     }
   };
 
   const handleRoleSwitch = async (newRole: string) => {
     if (!session || !profile) return;
     
-    console.log('Switching role to:', newRole);
+    logger.info('Switching role', { newRole });
     
     try {
       // Update currentRole in backend
@@ -207,15 +195,13 @@ export default function App() {
       );
 
       if (response.ok) {
-        console.log('Role switched successfully to:', newRole);
-        // Refresh the profile to get updated role
         await fetchProfile(session.access_token);
       } else {
         const errorData = await response.json();
-        console.error('Failed to switch role:', errorData);
+        logger.error('Failed to switch role', { error: errorData });
       }
-    } catch (error) {
-      console.error('Error switching role:', error);
+    } catch (error: unknown) {
+      logger.error('Error switching role', { message: (error as Error).message });
     }
   };
 
@@ -228,7 +214,6 @@ export default function App() {
       const { data: { session: currentSession } } = await supabase.auth.getSession();
       
       if (currentSession) {
-        console.log('Session found, fetching profile...');
         setSession(currentSession);
         await fetchProfile(currentSession.access_token);
         
@@ -239,11 +224,10 @@ export default function App() {
         setShowRoleChooser(false);
         setSignupData(null);
       } else {
-        console.log('No session found after signup, reloading...');
         window.location.reload();
       }
-    } catch (error) {
-      console.error('Error refreshing session after signup:', error);
+    } catch (error: unknown) {
+      logger.error('Error refreshing session after signup', { message: (error as Error).message });
       window.location.reload();
     }
   };
@@ -265,22 +249,6 @@ export default function App() {
     }
   };
 
-  // Check for admin fix tool
-  const urlParams = new URLSearchParams(window.location.search);
-  if (urlParams.get('admin') === 'fix-role') {
-    return (
-      <div 
-        className="min-h-screen py-12 px-4"
-        style={{
-          backgroundImage: `url(${wallpaperBg})`,
-          backgroundRepeat: 'repeat',
-          backgroundSize: '400px 400px',
-        }}
-      >
-        <AdminFixUserRole />
-      </div>
-    );
-  }
 
   if (loading) {
     return (

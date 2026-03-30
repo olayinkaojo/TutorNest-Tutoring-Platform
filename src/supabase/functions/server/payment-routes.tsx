@@ -1,47 +1,60 @@
 import { Hono } from 'npm:hono';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 
 const app = new Hono();
 
-// Paystack secret key should be set in environment variables
-const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY') || '';
-const PLATFORM_FEE_PERCENTAGE = 20; // Platform takes 20%, tutor gets 80%
+const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY') ?? '';
+const PLATFORM_FEE_PERCENTAGE = 20;
 
-// Helper to get user from access token
-async function getUserFromToken(accessToken: string | undefined) {
+// Verify JWT and return the authenticated user ID via Supabase auth
+async function getUserIdFromToken(accessToken: string | undefined): Promise<string | null> {
   if (!accessToken) return null;
-  
   try {
-    const users = await kv.getByPrefix('user:');
-    const user = users.find((u: any) => u.accessToken === accessToken || u.userId === accessToken || u.id === accessToken);
-    return user;
-  } catch (error) {
-    console.error('Error getting user from token:', error);
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    );
+    const { data: { user }, error } = await supabase.auth.getUser(accessToken);
+    if (error || !user) return null;
+    return user.id;
+  } catch {
     return null;
   }
+}
+
+// Validate payment initialization body
+function validatePaymentInit(body: Record<string, unknown>): string | null {
+  const { bookingId, tutorId, amount, email } = body;
+  if (!bookingId || typeof bookingId !== 'string') return 'bookingId is required';
+  if (!tutorId || typeof tutorId !== 'string') return 'tutorId is required';
+  if (!email || typeof email !== 'string' || !email.includes('@')) return 'valid email is required';
+  if (amount === undefined || amount === null) return 'amount is required';
+  const numAmount = Number(amount);
+  if (!Number.isFinite(numAmount) || numAmount <= 0) return 'amount must be a positive number';
+  if (numAmount > 10_000_000) return 'amount exceeds maximum allowed value';
+  return null;
 }
 
 // Initialize payment for a session booking
 app.post('/payments/initialize', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    const userId = await getUserIdFromToken(accessToken);
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
-    const user = await getUserFromToken(accessToken);
-    if (!user) {
-      return c.json({ error: 'User not found' }, 404);
-    }
+    const body = await c.req.json() as Record<string, unknown>;
+    const validationError = validatePaymentInit(body);
+    if (validationError) return c.json({ error: validationError }, 400);
 
-    const body = await c.req.json();
-    const { bookingId, tutorId, studentId, subject, amount, email, metadata } = body;
+    const { bookingId, tutorId, studentId, subject, amount, email, metadata } = body as {
+      bookingId: string; tutorId: string; studentId?: string;
+      subject?: string; amount: number; email: string; metadata?: Record<string, unknown>;
+    };
 
-    if (!bookingId || !tutorId || !amount || !email) {
-      return c.json({ error: 'Missing required fields' }, 400);
-    }
+    // Use a cryptographically random reference — not predictable
+    const reference = `TN_${crypto.randomUUID().replace(/-/g, '')}`;
 
-    // Initialize payment with Paystack
     const response = await fetch('https://api.paystack.co/transaction/initialize', {
       method: 'POST',
       headers: {
@@ -50,39 +63,25 @@ app.post('/payments/initialize', async (c) => {
       },
       body: JSON.stringify({
         email,
-        amount: amount * 100, // Paystack expects amount in kobo (₦1 = 100 kobo)
+        amount: Math.round(Number(amount) * 100), // kobo, always integer
         currency: 'NGN',
-        reference: `TUTORNEST_${bookingId}_${Date.now()}`,
-        callback_url: `${c.req.header('origin') || 'https://tutornest.com'}/payment/callback`,
-        metadata: {
-          bookingId,
-          tutorId,
-          studentId,
-          subject,
-          userId: user.userId || user.id,
-          ...metadata,
-        },
+        reference,
+        callback_url: `${c.req.header('origin') ?? 'https://tutornest.com'}/payment/callback`,
+        metadata: { bookingId, tutorId, studentId, subject, userId, ...metadata },
       }),
     });
 
-    const data = await response.json();
+    const data = await response.json() as { status: boolean; message?: string; data?: { reference: string; access_code: string; authorization_url: string } };
 
-    if (!data.status) {
-      console.error('Paystack initialization failed:', data);
-      return c.json({ error: 'Payment initialization failed', details: data.message }, 500);
+    if (!data.status || !data.data) {
+      console.error('Paystack initialization failed:', data.message);
+      return c.json({ error: 'Payment initialization failed' }, 500);
     }
 
-    // Store payment record
-    const paymentId = `payment_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    const paymentId = crypto.randomUUID();
     const payment = {
-      id: paymentId,
-      bookingId,
-      tutorId,
-      studentId,
-      userId: user.userId || user.id,
-      amount,
-      subject,
-      status: 'pending',
+      id: paymentId, bookingId, tutorId, studentId, userId,
+      amount: Number(amount), subject, status: 'pending',
       reference: data.data.reference,
       paystackAccessCode: data.data.access_code,
       authorizationUrl: data.data.authorization_url,
@@ -102,9 +101,9 @@ app.post('/payments/initialize', async (c) => {
         accessCode: data.data.access_code,
       },
     });
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Error initializing payment:', error);
-    return c.json({ error: error.message || 'Failed to initialize payment' }, 500);
+    return c.json({ error: 'Failed to initialize payment' }, 500);
   }
 });
 
@@ -112,11 +111,13 @@ app.post('/payments/initialize', async (c) => {
 app.post('/payments/verify/:reference', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    const userId = await getUserIdFromToken(accessToken);
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
     const reference = c.req.param('reference');
+    if (!reference || !/^TN_[0-9a-f]{32}$/.test(reference)) {
+      return c.json({ error: 'Invalid payment reference' }, 400);
+    }
 
     // Verify with Paystack
     const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
