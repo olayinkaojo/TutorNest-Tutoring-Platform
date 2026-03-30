@@ -34,6 +34,7 @@ import paymentRoutes from './payment-routes.tsx';
 import liveSessionRoutes from './live-session-routes.tsx';
 import payoutRoutes from './payout-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
+import paymentPlansRoutes from './payment-plans-routes.tsx';
 
 const app = new Hono();
 
@@ -403,6 +404,9 @@ app.route('/make-server-cbd74580/tutor-session-reports', tutorSessionReportsRout
 
 // Register payment routes
 app.route('/make-server-cbd74580', paymentRoutes);
+
+// Register NEW payment plans routes (Trial, Weekly, Twice-Weekly)
+app.route('/make-server-cbd74580', paymentPlansRoutes);
 
 // Register live session routes
 app.route('/make-server-cbd74580', liveSessionRoutes);

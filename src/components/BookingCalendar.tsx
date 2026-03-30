@@ -332,9 +332,9 @@ export function BookingCalendar({
                 <DollarSign className="w-5 h-5 mt-0.5 text-gray-600" />
                 <div>
                   <p className="text-sm font-medium">Price</p>
-                  <p className="text-gray-700">£{calculatePrice()}</p>
+                  <p className="text-gray-700">₦{calculatePrice()}</p>
                   <p className="text-xs text-gray-500 mt-1">
-                    £{tutorProfile.hourlyRate}/hour
+                    ₦{tutorProfile.hourlyRate}/hour
                   </p>
                 </div>
               </div>
@@ -373,7 +373,7 @@ export function BookingCalendar({
                 ) : (
                   <>
                     <CheckCircle className="w-4 h-4 mr-2" />
-                    Confirm & Pay £{calculatePrice()}
+                    Confirm & Pay ₦{calculatePrice()}
                   </>
                 )}
               </Button>
