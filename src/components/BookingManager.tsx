@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { projectId } from '../utils/supabase/info';
+import { formatNaira } from '../utils/currency';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
@@ -253,7 +254,7 @@ export function BookingManager({ session, userRole, userId }: BookingManagerProp
               </div>
               <div className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4" />
-                £{booking.price}
+                {formatNaira(parseFloat(booking.price))}
               </div>
             </div>
           </div>
@@ -352,7 +353,7 @@ export function BookingManager({ session, userRole, userId }: BookingManagerProp
           <Alert className="mt-4 bg-blue-50 border-blue-200">
             <DollarSign className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800 text-sm">
-              Refund: £{booking.refundAmount}
+              Refund: {formatNaira(parseFloat(booking.refundAmount!))}
             </AlertDescription>
           </Alert>
         )}
@@ -427,7 +428,7 @@ export function BookingManager({ session, userRole, userId }: BookingManagerProp
 
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm font-medium mb-1">Refund Amount</p>
-              <p className="text-gray-700">£{refundAmount}</p>
+              <p className="text-gray-700">{formatNaira(parseFloat(refundAmount))}</p>
               <p className="text-xs text-gray-500 mt-1">
                 {parseFloat(refundAmount) === parseFloat(selectedBooking.price)
                   ? 'Full refund (cancelled more than 24 hours in advance)'

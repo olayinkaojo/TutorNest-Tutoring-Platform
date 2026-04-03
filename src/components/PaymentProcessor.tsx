@@ -77,7 +77,7 @@ export function PaymentProcessor({
       // Open Paystack payment modal
       // @ts-ignore - PaystackPop is loaded via script
       const handler = window.PaystackPop.setup({
-        key: 'pk_test_XXXXXXXXXXXXXXXXXXXXXXXX', // This should be the Paystack public key
+        key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
         email: email,
         amount: amount * 100, // Paystack expects amount in kobo
         currency: 'NGN',

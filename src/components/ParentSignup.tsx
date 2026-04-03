@@ -24,6 +24,7 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
   const [success, setSuccess] = useState('');
   const [emailCheckLoading, setEmailCheckLoading] = useState(false);
   const [emailExists, setEmailExists] = useState(false);
+  const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
 
   // Form data
   const [email, setEmail] = useState(initialData?.email || '');
@@ -111,7 +112,6 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
     setLoading(true);
 
     try {
-      // Create account using backend API which auto-confirms email
       console.log('Attempting signup for:', email);
       let signupResponse;
       try {
@@ -127,6 +127,17 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
               email,
               password,
               name: fullName,
+              role: 'parent',
+              profileData: {
+                full_name: fullName,
+                email,
+                phone,
+                address,
+                number_of_children: numberOfChildren ? parseInt(numberOfChildren) : null,
+                children_ages: childrenAges,
+                role: 'parent',
+                onboardingComplete: true,
+              },
             }),
           }
         );
@@ -139,144 +150,63 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
       try {
         signupData = await signupResponse.json();
       } catch (jsonError: any) {
-        console.error('Error parsing signup response:', jsonError);
         throw new Error('Invalid server response. Please try again or contact support.');
       }
-      
-      console.log('Signup response status:', signupResponse.status);
-      console.log('Signup response data:', signupData);
 
       if (!signupResponse.ok) {
-        console.error('Signup failed with status:', signupResponse.status);
-        console.error('Error from server:', signupData.error);
-        console.error('Debug info:', signupData.debug);
-        
         if (signupData.error?.includes('already exists') || signupData.error?.includes('already registered')) {
           throw new Error('A user with this email already exists. Please sign in instead.');
         }
-        
-        // Show detailed error including debug info if available
-        const errorMsg = signupData.debug 
-          ? `${signupData.error}\n\nDebug: ${JSON.stringify(signupData.debug, null, 2)}`
-          : signupData.error || 'Failed to create account';
-        throw new Error(errorMsg);
+        throw new Error(signupData.error || 'Failed to create account');
       }
 
       if (!signupData.success) {
-        console.error('Signup succeeded but success flag is false');
         throw new Error('Failed to create account');
       }
 
-      // Get the session to create the profile, but we'll log out after
-      let session = signupData.session;
-      
-      if (!session) {
-        // Sign in to get a session for profile creation
-        console.log('No session from signup, signing in to create profile...');
-        const { data: { session: manualSession }, error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-
-        if (signInError) {
-          throw new Error('Account created but failed to sign in: ' + signInError.message);
-        }
-
-        if (!manualSession) {
-          throw new Error('Account created but no session returned');
-        }
-        
-        session = manualSession;
-      } else {
-        // Set the session in the Supabase client so it's persisted
-        console.log('Setting session in Supabase client...');
-        const { error: sessionError } = await supabase.auth.setSession({
-          access_token: session.access_token,
-          refresh_token: session.refresh_token,
-        });
-        
-        if (sessionError) {
-          console.error('Error setting session:', sessionError);
-          throw new Error('Failed to establish session: ' + sessionError.message);
-        }
-      }
-
-      // Update profile with parent-specific data
-      const profileData = {
-        full_name: fullName,
-        email,
-        phone,
-        address,
-        number_of_children: numberOfChildren ? parseInt(numberOfChildren) : null,
-        children_ages: childrenAges,
-        role: 'parent', // Explicitly set role
-        onboardingComplete: true, // Mark onboarding as complete
-      };
-
-      // Update profile via backend
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('👨‍👩‍👧 PARENT SIGNUP: Creating parent profile via PUT endpoint');
-      console.log('User ID:', session.user.id);
-      console.log('Profile data being sent:', JSON.stringify(profileData, null, 2));
-      console.log('ROLE in profileData:', profileData.role);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
-      const profileResponse = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profiles/${session.user.id}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify(profileData),
-        }
-      );
-
-      if (!profileResponse.ok) {
-        const errorData = await profileResponse.json();
-        console.error('❌ Parent profile creation failed:', errorData);
-        throw new Error('Failed to create profile: ' + (errorData.error || 'Unknown error'));
-      }
-
-      const profileResult = await profileResponse.json();
-      console.log('✅ Parent profile created successfully!');
-      console.log('Profile result:', JSON.stringify(profileResult, null, 2));
-      console.log('Final role:', profileResult.profile?.role);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-
-      // Show success message briefly, then trigger callback to refresh session
-      setSuccess('Account created successfully! Welcome to TutorNest!');
-      
-      // Call the onSignupSuccess callback after a brief delay
-      setTimeout(() => {
-        if (onSignupSuccess) {
-          onSignupSuccess();
-        } else {
-          // Fallback to reload if no callback provided
-          window.location.reload();
-        }
-      }, 1000);
+      // Email confirmation required — show check-your-email screen
+      setEmailConfirmationSent(true);
 
     } catch (err: any) {
       console.error('Signup error:', err);
-      
-      // Better error messages for common issues
       let errorMessage = err.message || 'An error occurred during signup';
-      
       if (err.message?.includes('string did not match')) {
-        errorMessage = 'Invalid email or password format. Please check your email address and ensure your password is at least 6 characters.';
-      } else if (err.message?.includes('email')) {
-        errorMessage = 'Invalid email format. Please enter a valid email address.';
-      } else if (err.message?.includes('password')) {
-        errorMessage = 'Invalid password. Password must be at least 6 characters long and contain only standard characters.';
+        errorMessage = 'Invalid email or password format. Please check your email and ensure your password is at least 6 characters.';
       }
-      
       setError(errorMessage);
     } finally {
       setLoading(false);
     }
   };
+
+  if (emailConfirmationSent) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center">
+          <div className="flex justify-center mb-6">
+            <TutorNestLogo />
+          </div>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#f0f4ff' }}>
+            <CheckCircle className="w-8 h-8" style={{ color: '#625d9c' }} />
+          </div>
+          <h2 className="mb-2 text-gray-900">Check your email</h2>
+          <p className="text-gray-600 mb-2">
+            We sent a confirmation link to <strong>{email}</strong>
+          </p>
+          <p className="text-sm text-gray-500 mb-6">
+            Click the link in the email to activate your account and sign in. Check your spam folder if you don't see it within a few minutes.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => onBackToSignIn?.()}
+            className="w-full"
+          >
+            Back to Sign In
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 py-8 px-4">

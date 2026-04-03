@@ -137,30 +137,8 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
           throw new Error(errorMsg);
         }
 
-        // Set the session in Supabase client if returned
-        if (data.session) {
-          console.log('Setting session in Supabase client...');
-          const { error: sessionError } = await supabase.auth.setSession({
-            access_token: data.session.access_token,
-            refresh_token: data.session.refresh_token,
-          });
-          
-          if (sessionError) {
-            console.error('Error setting session:', sessionError);
-            throw new Error('Failed to establish session: ' + sessionError.message);
-          }
-        }
-
+        // Email confirmation required — show check-your-email screen
         setSuccess(true);
-        // Keep user logged in - trigger callback to refresh session
-        setTimeout(() => {
-          if (onSignupSuccess) {
-            onSignupSuccess();
-          } else {
-            // Fallback to reload if no callback provided
-            window.location.reload();
-          }
-        }, 1000);
 
       } else if (signupType === 'dependent') {
         // Dependent student signup (13-17)
@@ -251,14 +229,14 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
             <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <CardTitle className="text-2xl">Account Created! 🎉</CardTitle>
+            <CardTitle className="text-2xl">Check your email</CardTitle>
             <CardDescription>
-              Your independent student account has been created successfully
+              A confirmation link has been sent to <strong>{formData.email}</strong>
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-sm text-gray-600 mb-4">
-              You can now log in and start finding tutors, booking sessions, and tracking your learning progress.
+              Click the link in your email to activate your account. Once confirmed, you can log in and start finding tutors and booking sessions.
             </p>
             <Button
               onClick={onBackToSignIn}

@@ -132,7 +132,8 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   const [success, setSuccess] = useState('');
   const [emailCheckLoading, setEmailCheckLoading] = useState(false);
   const [emailExists, setEmailExists] = useState(false);
-  const [isExistingUser, setIsExistingUser] = useState(false); // Track if user is already logged in
+  const [isExistingUser, setIsExistingUser] = useState(false);
+  const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
 
   // Step 1: Account Info - Pre-fill if initial data, session, or existing profile is provided
   const [email, setEmail] = useState(
@@ -346,9 +347,37 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
       let tutorSession = session; // Use existing session if user is logged in
       let userId = session?.user?.id;
 
-      // If user is NOT already logged in, create a new account
+      // If user is NOT already logged in, create a new account with full profile in one call
       if (!isExistingUser) {
-        console.log('Creating new account for:', email);
+        console.log('Creating new tutor account for:', email);
+        const tutorProfileData = {
+          full_name: fullName,
+          email,
+          phone,
+          location,
+          bio,
+          hourly_rate: parseFloat(hourlyRate),
+          experience_years: experienceYears ? parseInt(experienceYears) : null,
+          qualifications,
+          teaching_style: teachingStyle,
+          subjects: selectedSubjects,
+          age_groups: selectedAgeGroups,
+          classes: selectedClasses,
+          teaching_format: teachingFormat,
+          group_size: groupSize,
+          travel_radius: travelRadius ? parseFloat(travelRadius) : null,
+          max_students: maxStudents ? parseInt(maxStudents) : null,
+          exam_boards: selectedExamBoards,
+          learning_difficulties: selectedLearningDifficulties,
+          methodologies: selectedMethodologies,
+          languages: selectedLanguages,
+          dbs_checked: dbsChecked,
+          has_insurance: hasInsurance,
+          verificationStatus: 'pending',
+          role: 'tutor',
+          onboardingComplete: true,
+        };
+
         let signupResponse;
         try {
           signupResponse = await fetch(
@@ -363,81 +392,38 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                 email,
                 password,
                 name: fullName,
+                role: 'tutor',
+                profileData: tutorProfileData,
               }),
             }
           );
         } catch (networkError: any) {
-          console.error('Network error during signup:', networkError);
           throw new Error('Network error: Unable to connect to server. Please check your internet connection and try again.');
         }
 
         let signupData;
         try {
           signupData = await signupResponse.json();
-        } catch (jsonError: any) {
-          console.error('Error parsing signup response:', jsonError);
+        } catch {
           throw new Error('Invalid server response. Please try again or contact support.');
         }
-        
-        console.log('Signup response status:', signupResponse.status);
-        console.log('Signup response data:', signupData);
 
         if (!signupResponse.ok) {
-          console.error('Signup failed with status:', signupResponse.status);
-          console.error('Error from server:', signupData.error);
-          console.error('Debug info:', signupData.debug);
-          
           if (signupData.error?.includes('already exists') || signupData.error?.includes('already registered')) {
             throw new Error('A user with this email already exists. Please sign in instead.');
           }
-          
-          const errorMsg = signupData.debug 
-            ? `${signupData.error}\n\nDebug: ${JSON.stringify(signupData.debug, null, 2)}`
-            : signupData.error || 'Failed to create account';
-          throw new Error(errorMsg);
+          throw new Error(signupData.error || 'Failed to create account');
         }
 
         if (!signupData.success) {
-          console.error('Signup succeeded but success flag is false');
           throw new Error('Failed to create account');
         }
 
-        // Get the session to create the profile
-        tutorSession = signupData.session;
-        
-        if (!tutorSession) {
-          // Sign in to get a session for profile creation
-          console.log('No session from signup, signing in to create profile...');
-          const { data: { session: manualSession }, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
-            password,
-          });
-
-          if (signInError) {
-            throw new Error('Account created but failed to sign in: ' + signInError.message);
-          }
-
-          if (!manualSession) {
-            throw new Error('Account created but no session returned');
-          }
-          
-          tutorSession = manualSession;
-        } else {
-          // Set the session in the Supabase client so it's persisted
-          console.log('Setting session in Supabase client...');
-          const { error: sessionError } = await supabase.auth.setSession({
-            access_token: tutorSession.access_token,
-            refresh_token: tutorSession.refresh_token,
-          });
-          
-          if (sessionError) {
-            console.error('Error setting session:', sessionError);
-            throw new Error('Failed to establish session: ' + sessionError.message);
-          }
-        }
-        
-        userId = tutorSession?.user?.id;
+        // Email confirmation required — show check-your-email screen
+        setEmailConfirmationSent(true);
+        return;
       } else {
+        // Existing user updating their tutor profile
         console.log('User is already logged in, updating tutor profile for userId:', userId);
       }
 
@@ -449,7 +435,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         throw new Error('No access token available to create profile');
       }
 
-      // Update profile with all the data
+      // Existing user: update profile via backend
       const profileData = {
         full_name: fullName,
         email,
@@ -474,18 +460,10 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         dbs_checked: dbsChecked,
         has_insurance: hasInsurance,
         verificationStatus: 'pending',
-        role: 'tutor', // Explicitly set role
-        onboardingComplete: true, // Mark onboarding as complete
+        role: 'tutor',
+        onboardingComplete: true,
       };
 
-      // Update profile via backend
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      console.log('👨‍🏫 TUTOR SIGNUP: Creating/updating tutor profile via PUT endpoint');
-      console.log('User ID:', userId);
-      console.log('Profile data being sent:', JSON.stringify(profileData, null, 2));
-      console.log('ROLE in profileData:', profileData.role);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      
       const profileResponse = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profiles/${userId}`,
         {
@@ -500,26 +478,17 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
 
       if (!profileResponse.ok) {
         const errorData = await profileResponse.json();
-        console.error('❌ Tutor profile creation/update failed:', errorData);
         throw new Error('Failed to create profile: ' + (errorData.error || 'Unknown error'));
       }
 
-      const profileResult = await profileResponse.json();
-      console.log('✅ Tutor profile created/updated successfully!');
-      console.log('Profile result:', JSON.stringify(profileResult, null, 2));
-      console.log('Final role:', profileResult.profile?.role);
-      console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+      console.log('✅ Tutor profile updated successfully!');
 
-      // Keep users logged in after signup and notify them
       if (!isExistingUser) {
         setSuccess('Account created successfully! Welcome to TutorNest!');
-        
-        // Trigger callback to redirect to dashboard
         setTimeout(() => {
           if (onSignupComplete) {
             onSignupComplete();
           } else {
-            // Reload the page to refresh the profile and show dashboard
             window.location.reload();
           }
         }, 1000);
@@ -580,6 +549,35 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
       </div>
     </div>
   );
+
+  if (emailConfirmationSent) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 flex items-center justify-center p-4">
+        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center">
+          <div className="flex justify-center mb-6">
+            <TutorNestLogo />
+          </div>
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#f0f4ff' }}>
+            <CheckCircle className="w-8 h-8" style={{ color: '#625d9c' }} />
+          </div>
+          <h2 className="mb-2 text-gray-900">Check your email</h2>
+          <p className="text-gray-600 mb-2">
+            We sent a confirmation link to <strong>{email}</strong>
+          </p>
+          <p className="text-sm text-gray-500 mb-6">
+            Click the link in the email to activate your account and access your tutor dashboard. Check your spam folder if you don't see it within a few minutes.
+          </p>
+          <Button
+            variant="outline"
+            onClick={() => onBackToSignIn?.()}
+            className="w-full"
+          >
+            Back to Sign In
+          </Button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 py-8 px-4">

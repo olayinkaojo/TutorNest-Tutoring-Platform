@@ -9,6 +9,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { projectId } from '../utils/supabase/info';
+import { formatNaira } from '../utils/currency';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -460,7 +461,7 @@ export function SessionBookingCalendar({
                   <div className="flex justify-between items-center pt-2 border-t">
                     <span className="text-sm text-gray-600">Total Price:</span>
                     <span className="font-medium text-lg" style={{ color: '#5d9827' }}>
-                      £{calculatePrice()}
+                      {formatNaira(Number(calculatePrice()))}
                     </span>
                   </div>
                 </div>
@@ -515,7 +516,7 @@ export function SessionBookingCalendar({
               </div>
               <div className="flex justify-between pt-2 border-t">
                 <span className="text-sm text-gray-600">Total:</span>
-                <span className="font-medium text-lg" style={{ color: '#5d9827' }}>£{calculatePrice()}</span>
+                <span className="font-medium text-lg" style={{ color: '#5d9827' }}>{formatNaira(Number(calculatePrice()))}</span>
               </div>
             </div>
 
@@ -552,7 +553,7 @@ export function SessionBookingCalendar({
               className="text-white"
               style={{ backgroundColor: '#625d9c' }}
             >
-              {booking ? 'Booking...' : `Confirm & Pay £${calculatePrice()}`}
+              {booking ? 'Booking...' : `Confirm & Pay ${formatNaira(Number(calculatePrice()))}`}
             </Button>
           </DialogFooter>
         </DialogContent>

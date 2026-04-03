@@ -3,6 +3,7 @@ import { cors } from 'npm:hono/cors';
 import { logger } from 'npm:hono/logger';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
+import { sendEmail, emailTemplates } from './email-service.tsx';
 import { contentLibraryRoutes } from './content-library-routes.tsx';
 import { progressAnalyticsRoutes } from './progress-analytics-routes.tsx';
 import { notificationsRoutes } from './notifications-routes.tsx';
@@ -564,8 +565,8 @@ app.post('/make-server-cbd74580/check-email', async (c) => {
 app.post('/make-server-cbd74580/signup', async (c) => {
   try {
     console.log('=== SIGNUP ENDPOINT CALLED ===');
-    const { email, password, name } = await c.req.json();
-    console.log('Signup request for email:', email, 'name:', name);
+    const { email, password, name, profileData, role } = await c.req.json();
+    console.log('Signup request for email:', email, 'name:', name, 'role:', role);
 
     if (!email || !password || !name) {
       console.error('Missing required fields: email, password, or name');
@@ -637,7 +638,7 @@ app.post('/make-server-cbd74580/signup', async (c) => {
         email,
         password,
         user_metadata: { name },
-        email_confirm: true, // Auto-confirm email since we don't have email server configured
+        email_confirm: false, // Send confirmation email via Supabase built-in service
       });
       console.log('admin.createUser() call completed without throwing');
     } catch (createUserError: any) {
@@ -726,25 +727,29 @@ app.post('/make-server-cbd74580/signup', async (c) => {
     console.log('Is Admin:', isAdmin);
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
     try {
-      // DO NOT set a role here - let the specific signup flow (parent/tutor) set the role
-      // Only create a minimal profile during signup
+      // Build full profile — merge any profileData sent with the signup request
       const initialProfile: any = {
         userId: data.user.id,
         id: data.user.id,
         email,
         name,
         createdAt: new Date().toISOString(),
+        ...(profileData || {}),
       };
-      
-      // Only set role for admin users during signup
+
+      // Set role from explicit field, profileData, or admin detection
       if (isAdmin) {
         initialProfile.role = 'admin';
         initialProfile.onboardingComplete = true;
         console.log('✅ Setting role to ADMIN for admin email');
+      } else if (role || profileData?.role) {
+        initialProfile.role = role || profileData.role;
+        initialProfile.onboardingComplete = true;
+        console.log('✅ Role set from signup request:', initialProfile.role);
       } else {
         console.log('⏸️  NO ROLE SET - Will be set by specific signup flow (parent/tutor/student)');
       }
-      
+
       await kv.set(`user:${data.user.id}`, initialProfile);
       console.log('✅ Initial profile saved to KV store:', JSON.stringify(initialProfile, null, 2));
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -754,47 +759,13 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       // Don't fail the signup if KV store fails
     }
 
-    // Now sign the user in to get a session token
-    console.log('Signing in user to get session token...');
-    let sessionData;
-    try {
-      const anonSupabase = createClient(supabaseUrl, anonKey);
-      const { data: signInData, error: signInError } = await anonSupabase.auth.signInWithPassword({
-        email,
-        password,
-      });
-      
-      if (signInError) {
-        console.error('Error signing in after signup:', signInError);
-        // User was created but couldn't sign in - still return success
-        console.log('Signup successful but auto-login failed for:', email);
-        return c.json({ 
-          success: true, 
-          user: data.user, 
-          isAdmin,
-          warning: 'Account created successfully. Please sign in manually.'
-        });
-      }
-      
-      sessionData = signInData;
-      console.log('Auto-login successful, session created');
-    } catch (signInException: any) {
-      console.error('Exception during auto-login:', signInException);
-      // User was created but couldn't sign in - still return success
-      return c.json({ 
-        success: true, 
-        user: data.user, 
-        isAdmin,
-        warning: 'Account created successfully. Please sign in manually.'
-      });
-    }
-
-    console.log('Signup and auto-login successful for:', email);
-    return c.json({ 
-      success: true, 
-      user: sessionData.user, 
-      session: sessionData.session,
-      isAdmin 
+    // Account created — confirmation email sent by Supabase. No auto-login.
+    console.log('Signup successful, confirmation email sent for:', email);
+    return c.json({
+      success: true,
+      requiresEmailConfirmation: true,
+      userId: data.user.id,
+      isAdmin,
     });
   } catch (error: any) {
     console.error('Signup error (outer catch):', error);
@@ -1975,8 +1946,32 @@ app.post('/make-server-cbd74580/invitations/send', async (c) => {
 
     console.log(`Invitation sent from parent ${userId} to tutor ${tutorId} for ${childId ? 'child' : 'student'} ${targetStudentId}`);
 
-    // TODO: Send email notification to tutor (would require email service integration)
-    // For now, we'll just store the notification in-app
+    // Send email notification to tutor
+    try {
+      const tutorEmail = tutorData?.email;
+      const parentName = userData?.full_name || userData?.email || 'A parent';
+      const studentName = studentInfo?.full_name || studentInfo?.name || 'A student';
+      
+      if (tutorEmail) {
+        const acceptLink = `${Deno.env.get('FRONTEND_URL') || 'https://tutornest.com'}/invitations`;
+        const emailData = emailTemplates.tutorBookingNotification(
+          tutorData?.full_name || 'Tutor',
+          parentName,
+          studentName,
+          `${invitation.preferredDates?.[0] || 'TBD'}`,
+          `${invitation.preferredTimes?.[0] || 'TBD'}`,
+          acceptLink
+        );
+        
+        await sendEmail({
+          to: tutorEmail,
+          ...emailData,
+        });
+      }
+    } catch (emailError) {
+      console.error('Error sending tutor notification email:', emailError);
+      // Don't fail the request if email fails
+    }
 
     return c.json({ success: true, invitation });
   } catch (error: any) {
@@ -2490,7 +2485,43 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
         .catch(err => console.error('Error creating calendar events:', err));
     }
 
-    // TODO: Send confirmation emails to parent and tutor
+    // Send confirmation emails to parent and tutor
+    try {
+      const dailyRoomLink = `https://daily.co/${booking.roomName}` || `${Deno.env.get('FRONTEND_URL') || 'https://tutornest.com'}/session/${bookingId}`;
+      
+      if (parentEmail) {
+        const parentEmailData = emailTemplates.bookingConfirmation(
+          parentData?.full_name || 'Parent',
+          tutorData?.full_name || 'Your Tutor',
+          booking.date,
+          booking.startTime,
+          dailyRoomLink
+        );
+        
+        await sendEmail({
+          to: parentEmail,
+          ...parentEmailData,
+        }).catch(err => console.error('Error sending parent confirmation email:', err));
+      }
+      
+      if (tutorEmail) {
+        const tutorEmailData = emailTemplates.bookingConfirmation(
+          tutorData?.full_name || 'Tutor',
+          parentData?.full_name || 'A parent',
+          booking.date,
+          booking.startTime,
+          dailyRoomLink
+        );
+        
+        await sendEmail({
+          to: tutorEmail,
+          ...tutorEmailData,
+        }).catch(err => console.error('Error sending tutor confirmation email:', err));
+      }
+    } catch (emailError) {
+      console.error('Error sending confirmation emails:', emailError);
+      // Don't fail the request if email fails
+    }
 
     return c.json({ success: true, booking });
   } catch (error: any) {
@@ -2612,7 +2643,47 @@ app.post('/make-server-cbd74580/bookings/:bookingId/cancel', async (c) => {
     }
 
     // TODO: Process refund via payment gateway
-    // TODO: Send cancellation emails
+    
+    // Send cancellation emails
+    try {
+      const parentData = await kv.get(`user:${booking.parentId}`) as any;
+      const tutorData = await kv.get(`user:${booking.tutorId}`) as any;
+      
+      const cancelledByName = userId === booking.parentId ? 'Parent' : 'Tutor';
+      
+      if (parentData?.email) {
+        const parentEmailData = emailTemplates.bookingCancellation(
+          parentData.full_name || 'Parent',
+          tutorData?.full_name || 'Your Tutor',
+          booking.date,
+          booking.startTime,
+          `Cancelled by ${cancelledByName}`
+        );
+        
+        await sendEmail({
+          to: parentData.email,
+          ...parentEmailData,
+        }).catch(err => console.error('Error sending parent cancellation email:', err));
+      }
+      
+      if (tutorData?.email) {
+        const tutorEmailData = emailTemplates.bookingCancellation(
+          tutorData.full_name || 'Tutor',
+          parentData?.full_name || 'A parent',
+          booking.date,
+          booking.startTime,
+          `Cancelled by ${cancelledByName}`
+        );
+        
+        await sendEmail({
+          to: tutorData.email,
+          ...tutorEmailData,
+        }).catch(err => console.error('Error sending tutor cancellation email:', err));
+      }
+    } catch (emailError) {
+      console.error('Error sending cancellation emails:', emailError);
+      // Don't fail the request if email fails
+    }
 
     return c.json({ success: true, booking: updatedBooking });
   } catch (error: any) {
@@ -3517,8 +3588,8 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         const { data: authData, error: authError } = await supabase.auth.admin.createUser({
           email: tutorData.email,
           password: tutorData.password,
-          email_confirm: true,
-          user_metadata: { 
+          email_confirm: false,
+          user_metadata: {
             firstName: tutorData.firstName,
             lastName: tutorData.lastName,
             role: 'tutor'
