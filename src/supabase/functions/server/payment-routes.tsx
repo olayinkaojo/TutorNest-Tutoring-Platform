@@ -4,7 +4,7 @@ import * as kv from './kv_store.tsx';
 
 const app = new Hono();
 
-const PAYSTACK_SECRET_KEY = Deno.env.get('PAYSTACK_SECRET_KEY') ?? '';
+const FLUTTERWAVE_SECRET_KEY = Deno.env.get('FLUTTERWAVE_SECRET_KEY') ?? '';
 const PLATFORM_FEE_PERCENTAGE = 20;
 
 // Fixed payment plan definitions (prices in NGN)
@@ -90,26 +90,42 @@ app.post('/payments/initialize', async (c) => {
     // Use a cryptographically random reference — not predictable
     const reference = `TN_${crypto.randomUUID().replace(/-/g, '')}`;
 
-    const response = await fetch('https://api.paystack.co/transaction/initialize', {
+    const response = await fetch('https://api.flutterwave.com/v3/payments', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        email,
-        amount: Math.round(Number(amount) * 100), // kobo, always integer
+        tx_ref: reference,
+        amount: Number(amount),
         currency: 'NGN',
-        reference,
-        callback_url: `${c.req.header('origin') ?? 'https://tutornest.com'}/payment/callback`,
-        metadata: { bookingId, tutorId, studentId, subject, userId, ...metadata },
+        customer: {
+          email,
+          name: metadata?.studentName ?? 'Student',
+        },
+        payment_options: 'card,banktransfer',
+        customizations: {
+          title: 'TutorNest Session Booking',
+          description: `Booking for ${subject ?? 'Tutoring Session'}`,
+          logo: 'https://tutornest.com/logo.png',
+        },
+        meta: {
+          bookingId,
+          tutorId,
+          studentId,
+          subject,
+          userId,
+          ...metadata,
+        },
+        redirect_url: `${c.req.header('origin') ?? 'https://tutornest.com'}/payment/callback`,
       }),
     });
 
-    const data = await response.json() as { status: boolean; message?: string; data?: { reference: string; access_code: string; authorization_url: string } };
+    const data = await response.json() as { status: string; message?: string; data?: { link: string; payment_link: string } };
 
-    if (!data.status || !data.data) {
-      console.error('Paystack initialization failed:', data.message);
+    if (data.status !== 'success' || !data.data) {
+      console.error('Flutterwave initialization failed:', data.message);
       return c.json({ error: 'Payment initialization failed' }, 500);
     }
 
@@ -117,23 +133,21 @@ app.post('/payments/initialize', async (c) => {
     const payment = {
       id: paymentId, bookingId, tutorId, studentId, userId,
       amount: Number(amount), subject, status: 'pending',
-      reference: data.data.reference,
-      paystackAccessCode: data.data.access_code,
-      authorizationUrl: data.data.authorization_url,
+      reference: reference,
+      flutterwaveLink: data.data.link || data.data.payment_link,
       createdAt: new Date().toISOString(),
       metadata,
     };
 
     await kv.set(`payment:${paymentId}`, payment);
-    await kv.set(`payment_ref:${data.data.reference}`, paymentId);
+    await kv.set(`payment_ref:${reference}`, paymentId);
 
     return c.json({
       success: true,
       payment: {
         id: paymentId,
-        reference: data.data.reference,
-        authorizationUrl: data.data.authorization_url,
-        accessCode: data.data.access_code,
+        reference: reference,
+        authorizationUrl: data.data.link || data.data.payment_link,
       },
     });
   } catch (error: unknown) {
@@ -154,17 +168,17 @@ app.post('/payments/verify/:reference', async (c) => {
       return c.json({ error: 'Invalid payment reference' }, 400);
     }
 
-    // Verify with Paystack
-    const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+    // Verify with Flutterwave
+    const response = await fetch(`https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${reference}`, {
       method: 'GET',
       headers: {
-        'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
       },
     });
 
-    const data = await response.json();
+    const data = await response.json() as { status: string; message?: string; data?: { status: string; amount: number; customer: any } };
 
-    if (!data.status || data.data.status !== 'success') {
+    if (data.status !== 'success' || data.data?.status !== 'successful') {
       return c.json({ 
         success: false, 
         error: 'Payment verification failed',
@@ -186,7 +200,7 @@ app.post('/payments/verify/:reference', async (c) => {
     // Update payment status
     payment.status = 'successful';
     payment.verifiedAt = new Date().toISOString();
-    payment.paystackResponse = data.data;
+    payment.flutterwaveResponse = data.data;
     await kv.set(`payment:${paymentId}`, payment);
 
     // Process revenue split (80% tutor, 20% platform)
@@ -442,48 +456,48 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
       return c.json({ error: 'Payout already processed' }, 400);
     }
 
-    // Create transfer recipient on Paystack
-    const recipientResponse = await fetch('https://api.paystack.co/transferrecipient', {
+    // Create transfer recipient on Flutterwave
+    const recipientResponse = await fetch('https://api.flutterwave.com/v3/beneficiaries', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        type: 'nuban',
-        name: payout.bankDetails.accountName || 'Tutor',
         account_number: payout.bankDetails.accountNumber,
-        bank_code: payout.bankDetails.bankCode,
-        currency: 'NGN',
+        account_bank: payout.bankDetails.bankCode,
+        beneficiary_name: payout.bankDetails.accountName || 'Tutor',
       }),
     });
 
     const recipientData = await recipientResponse.json();
 
-    if (!recipientData.status) {
+    if (recipientData.status !== 'success') {
       console.error('Failed to create recipient:', recipientData);
       return c.json({ error: 'Failed to create recipient', details: recipientData.message }, 500);
     }
 
     // Initiate transfer
-    const transferResponse = await fetch('https://api.paystack.co/transfer', {
+    const transferResponse = await fetch('https://api.flutterwave.com/v3/transfers', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        source: 'balance',
-        amount: payout.amount * 100, // Convert to kobo
-        recipient: recipientData.data.recipient_code,
-        reason: `TutorNest payout - ${payoutId}`,
+        account_bank: payout.bankDetails.bankCode,
+        account_number: payout.bankDetails.accountNumber,
+        amount: payout.amount,
+        narration: `TutorNest payout - ${payoutId}`,
+        currency: 'NGN',
         reference: `PAYOUT_${payoutId}_${Date.now()}`,
+        beneficiary_name: payout.bankDetails.accountName || 'Tutor',
       }),
     });
 
     const transferData = await transferResponse.json();
 
-    if (!transferData.status) {
+    if (transferData.status !== 'success') {
       console.error('Failed to initiate transfer:', transferData);
       return c.json({ error: 'Failed to initiate transfer', details: transferData.message }, 500);
     }
@@ -492,7 +506,7 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
     payout.status = 'processing';
     payout.processedAt = new Date().toISOString();
     payout.reference = transferData.data.reference;
-    payout.transferCode = transferData.data.transfer_code;
+    payout.transferId = transferData.data.id;
     payout.processedBy = user.userId || user.id;
     await kv.set(`payout:${payoutId}`, payout);
 
@@ -684,31 +698,31 @@ app.post('/payments/initiate-plan', async (c) => {
       return c.json({ error: 'tutorId, startDate, startTime and email are required' }, 400);
     }
 
-    if (!PAYSTACK_SECRET_KEY) return c.json({ error: 'Payment not configured yet' }, 503);
+    if (!FLUTTERWAVE_SECRET_KEY) return c.json({ error: 'Payment not configured yet' }, 503);
 
     const reference = `TNP_${crypto.randomUUID().replace(/-/g, '')}`;
 
-    // Initialize transaction with Paystack
-    const paystackRes = await fetch('https://api.paystack.co/transaction/initialize', {
+    // Initialize transaction with Flutterwave
+    const flutterwaveRes = await fetch('https://api.flutterwave.com/v3/payments', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}`,
+        'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        email,
-        amount: plan.price * 100, // kobo
+        tx_ref: reference,
+        amount: plan.price,
         currency: 'NGN',
-        reference,
-        channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'],
-        metadata: { planType, tutorId, studentId, userId, startDate, startTime, subject, planName: plan.name },
+        customer: { email },
+        payment_options: 'card,banktransfer',
+        meta: { planType, tutorId, studentId, userId, startDate, startTime, subject, planName: plan.name },
       }),
     });
 
-    const paystackData = await paystackRes.json() as any;
-    if (!paystackData.status || !paystackData.data) {
-      console.error('Paystack init failed:', paystackData.message);
-      return c.json({ error: 'Failed to initialize payment with Paystack' }, 500);
+    const flutterwaveData = await flutterwaveRes.json() as any;
+    if (flutterwaveData.status !== 'success' || !flutterwaveData.data) {
+      console.error('Flutterwave init failed:', flutterwaveData.message);
+      return c.json({ error: 'Failed to initialize payment with Flutterwave' }, 500);
     }
 
     const paymentId = crypto.randomUUID();
@@ -731,7 +745,7 @@ app.post('/payments/initiate-plan', async (c) => {
     return c.json({
       success: true,
       reference,
-      access_code: paystackData.data.access_code,
+      authorizationUrl: flutterwaveData.data.link || flutterwaveData.data.payment_link,
       amount: plan.price,
       planName: plan.name,
       sessions: plan.sessions,
@@ -744,7 +758,7 @@ app.post('/payments/initiate-plan', async (c) => {
 
 // ─── Plan-based payment: confirm ─────────────────────────────────────────────
 // POST /payments/confirm-plan/:reference
-// Verifies the Paystack payment and creates all session bookings.
+// Verifies the Flutterwave payment and creates all session bookings.
 app.post('/payments/confirm-plan/:reference', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
@@ -756,15 +770,15 @@ app.post('/payments/confirm-plan/:reference', async (c) => {
       return c.json({ error: 'Invalid plan payment reference' }, 400);
     }
 
-    if (!PAYSTACK_SECRET_KEY) return c.json({ error: 'Payment not configured yet' }, 503);
+    if (!FLUTTERWAVE_SECRET_KEY) return c.json({ error: 'Payment not configured yet' }, 503);
 
-    // Verify with Paystack
-    const verifyRes = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
-      headers: { 'Authorization': `Bearer ${PAYSTACK_SECRET_KEY}` },
+    // Verify with Flutterwave
+    const verifyRes = await fetch(`https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${reference}`, {
+      headers: { 'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}` },
     });
     const verifyData = await verifyRes.json() as any;
 
-    if (!verifyData.status || verifyData.data?.status !== 'success') {
+    if (verifyData.status !== 'success' || verifyData.data?.status !== 'successful') {
       return c.json({ success: false, error: 'Payment not successful', status: verifyData.data?.status }, 400);
     }
 

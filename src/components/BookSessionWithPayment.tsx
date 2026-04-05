@@ -79,7 +79,7 @@ export function BookSessionWithPayment({
     setProcessing(plan.id);
 
     try {
-      // 1. Initialise plan payment on the backend → get Paystack reference + access_code
+      // 1. Initialise plan payment on the backend → get Flutterwave payment link
       const initRes = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/initiate-plan`,
         {
@@ -120,61 +120,61 @@ export function BookSessionWithPayment({
         throw new Error(initData.error || 'Failed to initialise payment');
       }
 
-      const { reference, access_code } = initData;
+      const { reference, authorizationUrl } = initData;
 
-      if (!access_code) {
-        throw new Error('No Paystack access code returned. Please check Paystack configuration.');
+      if (!authorizationUrl) {
+        throw new Error('No Flutterwave payment link returned. Please check Flutterwave configuration.');
       }
 
-      // 2. Open Paystack inline popup
-      await new Promise<void>((resolve, reject) => {
-        // @ts-ignore — PaystackPop is loaded via <script> in index.html
-        const handler = window.PaystackPop.setup({
-          key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
-          email: session.user.email,
-          amount: plan.price * 100, // kobo
-          currency: 'NGN',
-          ref: reference,
-          access_code,
-          callback: async (response: { reference: string }) => {
-            try {
-              // 3. Confirm payment and create all bookings
-              const confirmRes = await fetch(
-                `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/confirm-plan/${response.reference}`,
-                {
-                  method: 'POST',
-                  headers: {
-                    'Authorization': `Bearer ${session.access_token}`,
-                  },
-                }
-              );
-
-              let confirmData: any;
-              try {
-                confirmData = await confirmRes.json();
-              } catch {
-                throw new Error('Payment was received but session creation failed. Please contact support with your payment reference.');
-              }
-
-              if (!confirmRes.ok || !confirmData.success) {
-                throw new Error(confirmData.error || 'Payment confirmed by Paystack but session creation failed');
-              }
-
-              setSuccess({ sessions: confirmData.sessionsCreated, planName: plan.name });
-              resolve();
-            } catch (err: any) {
-              reject(err);
-            }
-          },
-          onClose: () => {
-            // User closed popup without paying
+      // 2. Open Flutterwave payment in new window
+      const paymentWindow = window.open(authorizationUrl, 'Flutterwave Payment', 'width=800,height=600');
+      
+      // Poll for payment completion
+      const pollInterval = setInterval(async () => {
+        try {
+          // Check if payment window is closed
+          if (paymentWindow?.closed) {
+            clearInterval(pollInterval);
             setProcessing(null);
-            resolve(); // not an error — just cancelled
-          },
-        });
+          }
+        } catch (err) {
+          // Ignore errors from cross-origin checks
+        }
+      }, 1000);
 
-        handler.openIframe();
-      });
+      // 3. Confirm payment after a delay (Flutterwave processes quickly)
+      setTimeout(async () => {
+        try {
+          clearInterval(pollInterval);
+          const confirmRes = await fetch(
+            `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/verify/${reference}`,
+            {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`,
+              },
+            }
+          );
+
+          let confirmData: any;
+          try {
+            confirmData = await confirmRes.json();
+          } catch {
+            throw new Error('Payment was received but session creation failed. Please contact support with your payment reference.');
+          }
+
+          if (!confirmRes.ok || !confirmData.success) {
+            throw new Error(confirmData.error || 'Payment confirmed by Flutterwave but session creation failed');
+          }
+
+          setSuccess({ sessions: confirmData.sessionsCreated, planName: plan.name });
+        } catch (err: any) {
+          console.error('Payment confirmation error:', err);
+          setError(err.message || 'Payment verification failed. Please try again.');
+        } finally {
+          setProcessing(null);
+        }
+      }, 3000);
     } catch (err: any) {
       console.error('Payment error:', err);
       setError(err.message || 'Payment failed. Please try again.');

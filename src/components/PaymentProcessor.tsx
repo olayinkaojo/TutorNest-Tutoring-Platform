@@ -74,25 +74,25 @@ export function PaymentProcessor({
         throw new Error(data.error || 'Failed to initialize payment');
       }
 
-      // Open Paystack payment modal
-      // @ts-ignore - PaystackPop is loaded via script
-      const handler = window.PaystackPop.setup({
-        key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
-        email: email,
-        amount: amount * 100, // Paystack expects amount in kobo
-        currency: 'NGN',
-        ref: data.payment.reference,
-        callback: async function(response: any) {
-          // Payment successful, verify with backend
-          await verifyPayment(response.reference);
-        },
-        onClose: function() {
-          setProcessing(false);
-          setStatus('idle');
-        }
-      });
+      // Open Flutterwave payment page
+      const paymentWindow = window.open(
+        data.payment.authorizationUrl,
+        'Flutterwave Payment',
+        'width=800,height=600'
+      );
 
-      handler.openIframe();
+      // Poll for payment completion
+      const pollInterval = setInterval(async () => {
+        try {
+          if (paymentWindow?.closed) {
+            clearInterval(pollInterval);
+            // Try to verify payment
+            await verifyPayment(data.payment.reference);
+          }
+        } catch (err) {
+          // Ignore errors from cross-origin checks
+        }
+      }, 1000);
     } catch (error: any) {
       console.error('Payment initialization error:', error);
       setErrorMessage(error.message || 'Failed to initialize payment');
@@ -197,7 +197,7 @@ export function PaymentProcessor({
         </Button>
 
         <p className="text-xs text-muted-foreground text-center">
-          Secured by Paystack. Your payment information is encrypted and secure.
+          Secured by Flutterwave. Your payment information is encrypted and secure.
         </p>
       </CardContent>
     </Card>

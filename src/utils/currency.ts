@@ -25,15 +25,16 @@ export function formatNaira(amount: number, includeDecimals: boolean = true): st
 }
 
 /**
- * Convert Naira to kobo (for Paystack API)
- * Paystack expects amounts in kobo (₦1 = 100 kobo)
+ * Convert Naira to kobo (for legacy Paystack API reference)
+ * Flutterwave uses direct Naira amounts
+ * Paystack expected amounts in kobo (₦1 = 100 kobo)
  */
 export function nairaToKobo(amount: number): number {
   return Math.round(amount * 100);
 }
 
 /**
- * Convert kobo to Naira (from Paystack API)
+ * Convert kobo to Naira (from legacy Paystack API reference)
  */
 export function koboToNaira(kobo: number): number {
   return kobo / 100;

@@ -320,10 +320,10 @@ export function TutorPayoutsManager() {
                   />
                   <p className="text-xs text-muted-foreground">
                     <a 
-                      href="https://paystack.com/docs/transfers/single-transfers/#supported-banks" 
+                      href="https://developer.flutterwave.com/reference/supported-banks" 
                       target="_blank" 
                       rel="noopener noreferrer"
-                      className="text-[#625d9c] hover:underline"
+                      className="text-blue-600 hover:underline"
                     >
                       Find your bank code
                     </a>
