@@ -622,108 +622,28 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       return c.json({ error: 'Server configuration error: Missing service role key. Please contact support.' }, 500);
     }
 
-    console.log('Creating Supabase client with SERVICE ROLE key for user creation...');
-    
-    let adminSupabase;
-    try {
-      adminSupabase = createClient(supabaseUrl, serviceRoleKey);
-      console.log('Admin Supabase client created successfully');
-    } catch (clientError: any) {
-      console.error('Failed to create admin Supabase client:', clientError);
-      return c.json({ 
-        error: 'Failed to initialize Supabase admin client: ' + clientError.message,
-        debug: { clientCreationError: clientError.message }
-      }, 500);
-    }
+    // Use anon client + signUp() so Supabase sends the confirmation email automatically
+    const anonSupabase = createClient(supabaseUrl, anonKey);
+    const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Create user with admin.createUser (auto-confirms email)
-    console.log('Creating user with admin.createUser method...');
-    console.log('Attempting createUser with email:', email);
-    console.log('Password length:', password?.length, 'chars');
-    
-    let createUserResult;
-    try {
-      createUserResult = await adminSupabase.auth.admin.createUser({
-        email,
-        password,
-        user_metadata: { name },
-        email_confirm: false, // Send confirmation email via Supabase built-in service
-      });
-      console.log('admin.createUser() call completed without throwing');
-    } catch (createUserError: any) {
-      console.error('EXCEPTION thrown during createUser:', createUserError);
-      console.error('Exception message:', createUserError.message);
-      console.error('Exception stack:', createUserError.stack);
-      return c.json({ 
-        error: 'CreateUser threw exception: ' + createUserError.message,
-        debug: {
-          exception: createUserError.message,
-          stack: createUserError.stack
-        }
-      }, 500);
-    }
-    
-    const { data, error } = createUserResult;
-    
-    console.log('User creation completed. Error?', !!error, 'Data?', !!data);
-    console.log('Full createUser result:', JSON.stringify(createUserResult, null, 2));
+    const { data, error } = await anonSupabase.auth.signUp({
+      email,
+      password,
+      options: { data: { name } },
+    });
 
     if (error) {
-      console.error('Error creating user with Supabase Auth:', error);
-      console.error('Error details:', JSON.stringify(error, null, 2));
-      console.error('Error status:', error.status);
-      console.error('Error code:', error.code);
-      
-      // Handle duplicate user error more gracefully
-      if (error.message?.includes('already been registered') || error.code === 'email_exists') {
+      if (error.message?.includes('already registered') || error.message?.includes('already been registered') || error.code === 'email_exists') {
         return c.json({ error: 'A user with this email already exists. Please sign in instead.' }, 409);
       }
-      
-      // Handle specific Supabase validation errors
-      if (error.message?.includes('invalid email') || error.message?.includes('email')) {
-        return c.json({ error: 'Please enter a valid email address' }, 400);
-      }
-      
-      if (error.message?.includes('password') || error.message?.includes('weak')) {
-        return c.json({ error: 'Password must be at least 6 characters long' }, 400);
-      }
-      
-      if (error.message?.includes('pattern') || error.message?.includes('syntax')) {
-        return c.json({ error: 'Invalid email or password format. Email must be valid and password must be at least 6 characters.' }, 400);
-      }
-      
-      // Return auth errors with 401 status - include full error details
-      if (error.status === 401 || error.message?.includes('JWT') || error.message?.includes('unauthorized')) {
-        const detailedError = `Authentication error: ${error.message} | Status: ${error.status} | Code: ${error.code} | Name: ${error.name}`;
-        console.error('Returning 401 with details:', detailedError);
-        return c.json({ 
-          error: detailedError,
-          debug: {
-            message: error.message,
-            status: error.status,
-            code: error.code,
-            name: error.name
-          }
-        }, 401);
-      }
-      
-      return c.json({ 
-        error: error.message || 'Failed to create account',
-        debug: {
-          message: error.message,
-          status: error.status,
-          code: error.code
-        }
-      }, error.status || 400);
+      return c.json({ error: error.message || 'Failed to create account' }, 400);
     }
 
-    if (!data || !data.user) {
-      console.error('No user data returned from Supabase');
+    if (!data?.user) {
       return c.json({ error: 'Failed to create account - no user data returned' }, 500);
     }
 
-    console.log('User created successfully:', data.user.id);
-    console.log('User email confirmed:', data.user.email_confirmed_at ? 'YES' : 'NO');
+    console.log('User created via signUp, confirmation email sent for:', email);
 
     // Detect admin email and auto-assign role
     const isAdmin = email.toLowerCase().includes('admin@') || email.toLowerCase() === 'admin@tutornest.com';
