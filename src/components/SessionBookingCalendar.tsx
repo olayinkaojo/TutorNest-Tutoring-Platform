@@ -10,6 +10,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { projectId } from '../utils/supabase/info';
 import { formatNaira } from '../utils/currency';
+import { BookSessionWithPayment } from './BookSessionWithPayment';
 import {
   Calendar as CalendarIcon,
   Clock,
@@ -57,6 +58,7 @@ export function SessionBookingCalendar({
   const [sessionDuration, setSessionDuration] = useState<string>('60');
   const [sessionNotes, setSessionNotes] = useState('');
   const [showConfirmDialog, setShowConfirmDialog] = useState(false);
+  const [showPaymentPlans, setShowPaymentPlans] = useState(false);
   const [booking, setBooking] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -467,7 +469,7 @@ export function SessionBookingCalendar({
                 </div>
 
                 <Button
-                  onClick={() => setShowConfirmDialog(true)}
+                  onClick={() => setShowPaymentPlans(true)}
                   className="w-full text-white h-12"
                   style={{ backgroundColor: '#625d9c' }}
                 >
@@ -476,7 +478,7 @@ export function SessionBookingCalendar({
                 </Button>
 
                 <p className="text-xs text-center text-gray-500">
-                  This time will be blocked on both the tutor's and student's calendar
+                  Choose a plan and pay securely with Paystack
                 </p>
               </CardContent>
             </Card>
@@ -484,7 +486,28 @@ export function SessionBookingCalendar({
         </div>
       </div>
 
-      {/* Confirmation Dialog */}
+      {/* Payment Plan Dialog */}
+      {showPaymentPlans && selectedTutor && selectedDate && selectedSlot && (
+        <BookSessionWithPayment
+          session={session}
+          tutorId={selectedTutor}
+          tutorName={selectedTutorData?.name ?? ''}
+          studentId={activeChildId}
+          studentName={childName ?? ''}
+          startDate={selectedDate.toISOString().split('T')[0]}
+          startTime={selectedSlot}
+          onSuccess={(sessionsCreated) => {
+            setShowPaymentPlans(false);
+            setSuccess(`Payment successful! ${sessionsCreated} session${sessionsCreated > 1 ? 's' : ''} booked and added to your calendar.`);
+            setSelectedSlot('');
+            setSessionNotes('');
+            fetchAvailableSlots();
+          }}
+          onCancel={() => setShowPaymentPlans(false)}
+        />
+      )}
+
+      {/* Confirmation Dialog (kept for reference — now superseded by payment flow) */}
       <Dialog open={showConfirmDialog} onOpenChange={setShowConfirmDialog}>
         <DialogContent>
           <DialogHeader>

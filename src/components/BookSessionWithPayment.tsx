@@ -4,83 +4,84 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter }
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { Check, Calendar, Clock, TrendingUp, Loader2, AlertCircle } from 'lucide-react';
-import { projectId } from '../utils/supabase/info';
-import { toast } from 'sonner@2.0.3';
+import { Check, Calendar, Clock, TrendingUp, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
+
+// ─── Fixed plan definitions ────────────────────────────────────────────────
+const PLANS = [
+  {
+    id: 'trial',
+    planType: 'trial' as const,
+    name: 'Trial Session',
+    description: 'Try one session before committing to a full term.',
+    price: 20_000,
+    sessions: 1,
+    sessionsPerWeek: 1,
+    weeks: 1,
+  },
+  {
+    id: 'once_weekly',
+    planType: 'once_weekly' as const,
+    name: 'Once a Week',
+    description: '1 session per week for a full 13-week term.',
+    price: 260_000,
+    sessions: 13,
+    sessionsPerWeek: 1,
+    weeks: 13,
+  },
+  {
+    id: 'twice_weekly',
+    planType: 'twice_weekly' as const,
+    name: 'Twice a Week',
+    description: '2 sessions per week for a full 13-week term.',
+    price: 520_000,
+    sessions: 26,
+    sessionsPerWeek: 2,
+    weeks: 13,
+  },
+];
 
 interface BookSessionWithPaymentProps {
   session: any;
-  booking: {
-    tutorId: string;
-    tutorName: string;
-    studentId: string;
-    studentName: string;
-    subject: string;
-  };
-  onSuccess?: () => void;
+  tutorId: string;
+  tutorName: string;
+  studentId: string;
+  studentName: string;
+  subject?: string;
+  startDate: string;   // YYYY-MM-DD
+  startTime: string;   // HH:MM
+  onSuccess?: (sessionsCreated: number) => void;
   onCancel?: () => void;
 }
 
-interface PaymentPlan {
-  id: string;
-  plan_type: 'trial' | 'once_weekly' | 'twice_weekly';
-  name: string;
-  description: string;
-  price_naira: number;
-  sessions_count: number;
-  duration_weeks: number;
-  sessions_per_week: number;
+function formatNaira(amount: number): string {
+  return `₦${amount.toLocaleString('en-NG')}`;
 }
 
 export function BookSessionWithPayment({
   session,
-  booking,
+  tutorId,
+  tutorName,
+  studentId,
+  studentName,
+  subject,
+  startDate,
+  startTime,
   onSuccess,
   onCancel,
 }: BookSessionWithPaymentProps) {
-  const [plans, setPlans] = useState<PaymentPlan[]>([]);
-  const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
-  const [selectedPlan, setSelectedPlan] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState<{ sessions: number; planName: string } | null>(null);
 
-  // Fetch plans on mount
-  useState(() => {
-    fetchPlans();
-  });
-
-  const fetchPlans = async () => {
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/plans`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch payment plans');
-      }
-
-      const data = await response.json();
-      setPlans(data.plans || []);
-    } catch (error: any) {
-      console.error('Error fetching plans:', error);
-      toast.error('Failed to load payment plans');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleSelectPlan = async (plan: PaymentPlan) => {
-    setSelectedPlan(plan.id);
+  const handleSelectPlan = async (plan: typeof PLANS[number]) => {
+    setError('');
     setProcessing(plan.id);
 
     try {
-      // Initialize payment with new system
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/initiate`,
+      // 1. Initialise plan payment on the backend → get Paystack reference + access_code
+      const initRes = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/initiate-plan`,
         {
           method: 'POST',
           headers: {
@@ -88,105 +89,186 @@ export function BookSessionWithPayment({
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            planType: plan.plan_type,
-            tutorId: booking.tutorId,
-            preferredStartDate: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0],
-            preferredTime: '10:00',
-            subject: booking.subject,
+            planType: plan.planType,
+            tutorId,
+            studentId,
+            startDate,
+            startTime,
+            subject: subject ?? '',
+            email: session.user.email,
           }),
         }
       );
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Failed to initialize payment');
+      // Safely parse JSON — if the response is not JSON (e.g. edge function not deployed),
+      // show a clear error instead of a cryptic SyntaxError.
+      let initData: any;
+      const rawText = await initRes.text();
+      try {
+        initData = JSON.parse(rawText);
+      } catch {
+        if (!initRes.ok) {
+          throw new Error(
+            `Server error (${initRes.status}). The payment endpoint may not be deployed yet. ` +
+            `Please deploy the Supabase edge function and try again.`
+          );
+        }
+        throw new Error('Unexpected server response. Please try again.');
       }
 
-      const data = await response.json();
+      if (!initRes.ok || !initData.success) {
+        throw new Error(initData.error || 'Failed to initialise payment');
+      }
 
-      // Store payment reference for verification
-      localStorage.setItem('pending_payment_reference', data.reference);
-      localStorage.setItem('pending_payment_id', data.payment_id);
+      const { reference, access_code } = initData;
 
-      // Close dialog before redirecting
-      onCancel?.();
+      if (!access_code) {
+        throw new Error('No Paystack access code returned. Please check Paystack configuration.');
+      }
 
-      // Redirect to Paystack
-      window.location.href = data.authorization_url;
+      // 2. Open Paystack inline popup
+      await new Promise<void>((resolve, reject) => {
+        // @ts-ignore — PaystackPop is loaded via <script> in index.html
+        const handler = window.PaystackPop.setup({
+          key: import.meta.env.VITE_PAYSTACK_PUBLIC_KEY,
+          email: session.user.email,
+          amount: plan.price * 100, // kobo
+          currency: 'NGN',
+          ref: reference,
+          access_code,
+          callback: async (response: { reference: string }) => {
+            try {
+              // 3. Confirm payment and create all bookings
+              const confirmRes = await fetch(
+                `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/confirm-plan/${response.reference}`,
+                {
+                  method: 'POST',
+                  headers: {
+                    'Authorization': `Bearer ${session.access_token}`,
+                  },
+                }
+              );
 
-    } catch (error: any) {
-      console.error('Error initiating payment:', error);
-      toast.error(error.message || 'Failed to process payment');
+              let confirmData: any;
+              try {
+                confirmData = await confirmRes.json();
+              } catch {
+                throw new Error('Payment was received but session creation failed. Please contact support with your payment reference.');
+              }
+
+              if (!confirmRes.ok || !confirmData.success) {
+                throw new Error(confirmData.error || 'Payment confirmed by Paystack but session creation failed');
+              }
+
+              setSuccess({ sessions: confirmData.sessionsCreated, planName: plan.name });
+              resolve();
+            } catch (err: any) {
+              reject(err);
+            }
+          },
+          onClose: () => {
+            // User closed popup without paying
+            setProcessing(null);
+            resolve(); // not an error — just cancelled
+          },
+        });
+
+        handler.openIframe();
+      });
+    } catch (err: any) {
+      console.error('Payment error:', err);
+      setError(err.message || 'Payment failed. Please try again.');
+    } finally {
       setProcessing(null);
-      setSelectedPlan(null);
     }
   };
 
-  const formatNaira = (amount: number): string => {
-    return `₦${amount.toLocaleString('en-NG')}`;
-  };
-
-  const calculatePerSessionPrice = (totalPrice: number, sessions: number): string => {
-    return formatNaira(Math.round(totalPrice / sessions));
-  };
-
-  if (loading) {
+  // ─── Success screen ──────────────────────────────────────────────────────
+  if (success) {
     return (
-      <Dialog open={true} onOpenChange={(open) => !open && onCancel?.()}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
-          <div className="flex items-center justify-center py-12">
-            <Loader2 className="w-8 h-8 animate-spin text-[#625d9c]" />
+      <Dialog open onOpenChange={(open) => { if (!open) onSuccess?.(success.sessions); }}>
+        <DialogContent className="max-w-md text-center">
+          <div className="py-6 space-y-4">
+            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ backgroundColor: '#f0f4ff' }}>
+              <CheckCircle className="w-9 h-9" style={{ color: '#625d9c' }} />
+            </div>
+            <h2 className="text-xl font-bold">Booking Confirmed!</h2>
+            <p className="text-gray-600">
+              <span className="font-semibold">{success.sessions} session{success.sessions > 1 ? 's' : ''}</span> have been scheduled
+              with <span className="font-semibold">{tutorName}</span>.
+            </p>
+            <p className="text-sm text-gray-500">
+              Starting <strong>{new Date(startDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> at <strong>{startTime}</strong>
+            </p>
+            <Alert className="bg-blue-50 border-blue-200 text-left">
+              <AlertCircle className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800 text-sm">
+                Calendar invites will be sent to both you and your tutor.
+              </AlertDescription>
+            </Alert>
+            <Button
+              className="w-full text-white"
+              style={{ backgroundColor: '#625d9c' }}
+              onClick={() => onSuccess?.(success.sessions)}
+            >
+              View My Bookings
+            </Button>
           </div>
         </DialogContent>
       </Dialog>
     );
   }
 
+  // ─── Plan selector ───────────────────────────────────────────────────────
   return (
-    <Dialog open={true} onOpenChange={(open) => !open && onCancel?.()}>
+    <Dialog open onOpenChange={(open) => { if (!open) onCancel?.(); }}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="text-2xl">Choose Your Tutoring Plan</DialogTitle>
           <DialogDescription>
-            Book sessions with <span className="font-semibold text-[#625d9c]">{booking.tutorName}</span> for {booking.subject}
+            Book sessions with <span className="font-semibold" style={{ color: '#625d9c' }}>{tutorName}</span>
+            {subject ? ` for ${subject}` : ''}
           </DialogDescription>
         </DialogHeader>
 
-        {/* Session Info Alert */}
-        <Alert className="bg-blue-50 dark:bg-blue-950 border-blue-200 dark:border-blue-800">
+        <Alert className="bg-blue-50 border-blue-200">
           <AlertCircle className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-900 dark:text-blue-100">
-            <strong>Student:</strong> {booking.studentName} • <strong>Subject:</strong> {booking.subject}
+          <AlertDescription className="text-blue-900">
+            <strong>Student:</strong> {studentName}
+            {subject && <> &bull; <strong>Subject:</strong> {subject}</>}
+            &bull; <strong>Start:</strong>{' '}
+            {new Date(startDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} at {startTime}
           </AlertDescription>
         </Alert>
 
-        {/* Plans Grid */}
-        <div className="grid md:grid-cols-3 gap-6">
-          {plans.map((plan) => {
-            const isPopular = plan.plan_type === 'once_weekly';
-            const isBestValue = plan.plan_type === 'twice_weekly';
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {/* Plans grid */}
+        <div className="grid md:grid-cols-3 gap-6 mt-2">
+          {PLANS.map((plan) => {
+            const isPopular = plan.planType === 'once_weekly';
+            const isBestValue = plan.planType === 'twice_weekly';
             const isProcessing = processing === plan.id;
+            const perSession = Math.round(plan.price / plan.sessions);
 
             return (
               <Card
                 key={plan.id}
-                className={`relative transition-all hover:shadow-lg ${
-                  selectedPlan === plan.id ? 'ring-2 ring-[#625d9c]' : ''
-                } ${isPopular || isBestValue ? 'border-[#625d9c]' : ''}`}
+                className={`relative transition-all hover:shadow-lg ${isPopular || isBestValue ? 'border-[#625d9c]' : ''}`}
               >
-                {/* Badge */}
                 {isPopular && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <Badge className="px-4 py-1 bg-[#625d9c] hover:bg-[#625d9c]/90">
-                      Most Popular
-                    </Badge>
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <Badge className="px-4 py-1 bg-[#625d9c] hover:bg-[#625d9c]/90">Most Popular</Badge>
                   </div>
                 )}
                 {isBestValue && (
-                  <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                    <Badge className="px-4 py-1 bg-[#5d9827] hover:bg-[#5d9827]/90">
-                      Best Value
-                    </Badge>
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
+                    <Badge className="px-4 py-1 bg-[#5d9827] hover:bg-[#5d9827]/90">Best Value</Badge>
                   </div>
                 )}
 
@@ -196,30 +278,28 @@ export function BookSessionWithPayment({
                 </CardHeader>
 
                 <CardContent className="space-y-4">
-                  {/* Price */}
                   <div className="text-center py-4">
-                    <div className="text-3xl font-bold text-[#625d9c]">
-                      {formatNaira(plan.price_naira)}
+                    <div className="text-3xl font-bold" style={{ color: '#625d9c' }}>
+                      {formatNaira(plan.price)}
                     </div>
                     <div className="text-sm text-muted-foreground mt-1">
-                      {calculatePerSessionPrice(plan.price_naira, plan.sessions_count)} per session
+                      {plan.sessions > 1 ? `${formatNaira(perSession)} per session` : 'flat rate'}
                     </div>
                   </div>
 
-                  {/* Features */}
                   <div className="space-y-3">
                     <div className="flex items-start gap-2">
-                      <Calendar className="w-5 h-5 text-[#5d9827] mt-0.5 flex-shrink-0" />
+                      <Calendar className="w-5 h-5 text-[#5d9827] mt-0.5 shrink-0" />
                       <div className="text-sm">
-                        <div className="font-semibold">{plan.sessions_count} Sessions</div>
+                        <div className="font-semibold">{plan.sessions} Session{plan.sessions > 1 ? 's' : ''}</div>
                         <div className="text-muted-foreground">
-                          {plan.sessions_per_week}x per week for {plan.duration_weeks} weeks
+                          {plan.sessionsPerWeek}× per week{plan.weeks > 1 ? ` for ${plan.weeks} weeks` : ''}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-start gap-2">
-                      <Clock className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                      <Clock className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
                       <div className="text-sm">
                         <div className="font-semibold">60-minute sessions</div>
                         <div className="text-muted-foreground">Full hour of focused learning</div>
@@ -227,24 +307,25 @@ export function BookSessionWithPayment({
                     </div>
 
                     <div className="flex items-start gap-2">
-                      <Check className="w-5 h-5 text-[#625d9c] mt-0.5 flex-shrink-0" />
+                      <Check className="w-5 h-5 text-[#625d9c] mt-0.5 shrink-0" />
                       <div className="text-sm">
-                        <div className="font-semibold">Scheduled booking</div>
+                        <div className="font-semibold">
+                          {plan.planType === 'trial' ? 'Pick your time' : 'Calendar blocked'}
+                        </div>
                         <div className="text-muted-foreground">
-                          {plan.plan_type === 'trial' 
-                            ? 'Pick your time'
-                            : 'Auto-scheduled sessions'
-                          }
+                          {plan.planType === 'trial'
+                            ? 'Choose any available slot'
+                            : 'All sessions auto-scheduled & locked in'}
                         </div>
                       </div>
                     </div>
 
-                    {plan.plan_type !== 'trial' && (
+                    {plan.planType !== 'trial' && (
                       <div className="flex items-start gap-2">
-                        <TrendingUp className="w-5 h-5 text-orange-600 mt-0.5 flex-shrink-0" />
+                        <TrendingUp className="w-5 h-5 text-orange-600 mt-0.5 shrink-0" />
                         <div className="text-sm">
                           <div className="font-semibold">Progress tracking</div>
-                          <div className="text-muted-foreground">Monitor improvement</div>
+                          <div className="text-muted-foreground">Monitor improvement over the term</div>
                         </div>
                       </div>
                     )}
@@ -257,18 +338,13 @@ export function BookSessionWithPayment({
                     size="lg"
                     onClick={() => handleSelectPlan(plan)}
                     disabled={!!processing}
-                    style={{ 
-                      background: isPopular || isBestValue ? '#625d9c' : undefined 
-                    }}
                     variant={isPopular || isBestValue ? 'default' : 'outline'}
+                    style={isPopular || isBestValue ? { backgroundColor: '#625d9c' } : undefined}
                   >
                     {isProcessing ? (
-                      <>
-                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                        Processing...
-                      </>
+                      <><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Processing...</>
                     ) : (
-                      <>Select {plan.name}</>
+                      `Pay ${formatNaira(plan.price)}`
                     )}
                   </Button>
                 </CardFooter>
@@ -277,31 +353,28 @@ export function BookSessionWithPayment({
           })}
         </div>
 
-        {/* Info Footer */}
+        {/* Footer info */}
         <div className="mt-4 p-4 bg-muted rounded-lg">
           <div className="grid md:grid-cols-2 gap-3 text-sm">
             <div className="flex items-start gap-2">
-              <Check className="w-4 h-4 text-[#5d9827] mt-0.5 flex-shrink-0" />
+              <Check className="w-4 h-4 text-[#5d9827] mt-0.5 shrink-0" />
               <div>
                 <div className="font-semibold">Secure Payment</div>
-                <div className="text-muted-foreground">Protected by Paystack</div>
+                <div className="text-muted-foreground">Protected by Paystack — card, bank, USSD accepted</div>
               </div>
             </div>
             <div className="flex items-start gap-2">
-              <Check className="w-4 h-4 text-[#5d9827] mt-0.5 flex-shrink-0" />
+              <Check className="w-4 h-4 text-[#5d9827] mt-0.5 shrink-0" />
               <div>
-                <div className="font-semibold">Currency: Nigerian Naira (₦)</div>
-                <div className="text-muted-foreground">Card payments accepted</div>
+                <div className="font-semibold">Nigerian Naira (₦)</div>
+                <div className="text-muted-foreground">Any card charged at the current Naira rate</div>
               </div>
             </div>
           </div>
         </div>
 
-        {/* Cancel Button */}
         <div className="flex justify-center pt-2">
-          <Button variant="ghost" onClick={onCancel}>
-            Cancel
-          </Button>
+          <Button variant="ghost" onClick={onCancel} disabled={!!processing}>Cancel</Button>
         </div>
       </DialogContent>
     </Dialog>
