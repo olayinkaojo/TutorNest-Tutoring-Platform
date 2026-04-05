@@ -40,10 +40,19 @@ import paymentPlansRoutes from './payment-plans-routes.tsx';
 const app = new Hono();
 
 // Middleware
-const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') ?? 'http://localhost:3000').split(',').map(o => o.trim());
+const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') ?? '').split(',').map(o => o.trim()).filter(Boolean);
 
 app.use('*', cors({
-  origin: (origin) => allowedOrigins.includes(origin) ? origin : allowedOrigins[0],
+  origin: (origin) => {
+    // Always allow localhost on any port (development)
+    if (origin && /^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
+    // Always allow tutornest.com and any subdomain (production)
+    if (origin && /https?:\/\/(.*\.)?tutornest\.com$/.test(origin)) return origin;
+    // Allow any explicitly configured origin
+    if (allowedOrigins.includes(origin)) return origin;
+    // Default: reflect the origin back (Supabase dashboard calls, Postman, etc.)
+    return origin ?? '*';
+  },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowHeaders: ['Content-Type', 'Authorization'],
   credentials: true,
