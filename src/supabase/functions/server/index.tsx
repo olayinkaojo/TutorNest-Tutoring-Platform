@@ -32,6 +32,7 @@ import curriculumRoutes from './curriculum-routes.tsx';
 import triviaRoutes from './trivia-routes.tsx';
 import tutorSessionReportsRoutes from './tutor-session-reports-routes.tsx';
 import paymentRoutes from './payment-routes.tsx';
+import { upsertProfile } from './db.tsx';
 import liveSessionRoutes from './live-session-routes.tsx';
 import payoutRoutes from './payout-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
@@ -666,7 +667,7 @@ app.post('/make-server-cbd74580/signup', async (c) => {
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({
-            from: 'TutorNest <onboarding@resend.dev>',
+            from: 'TutorNest <noreply@tutornest.org>',
             to: [email],
             subject: 'Confirm your TutorNest account',
             html: `
@@ -738,6 +739,15 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       await kv.set(`user:${data.user.id}`, initialProfile);
       console.log('✅ Initial profile saved to KV store:', JSON.stringify(initialProfile, null, 2));
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      // Also write to proper profiles table (dual-write during migration)
+      try {
+        await upsertProfile(data.user.id, initialProfile);
+        console.log('✅ Profile also saved to profiles table');
+      } catch (dbError: any) {
+        // Non-fatal — schema.sql may not have been run yet
+        console.warn('⚠️ Could not write to profiles table (run schema.sql first):', dbError.message);
+      }
     } catch (kvError: any) {
       console.error('❌ Error creating user profile in KV store:', kvError);
       console.error('KV Error details:', JSON.stringify(kvError, null, 2));

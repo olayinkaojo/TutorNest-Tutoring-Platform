@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
 
 const app = new Hono();
 
@@ -726,7 +727,9 @@ app.post('/payments/initiate-plan', async (c) => {
     }
 
     const paymentId = crypto.randomUUID();
-    await kv.set(`payment:${paymentId}`, {
+
+    // Write to proper payments table
+    await db.createPayment({
       id: paymentId,
       userId,
       tutorId,
@@ -738,9 +741,7 @@ app.post('/payments/initiate-plan', async (c) => {
       startTime,
       subject: subject ?? null,
       status: 'pending',
-      createdAt: new Date().toISOString(),
     });
-    await kv.set(`payment_ref:${reference}`, paymentId);
 
     return c.json({
       success: true,
@@ -782,12 +783,11 @@ app.post('/payments/confirm-plan/:reference', async (c) => {
       return c.json({ success: false, error: 'Payment not successful', status: verifyData.data?.status }, 400);
     }
 
-    // Get our payment record
-    const paymentId = await kv.get(`payment_ref:${reference}`) as string;
-    if (!paymentId) return c.json({ error: 'Payment record not found' }, 404);
+    // Get our payment record from the database
+    const payment = await db.getPaymentByReference(reference);
+    if (!payment) return c.json({ error: 'Payment record not found' }, 404);
 
-    const payment = await kv.get(`payment:${paymentId}`) as any;
-    if (!payment) return c.json({ error: 'Payment not found' }, 404);
+    const paymentId = payment.id;
 
     // Idempotency: already confirmed
     if (payment.status === 'successful') {
@@ -805,7 +805,7 @@ app.post('/payments/confirm-plan/:reference', async (c) => {
     const bookingIds: string[] = [];
     for (let i = 0; i < bookingDates.length; i++) {
       const bookingId = crypto.randomUUID();
-      await kv.set(`booking:${bookingId}`, {
+      await db.createBooking({
         id: bookingId,
         paymentId,
         planType: payment.planType,
@@ -821,37 +821,27 @@ app.post('/payments/confirm-plan/:reference', async (c) => {
         subject: payment.subject,
         status: 'scheduled',
         paymentStatus: 'paid',
-        createdAt: new Date().toISOString(),
       });
       bookingIds.push(bookingId);
     }
 
-    // Update payment status
-    payment.status = 'successful';
-    payment.confirmedAt = new Date().toISOString();
-    payment.bookingIds = bookingIds;
-    await kv.set(`payment:${paymentId}`, payment);
+    // Mark payment as confirmed in database
+    await db.updatePayment(paymentId, {
+      status: 'successful',
+      bookingIds,
+      confirmedAt: new Date().toISOString(),
+    });
 
     // Update tutor balance (80/20 split)
     const tutorAmount = payment.amount * 0.8;
-    const balanceKey = `tutor_balance:${payment.tutorId}`;
-    const balance = (await kv.get(balanceKey) as any) ?? { pendingBalance: 0, availableBalance: 0, totalEarnings: 0, totalPayouts: 0 };
-    balance.tutorId = payment.tutorId;
-    balance.pendingBalance = (balance.pendingBalance || 0) + tutorAmount;
-    balance.totalEarnings = (balance.totalEarnings || 0) + tutorAmount;
-    balance.lastUpdated = new Date().toISOString();
-    await kv.set(balanceKey, balance);
+    await db.incrementTutorBalance(payment.tutorId, tutorAmount);
 
     // Notify tutor
-    const notifId = `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    await kv.set(`notification:${notifId}`, {
-      id: notifId,
+    await db.createNotification({
       userId: payment.tutorId,
       type: 'payment_received',
       title: 'New Plan Booking',
       message: `You have a new ${plan.name} booking — ${plan.sessions} sessions starting ${payment.startDate}. Expected earnings: ₦${tutorAmount.toLocaleString()}.`,
-      read: false,
-      createdAt: new Date().toISOString(),
     });
 
     return c.json({

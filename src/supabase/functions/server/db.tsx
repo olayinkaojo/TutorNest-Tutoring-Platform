@@ -1,0 +1,347 @@
+/**
+ * db.tsx — Typed Supabase Postgres operations for TutorNest core tables.
+ *
+ * Tables covered: profiles, bookings, payments, tutor_balance, notifications
+ *
+ * Run schema.sql in Supabase before using these functions:
+ * https://supabase.com/dashboard/project/wevmvbskunhnhuxzaqoz/sql/new
+ */
+
+import { createClient } from 'jsr:@supabase/supabase-js@2';
+
+function db() {
+  return createClient(
+    Deno.env.get('SUPABASE_URL') ?? '',
+    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+  );
+}
+
+// ─── Profiles ─────────────────────────────────────────────────────────────────
+
+/** Returns the profile object in the same shape the KV store used. */
+export async function getProfile(userId: string): Promise<any | null> {
+  const { data, error } = await db()
+    .from('profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  // Merge typed columns on top of raw_data so callers get up-to-date values
+  return { ...data.raw_data, id: data.id, userId: data.id, role: data.role, email: data.email, fullName: data.full_name };
+}
+
+/** Writes (or overwrites) a profile row. Safe to call on every update. */
+export async function upsertProfile(userId: string, profileData: any): Promise<void> {
+  const { error } = await db()
+    .from('profiles')
+    .upsert(
+      {
+        id: userId,
+        role: profileData.role ?? null,
+        email: profileData.email ?? null,
+        full_name: profileData.fullName ?? profileData.name ?? null,
+        raw_data: profileData,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'id' },
+    );
+  if (error) throw new Error(error.message);
+}
+
+/** Returns all profiles with a given role. */
+export async function getProfilesByRole(role: string): Promise<any[]> {
+  const { data, error } = await db()
+    .from('profiles')
+    .select('*')
+    .eq('role', role);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    ...row.raw_data,
+    id: row.id,
+    userId: row.id,
+    role: row.role,
+    email: row.email,
+    fullName: row.full_name,
+  }));
+}
+
+// ─── Bookings ─────────────────────────────────────────────────────────────────
+
+export interface BookingRow {
+  id: string;
+  paymentId: string;
+  planType: string;
+  sessionNumber: number;
+  totalSessions: number;
+  tutorId: string;
+  studentId: string;
+  userId: string;
+  date: string;      // YYYY-MM-DD
+  startTime: string; // HH:MM
+  endTime: string;   // HH:MM
+  duration: number;
+  subject: string | null;
+  status: string;
+  paymentStatus: string;
+}
+
+export async function createBooking(booking: BookingRow): Promise<void> {
+  const { error } = await db()
+    .from('bookings')
+    .insert({
+      id: booking.id,
+      payment_id: booking.paymentId,
+      plan_type: booking.planType,
+      session_number: booking.sessionNumber,
+      total_sessions: booking.totalSessions,
+      tutor_id: booking.tutorId,
+      student_id: booking.studentId,
+      user_id: booking.userId,
+      date: booking.date,
+      start_time: booking.startTime,
+      end_time: booking.endTime,
+      duration: booking.duration,
+      subject: booking.subject,
+      status: booking.status,
+      payment_status: booking.paymentStatus,
+    });
+  if (error) throw new Error(error.message);
+}
+
+/** Returns all bookings for a tutor on a specific date (for availability checks). */
+export async function getBookingsByTutorAndDate(tutorId: string, date: string): Promise<Pick<BookingRow, 'startTime' | 'endTime' | 'status'>[]> {
+  const { data, error } = await db()
+    .from('bookings')
+    .select('start_time, end_time, status')
+    .eq('tutor_id', tutorId)
+    .eq('date', date)
+    .in('status', ['scheduled', 'confirmed']);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    startTime: row.start_time,
+    endTime: row.end_time,
+    status: row.status,
+  }));
+}
+
+/** Returns all bookings for a student on a specific date (for conflict checks). */
+export async function getBookingsByStudentAndDate(studentId: string, date: string): Promise<Pick<BookingRow, 'startTime' | 'endTime' | 'status'>[]> {
+  const { data, error } = await db()
+    .from('bookings')
+    .select('start_time, end_time, status')
+    .eq('student_id', studentId)
+    .eq('date', date)
+    .in('status', ['scheduled', 'confirmed']);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    startTime: row.start_time,
+    endTime: row.end_time,
+    status: row.status,
+  }));
+}
+
+/** Returns all bookings for a user (as student, tutor, or paying parent). */
+export async function getBookingsByUserId(userId: string): Promise<BookingRow[]> {
+  const { data, error } = await db()
+    .from('bookings')
+    .select('*')
+    .or(`user_id.eq.${userId},tutor_id.eq.${userId},student_id.eq.${userId}`)
+    .order('date', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    paymentId: row.payment_id,
+    planType: row.plan_type,
+    sessionNumber: row.session_number,
+    totalSessions: row.total_sessions,
+    tutorId: row.tutor_id,
+    studentId: row.student_id,
+    userId: row.user_id,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    duration: row.duration,
+    subject: row.subject,
+    status: row.status,
+    paymentStatus: row.payment_status,
+  }));
+}
+
+// ─── Payments ─────────────────────────────────────────────────────────────────
+
+export interface PaymentRow {
+  id: string;
+  userId: string;
+  tutorId: string;
+  studentId: string;
+  planType: string;
+  amount: number;
+  reference: string;
+  startDate: string;
+  startTime: string;
+  subject: string | null;
+  status: string;
+  bookingIds?: string[];
+  confirmedAt?: string;
+}
+
+export async function createPayment(payment: PaymentRow): Promise<void> {
+  const { error } = await db()
+    .from('payments')
+    .insert({
+      id: payment.id,
+      user_id: payment.userId,
+      tutor_id: payment.tutorId,
+      student_id: payment.studentId,
+      plan_type: payment.planType,
+      amount: payment.amount,
+      reference: payment.reference,
+      start_date: payment.startDate,
+      start_time: payment.startTime,
+      subject: payment.subject,
+      status: payment.status,
+    });
+  if (error) throw new Error(error.message);
+}
+
+export async function getPaymentByReference(reference: string): Promise<PaymentRow | null> {
+  const { data, error } = await db()
+    .from('payments')
+    .select('*')
+    .eq('reference', reference)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return {
+    id: data.id,
+    userId: data.user_id,
+    tutorId: data.tutor_id,
+    studentId: data.student_id,
+    planType: data.plan_type,
+    amount: data.amount,
+    reference: data.reference,
+    startDate: data.start_date,
+    startTime: data.start_time,
+    subject: data.subject,
+    status: data.status,
+    bookingIds: data.booking_ids ?? [],
+    confirmedAt: data.confirmed_at,
+  };
+}
+
+export async function updatePayment(id: string, updates: {
+  status?: string;
+  bookingIds?: string[];
+  confirmedAt?: string;
+}): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (updates.status !== undefined) row.status = updates.status;
+  if (updates.bookingIds !== undefined) row.booking_ids = updates.bookingIds;
+  if (updates.confirmedAt !== undefined) row.confirmed_at = updates.confirmedAt;
+  const { error } = await db().from('payments').update(row).eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
+// ─── Tutor Balance ────────────────────────────────────────────────────────────
+
+export async function getTutorBalance(tutorId: string): Promise<{
+  tutor_id: string;
+  pending_balance: number;
+  available_balance: number;
+  total_earnings: number;
+  total_payouts: number;
+}> {
+  const { data, error } = await db()
+    .from('tutor_balance')
+    .select('*')
+    .eq('tutor_id', tutorId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ?? {
+    tutor_id: tutorId,
+    pending_balance: 0,
+    available_balance: 0,
+    total_earnings: 0,
+    total_payouts: 0,
+  };
+}
+
+/**
+ * Atomically adds tutorAmount to pending_balance and total_earnings.
+ * Creates the row if it doesn't exist yet.
+ */
+export async function incrementTutorBalance(tutorId: string, tutorAmount: number): Promise<void> {
+  const current = await getTutorBalance(tutorId);
+  const { error } = await db()
+    .from('tutor_balance')
+    .upsert(
+      {
+        tutor_id: tutorId,
+        pending_balance: (current.pending_balance ?? 0) + tutorAmount,
+        available_balance: current.available_balance ?? 0,
+        total_earnings: (current.total_earnings ?? 0) + tutorAmount,
+        total_payouts: current.total_payouts ?? 0,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tutor_id' },
+    );
+  if (error) throw new Error(error.message);
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export async function createNotification(notification: {
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  const { error } = await db()
+    .from('notifications')
+    .insert({
+      user_id: notification.userId,
+      type: notification.type,
+      title: notification.title,
+      message: notification.message,
+      metadata: notification.metadata ?? null,
+    });
+  if (error) throw new Error(error.message);
+}
+
+export async function getNotificationsByUser(userId: string): Promise<{
+  id: string;
+  userId: string;
+  type: string;
+  title: string;
+  message: string;
+  read: boolean;
+  metadata: any;
+  createdAt: string;
+}[]> {
+  const { data, error } = await db()
+    .from('notifications')
+    .select('*')
+    .eq('user_id', userId)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    type: row.type,
+    title: row.title,
+    message: row.message,
+    read: row.read,
+    metadata: row.metadata,
+    createdAt: row.created_at,
+  }));
+}
+
+export async function markNotificationRead(notificationId: string): Promise<void> {
+  const { error } = await db()
+    .from('notifications')
+    .update({ read: true })
+    .eq('id', notificationId);
+  if (error) throw new Error(error.message);
+}

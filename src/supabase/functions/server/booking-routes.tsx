@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
 
 const app = new Hono();
 
@@ -20,11 +21,17 @@ app.get('/bookings', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    // Get all bookings and filter by user
-    const allBookings = await kv.getByPrefix('booking:');
-    
-    // For now, return all bookings (in production, filter by user role)
-    return c.json({ bookings: allBookings || [] });
+    // Verify token and get userId
+    const { createClient } = await import('jsr:@supabase/supabase-js@2');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+    const { data: { user } } = await supabase.auth.getUser(accessToken);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const bookings = await db.getBookingsByUserId(user.id);
+    return c.json({ bookings });
   } catch (error: any) {
     console.error('Error fetching bookings:', error);
     return c.json({ error: error.message || 'Failed to fetch bookings' }, 500);
@@ -42,40 +49,29 @@ app.get('/tutors/:tutorId/availability', async (c) => {
       return c.json({ error: 'Date parameter is required' }, 400);
     }
 
-    // Get tutor's existing bookings for the date
-    const allBookings = await kv.getByPrefix('booking:');
-    const tutorBookings = allBookings.filter((b: any) => 
-      b.tutorId === tutorId && b.date === date && b.status === 'confirmed'
-    );
-
-    // Get student's existing bookings for the date
-    const studentBookings = studentId ? allBookings.filter((b: any) => 
-      b.studentId === studentId && b.date === date && b.status === 'confirmed'
-    ) : [];
+    // Fetch booked slots using indexed DB queries (replaces full-table KV scan)
+    const [tutorBookings, studentBookings] = await Promise.all([
+      db.getBookingsByTutorAndDate(tutorId, date),
+      studentId ? db.getBookingsByStudentAndDate(studentId, date) : Promise.resolve([]),
+    ]);
 
     // Generate time slots from 9 AM to 8 PM
     const slots = [];
     for (let hour = 9; hour <= 20; hour++) {
       for (let minute = 0; minute < 60; minute += 30) {
         const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        
-        // Check if slot is blocked by tutor or student bookings
-        const blockedByTutor = tutorBookings.some((b: any) => {
-          const bookingStart = b.startTime;
-          const bookingEnd = b.endTime;
-          return time >= bookingStart && time < bookingEnd;
-        });
 
-        const blockedByStudent = studentBookings.some((b: any) => {
-          const bookingStart = b.startTime;
-          const bookingEnd = b.endTime;
-          return time >= bookingStart && time < bookingEnd;
-        });
+        const blockedByTutor = tutorBookings.some((b) =>
+          time >= b.startTime && time < b.endTime
+        );
+        const blockedByStudent = studentBookings.some((b) =>
+          time >= b.startTime && time < b.endTime
+        );
 
         slots.push({
           time,
           available: !blockedByTutor && !blockedByStudent,
-          blocked: blockedByTutor || blockedByStudent
+          blocked: blockedByTutor || blockedByStudent,
         });
       }
     }
@@ -90,15 +86,15 @@ app.get('/tutors/:tutorId/availability', async (c) => {
 // Get all tutors
 app.get('/tutors', async (c) => {
   try {
-    const allUsers = await kv.getByPrefix('user:');
-    const tutors = allUsers
-      .filter((u: any) => u.role === 'tutor' && u.verificationStatus === 'verified')
+    const allTutors = await db.getProfilesByRole('tutor');
+    const tutors = allTutors
+      .filter((u: any) => u.verificationStatus === 'verified' || u.verificationStatus === 'approved')
       .map((tutor: any) => ({
-        id: tutor.userId || tutor.id,
+        id: tutor.id,
         name: tutor.fullName || tutor.name || 'Unknown Tutor',
         subjects: tutor.subjects || [],
         hourlyRate: tutor.hourlyRate || 25,
-        availability: tutor.availability || {}
+        availability: tutor.availability || {},
       }));
 
     return c.json({ tutors });

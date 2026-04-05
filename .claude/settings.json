@@ -1,7 +1,8 @@
 {
   "permissions": {
     "allow": [
-      "Bash(curl -s -X POST https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/signup -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indldm12YnNrdW5obmh1eHphcW96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjQzNDcsImV4cCI6MjA3ODcwMDM0N30.L_N8kMAOitpFO28SJx_OpS7uAb7NYwMCOo5RiRBvx5c' -H 'Origin: http://localhost:5173' -v -d '{\"email\":\"corstest3@test.com\",\"password\":\"test123\",\"name\":\"CORS Test\"}')"
+      "Bash(curl -s -X POST https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/signup -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indldm12YnNrdW5obmh1eHphcW96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjQzNDcsImV4cCI6MjA3ODcwMDM0N30.L_N8kMAOitpFO28SJx_OpS7uAb7NYwMCOo5RiRBvx5c' -H 'Origin: http://localhost:5173' -v -d '{\"email\":\"corstest3@test.com\",\"password\":\"test123\",\"name\":\"CORS Test\"}')",
+      "Bash(curl -s -X POST https://api.resend.com/emails -H 'Authorization: Bearer re_XymTBX3H_13XTLvuJX4jbFppZKXMQo4K7' -H 'Content-Type: application/json' -d '{:*)"
     ]
   }
 }

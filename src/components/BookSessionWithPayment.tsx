@@ -74,12 +74,36 @@ export function BookSessionWithPayment({
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<{ sessions: number; planName: string } | null>(null);
 
+  const confirmPayment = async (reference: string, planName: string) => {
+    const confirmRes = await fetch(
+      `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/confirm-plan/${reference}`,
+      {
+        method: 'POST',
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      }
+    );
+
+    let confirmData: any;
+    const rawConfirm = await confirmRes.text();
+    try {
+      confirmData = JSON.parse(rawConfirm);
+    } catch {
+      throw new Error('Payment received but session creation failed. Please contact support with reference: ' + reference);
+    }
+
+    if (!confirmRes.ok || !confirmData.success) {
+      throw new Error(confirmData.error || 'Sessions could not be created after payment');
+    }
+
+    setSuccess({ sessions: confirmData.sessionsCreated, planName });
+  };
+
   const handleSelectPlan = async (plan: typeof PLANS[number]) => {
     setError('');
     setProcessing(plan.id);
 
     try {
-      // 1. Initialise plan payment on the backend → get Flutterwave payment link
+      // 1. Initialise on backend — get Flutterwave tx_ref + amount
       const initRes = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/initiate-plan`,
         {
@@ -100,81 +124,66 @@ export function BookSessionWithPayment({
         }
       );
 
-      // Safely parse JSON — if the response is not JSON (e.g. edge function not deployed),
-      // show a clear error instead of a cryptic SyntaxError.
       let initData: any;
       const rawText = await initRes.text();
       try {
         initData = JSON.parse(rawText);
       } catch {
-        if (!initRes.ok) {
-          throw new Error(
-            `Server error (${initRes.status}). The payment endpoint may not be deployed yet. ` +
-            `Please deploy the Supabase edge function and try again.`
-          );
-        }
-        throw new Error('Unexpected server response. Please try again.');
+        throw new Error(
+          initRes.ok
+            ? 'Unexpected server response. Please try again.'
+            : `Server error (${initRes.status}). Please ensure the edge function is deployed.`
+        );
       }
 
       if (!initRes.ok || !initData.success) {
         throw new Error(initData.error || 'Failed to initialise payment');
       }
 
-      const { reference, authorizationUrl } = initData;
+      const { reference } = initData;
+      const publicKey = import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY;
 
-      if (!authorizationUrl) {
-        throw new Error('No Flutterwave payment link returned. Please check Flutterwave configuration.');
+      if (!publicKey) {
+        throw new Error('Flutterwave public key not configured (VITE_FLUTTERWAVE_PUBLIC_KEY).');
       }
 
-      // 2. Open Flutterwave payment in new window
-      const paymentWindow = window.open(authorizationUrl, 'Flutterwave Payment', 'width=800,height=600');
-      
-      // Poll for payment completion
-      const pollInterval = setInterval(async () => {
-        try {
-          // Check if payment window is closed
-          if (paymentWindow?.closed) {
-            clearInterval(pollInterval);
-            setProcessing(null);
-          }
-        } catch (err) {
-          // Ignore errors from cross-origin checks
-        }
-      }, 1000);
-
-      // 3. Confirm payment after a delay (Flutterwave processes quickly)
-      setTimeout(async () => {
-        try {
-          clearInterval(pollInterval);
-          const confirmRes = await fetch(
-            `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/verify/${reference}`,
-            {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`,
-              },
+      // 2. Open Flutterwave inline checkout — callback fires when payment completes
+      await new Promise<void>((resolve, reject) => {
+        // @ts-ignore — FlutterwaveCheckout loaded via <script> in index.html
+        window.FlutterwaveCheckout({
+          public_key: publicKey,
+          tx_ref: reference,
+          amount: plan.price,
+          currency: 'NGN',
+          payment_options: 'card,banktransfer,ussd,mobilemoney',
+          customer: {
+            email: session.user.email,
+            name: studentName,
+          },
+          customizations: {
+            title: 'TutorNest',
+            description: `${plan.name}${subject ? ' — ' + subject : ''}`,
+            logo: 'https://tutornest.org/logo.png',
+          },
+          callback: async (response: { status: string; tx_ref: string; transaction_id: number }) => {
+            if (response.status === 'successful' || response.status === 'completed') {
+              try {
+                await confirmPayment(response.tx_ref, plan.name);
+                resolve();
+              } catch (err: any) {
+                reject(err);
+              }
+            } else {
+              reject(new Error('Payment was not completed. Please try again.'));
             }
-          );
-
-          let confirmData: any;
-          try {
-            confirmData = await confirmRes.json();
-          } catch {
-            throw new Error('Payment was received but session creation failed. Please contact support with your payment reference.');
-          }
-
-          if (!confirmRes.ok || !confirmData.success) {
-            throw new Error(confirmData.error || 'Payment confirmed by Flutterwave but session creation failed');
-          }
-
-          setSuccess({ sessions: confirmData.sessionsCreated, planName: plan.name });
-        } catch (err: any) {
-          console.error('Payment confirmation error:', err);
-          setError(err.message || 'Payment verification failed. Please try again.');
-        } finally {
-          setProcessing(null);
-        }
-      }, 3000);
+          },
+          onclose: () => {
+            // User closed modal without paying — not an error
+            setProcessing(null);
+            resolve();
+          },
+        });
+      });
     } catch (err: any) {
       console.error('Payment error:', err);
       setError(err.message || 'Payment failed. Please try again.');
