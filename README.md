@@ -1,7 +1,7 @@
 
   # Personalized Tutoring Platform
 
-  This is a code bundle for Personalized Tutoring Platform (TutorNest). The original project is available at https://www.figma.com/design/Hk66Tgu8hzPgf35d2Yl739/Personalized-Tutoring-Platform.
+  This is a code bundle for Personalized Tutoring Platform (TutorNest.org). The original project is available at https://www.figma.com/design/Hk66Tgu8hzPgf35d2Yl739/Personalized-Tutoring-Platform.
 
   ## Running the code
 
