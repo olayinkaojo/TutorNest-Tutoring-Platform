@@ -690,7 +690,6 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
         type: 'signup',
         email,
-        password,
         options: { redirectTo: appUrl },
       });
 

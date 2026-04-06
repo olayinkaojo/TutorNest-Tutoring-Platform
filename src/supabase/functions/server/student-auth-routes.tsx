@@ -333,7 +333,6 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
           type: 'signup',
           email,
-          password,
           options: { redirectTo: appUrl },
         });
         if (!linkError && linkData?.properties?.action_link) {
@@ -471,7 +470,6 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         const { data: linkData2, error: linkError2 } = await supabase.auth.admin.generateLink({
           type: 'signup',
           email,
-          password,
           options: { redirectTo: appUrl2 },
         });
         if (!linkError2 && linkData2?.properties?.action_link) {
