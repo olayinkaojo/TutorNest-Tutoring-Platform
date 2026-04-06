@@ -10,6 +10,12 @@ export interface ClassAnalyticsDashboardProps {
     completionRate: number;
     engagementScore: number;
   };
+  workflowStats?: {
+    preWorkCompletionRate: number;
+    sessionAttendanceRate: number;
+    homeworkCompletionRate: number;
+    averageWorkflowProgress: number;
+  };
   strugglingStudents?: any[];
   recentActivity?: any[];
 }
@@ -22,6 +28,12 @@ export default function ClassAnalyticsDashboard({
     averageMastery: 78.5,
     completionRate: 85,
     engagementScore: 82,
+  },
+  workflowStats = {
+    preWorkCompletionRate: 85,
+    sessionAttendanceRate: 90,
+    homeworkCompletionRate: 78,
+    averageWorkflowProgress: 84,
   },
   strugglingStudents = [],
   recentActivity = [],
@@ -236,6 +248,88 @@ export default function ClassAnalyticsDashboard({
           </CardContent>
         </Card>
       </div>
+
+      {/* Hybrid Workflow Completion */}
+      <Card className="border-l-4 border-l-purple-500">
+        <CardHeader>
+          <CardTitle>📚 Tutoring Session Workflow Progress</CardTitle>
+          <CardDescription>Pre-work → Live Session → Homework completion rates</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-6">
+          <div className="grid grid-cols-4 gap-4">
+            {/* Pre-Work */}
+            <div className="text-center p-4 bg-blue-50 rounded-lg">
+              <p className="text-sm text-gray-600 mb-2">Pre-Work</p>
+              <p className="text-3xl font-bold text-blue-600">{workflowStats.preWorkCompletionRate}%</p>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                <div
+                  className="bg-blue-500 h-2 rounded-full"
+                  style={{ width: `${workflowStats.preWorkCompletionRate}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-600 mt-2">📋 Assessment</p>
+            </div>
+
+            {/* Session Attendance */}
+            <div className="text-center p-4 bg-green-50 rounded-lg">
+              <p className="text-sm text-gray-600 mb-2">Session Attendance</p>
+              <p className="text-3xl font-bold text-green-600">{workflowStats.sessionAttendanceRate}%</p>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                <div
+                  className="bg-green-500 h-2 rounded-full"
+                  style={{ width: `${workflowStats.sessionAttendanceRate}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-600 mt-2">🎓 Live Teaching</p>
+            </div>
+
+            {/* Homework */}
+            <div className="text-center p-4 bg-purple-50 rounded-lg">
+              <p className="text-sm text-gray-600 mb-2">Homework Completion</p>
+              <p className="text-3xl font-bold text-purple-600">{workflowStats.homeworkCompletionRate}%</p>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                <div
+                  className="bg-purple-500 h-2 rounded-full"
+                  style={{ width: `${workflowStats.homeworkCompletionRate}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-600 mt-2">📚 Practice</p>
+            </div>
+
+            {/* Overall */}
+            <div className="text-center p-4 bg-gradient-to-br from-blue-50 to-purple-50 rounded-lg border-2 border-gray-300">
+              <p className="text-sm text-gray-600 mb-2">Overall Progress</p>
+              <p className="text-3xl font-bold text-gray-900">{Math.round(workflowStats.averageWorkflowProgress)}%</p>
+              <div className="w-full bg-gray-200 rounded-full h-2 mt-3">
+                <div
+                  className="bg-gradient-to-r from-blue-500 to-purple-500 h-2 rounded-full"
+                  style={{ width: `${workflowStats.averageWorkflowProgress}%` }}
+                />
+              </div>
+              <p className="text-xs text-gray-600 mt-2">🎯 Workflow</p>
+            </div>
+          </div>
+
+          {/* Workflow Status Legend */}
+          <div className="p-4 bg-gray-50 rounded-lg border border-gray-200">
+            <p className="text-sm font-semibold text-gray-700 mb-3">Workflow Stages:</p>
+            <div className="grid grid-cols-3 gap-4 text-sm">
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-blue-500 rounded"></span>
+                <span className="text-gray-700">Pre-Work: Students complete assessment before session</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-green-500 rounded"></span>
+                <span className="text-gray-700">Session: Students attend live tutoring</span>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="inline-block w-3 h-3 bg-purple-500 rounded"></span>
+                <span className="text-gray-700">Homework: Students practice what they learned</span>
+              </div>
+            </div>
+          </div>
+        </CardContent>
+      </Card>
 
       {/* Grade Distribution */}
       <Card>

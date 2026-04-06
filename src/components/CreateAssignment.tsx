@@ -20,7 +20,8 @@ export default function CreateAssignment({
   const [formData, setFormData] = useState({
     name: '',
     description: '',
-    type: 'homework' as 'homework' | 'quiz' | 'test',
+    assignmentType: 'normal' as 'pre-work' | 'session' | 'homework' | 'normal',
+    assessmentType: 'homework' as 'homework' | 'quiz' | 'test',
     dueDate: '',
     dueTime: '23:59',
     releaseDate: '',
@@ -153,10 +154,25 @@ export default function CreateAssignment({
 
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Type</label>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Workflow Type *</label>
                   <select
-                    name="type"
-                    value={formData.type}
+                    name="assignmentType"
+                    value={formData.assignmentType}
+                    onChange={handleInputChange}
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="normal">Regular Assignment</option>
+                    <option value="pre-work">📋 Pre-Work (Before Session)</option>
+                    <option value="session">🎓 Session Work (During Teaching)</option>
+                    <option value="homework">📚 Homework (After Session)</option>
+                  </select>
+                  <p className="text-xs text-gray-500 mt-1">Choose if this is part of a tutoring session workflow</p>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">Assessment Type</label>
+                  <select
+                    name="assessmentType"
+                    value={formData.assessmentType}
                     onChange={handleInputChange}
                     className="w-full px-4 py-2 border border-gray-300 rounded-lg"
                   >
@@ -165,8 +181,7 @@ export default function CreateAssignment({
                     <option value="test">Test</option>
                   </select>
                 </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Grade Weight</label>
+              </div>
                   <input
                     type="number"
                     name="gradeWeight"

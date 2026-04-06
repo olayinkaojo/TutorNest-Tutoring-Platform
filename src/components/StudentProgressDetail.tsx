@@ -13,6 +13,12 @@ export interface StudentProgressDetailProps {
     learningVelocity: number;
     recommendations: string[];
   };
+  workflowProgress?: {
+    preWorkStatus: 'pending' | 'submitted' | 'reviewed';
+    sessionStatus: 'pending' | 'attended' | 'completed';
+    homeworkStatus: 'pending' | 'submitted' | 'graded';
+    overallProgress: number;
+  };
 }
 
 export default function StudentProgressDetail({
@@ -35,6 +41,12 @@ export default function StudentProgressDetail({
       '🎯 Focus on: Geometry basics',
       '✓ Student is on track - Encourage them to continue!',
     ],
+  },
+  workflowProgress = {
+    preWorkStatus: 'reviewed',
+    sessionStatus: 'attended',
+    homeworkStatus: 'submitted',
+    overallProgress: 89,
   },
 }: StudentProgressDetailProps) {
   const [selectedTopic, setSelectedTopic] = useState<string | null>(null);
@@ -150,6 +162,86 @@ export default function StudentProgressDetail({
             ))}
           </div>
           <p className="text-xs text-gray-500 text-center">Last 12 assignments - Upward trend 📈</p>
+        </CardContent>
+      </Card>
+
+      {/* Session Workflow Progress (if applicable) */}
+      <Card className="border-l-4 border-l-indigo-500">
+        <CardHeader>
+          <CardTitle className="text-lg">📚 Tutoring Session Progress</CardTitle>
+          <CardDescription>Tracking through pre-work, session, and homework phases</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            {/* Pre-Work */}
+            <div className="flex-1 text-center">
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 ${
+                  workflowProgress.preWorkStatus !== 'pending'
+                    ? 'bg-blue-100 text-blue-600'
+                    : 'bg-gray-100 text-gray-400'
+                }`}
+              >
+                {workflowProgress.preWorkStatus === 'reviewed' ? '✓' : workflowProgress.preWorkStatus === 'submitted' ? '◐' : '○'}
+              </div>
+              <p className="text-sm font-semibold text-gray-900">Pre-Work</p>
+              <p className="text-xs text-gray-600 capitalize">{workflowProgress.preWorkStatus}</p>
+            </div>
+
+            {/* Arrow */}
+            <div className="text-2xl text-gray-400">→</div>
+
+            {/* Session */}
+            <div className="flex-1 text-center">
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 ${
+                  workflowProgress.sessionStatus === 'completed'
+                    ? 'bg-green-100 text-green-600'
+                    : workflowProgress.sessionStatus === 'attended'
+                      ? 'bg-blue-100 text-blue-600'
+                      : 'bg-gray-100 text-gray-400'
+                }`}
+              >
+                {workflowProgress.sessionStatus === 'completed' ? '✓' : workflowProgress.sessionStatus === 'attended' ? '●' : '○'}
+              </div>
+              <p className="text-sm font-semibold text-gray-900">Live Session</p>
+              <p className="text-xs text-gray-600 capitalize">{workflowProgress.sessionStatus}</p>
+            </div>
+
+            {/* Arrow */}
+            <div className="text-2xl text-gray-400">→</div>
+
+            {/* Homework */}
+            <div className="flex-1 text-center">
+              <div
+                className={`w-12 h-12 rounded-full flex items-center justify-center mx-auto mb-2 ${
+                  workflowProgress.homeworkStatus === 'graded'
+                    ? 'bg-purple-100 text-purple-600'
+                    : workflowProgress.homeworkStatus === 'submitted'
+                      ? 'bg-indigo-100 text-indigo-600'
+                      : 'bg-gray-100 text-gray-400'
+                }`}
+              >
+                {workflowProgress.homeworkStatus === 'graded' ? '✓' : workflowProgress.homeworkStatus === 'submitted' ? '◐' : '○'}
+              </div>
+              <p className="text-sm font-semibold text-gray-900">Homework</p>
+              <p className="text-xs text-gray-600 capitalize">{workflowProgress.homeworkStatus}</p>
+            </div>
+          </div>
+
+          {/* Overall Progress Bar */}
+          <div className="pt-4 border-t">
+            <div className="flex justify-between items-center mb-2">
+              <p className="text-sm font-semibold text-gray-700">Overall Workflow Progress</p>
+              <p className="text-lg font-bold text-indigo-600">{workflowProgress.overallProgress}%</p>
+            </div>
+            <div className="w-full bg-gray-200 rounded-full h-3">
+              <div
+                className="bg-gradient-to-r from-blue-500 via-indigo-500 to-purple-500 h-3 rounded-full transition-all"
+                style={{ width: `${workflowProgress.overallProgress}%` }}
+              />
+            </div>
+          </div>
         </CardContent>
       </Card>
 
