@@ -36,6 +36,8 @@ import { topicRoutes } from './topic-routes.tsx';
 import { teacherRoutes } from './teacher-routes.tsx';
 import { teacherQuestionRoutes } from './teacher-question-routes.tsx';
 import { analyticsRoutes } from './analytics-routes.tsx';
+import { sessionAssignmentRoutes } from './session-assignment-routes.tsx';
+import { liveCollaborationRoutes } from './live-collaboration-routes.tsx';
 import tutorSessionReportsRoutes from './tutor-session-reports-routes.tsx';
 import paymentRoutes from './payment-routes.tsx';
 import { upsertProfile, getProfile } from './db.tsx';
@@ -414,6 +416,12 @@ app.route('/make-server-cbd74580/teacher', teacherQuestionRoutes);
 
 // Register analytics routes
 app.route('/make-server-cbd74580/analytics', analyticsRoutes);
+
+// Register session assignment (workflow) routes
+app.route('/make-server-cbd74580', sessionAssignmentRoutes);
+
+// Register live collaboration (whiteboard) routes
+app.route('/make-server-cbd74580', liveCollaborationRoutes);
 
 // Register tutor session reports routes
 app.route('/make-server-cbd74580/tutor-session-reports', tutorSessionReportsRoutes);
