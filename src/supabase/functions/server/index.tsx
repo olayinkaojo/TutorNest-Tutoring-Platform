@@ -765,11 +765,12 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       // Don't fail the signup if KV store fails
     }
 
-    // Account created — confirmation email sent by Supabase. No auto-login.
-    console.log('Signup successful, confirmation email sent for:', email);
+    // Account created — user can log in immediately (email_confirm: false)
+    // Email sent for engagement/notification purposes
+    console.log('Signup successful, email sent for:', email);
     return c.json({
       success: true,
-      requiresEmailConfirmation: true,
+      requiresEmailConfirmation: false,
       userId: data.user.id,
       isAdmin,
     });

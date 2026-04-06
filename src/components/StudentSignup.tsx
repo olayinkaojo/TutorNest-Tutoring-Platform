@@ -137,8 +137,16 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
           throw new Error(errorMsg);
         }
 
-        // Email confirmation required — show check-your-email screen
+        // Account created successfully - user can log in immediately
+        // Show "check your email" screen, but user CAN log in now
         setSuccess(true);
+        
+        // Trigger callback to show dashboard or navigate
+        setTimeout(() => {
+          if (onSignupSuccess) {
+            onSignupSuccess();
+          }
+        }, 1500);
 
       } else if (signupType === 'dependent') {
         // Dependent student signup (13-17)
@@ -229,14 +237,14 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
             <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
               <CheckCircle className="w-10 h-10 text-green-600" />
             </div>
-            <CardTitle className="text-2xl">Check your email</CardTitle>
+            <CardTitle className="text-2xl">Account Created! ✅</CardTitle>
             <CardDescription>
-              A confirmation link has been sent to <strong>{formData.email}</strong>
+              A verification email has been sent to <strong>{formData.email}</strong>
             </CardDescription>
           </CardHeader>
           <CardContent className="text-center">
             <p className="text-sm text-gray-600 mb-4">
-              Click the link in your email to activate your account. Once confirmed, you can log in and start finding tutors and booking sessions.
+              You can log in and start using TutorNest right now! The email is for your reference.
             </p>
             <Button
               onClick={onBackToSignIn}
