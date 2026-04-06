@@ -101,7 +101,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         const { data, error: authError } = await supabase.auth.admin.createUser({
           email: finalStudentEmail,
           password: password,
-          email_confirm: true, // Auto-confirm since parent is creating it
+          email_confirm: false,
           user_metadata: {
             role: 'student',
             firstName: child.firstName,
@@ -280,7 +280,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: email,
         password: password,
-        email_confirm: true,
+        email_confirm: false,
         user_metadata: {
           role: 'student',
           firstName: firstName,
@@ -440,7 +440,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: email,
         password: password,
-        email_confirm: true, // Auto-confirm email
+        email_confirm: false,
         user_metadata: {
           role: 'student',
           firstName: firstName,

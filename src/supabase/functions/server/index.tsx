@@ -696,47 +696,18 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       console.error('Failed to generate confirmation link:', linkError);
       // Don't fail signup — user can request a new link from sign-in page
     } else {
-      // Step 3: Send confirmation email via Resend API directly
-      const resendKey = Deno.env.get('RESEND_API_KEY');
-      if (resendKey && linkData.properties.action_link) {
-        const confirmUrl = linkData.properties.action_link;
-        const emailRes = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'TutorNest <noreply@tutornest.org>',
-            to: [email],
-            subject: 'Confirm your TutorNest account',
-            html: `
-              <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px">
-                <h2 style="color:#625d9c;margin-bottom:8px">Welcome to TutorNest!</h2>
-                <p style="color:#444;margin-bottom:24px">Hi ${name}, please confirm your email address to activate your account.</p>
-                <a href="${confirmUrl}"
-                   style="display:inline-block;background:#625d9c;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">
-                  Confirm Email Address
-                </a>
-                <p style="color:#888;font-size:13px;margin-top:24px">
-                  Or copy this link into your browser:<br/>
-                  <span style="color:#625d9c;word-break:break-all">${confirmUrl}</span>
-                </p>
-                <p style="color:#bbb;font-size:12px;margin-top:32px">
-                  If you didn't create a TutorNest account, you can safely ignore this email.
-                </p>
-              </div>
-            `,
-          }),
-        });
-        if (!emailRes.ok) {
-          const emailErr = await emailRes.text();
-          console.error('Resend email failed:', emailErr);
-        } else {
-          console.log('Confirmation email sent via Resend for:', email);
-        }
+      // Step 3: Send professional tutor verification email via sendEmail service
+      const verificationLink = `${Deno.env.get('VITE_APP_URL') || 'https://tutornest.com'}/verify-email?token=${data.user.id}`;
+      const emailResult = await sendEmail({
+        to: email,
+        subject: emailTemplates.emailVerification(name, verificationLink).subject,
+        html: emailTemplates.emailVerification(name, verificationLink).html,
+      });
+      
+      if (!emailResult.success) {
+        console.warn('⚠️ Failed to send tutor verification email:', emailResult.error);
       } else {
-        console.warn('RESEND_API_KEY not set — confirmation email not sent');
+        console.log('✅ Tutor verification email sent to:', email);
       }
     }
 
