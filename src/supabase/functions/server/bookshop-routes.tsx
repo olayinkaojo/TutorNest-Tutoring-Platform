@@ -1,6 +1,8 @@
 import { Hono } from 'npm:hono';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
+import { PaymentProcessor } from './unified-payment-processor.tsx';
+import { NotificationBroker } from './notification-broker.tsx';
 
 const app = new Hono();
 
@@ -265,9 +267,10 @@ app.get('/library/:userId', async (c) => {
   }
 });
 
-// Purchase books
-app.post('/purchase', async (c) => {
-  console.log('=== POST /bookshop/purchase endpoint called ===');
+// ─── Bookshop Payment Initialization ─────────────────────────────────────────
+// Initialize payment for book purchases with Flutterwave
+app.post('/purchase/initialize', async (c) => {
+  console.log('=== POST /bookshop/purchase/initialize (Flutterwave) ===');
   
   try {
     const authHeader = c.req.header('Authorization');
@@ -278,7 +281,171 @@ app.post('/purchase', async (c) => {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
 
-    const { bookIds } = await c.req.json();
+    const body = await c.req.json() as { bookIds: string[] };
+    const { bookIds } = body;
+    
+    if (!bookIds || !Array.isArray(bookIds) || bookIds.length === 0) {
+      return c.json({ success: false, error: 'Invalid book IDs' }, 400);
+    }
+
+    // Get book details and calculate total
+    const purchasedBooks = SAMPLE_BOOKS.filter(book => bookIds.includes(book.id));
+    if (purchasedBooks.length === 0) {
+      return c.json({ success: false, error: 'No valid books found' }, 400);
+    }
+
+    const totalPrice = purchasedBooks.reduce((sum, book) => sum + book.price, 0);
+    const bookTitles = purchasedBooks.map(b => b.title);
+
+    // Initialize Flutterwave payment
+    const paymentResult = await PaymentProcessor.initializeFlutterwavePayment({
+      type: 'bookshop',
+      userId: user.id,
+      email: 'placeholder@tutornest.com', // In production, get from user profile
+      amount: totalPrice,
+      currency: 'GBP',
+      description: `Purchase: ${bookTitles.join(', ')}`,
+      metadata: {
+        customerName: 'Student/Parent',
+        bookIds,
+        bookCount: purchasedBooks.length,
+        bookTitles,
+      },
+    });
+
+    if (!paymentResult.success) {
+      return c.json({ success: false, error: paymentResult.error }, 500);
+    }
+
+    // Store pending purchase
+    const pendingPurchase = {
+      id: paymentResult.paymentId,
+      userId: user.id,
+      bookIds,
+      bookTitles,
+      totalPrice,
+      reference: paymentResult.reference,
+      status: 'pending',
+      createdAt: new Date().toISOString(),
+    };
+
+    await kv.set(`pending_purchase:${paymentResult.paymentId}`, pendingPurchase);
+    await kv.set(`purchase_ref:${paymentResult.reference}`, paymentResult.paymentId);
+
+    console.log(`[Bookshop] Initialized payment for ${bookIds.length} books: ${paymentResult.reference}`);
+
+    return c.json({
+      success: true,
+      paymentId: paymentResult.paymentId,
+      reference: paymentResult.reference,
+      authorizationUrl: paymentResult.authorizationUrl,
+      amount: totalPrice,
+      currency: 'GBP',
+      bookCount: purchasedBooks.length,
+    });
+  } catch (error) {
+    console.error('[Bookshop] Error initializing payment:', error);
+    return c.json({ success: false, error: 'Failed to initialize payment' }, 500);
+  }
+});
+
+// ─── Bookshop Payment Verification ───────────────────────────────────────────
+// Verify payment and complete book purchase
+app.post('/purchase/verify/:reference', async (c) => {
+  console.log('=== POST /bookshop/purchase/verify/:reference (Flutterwave) ===');
+  
+  try {
+    const authHeader = c.req.header('Authorization');
+    const accessToken = authHeader?.replace('Bearer ', '');
+    
+    const user = await getUserFromToken(accessToken);
+    if (!user) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+
+    const reference = c.req.param('reference');
+    if (!reference) {
+      return c.json({ success: false, error: 'Invalid payment reference' }, 400);
+    }
+
+    // Get pending purchase
+    const paymentId = await kv.get(`purchase_ref:${reference}`) as string;
+    if (!paymentId) {
+      return c.json({ success: false, error: 'Purchase not found' }, 404);
+    }
+
+    const pendingPurchase = await kv.get(`pending_purchase:${paymentId}`) as any;
+    if (!pendingPurchase) {
+      return c.json({ success: false, error: 'Purchase record not found' }, 404);
+    }
+
+    // Verify payment with Flutterwave
+    const verifyResult = await PaymentProcessor.verifyFlutterwavePayment(reference);
+    if (!verifyResult.success || !verifyResult.paymentVerified) {
+      console.error(`[Bookshop] Payment verification failed: ${reference}`);
+      return c.json({
+        success: false,
+        error: verifyResult.error || 'Payment verification failed',
+      }, 400);
+    }
+
+    // Update user's book library
+    const existingBooks = (await kv.get(`user_books:${user.id}`)) as string[] || [];
+    const updatedBooks = [...new Set([...existingBooks, ...pendingPurchase.bookIds])];
+    await kv.set(`user_books:${user.id}`, updatedBooks);
+
+    // Create completed purchase record
+    const completedPurchase = {
+      ...pendingPurchase,
+      id: `purchase_${Date.now()}_${user.id}`,
+      status: 'completed',
+      verifiedAt: new Date().toISOString(),
+      paymentAmount: verifyResult.amount,
+      paymentCurrency: verifyResult.currency,
+    };
+
+    await kv.set(`purchase:${completedPurchase.id}`, completedPurchase);
+    
+    // Clean up pending purchase
+    await kv.delete(`pending_purchase:${paymentId}`);
+    await kv.delete(`purchase_ref:${reference}`);
+
+    // Create notification
+    await NotificationBroker.createNotification(kv,
+      NotificationBroker.createBookshopPurchaseNotification(
+        user.id,
+        pendingPurchase.bookTitles,
+        pendingPurchase.totalPrice
+      )
+    );
+
+    console.log(`[Bookshop] Purchase verified: ${completedPurchase.id} (${pendingPurchase.bookIds.length} books)`);
+
+    return c.json({
+      success: true,
+      purchase: completedPurchase,
+      message: `Successfully purchased ${pendingPurchase.bookIds.length} books`,
+    });
+  } catch (error) {
+    console.error('[Bookshop] Error verifying payment:', error);
+    return c.json({ success: false, error: 'Failed to verify payment' }, 500);
+  }
+});
+
+// Purchase books (LEGACY - kept for backward compatibility, redirect to initialize)
+app.post('/purchase', async (c) => {
+  console.log('=== POST /bookshop/purchase (LEGACY) ===');
+  
+  try {
+    const authHeader = c.req.header('Authorization');
+    const accessToken = authHeader?.replace('Bearer ', '');
+    
+    const user = await getUserFromToken(accessToken);
+    if (!user) {
+      return c.json({ success: false, error: 'Unauthorized' }, 401);
+    }
+
+    const { bookIds } = await c.req.json() as { bookIds: string[] };
     
     if (!bookIds || !Array.isArray(bookIds) || bookIds.length === 0) {
       return c.json({ success: false, error: 'Invalid book IDs' }, 400);

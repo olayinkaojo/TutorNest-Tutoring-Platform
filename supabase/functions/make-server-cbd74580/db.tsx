@@ -345,3 +345,115 @@ export async function markNotificationRead(notificationId: string): Promise<void
     .eq('id', notificationId);
   if (error) throw new Error(error.message);
 }
+
+// ─── Meet links ───────────────────────────────────────────────────────────────
+
+/** Stamps all given booking rows with the same Google Meet link. */
+export async function updateBookingsMeetLink(bookingIds: string[], meetLink: string): Promise<void> {
+  const { error } = await db()
+    .from('bookings')
+    .update({ meet_link: meetLink })
+    .in('id', bookingIds);
+  if (error) throw new Error(error.message);
+}
+
+// ─── Admin queries ────────────────────────────────────────────────────────────
+
+/**
+ * Returns all bookings from the DB, mapped to the same shape the KV store used.
+ * Pass year + month to filter by session date.
+ */
+export async function getAllBookingsForAdmin(year?: number, month?: number): Promise<any[]> {
+  let query = db().from('bookings').select('*');
+  if (year && month) {
+    // Filter by date column: e.g. 2026-04 → 2026-04-01 to 2026-04-30
+    const from = `${year}-${String(month).padStart(2, '0')}-01`;
+    const nextMonth = month === 12 ? `${year + 1}-01-01` : `${year}-${String(month + 1).padStart(2, '0')}-01`;
+    query = query.gte('date', from).lt('date', nextMonth);
+  }
+  const { data, error } = await query.order('date', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    paymentId: row.payment_id,
+    planType: row.plan_type,
+    sessionNumber: row.session_number,
+    totalSessions: row.total_sessions,
+    tutorId: row.tutor_id,
+    studentId: row.student_id,
+    userId: row.user_id,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    duration: row.duration,
+    subject: row.subject,
+    status: row.status,
+    paymentStatus: row.payment_status,
+    createdAt: row.created_at,
+  }));
+}
+
+/**
+ * Returns all payments from the DB, mapped to the same shape the KV store used.
+ * Pass year + month to filter by created_at.
+ */
+export async function getAllPaymentsForAdmin(year?: number, month?: number): Promise<any[]> {
+  let query = db().from('payments').select('*');
+  if (year && month) {
+    const from = new Date(year, month - 1, 1).toISOString();
+    const to   = new Date(year, month, 1).toISOString();
+    query = query.gte('created_at', from).lt('created_at', to);
+  }
+  const { data, error } = await query.order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    tutorId: row.tutor_id,
+    studentId: row.student_id,
+    planType: row.plan_type,
+    amount: row.amount,
+    reference: row.reference,
+    status: row.status,
+    startDate: row.start_date,
+    startTime: row.start_time,
+    subject: row.subject,
+    bookingIds: row.booking_ids ?? [],
+    confirmedAt: row.confirmed_at,
+    createdAt: row.created_at,
+  }));
+}
+
+/**
+ * Returns the count of unread notifications for a specific user from the DB.
+ */
+export async function getUnreadNotificationCount(userId: string): Promise<number> {
+  const { count, error } = await db()
+    .from('notifications')
+    .select('*', { count: 'exact', head: true })
+    .eq('user_id', userId)
+    .eq('read', false);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+/**
+ * Returns all profiles with a specific role, shaped like the KV user objects.
+ * Used for admin user-management queries.
+ */
+export async function getAllProfilesForAdmin(): Promise<any[]> {
+  const { data, error } = await db()
+    .from('profiles')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    ...row.raw_data,
+    id: row.id,
+    userId: row.id,
+    role: row.role,
+    email: row.email,
+    fullName: row.full_name,
+    createdAt: row.created_at,
+  }));
+}

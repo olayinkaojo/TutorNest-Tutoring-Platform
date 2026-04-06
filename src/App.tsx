@@ -15,6 +15,7 @@ import { ParentSignup } from './components/ParentSignup';
 import { getSupabaseClient } from './utils/supabase/client';
 import { projectId } from './utils/supabase/info';
 import { logger } from './utils/logger';
+import { GoogleCalendarSetup } from './components/GoogleCalendarSetup';
 import wallpaperBg from 'figma:asset/c2a495c4aec3903270b747684d5b5dd5d609b3da.png';
 
 interface UserProfile {
@@ -38,10 +39,17 @@ export default function App() {
   const [showRoleChooser, setShowRoleChooser] = useState(false);
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [signupData, setSignupData] = useState<{ email: string; password: string; name: string; phone?: string } | null>(null);
+  // True when the URL contains Google OAuth callback params (?code=&state=)
+  const [googleOAuthCallback, setGoogleOAuthCallback] = useState(false);
 
   useEffect(() => {
     // Check URL params for signup routing
     const urlParams = new URLSearchParams(window.location.search);
+
+    // Detect Google OAuth callback (?code=xxx&state=xxx)
+    if (urlParams.get('code') && urlParams.get('state')) {
+      setGoogleOAuthCallback(true);
+    }
 
     // Check URL params for tutor signup
     if (urlParams.get('signup') === 'tutor') {
@@ -376,6 +384,39 @@ export default function App() {
             setShowTutorSignup(true);
           }}
         />
+      </ErrorBoundary>
+    );
+  }
+
+  // Google OAuth callback — tutor returned from Google authorization
+  // GoogleCalendarSetup handles the token exchange via its own useEffect
+  if (googleOAuthCallback && session) {
+    return (
+      <ErrorBoundary>
+        <div className="min-h-screen flex items-center justify-center bg-gray-50">
+          <div className="max-w-md w-full px-4">
+            <GoogleCalendarSetup
+              session={session}
+              onConnectionChange={(connected) => {
+                if (connected) {
+                  // Token exchanged — clear callback flag and go to dashboard
+                  setGoogleOAuthCallback(false);
+                }
+              }}
+            />
+            <div className="mt-4 text-center">
+              <button
+                className="text-sm text-gray-500 underline"
+                onClick={() => {
+                  setGoogleOAuthCallback(false);
+                  window.history.replaceState({}, document.title, window.location.pathname);
+                }}
+              >
+                Back to dashboard
+              </button>
+            </div>
+          </div>
+        </div>
       </ErrorBoundary>
     );
   }

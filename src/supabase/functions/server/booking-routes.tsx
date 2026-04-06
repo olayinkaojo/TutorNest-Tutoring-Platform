@@ -13,15 +13,15 @@ async function getUserFromToken(accessToken: string | undefined) {
   return user;
 }
 
-// Get all bookings for a user
+// Get bookings for a user.
+// Supports optional query params: ?studentId=, ?tutorId= (for parent viewing child's bookings)
+// Falls back to the authenticated user's own bookings if no param is provided.
 app.get('/bookings', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    if (!accessToken) return c.json({ error: 'Unauthorized' }, 401);
 
-    // Verify token and get userId
+    // Verify token
     const { createClient } = await import('jsr:@supabase/supabase-js@2');
     const supabase = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
@@ -30,7 +30,11 @@ app.get('/bookings', async (c) => {
     const { data: { user } } = await supabase.auth.getUser(accessToken);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    const bookings = await db.getBookingsByUserId(user.id);
+    // If a specific student/tutor ID is requested (e.g. parent viewing child's bookings),
+    // use that — otherwise default to the authenticated user's own ID.
+    const targetId = c.req.query('studentId') || c.req.query('tutorId') || user.id;
+
+    const bookings = await db.getBookingsByUserId(targetId);
     return c.json({ bookings });
   } catch (error: any) {
     console.error('Error fetching bookings:', error);

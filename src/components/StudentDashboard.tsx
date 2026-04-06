@@ -8,6 +8,9 @@ import { SessionReportsViewer } from './SessionReportsViewer';
 import { TriviaGame } from './TriviaGame';
 import { TriviaLeaderboard } from './TriviaLeaderboard';
 import { GamificationSystem } from './GamificationSystem';
+import { DailyChallenge } from './trivia/DailyChallenge';
+import { TimeAttackMode } from './trivia/TimeAttackMode';
+import { BattleArena } from './trivia/BattleArena';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { NotificationCenter } from './NotificationCenter';
@@ -870,7 +873,23 @@ export function StudentDashboard({ initialProfile, onSignOut }: { initialProfile
           {/* Gamification Tab */}
           <TabsContent value="gamification">
             <div className="space-y-6">
-              {/* Trivia Challenge Game */}
+              {/* World-Class Trivia Section */}
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
+                {/* Daily Challenge */}
+                <div className="lg:col-span-3">
+                  <DailyChallenge />
+                </div>
+
+                {/* Time Attack Mode */}
+                <TimeAttackMode />
+
+                {/* Battle Arena */}
+                <div className="lg:col-span-2">
+                  <BattleArena />
+                </div>
+              </div>
+
+              {/* Original Trivia Challenge Game */}
               <TriviaGame 
                 userId={profile.userId} 
                 grade={profile.gradeLevel || profile.grade || 'year_1'}

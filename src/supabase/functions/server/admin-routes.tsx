@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
 
 // Helper function to format timestamp
 function formatTimestamp(timestamp: string): string {
@@ -38,94 +39,89 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
   // Admin Dashboard Overview Stats
   app.get('/make-server-cbd74580/admin/dashboard-stats', async (c) => {
     try {
-      console.log('=== Dashboard stats endpoint called ===');
       const accessToken = c.req.header('Authorization')?.split(' ')[1];
       const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
-      if (!userId) {
-        console.log('Unauthorized access attempt to dashboard stats');
-        return c.json({ error: 'Unauthorized' }, 401);
+      // Admin role guard
+      const adminProfile = await kv.get(`user:${userId}`) as any
+        ?? await db.getProfile(userId);
+      if (!adminProfile || adminProfile.role !== 'admin') {
+        return c.json({ error: 'Forbidden' }, 403);
       }
 
-      console.log('Fetching dashboard stats for admin user:', userId);
-
-      // Get query parameters for filtering
-      const year = c.req.query('year') ? parseInt(c.req.query('year')!) : new Date().getFullYear();
+      const year  = c.req.query('year')  ? parseInt(c.req.query('year')!)  : new Date().getFullYear();
       const month = c.req.query('month') ? parseInt(c.req.query('month')!) : new Date().getMonth() + 1;
 
-      console.log('Fetching data from KV store...');
-      // Get all data
-      const allUsers = await kv.getByPrefix('user:');
-      console.log('Users fetched:', allUsers.length);
-      
-      const allBookings = await kv.getByPrefix('booking:');
-      console.log('Bookings fetched:', allBookings.length);
-      
-      const allPayments = await kv.getByPrefix('payment:');
-      console.log('Payments fetched:', allPayments.length);
-      
-      const allAlerts = await kv.getByPrefix('alert:');
-      console.log('Alerts fetched:', allAlerts.length);
-      
-      const allNotifications = await kv.getByPrefix('notification:');
-      console.log('Notifications fetched:', allNotifications.length);
+      // ── Fetch from both KV (legacy) and DB (new) in parallel ──────────────
+      const [
+        kvUsers, kvBookings, kvPayments, kvAlerts, kvNotifications,
+        dbBookings, dbPayments,
+      ] = await Promise.all([
+        kv.getByPrefix('user:'),
+        kv.getByPrefix('booking:'),
+        kv.getByPrefix('payment:'),
+        kv.getByPrefix('alert:'),
+        kv.getByPrefix('notification:'),
+        db.getAllBookingsForAdmin(year, month),
+        db.getAllPaymentsForAdmin(year, month),
+      ]);
 
-      console.log('=== Dashboard Stats Debug ===');
-      console.log('Filter - Year:', year, 'Month:', month);
-      console.log('Total users found:', allUsers.length);
-      console.log('Total bookings found:', allBookings.length);
+      // Merge, deduplicating by id (DB records take precedence)
+      const kvBookingIds = new Set(kvBookings.map((b: any) => b.id));
+      const allBookings = [
+        ...kvBookings,
+        ...dbBookings.filter((b) => !kvBookingIds.has(b.id)),
+      ];
 
-      // Filter bookings by selected year and month
-      const filteredBookings = allBookings.filter((b: any) => {
+      const kvPaymentIds = new Set(kvPayments.map((p: any) => p.id));
+      const allPayments = [
+        ...kvPayments,
+        ...dbPayments.filter((p) => !kvPaymentIds.has(p.id)),
+      ];
+
+      // Filter KV bookings for the selected period (DB bookings already filtered)
+      const kvFiltered = kvBookings.filter((b: any) => {
         if (!b.date) return false;
-        const bookingDate = new Date(b.date);
-        return bookingDate.getFullYear() === year && (bookingDate.getMonth() + 1) === month;
+        const d = new Date(b.date);
+        return d.getFullYear() === year && d.getMonth() + 1 === month;
       });
+      const filteredBookings = [
+        ...kvFiltered,
+        ...dbBookings,
+      ];
 
-      console.log('Filtered bookings for', year, '/', month, ':', filteredBookings.length);
+      // Filter KV payments for the selected period (DB payments already filtered)
+      const kvPaymentsFiltered = kvPayments.filter((p: any) => {
+        if (!p.createdAt) return false;
+        const d = new Date(p.createdAt);
+        return d.getFullYear() === year && d.getMonth() + 1 === month;
+      });
+      const filteredPayments = [
+        ...kvPaymentsFiltered,
+        ...dbPayments,
+      ];
 
-      // Count all tutors (not just active ones with sessions)
-      const allTutors = allUsers.filter((u: any) => u.role === 'tutor');
-      console.log('Total tutors found:', allTutors.length);
-      
-      // Calculate active tutors as verified tutors (not time-based)
-      const activeTutorsCount = allTutors.filter((u: any) => 
+      // ── Compute stats ──────────────────────────────────────────────────────
+      const allTutors = kvUsers.filter((u: any) => u.role === 'tutor');
+      const activeTutorsCount = allTutors.filter((u: any) =>
         u.verificationStatus === 'verified'
       ).length;
-      
-      console.log('Active tutors (verified tutors):', activeTutorsCount);
-      
-      // Calculate tutors with sessions in selected period for reference
-      const activeTutorIds = new Set(filteredBookings.map((b: any) => b.tutorId));
-      const tutorsWithSessionsCount = allTutors.filter((u: any) => 
-        activeTutorIds.has(u.id || u.userId)
-      ).length;
-      console.log('Tutors with sessions in selected period:', tutorsWithSessionsCount);
 
-      // Total Sessions (filtered bookings)
       const totalSessions = filteredBookings.length;
 
-      // Revenue (sum of payments from filtered bookings)
-      const filteredPayments = allPayments.filter((p: any) => {
-        if (!p.createdAt) return false;
-        const paymentDate = new Date(p.createdAt);
-        return paymentDate.getFullYear() === year && (paymentDate.getMonth() + 1) === month;
-      });
+      const revenue = filteredPayments.reduce((sum: number, p: any) =>
+        sum + (parseFloat(p.amount) || 0), 0
+      );
 
-      const revenue = filteredPayments.reduce((sum: number, p: any) => {
-        const amount = parseFloat(p.amount) || 0;
-        return sum + amount;
-      }, 0);
-
-      // Active Alerts (unresolved alerts)
-      const activeAlerts = allAlerts.filter((a: any) => 
+      const activeAlerts = kvAlerts.filter((a: any) =>
         a.status !== 'resolved' && a.status !== 'dismissed'
       ).length;
 
-      // Unread Notifications for admin
-      const unreadNotifications = allNotifications.filter((n: any) => 
-        n.userId === userId && !n.read
-      ).length;
+      // Unread notifications: KV count + DB count
+      const kvUnread = kvNotifications.filter((n: any) => n.userId === userId && !n.read).length;
+      const dbUnread = await db.getUnreadNotificationCount(userId).catch(() => 0);
+      const unreadNotifications = kvUnread + dbUnread;
 
       return c.json({
         stats: {
@@ -133,8 +129,8 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
           totalSessions,
           revenue: revenue.toFixed(2),
           activeAlerts,
-          unreadNotifications
-        }
+          unreadNotifications,
+        },
       });
     } catch (error: any) {
       console.error('Error fetching dashboard stats:', error);
@@ -147,16 +143,37 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
     try {
       const accessToken = c.req.header('Authorization')?.split(' ')[1];
       const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
-      if (!userId) {
-        return c.json({ error: 'Unauthorized' }, 401);
+      // Admin role guard
+      const adminProfile = await kv.get(`user:${userId}`) as any
+        ?? await db.getProfile(userId);
+      if (!adminProfile || adminProfile.role !== 'admin') {
+        return c.json({ error: 'Forbidden' }, 403);
       }
 
-      // Get all data
-      const allUsers = await kv.getByPrefix('user:');
-      const allBookings = await kv.getByPrefix('booking:');
-      const allPayments = await kv.getByPrefix('payment:');
-      const allVerifications = await kv.getByPrefix('verification:');
+      // Fetch from KV (legacy) and DB (new) in parallel
+      const [kvUsers, kvBookings, kvPayments, allVerifications, dbBookings, dbPayments, dbProfiles] =
+        await Promise.all([
+          kv.getByPrefix('user:'),
+          kv.getByPrefix('booking:'),
+          kv.getByPrefix('payment:'),
+          kv.getByPrefix('verification:'),
+          db.getAllBookingsForAdmin(),
+          db.getAllPaymentsForAdmin(),
+          db.getAllProfilesForAdmin().catch(() => [] as any[]),
+        ]);
+
+      // Merge users (DB profiles take precedence for deduplication)
+      const dbProfileIds = new Set(dbProfiles.map((p: any) => p.id));
+      const allUsers = [...kvUsers.filter((u: any) => !dbProfileIds.has(u.id || u.userId)), ...dbProfiles];
+
+      // Merge bookings and payments
+      const kvBookingIds = new Set(kvBookings.map((b: any) => b.id));
+      const allBookings = [...kvBookings, ...dbBookings.filter((b) => !kvBookingIds.has(b.id))];
+
+      const kvPaymentIds = new Set(kvPayments.map((p: any) => p.id));
+      const allPayments = [...kvPayments, ...dbPayments.filter((p) => !kvPaymentIds.has(p.id))];
 
       // Calculate date ranges
       const now = new Date();

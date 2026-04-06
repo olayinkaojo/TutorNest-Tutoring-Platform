@@ -231,11 +231,11 @@ app.post('/make-server-cbd74580/google-calendar/events', async (c) => {
       description,
       start: {
         dateTime: startDateTime,
-        timeZone: 'Europe/London',
+        timeZone: 'Africa/Lagos',
       },
       end: {
         dateTime: endDateTime,
-        timeZone: 'Europe/London',
+        timeZone: 'Africa/Lagos',
       },
       attendees: attendees?.map((email: string) => ({ email })) || [],
       location: location || 'TutorNest Virtual Classroom',
@@ -411,14 +411,14 @@ app.patch('/make-server-cbd74580/google-calendar/events/:eventId', async (c) => 
     if (updates.startDateTime) {
       eventUpdates.start = {
         dateTime: updates.startDateTime,
-        timeZone: 'Europe/London',
+        timeZone: 'Africa/Lagos',
       };
     }
     
     if (updates.endDateTime) {
       eventUpdates.end = {
         dateTime: updates.endDateTime,
-        timeZone: 'Europe/London',
+        timeZone: 'Africa/Lagos',
       };
     }
     

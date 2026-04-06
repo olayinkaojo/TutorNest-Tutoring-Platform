@@ -6,6 +6,7 @@ import * as db from './db.tsx';
 const app = new Hono();
 
 const FLUTTERWAVE_SECRET_KEY = Deno.env.get('FLUTTERWAVE_SECRET_KEY') ?? '';
+const FLUTTERWAVE_WEBHOOK_SECRET = Deno.env.get('FLUTTERWAVE_WEBHOOK_SECRET') ?? '';
 const PLATFORM_FEE_PERCENTAGE = 20;
 
 // Fixed payment plan definitions (prices in NGN)
@@ -757,10 +758,199 @@ app.post('/payments/initiate-plan', async (c) => {
   }
 });
 
-// ─── Plan-based payment: confirm ─────────────────────────────────────────────
+// ─── Google Calendar helpers ──────────────────────────────────────────────────
+
+/** Returns a valid Google access token, refreshing if it is about to expire. */
+async function getGoogleToken(tutorId: string): Promise<string | null> {
+  const tokens = await kv.get(`google_calendar_tokens:${tutorId}`) as any;
+  if (!tokens?.accessToken) return null;
+
+  // Refresh if expiring within 5 minutes
+  if (tokens.expiresAt && Date.now() >= tokens.expiresAt - 300_000) {
+    const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+    const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+    if (!clientId || !clientSecret || !tokens.refreshToken) return null;
+
+    const res = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        refresh_token: tokens.refreshToken,
+        client_id: clientId,
+        client_secret: clientSecret,
+        grant_type: 'refresh_token',
+      }),
+    });
+    if (!res.ok) return null;
+    const fresh = await res.json() as any;
+    await kv.set(`google_calendar_tokens:${tutorId}`, {
+      ...tokens,
+      accessToken: fresh.access_token,
+      expiresAt: Date.now() + (fresh.expires_in * 1000),
+      refreshToken: fresh.refresh_token || tokens.refreshToken,
+    });
+    return fresh.access_token;
+  }
+
+  return tokens.accessToken;
+}
+
+/**
+ * Creates a single Google Calendar event with a Meet link.
+ * Returns the hangout (Meet) link, or null on failure.
+ */
+async function createMeetEvent(
+  googleToken: string,
+  opts: { date: string; startTime: string; endTime: string; subject: string | null; sessionLabel: string },
+): Promise<string | null> {
+  const tz = 'Africa/Lagos';
+  const event = {
+    summary: `TutorNest: ${opts.subject ?? 'Tutoring Session'}`,
+    description: opts.sessionLabel,
+    start: { dateTime: `${opts.date}T${opts.startTime}:00`, timeZone: tz },
+    end:   { dateTime: `${opts.date}T${opts.endTime}:00`,   timeZone: tz },
+    reminders: {
+      useDefault: false,
+      overrides: [
+        { method: 'email', minutes: 24 * 60 },
+        { method: 'popup', minutes: 30 },
+      ],
+    },
+    conferenceData: {
+      createRequest: {
+        requestId: crypto.randomUUID(),
+        conferenceSolutionKey: { type: 'hangoutsMeet' },
+      },
+    },
+  };
+
+  const res = await fetch(
+    'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1',
+    {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${googleToken}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify(event),
+    },
+  );
+
+  if (!res.ok) {
+    console.warn('Google Calendar event creation failed:', await res.text());
+    return null;
+  }
+  const data = await res.json() as any;
+  return data.hangoutLink ?? data.conferenceData?.entryPoints?.[0]?.uri ?? null;
+}
+
+// ─── Shared: confirm a plan payment and create all bookings ──────────────────
+// Called by both the client-side confirm-plan route AND the Flutterwave webhook.
+// Returns the number of sessions created, or throws on failure.
+// Fully idempotent — safe to call multiple times for the same reference.
+async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated: number; bookingIds: string[] }> {
+  if (!FLUTTERWAVE_SECRET_KEY) throw new Error('Payment not configured yet');
+
+  // Verify the transaction with Flutterwave
+  const verifyRes = await fetch(
+    `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${reference}`,
+    { headers: { 'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}` } },
+  );
+  const verifyData = await verifyRes.json() as any;
+
+  if (verifyData.status !== 'success' || verifyData.data?.status !== 'successful') {
+    throw new Error(`Payment not confirmed by Flutterwave (status: ${verifyData.data?.status ?? 'unknown'})`);
+  }
+
+  // Get our payment record
+  const payment = await db.getPaymentByReference(reference);
+  if (!payment) throw new Error('Payment record not found for reference: ' + reference);
+
+  // Idempotency — already processed
+  if (payment.status === 'successful') {
+    return { sessionsCreated: (payment.bookingIds ?? []).length, bookingIds: payment.bookingIds ?? [] };
+  }
+
+  const plan = PAYMENT_PLANS[payment.planType];
+  if (!plan) throw new Error('Invalid plan type on payment record: ' + payment.planType);
+
+  // Generate all session dates and create booking rows
+  const startDate = new Date(payment.startDate);
+  const bookingDates = generateBookingDates(startDate, plan.sessions, plan.sessionsPerWeek);
+  const endTime = addMinutesToTime(payment.startTime, 60);
+
+  const bookingIds: string[] = [];
+  for (let i = 0; i < bookingDates.length; i++) {
+    const bookingId = crypto.randomUUID();
+    await db.createBooking({
+      id: bookingId,
+      paymentId: payment.id,
+      planType: payment.planType,
+      sessionNumber: i + 1,
+      totalSessions: plan.sessions,
+      tutorId: payment.tutorId,
+      studentId: payment.studentId,
+      userId: payment.userId,
+      date: bookingDates[i].toISOString().split('T')[0],
+      startTime: payment.startTime,
+      endTime,
+      duration: 60,
+      subject: payment.subject,
+      status: 'scheduled',
+      paymentStatus: 'paid',
+    });
+    bookingIds.push(bookingId);
+  }
+
+  // Mark payment confirmed
+  await db.updatePayment(payment.id, {
+    status: 'successful',
+    bookingIds,
+    confirmedAt: new Date().toISOString(),
+  });
+
+  // Credit tutor (80%)
+  const tutorAmount = payment.amount * 0.8;
+  await db.incrementTutorBalance(payment.tutorId, tutorAmount);
+
+  // Notify tutor
+  await db.createNotification({
+    userId: payment.tutorId,
+    type: 'payment_received',
+    title: 'New Plan Booking',
+    message: `You have a new ${plan.name} booking — ${plan.sessions} sessions starting ${payment.startDate}. Expected earnings: ₦${tutorAmount.toLocaleString()}.`,
+  });
+
+  // ── Create Google Meet link (non-fatal) ────────────────────────────────────
+  // We create ONE calendar event for the first session. The resulting Meet URL
+  // is stored on ALL bookings so tutor and student use the same room every week.
+  try {
+    const googleToken = await getGoogleToken(payment.tutorId);
+    if (googleToken) {
+      const firstDate = bookingDates[0].toISOString().split('T')[0];
+      const meetLink = await createMeetEvent(googleToken, {
+        date: firstDate,
+        startTime: payment.startTime,
+        endTime,
+        subject: payment.subject,
+        sessionLabel: `${plan.name} (${plan.sessions} sessions) — TutorNest`,
+      });
+      if (meetLink) {
+        await db.updateBookingsMeetLink(bookingIds, meetLink);
+        console.log(`Meet link created for payment ${payment.id}:`, meetLink);
+      }
+    }
+  } catch (calendarErr: any) {
+    // Non-fatal — bookings are already confirmed, Meet link is optional
+    console.warn('Google Calendar Meet link creation skipped:', calendarErr.message);
+  }
+
+  return { sessionsCreated: bookingIds.length, bookingIds };
+}
+
+// ─── Plan-based payment: confirm (client-side call) ───────────────────────────
 // POST /payments/confirm-plan/:reference
-// Verifies the Flutterwave payment and creates all session bookings.
-app.post('/payments/confirm-plan/:reference', async (c) => {
+app.post('/payments/confirm-plan/:reference', async (c: any) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     const userId = await getUserIdFromToken(accessToken);
@@ -771,88 +961,76 @@ app.post('/payments/confirm-plan/:reference', async (c) => {
       return c.json({ error: 'Invalid plan payment reference' }, 400);
     }
 
-    if (!FLUTTERWAVE_SECRET_KEY) return c.json({ error: 'Payment not configured yet' }, 503);
-
-    // Verify with Flutterwave
-    const verifyRes = await fetch(`https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${reference}`, {
-      headers: { 'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}` },
-    });
-    const verifyData = await verifyRes.json() as any;
-
-    if (verifyData.status !== 'success' || verifyData.data?.status !== 'successful') {
-      return c.json({ success: false, error: 'Payment not successful', status: verifyData.data?.status }, 400);
-    }
-
-    // Get our payment record from the database
-    const payment = await db.getPaymentByReference(reference);
-    if (!payment) return c.json({ error: 'Payment record not found' }, 404);
-
-    const paymentId = payment.id;
-
-    // Idempotency: already confirmed
-    if (payment.status === 'successful') {
-      return c.json({ success: true, message: 'Already confirmed', bookingIds: payment.bookingIds ?? [] });
-    }
-
-    const plan = PAYMENT_PLANS[payment.planType];
-    if (!plan) return c.json({ error: 'Invalid plan type on payment record' }, 400);
-
-    // Generate and create all booking records
-    const startDate = new Date(payment.startDate);
-    const bookingDates = generateBookingDates(startDate, plan.sessions, plan.sessionsPerWeek);
-    const endTime = addMinutesToTime(payment.startTime, 60);
-
-    const bookingIds: string[] = [];
-    for (let i = 0; i < bookingDates.length; i++) {
-      const bookingId = crypto.randomUUID();
-      await db.createBooking({
-        id: bookingId,
-        paymentId,
-        planType: payment.planType,
-        sessionNumber: i + 1,
-        totalSessions: plan.sessions,
-        tutorId: payment.tutorId,
-        studentId: payment.studentId,
-        userId,
-        date: bookingDates[i].toISOString().split('T')[0],
-        startTime: payment.startTime,
-        endTime,
-        duration: 60,
-        subject: payment.subject,
-        status: 'scheduled',
-        paymentStatus: 'paid',
-      });
-      bookingIds.push(bookingId);
-    }
-
-    // Mark payment as confirmed in database
-    await db.updatePayment(paymentId, {
-      status: 'successful',
-      bookingIds,
-      confirmedAt: new Date().toISOString(),
-    });
-
-    // Update tutor balance (80/20 split)
-    const tutorAmount = payment.amount * 0.8;
-    await db.incrementTutorBalance(payment.tutorId, tutorAmount);
-
-    // Notify tutor
-    await db.createNotification({
-      userId: payment.tutorId,
-      type: 'payment_received',
-      title: 'New Plan Booking',
-      message: `You have a new ${plan.name} booking — ${plan.sessions} sessions starting ${payment.startDate}. Expected earnings: ₦${tutorAmount.toLocaleString()}.`,
-    });
+    const result = await confirmPlanPayment(reference);
 
     return c.json({
       success: true,
-      sessionsCreated: bookingIds.length,
-      bookingIds,
-      message: `Payment confirmed. ${bookingIds.length} sessions scheduled successfully.`,
+      sessionsCreated: result.sessionsCreated,
+      bookingIds: result.bookingIds,
+      message: `Payment confirmed. ${result.sessionsCreated} sessions scheduled successfully.`,
     });
   } catch (err: any) {
     console.error('Error in confirm-plan:', err);
     return c.json({ error: err.message || 'Failed to confirm plan payment' }, 500);
+  }
+});
+
+// ─── Flutterwave webhook ──────────────────────────────────────────────────────
+// POST /payments/webhook
+//
+// Flutterwave calls this URL server-to-server after every successful payment.
+// This is the safety net: if the user's browser closes before confirm-plan runs,
+// this ensures bookings are still created.
+//
+// Setup in Flutterwave dashboard:
+//   Webhook URL: https://<project>.supabase.co/functions/v1/make-server-cbd74580/payments/webhook
+//   Secret hash: set FLUTTERWAVE_WEBHOOK_SECRET in Supabase edge function secrets
+app.post('/payments/webhook', async (c: any) => {
+  try {
+    // 1. Verify the request is genuinely from Flutterwave
+    const secretHash = FLUTTERWAVE_WEBHOOK_SECRET;
+    if (secretHash) {
+      const signature = c.req.header('verif-hash');
+      if (!signature || signature !== secretHash) {
+        console.warn('Webhook rejected: invalid verif-hash');
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+    } else {
+      console.warn('FLUTTERWAVE_WEBHOOK_SECRET not set — webhook signature not verified');
+    }
+
+    const payload = await c.req.json() as any;
+    console.log('Flutterwave webhook received:', JSON.stringify(payload));
+
+    // 2. Only process successful plan payments (our TNP_ references)
+    const status = payload?.data?.status ?? payload?.event?.data?.status;
+    const txRef = payload?.data?.tx_ref ?? payload?.event?.data?.tx_ref;
+
+    if (!txRef || !txRef.startsWith('TNP_')) {
+      // Not a plan payment — ignore silently (Flutterwave sends all events)
+      return c.json({ received: true });
+    }
+
+    if (status !== 'successful') {
+      console.log(`Webhook: payment ${txRef} status is "${status}", skipping`);
+      return c.json({ received: true });
+    }
+
+    // 3. Confirm the payment (idempotent — safe if browser already confirmed it)
+    try {
+      const result = await confirmPlanPayment(txRef);
+      console.log(`Webhook: confirmed ${txRef} — ${result.sessionsCreated} sessions created`);
+    } catch (err: any) {
+      // Log but still return 200 so Flutterwave doesn't retry endlessly
+      console.error(`Webhook: confirmPlanPayment failed for ${txRef}:`, err.message);
+    }
+
+    // Always return 200 — Flutterwave retries on any non-2xx response
+    return c.json({ received: true });
+  } catch (err: any) {
+    console.error('Webhook error:', err);
+    // Still return 200 to stop retries on malformed payloads
+    return c.json({ received: true });
   }
 });
 

@@ -32,7 +32,7 @@ import curriculumRoutes from './curriculum-routes.tsx';
 import triviaRoutes from './trivia-routes.tsx';
 import tutorSessionReportsRoutes from './tutor-session-reports-routes.tsx';
 import paymentRoutes from './payment-routes.tsx';
-import { upsertProfile } from './db.tsx';
+import { upsertProfile, getProfile } from './db.tsx';
 import liveSessionRoutes from './live-session-routes.tsx';
 import payoutRoutes from './payout-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
@@ -169,11 +169,11 @@ async function createGoogleCalendarEvent(userId: string, eventData: any) {
     description: eventData.description,
     start: {
       dateTime: eventData.startDateTime,
-      timeZone: 'Europe/London',
+      timeZone: 'Africa/Lagos',
     },
     end: {
       dateTime: eventData.endDateTime,
-      timeZone: 'Europe/London',
+      timeZone: 'Africa/Lagos',
     },
     location: eventData.location || 'TutorNest Virtual Classroom',
     reminders: {
@@ -936,6 +936,31 @@ app.post('/make-server-cbd74580/profile', async (c) => {
   } catch (error: any) {
     console.error('Error setting role:', error);
     return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
+// Get any user's profile by ID (used by TutorDashboard to load student details)
+app.get('/make-server-cbd74580/profiles/:userId', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const requesterId = await getUserId(accessToken ?? null);
+    if (!requesterId) return c.json({ error: 'Unauthorized' }, 401);
+
+    const targetUserId = c.req.param('userId');
+
+    // Try KV first (most profiles still there), fall back to profiles table
+    let profile = await kv.get(`user:${targetUserId}`) as any;
+    if (!profile) {
+      profile = await getProfile(targetUserId);
+    }
+    if (!profile) return c.json({ error: 'Profile not found' }, 404);
+
+    // Strip sensitive fields before returning to other users
+    const { password, ...safeProfile } = profile;
+    return c.json({ profile: safeProfile });
+  } catch (err: any) {
+    console.error('GET /profiles/:userId error:', err);
+    return c.json({ error: err.message || 'Internal server error' }, 500);
   }
 });
 
@@ -2138,7 +2163,7 @@ app.get('/make-server-cbd74580/availability/:tutorId', async (c) => {
           Saturday: { enabled: false, slots: [] },
           Sunday: { enabled: false, slots: [] },
         },
-        timezone: 'Europe/London',
+        timezone: 'Africa/Lagos',
       });
     }
 
@@ -2406,11 +2431,11 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
           description: eventData.event.description,
           start: {
             dateTime: eventData.event.startDateTime,
-            timeZone: 'Europe/London',
+            timeZone: 'Africa/Lagos',
           },
           end: {
             dateTime: eventData.event.endDateTime,
-            timeZone: 'Europe/London',
+            timeZone: 'Africa/Lagos',
           },
           attendees: eventData.event.attendees.map((email: string) => ({ email })),
           location: eventData.event.location,

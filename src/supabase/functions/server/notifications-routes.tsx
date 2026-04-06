@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
 
 export const notificationsRoutes = (app: Hono, getUserId: Function) => {
 
@@ -38,11 +39,21 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       // Always use the authenticated user's ID for security, not the URL parameter
       const safeUserId = currentUserId;
       
-      // Get all notifications for user
-      const allNotifications = await kv.getByPrefix('notification:');
-      const userNotifications = allNotifications
-        .filter((n: any) => n.userId === safeUserId)
-        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      // Get notifications from both KV (legacy) and DB (new) in parallel
+      const [kvAllNotifications, dbNotifications] = await Promise.all([
+        kv.getByPrefix('notification:'),
+        db.getNotificationsByUser(safeUserId).catch(() => [] as any[]),
+      ]);
+
+      const kvUserNotifications = kvAllNotifications
+        .filter((n: any) => n.userId === safeUserId);
+
+      // Merge: DB notifications take precedence (deduplicate by id)
+      const kvIds = new Set(kvUserNotifications.map((n: any) => n.id));
+      const userNotifications = [
+        ...kvUserNotifications,
+        ...dbNotifications.filter((n) => !kvIds.has(n.id)),
+      ].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
       console.log('Found', userNotifications.length, 'notifications for user');
       
@@ -50,9 +61,16 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       let bookingNotifications: any[] = [];
       
       try {
-        const allBookings = await kv.getByPrefix('booking:');
+        // Merge KV bookings (legacy) and DB bookings for reminder generation
+        const [kvBookings, dbBookings] = await Promise.all([
+          kv.getByPrefix('booking:'),
+          db.getBookingsByUserId(safeUserId).catch(() => [] as any[]),
+        ]);
+        const kvBookingIds = new Set(kvBookings.map((b: any) => b.id));
+        const allBookings = [...kvBookings, ...dbBookings.filter((b) => !kvBookingIds.has(b.id))];
+
         const now = new Date();
-        
+
         const upcomingBookings = allBookings.filter((booking: any) => {
           try {
             // Validate booking has required fields
@@ -181,14 +199,18 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       }
 
       const notificationId = c.req.param('notificationId');
-      const notification = await kv.get(notificationId) as any;
 
-      if (!notification) {
-        return c.json({ error: 'Notification not found' }, 404);
+      // Try KV first, then DB
+      const kvNotification = await kv.get(notificationId) as any;
+      if (kvNotification) {
+        kvNotification.read = true;
+        await kv.set(notificationId, kvNotification);
+      } else {
+        // May be a UUID from the notifications table
+        await db.markNotificationRead(notificationId).catch(() => {
+          // Silent fail — booking-generated notifications (booking-notification:xxx) are ephemeral
+        });
       }
-
-      notification.read = true;
-      await kv.set(notificationId, notification);
 
       return c.json({ success: true });
     } catch (error: any) {

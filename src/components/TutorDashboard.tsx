@@ -41,6 +41,7 @@ import TutorNestLogo from './TutorNestLogo';
 import { MobileNavigation } from './MobileNavigation';
 import { NotificationCenter } from './NotificationCenter';
 import { TutorProfileEditor } from './TutorProfileEditor';
+import { GoogleCalendarSetup } from './GoogleCalendarSetup';
 import { TutorInvitations } from './TutorInvitations';
 import { TutorAvailabilityManager } from './TutorAvailabilityManager';
 import { BookingManager } from './BookingManager';
@@ -892,12 +893,15 @@ export function TutorDashboard({ profile, onSignOut, availableRoles, onRoleSwitc
 
           <TabsContent value="profile">
             {session && (
-              <TutorProfileEditor 
-                session={session}
-                tutorId={profile.id || profile.userId}
-                currentProfile={profile}
-                onProfileUpdated={fetchDashboardData}
-              />
+              <div className="space-y-6">
+                <TutorProfileEditor
+                  session={session}
+                  tutorId={profile.id || profile.userId}
+                  currentProfile={profile}
+                  onProfileUpdated={fetchDashboardData}
+                />
+                <GoogleCalendarSetup session={session} />
+              </div>
             )}
           </TabsContent>
 
