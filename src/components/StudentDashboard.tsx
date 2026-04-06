@@ -11,6 +11,9 @@ import { GamificationSystem } from './GamificationSystem';
 import { DailyChallenge } from './trivia/DailyChallenge';
 import { TimeAttackMode } from './trivia/TimeAttackMode';
 import { BattleArena } from './trivia/BattleArena';
+import AchievementPanel from './achievements/AchievementPanel';
+import AchievementNotification from './achievements/AchievementNotification';
+import LeaderboardAchievements from './achievements/LeaderboardAchievements';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { NotificationCenter } from './NotificationCenter';
@@ -437,6 +440,7 @@ export function StudentDashboard({ initialProfile, onSignOut }: { initialProfile
             <TabsTrigger value="messages">Messages</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="gamification">Trivia & Rewards</TabsTrigger>
+            <TabsTrigger value="achievements">Achievements</TabsTrigger>
           </TabsList>
 
           {/* Performance Tab - DEFAULT ACTIVE */}
@@ -908,6 +912,30 @@ export function StudentDashboard({ initialProfile, onSignOut }: { initialProfile
 
               {/* Main Gamification System */}
               <GamificationSystem key={gamificationKey} userId={profile.userId} userType="student" />
+            </div>
+          </TabsContent>
+
+          <TabsContent value="achievements">
+            <div className="space-y-6">
+              {/* Achievement Notification */}
+              <AchievementNotification
+                badge={null}
+                onDismiss={() => {}}
+              />
+
+              {/* Achievement Panel */}
+              <AchievementPanel
+                achievements={[]}
+                unlockedCount={0}
+                totalCount={20}
+              />
+
+              {/* Leaderboard */}
+              <LeaderboardAchievements
+                leaderboard={[]}
+                currentUserId={profile.userId}
+                limit={50}
+              />
             </div>
           </TabsContent>
         </Tabs>
