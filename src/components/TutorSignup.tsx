@@ -419,15 +419,25 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
           throw new Error('Failed to create account');
         }
 
-        // Account auto-confirmed — sign in immediately
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (signInError) {
-          // Sign-in failed after account creation — show sign-in screen as fallback
-          setEmailConfirmationSent(true);
+        // Backend returns a session — set it directly, no separate sign-in needed
+        if (signupData.session?.access_token) {
+          await supabase.auth.setSession({
+            access_token: signupData.session.access_token,
+            refresh_token: signupData.session.refresh_token,
+          });
+          onSignupComplete?.();
           return;
         }
 
-        onSignupComplete?.();
+        // Fallback: try signing in client-side
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (!signInError) {
+          onSignupComplete?.();
+          return;
+        }
+
+        // Last resort: go to sign-in page so they can log in manually
+        onBackToSignIn?.();
         return;
       } else {
         // Existing user updating their tutor profile
@@ -556,35 +566,6 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
       </div>
     </div>
   );
-
-  if (emailConfirmationSent) {
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 flex items-center justify-center p-4">
-        <div className="max-w-md w-full bg-white rounded-3xl shadow-xl p-8 text-center">
-          <div className="flex justify-center mb-6">
-            <TutorNestLogo />
-          </div>
-          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#f0f4ff' }}>
-            <CheckCircle className="w-8 h-8" style={{ color: '#625d9c' }} />
-          </div>
-          <h2 className="mb-2 text-gray-900">Account Created! ✅</h2>
-          <p className="text-gray-600 mb-2">
-            We sent a verification email to <strong>{email}</strong>
-          </p>
-          <p className="text-sm text-gray-500 mb-6">
-            You can log in and start managing your tutor profile right now! The email is for your reference.
-          </p>
-          <Button
-            variant="outline"
-            onClick={() => onBackToSignIn?.()}
-            className="w-full"
-          >
-            Go to Sign In
-          </Button>
-        </div>
-      </div>
-    );
-  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 py-8 px-4">

@@ -766,14 +766,21 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       // Don't fail the signup if KV store fails
     }
 
-    // Account created — user can log in immediately (email_confirm: true = auto-confirmed)
-    // Email sent for engagement/notification purposes
-    console.log('Signup successful, email sent for:', email);
+    // Step 3: Sign the user in server-side and return the session so the frontend
+    // can call setSession() directly — no separate sign-in call needed on the client.
+    const anonSupabase = createClient(supabaseUrl, anonKey);
+    const { data: signInData, error: signInError } = await anonSupabase.auth.signInWithPassword({ email, password });
+    if (signInError || !signInData?.session) {
+      console.warn('⚠️ Server-side sign-in after signup failed:', signInError?.message);
+    }
+
+    console.log('Signup successful for:', email);
     return c.json({
       success: true,
       requiresEmailConfirmation: false,
       userId: data.user.id,
       isAdmin,
+      session: signInData?.session ?? null,
     });
   } catch (error: any) {
     console.error('Signup error (outer catch):', error);
