@@ -189,19 +189,19 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
           <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4" style={{ backgroundColor: '#f0f4ff' }}>
             <CheckCircle className="w-8 h-8" style={{ color: '#625d9c' }} />
           </div>
-          <h2 className="mb-2 text-gray-900">Check your email</h2>
+          <h2 className="mb-2 text-gray-900">Account Created! ✅</h2>
           <p className="text-gray-600 mb-2">
-            We sent a confirmation link to <strong>{email}</strong>
+            We sent a verification email to <strong>{email}</strong>
           </p>
           <p className="text-sm text-gray-500 mb-6">
-            Click the link in the email to activate your account and sign in. Check your spam folder if you don't see it within a few minutes.
+            You can log in and start using TutorNest right now! The email is for your reference.
           </p>
           <Button
             variant="outline"
             onClick={() => onBackToSignIn?.()}
             className="w-full"
           >
-            Back to Sign In
+            Go to Sign In
           </Button>
         </div>
       </div>
