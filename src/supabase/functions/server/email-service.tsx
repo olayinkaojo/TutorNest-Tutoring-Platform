@@ -222,4 +222,82 @@ export const emailTemplates = {
       </div>
     `,
   }),
+
+  // Email verification/confirmation for signup
+  emailVerification: (name: string, confirmationLink: string) => ({
+    subject: "Confirm Your Email Address - TutorNest",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #625d9c; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
+          <h1>Email Verification</h1>
+        </div>
+        
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px;">
+          <p>Hi ${name},</p>
+          
+          <p>Thank you for signing up for <strong>TutorNest</strong>! We're excited to have you join our tutoring community.</p>
+          
+          <p>To complete your signup and activate your account, please verify your email address by clicking the button below:</p>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${confirmationLink}" style="display: inline-block; background-color: #625d9c; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+              Verify Email Address
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px;">
+            Or copy and paste this link in your browser:<br>
+            <span style="word-break: break-all; color: #0066cc;">${confirmationLink}</span>
+          </p>
+          
+          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999;">
+            <p>This link will expire in 24 hours.</p>
+            <p>If you didn't sign up for TutorNest, you can safely ignore this email.</p>
+            <p>© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    `,
+  }),
+
+  // Account verification successful
+  emailVerificationSuccess: (name: string, dashboardLink: string) => ({
+    subject: "Email Verified! Welcome to TutorNest",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
+          <h1>✅ Email Verified!</h1>
+        </div>
+        
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px;">
+          <p>Hi ${name},</p>
+          
+          <p>Excellent! Your email has been verified and your TutorNest account is now active.</p>
+          
+          <p>You can now:</p>
+          <ul style="color: #333;">
+            <li>Access your personal dashboard</li>
+            <li>Browse tutors and book sessions</li>
+            <li>Participate in learning activities</li>
+            <li>Track your progress</li>
+          </ul>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${dashboardLink}" style="display: inline-block; background-color: #625d9c; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+              Go to Dashboard
+            </a>
+          </div>
+          
+          <p style="color: #666; font-size: 14px;">
+            If you need any help getting started, check out our FAQ or contact our support team.
+          </p>
+          
+          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999;">
+            <p>Welcome to the TutorNest community!</p>
+            <p>© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    `,
+  }),
 };
