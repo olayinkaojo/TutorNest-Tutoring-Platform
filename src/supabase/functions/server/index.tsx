@@ -33,6 +33,7 @@ import triviaRoutes from './trivia-routes.tsx';
 import extendedTriviaRoutes from './extended-trivia-routes.tsx';
 import { achievementRoutes } from './achievement-routes.tsx';
 import { topicRoutes } from './topic-routes.tsx';
+import { teacherRoutes } from './teacher-routes.tsx';
 import tutorSessionReportsRoutes from './tutor-session-reports-routes.tsx';
 import paymentRoutes from './payment-routes.tsx';
 import { upsertProfile, getProfile } from './db.tsx';
@@ -402,6 +403,9 @@ app.route('/make-server-cbd74580/achievements', achievementRoutes);
 
 // Register topic/learning paths routes
 app.route('/make-server-cbd74580/topics', topicRoutes);
+
+// Register teacher routes (profiles, classes, management)
+app.route('/make-server-cbd74580/teacher', teacherRoutes);
 
 // Register tutor session reports routes
 app.route('/make-server-cbd74580/tutor-session-reports', tutorSessionReportsRoutes);
