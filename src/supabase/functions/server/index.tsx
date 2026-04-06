@@ -688,7 +688,7 @@ app.post('/make-server-cbd74580/signup', async (c) => {
     const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
     try {
       const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
-        type: 'signup',
+        type: 'magiclink',
         email,
         options: { redirectTo: appUrl },
       });
