@@ -688,7 +688,7 @@ app.post('/make-server-cbd74580/signup', async (c) => {
     // NOTE: Do NOT call generateLink({ type: 'signup' }) here — it resets the user back to
     // unconfirmed and causes the "Email not confirmed" sign-in error.
     try {
-      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.com';
+      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
       await sendEmail({
         to: email,
         subject: `Welcome to TutorNest, ${name}!`,
@@ -2008,7 +2008,7 @@ app.post('/make-server-cbd74580/invitations/send', async (c) => {
       const studentName = studentInfo?.full_name || studentInfo?.name || 'A student';
       
       if (tutorEmail) {
-        const acceptLink = `${Deno.env.get('FRONTEND_URL') || 'https://tutornest.com'}/invitations`;
+        const acceptLink = `${Deno.env.get('FRONTEND_URL') || 'https://tutornest.org'}/invitations`;
         const emailData = emailTemplates.tutorBookingNotification(
           tutorData?.full_name || 'Tutor',
           parentName,
@@ -2542,7 +2542,7 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
 
     // Send confirmation emails to parent and tutor
     try {
-      const dailyRoomLink = `https://daily.co/${booking.roomName}` || `${Deno.env.get('FRONTEND_URL') || 'https://tutornest.com'}/session/${bookingId}`;
+      const dailyRoomLink = `https://daily.co/${booking.roomName}` || `${Deno.env.get('FRONTEND_URL') || 'https://tutornest.org'}/session/${bookingId}`;
       
       if (parentEmail) {
         const parentEmailData = emailTemplates.bookingConfirmation(
