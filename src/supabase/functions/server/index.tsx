@@ -30,21 +30,21 @@ import roleManagementRoutes from './role-management-routes.tsx';
 import assessmentsRoutes from './assessments-routes.tsx';
 import curriculumRoutes from './curriculum-routes.tsx';
 import triviaRoutes from './trivia-routes.tsx';
-import extendedTriviaRoutes from './extended-trivia-routes.tsx';
-import { achievementRoutes } from './achievement-routes.tsx';
-import { topicRoutes } from './topic-routes.tsx';
-import { teacherRoutes } from './teacher-routes.tsx';
-import { teacherQuestionRoutes } from './teacher-question-routes.tsx';
-import { analyticsRoutes } from './analytics-routes.tsx';
-import { sessionAssignmentRoutes } from './session-assignment-routes.tsx';
-import { liveCollaborationRoutes } from './live-collaboration-routes.tsx';
+// import extendedTriviaRoutes from './extended-trivia-routes.tsx'; // disabled: imports broken time-attack/multiplayer/daily-challenge services
+// import { achievementRoutes } from './achievement-routes.tsx'; // disabled: uses incompatible oak/deno-kv API
+// import { topicRoutes } from './topic-routes.tsx'; // disabled: uses incompatible oak/deno-kv API
+// import { teacherRoutes } // disabled: uses non-existent Hono Router from './teacher-routes.tsx';
+// import { teacherQuestionRoutes } // disabled: uses non-existent Hono Router from './teacher-question-routes.tsx';
+// import { analyticsRoutes } // disabled: uses non-existent Hono Router from './analytics-routes.tsx';
+// import { sessionAssignmentRoutes } // disabled: uses non-existent Hono Router from './session-assignment-routes.tsx';
+// import { liveCollaborationRoutes } // disabled: uses non-existent Hono Router from './live-collaboration-routes.tsx';
 import tutorSessionReportsRoutes from './tutor-session-reports-routes.tsx';
 import paymentRoutes from './payment-routes.tsx';
 import { upsertProfile, getProfile } from './db.tsx';
 import liveSessionRoutes from './live-session-routes.tsx';
 import payoutRoutes from './payout-routes.tsx';
-import { videoRoutes } from './video-routes.tsx';
-import { screenShareRoutes } from './screen-share-routes.tsx';
+// import { videoRoutes } // disabled: uses non-existent Hono Router from './video-routes.tsx';
+// import { screenShareRoutes } // disabled: uses non-existent Hono Router from './screen-share-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
 import paymentPlansRoutes from './payment-plans-routes.tsx';
 
@@ -402,28 +402,28 @@ app.route('/make-server-cbd74580/curriculum', curriculumRoutes);
 app.route('/make-server-cbd74580/trivia', triviaRoutes);
 
 // Register extended trivia routes (daily challenges, time attack, battles)
-app.route('/make-server-cbd74580/trivia-extended', extendedTriviaRoutes);
+// app.route('/make-server-cbd74580/trivia-extended', extendedTriviaRoutes);
 
 // Register achievement routes (badges, leaderboards, stats)
-app.route('/make-server-cbd74580/achievements', achievementRoutes);
+// app.route('/make-server-cbd74580/achievements', achievementRoutes);
 
 // Register topic/learning paths routes
-app.route('/make-server-cbd74580/topics', topicRoutes);
+// app.route('/make-server-cbd74580/topics', topicRoutes);
 
 // Register teacher routes (profiles, classes, management)
-app.route('/make-server-cbd74580/teacher', teacherRoutes);
+// app.route('/make-server-cbd74580/teacher', teacherRoutes);
 
 // Register teacher question & assignment routes
-app.route('/make-server-cbd74580/teacher', teacherQuestionRoutes);
+// app.route('/make-server-cbd74580/teacher', teacherQuestionRoutes);
 
 // Register analytics routes
-app.route('/make-server-cbd74580/analytics', analyticsRoutes);
+// app.route('/make-server-cbd74580/analytics', analyticsRoutes);
 
 // Register session assignment (workflow) routes
-app.route('/make-server-cbd74580', sessionAssignmentRoutes);
+// app.route('/make-server-cbd74580', sessionAssignmentRoutes);
 
 // Register live collaboration (whiteboard) routes
-app.route('/make-server-cbd74580', liveCollaborationRoutes);
+// app.route('/make-server-cbd74580', liveCollaborationRoutes);
 
 // Register tutor session reports routes
 app.route('/make-server-cbd74580/tutor-session-reports', tutorSessionReportsRoutes);
@@ -444,10 +444,10 @@ app.route('/make-server-cbd74580/payouts', payoutRoutes);
 app.route('/make-server-cbd74580/invoices', invoiceRoutes);
 
 // Register video conference routes
-app.route('/make-server-cbd74580', videoRoutes);
+// app.route('/make-server-cbd74580', videoRoutes);
 
 // Register screen sharing routes
-app.route('/make-server-cbd74580', screenShareRoutes);
+// app.route('/make-server-cbd74580', screenShareRoutes);
 
 // TEST ROUTE - Direct subscription tiers endpoint
 app.get('/make-server-cbd74580/subscription-tiers-test', async (c) => {
@@ -665,12 +665,12 @@ app.post('/make-server-cbd74580/signup', async (c) => {
 
     const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Step 1: Create user (auto-confirmed) via admin client
+    // Step 1: Create user (email confirmation required) via admin client
     const { data, error } = await adminSupabase.auth.admin.createUser({
       email,
       password,
       user_metadata: { name },
-      email_confirm: true,
+      email_confirm: false,
     });
 
     if (error) {
@@ -684,32 +684,42 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       return c.json({ error: 'Failed to create account - no user data returned' }, 500);
     }
 
-    // Step 2: Send a welcome email (non-blocking — account is already confirmed above)
-    // NOTE: Do NOT call generateLink({ type: 'signup' }) here — it resets the user back to
-    // unconfirmed and causes the "Email not confirmed" sign-in error.
+    // Step 2: Generate verification link and send confirmation email via Resend
+    const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
     try {
-      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
-      await sendEmail({
-        to: email,
-        subject: `Welcome to TutorNest, ${name}!`,
-        html: `
-          <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
-            <h2 style="color:#625d9c">Welcome to TutorNest! 🎉</h2>
-            <p>Hi ${name},</p>
-            <p>Your account has been created and you can sign in immediately — no confirmation needed.</p>
-            <p style="margin:24px 0">
-              <a href="${appUrl}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
-                Sign In to TutorNest
-              </a>
-            </p>
-            <p style="color:#666;font-size:14px">If you did not create this account, please ignore this email.</p>
-          </div>
-        `,
+      const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
+        type: 'signup',
+        email,
+        password,
+        options: { redirectTo: appUrl },
       });
-      console.log('✅ Welcome email sent to:', email);
+
+      if (linkError) {
+        console.warn('⚠️ Could not generate verification link:', linkError.message);
+      } else {
+        const verificationUrl = linkData?.properties?.action_link;
+        if (verificationUrl) {
+          await sendEmail({
+            to: email,
+            subject: `Confirm your TutorNest account`,
+            html: `
+              <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+                <h2 style="color:#625d9c">Almost there, ${name}!</h2>
+                <p>Thank you for signing up to TutorNest. Please confirm your email address to activate your account.</p>
+                <p style="margin:24px 0">
+                  <a href="${verificationUrl}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
+                    Confirm Email Address
+                  </a>
+                </p>
+                <p style="color:#666;font-size:14px">This link expires in 24 hours. If you did not create this account, please ignore this email.</p>
+              </div>
+            `,
+          });
+          console.log('✅ Verification email sent to:', email);
+        }
+      }
     } catch (emailErr: any) {
-      // Non-fatal — don't fail signup if welcome email fails
-      console.warn('⚠️ Could not send welcome email:', emailErr.message);
+      console.warn('⚠️ Could not send verification email:', emailErr.message);
     }
 
     console.log('User created successfully for:', email);
@@ -766,36 +776,13 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       // Don't fail the signup if KV store fails
     }
 
-    // Step 3: Force-confirm the email via updateUserById.
-    // email_confirm:true in createUser is sometimes ignored depending on project settings —
-    // this explicit update guarantees email_confirmed_at is set before we try to sign in.
-    const { error: confirmError } = await adminSupabase.auth.admin.updateUserById(
-      data.user.id,
-      { email_confirm: true },
-    );
-    if (confirmError) {
-      console.warn('⚠️ Could not force-confirm email:', confirmError.message);
-    } else {
-      console.log('✅ Email confirmed for user:', data.user.id);
-    }
-
-    // Step 4: Sign the user in server-side and return the session so the frontend
-    // can call setSession() directly — no separate sign-in call needed on the client.
-    const anonSupabase = createClient(supabaseUrl, anonKey);
-    const { data: signInData, error: signInError } = await anonSupabase.auth.signInWithPassword({ email, password });
-    if (signInError || !signInData?.session) {
-      console.warn('⚠️ Server-side sign-in after signup failed:', signInError?.message);
-    } else {
-      console.log('✅ Server-side sign-in successful for:', email);
-    }
-
     console.log('Signup successful for:', email);
     return c.json({
       success: true,
-      requiresEmailConfirmation: false,
+      requiresEmailConfirmation: true,
       userId: data.user.id,
       isAdmin,
-      session: signInData?.session ?? null,
+      session: null,
     });
   } catch (error: any) {
     console.error('Signup error (outer catch):', error);

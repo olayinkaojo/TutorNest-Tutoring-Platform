@@ -279,11 +279,11 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
 
-      // Create Supabase auth user
+      // Create Supabase auth user (email confirmation required)
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: email,
         password: password,
-        email_confirm: true,
+        email_confirm: false,
         user_metadata: {
           role: 'student',
           firstName: firstName,
@@ -296,9 +296,6 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         console.error('Error creating independent student:', authError);
         return c.json({ error: authError?.message || 'Failed to create account' }, 500);
       }
-
-      // Force-confirm email regardless of project settings
-      await supabase.auth.admin.updateUserById(authData.user.id, { email_confirm: true });
 
       // Create student user profile
       const studentProfile = {
@@ -330,73 +327,42 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       console.log('✅ Independent student profile saved to KV store');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
-      // Send welcome email (no confirmation required — account is already active)
-      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.com';
-      await sendEmail({
-        to: email,
-        subject: `Welcome to TutorNest, ${firstName}!`,
-        html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
-          <h2 style="color:#625d9c">Welcome to TutorNest! 🎓</h2>
-          <p>Hi ${firstName},</p>
-          <p>Your student account is ready. You can sign in immediately — no confirmation needed.</p>
-          <p style="margin:24px 0">
-            <a href="${appUrl}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Sign In to TutorNest</a>
-          </p>
-        </div>`,
-      }).catch((e: any) => console.warn('Welcome email failed (non-fatal):', e.message));
-
-      // Create welcome notification
-      const notificationId = `notification:${Date.now()}`;
-      await kv.set(notificationId, {
-        id: notificationId,
-        userId: authData.user.id,
-        type: 'welcome',
-        title: 'Welcome to TutorNest! 🎓',
-        message: 'Your account has been created. Complete your profile to find the perfect tutor.',
-        read: false,
-        priority: 'medium',
-        createdAt: new Date().toISOString()
-      });
-
-      // Auto-login user after signup
-      console.log('Signing in independent student to get session token...');
+      // Send verification email via Resend
+      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
       try {
-        const anonSupabase = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-        );
-        const { data: signInData, error: signInError } = await anonSupabase.auth.signInWithPassword({
+        const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
+          type: 'signup',
           email,
           password,
+          options: { redirectTo: appUrl },
         });
-        
-        if (signInError) {
-          console.error('Error auto-login after independent signup:', signInError);
-          return c.json({ 
-            success: true,
-            userId: authData.user.id,
-            message: 'Account created successfully. Please sign in manually.',
-            warning: 'Auto-login failed'
+        if (!linkError && linkData?.properties?.action_link) {
+          await sendEmail({
+            to: email,
+            subject: `Confirm your TutorNest account`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+              <h2 style="color:#625d9c">Almost there, ${firstName}!</h2>
+              <p>Please confirm your email address to activate your TutorNest student account.</p>
+              <p style="margin:24px 0">
+                <a href="${linkData.properties.action_link}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Confirm Email Address</a>
+              </p>
+              <p style="color:#666;font-size:14px">This link expires in 24 hours.</p>
+            </div>`,
           });
+          console.log('✅ Verification email sent to independent student:', email);
+        } else {
+          console.warn('⚠️ Could not generate verification link:', linkError?.message);
         }
-        
-        console.log('Auto-login successful for independent student');
-        return c.json({ 
-          success: true,
-          userId: authData.user.id,
-          user: signInData.user,
-          session: signInData.session,
-          message: 'Independent student account created successfully'
-        });
-      } catch (signInException: any) {
-        console.error('Exception during independent student auto-login:', signInException);
-        return c.json({ 
-          success: true,
-          userId: authData.user.id,
-          message: 'Account created successfully. Please sign in manually.',
-          warning: 'Auto-login failed'
-        });
+      } catch (emailErr: any) {
+        console.warn('⚠️ Verification email failed (non-fatal):', emailErr.message);
       }
+
+      return c.json({
+        success: true,
+        requiresEmailConfirmation: true,
+        userId: authData.user.id,
+        message: 'Account created. Please check your email to confirm your account.',
+      });
     } catch (error: any) {
       console.error('Error creating independent student:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);
@@ -443,11 +409,11 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
       );
 
-      // Create Supabase auth user
+      // Create Supabase auth user (email confirmation required)
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: email,
         password: password,
-        email_confirm: true,
+        email_confirm: false,
         user_metadata: {
           role: 'student',
           firstName: firstName,
@@ -462,9 +428,6 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         console.error('Error creating dependent student:', authError);
         return c.json({ error: authError?.message || 'Failed to create account' }, 500);
       }
-
-      // Force-confirm email regardless of project settings
-      await supabase.auth.admin.updateUserById(authData.user.id, { email_confirm: true });
 
       // Create student user profile (pending parent link)
       const studentProfile = {
@@ -502,20 +465,34 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
       });
 
-      // Send welcome email to student (no confirmation required — account is already active)
-      const appUrl2 = Deno.env.get('VITE_APP_URL') || 'https://tutornest.com';
-      await sendEmail({
-        to: email,
-        subject: `Welcome to TutorNest, ${firstName}!`,
-        html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
-          <h2 style="color:#625d9c">Welcome to TutorNest! 🎓</h2>
-          <p>Hi ${firstName},</p>
-          <p>Your account is ready. Your parent will link their account to yours shortly.</p>
-          <p style="margin:24px 0">
-            <a href="${appUrl2}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Sign In to TutorNest</a>
-          </p>
-        </div>`,
-      }).catch((e: any) => console.warn('Welcome email failed (non-fatal):', e.message));
+      // Send verification email to student
+      const appUrl2 = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+      try {
+        const { data: linkData2, error: linkError2 } = await supabase.auth.admin.generateLink({
+          type: 'signup',
+          email,
+          password,
+          options: { redirectTo: appUrl2 },
+        });
+        if (!linkError2 && linkData2?.properties?.action_link) {
+          await sendEmail({
+            to: email,
+            subject: `Confirm your TutorNest account`,
+            html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+              <h2 style="color:#625d9c">Almost there, ${firstName}!</h2>
+              <p>Please confirm your email address to activate your TutorNest account. Your parent/guardian will also receive an invitation to link their account to yours.</p>
+              <p style="margin:24px 0">
+                <a href="${linkData2.properties.action_link}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Confirm Email Address</a>
+              </p>
+              <p style="color:#666;font-size:14px">This link expires in 24 hours.</p>
+            </div>`,
+          });
+        } else {
+          console.warn('⚠️ Could not generate verification link for dependent student:', linkError2?.message);
+        }
+      } catch (emailErr: any) {
+        console.warn('⚠️ Verification email failed (non-fatal):', emailErr.message);
+      }
 
       // Send email to parent with linking invitation
       const parentLinkUrl = `${Deno.env.get('VITE_APP_URL') || 'https://tutornest.com'}/parent/link-student?token=${studentProfile.parentLinkToken}&studentId=${authData.user.id}`;
@@ -562,48 +539,13 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         console.log('✅ Parent invitation email sent to', parentEmail);
       }
 
-      // Auto-login user after signup
-      console.log('Signing in dependent student to get session token...');
-      try {
-        const anonSupabase = createClient(
-          Deno.env.get('SUPABASE_URL') ?? '',
-          Deno.env.get('SUPABASE_ANON_KEY') ?? ''
-        );
-        const { data: signInData, error: signInError } = await anonSupabase.auth.signInWithPassword({
-          email,
-          password,
-        });
-        
-        if (signInError) {
-          console.error('Error auto-login after dependent signup:', signInError);
-          return c.json({ 
-            success: true,
-            userId: authData.user.id,
-            message: 'Account created. Please sign in manually. An invitation has been sent to your parent/guardian.',
-            awaitingParentLink: true,
-            warning: 'Auto-login failed'
-          });
-        }
-        
-        console.log('Auto-login successful for dependent student');
-        return c.json({ 
-          success: true,
-          userId: authData.user.id,
-          user: signInData.user,
-          session: signInData.session,
-          message: 'Account created. An invitation has been sent to your parent/guardian.',
-          awaitingParentLink: true
-        });
-      } catch (signInException: any) {
-        console.error('Exception during dependent student auto-login:', signInException);
-        return c.json({ 
-          success: true,
-          userId: authData.user.id,
-          message: 'Account created. Please sign in manually. An invitation has been sent to your parent/guardian.',
-          awaitingParentLink: true,
-          warning: 'Auto-login failed'
-        });
-      }
+      return c.json({
+        success: true,
+        requiresEmailConfirmation: true,
+        userId: authData.user.id,
+        message: 'Account created. Please check your email to confirm your account. An invitation has been sent to your parent/guardian.',
+        awaitingParentLink: true,
+      });
     } catch (error: any) {
       console.error('Error creating dependent student:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);

@@ -419,25 +419,8 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
           throw new Error('Failed to create account');
         }
 
-        // Backend returns a session — set it directly, no separate sign-in needed
-        if (signupData.session?.access_token) {
-          await supabase.auth.setSession({
-            access_token: signupData.session.access_token,
-            refresh_token: signupData.session.refresh_token,
-          });
-          onSignupComplete?.();
-          return;
-        }
-
-        // Fallback: try signing in client-side
-        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
-        if (!signInError) {
-          onSignupComplete?.();
-          return;
-        }
-
-        // Last resort: go to sign-in page so they can log in manually
-        onBackToSignIn?.();
+        // Email confirmation required — show the "check your email" screen
+        setEmailConfirmationSent(true);
         return;
       } else {
         // Existing user updating their tutor profile
@@ -574,6 +557,27 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         <div className="flex justify-center mb-6">
           <TutorNestLogo />
         </div>
+
+        {emailConfirmationSent ? (
+          <div className="bg-white rounded-3xl shadow-xl p-8 text-center">
+            <div className="flex justify-center mb-4">
+              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-8 h-8 text-purple-600" />
+              </div>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
+            <p className="text-gray-600 mb-4">
+              We sent a confirmation link to <strong>{email}</strong>.
+              Click the link in the email to activate your account.
+            </p>
+            <p className="text-sm text-gray-500">
+              Already confirmed?{' '}
+              <button onClick={onBackToSignIn} className="text-purple-600 hover:underline font-medium">
+                Sign in
+              </button>
+            </p>
+          </div>
+        ) : (
 
         <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8">
           <h1 className="text-center mb-2 text-gray-900">Become a TutorNest Tutor</h1>
@@ -1168,6 +1172,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
             </button>
           </div>
         </div>
+        )}
       </div>
     </div>
   );
