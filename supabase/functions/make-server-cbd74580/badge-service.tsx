@@ -1,4 +1,4 @@
-import { kv } from "https://deno.land/x/deno_kv_oauthv2@v0.0.2/mod.ts";
+import * as kv from "./kv_store.tsx";
 
 export type BadgeRarity = "common" | "rare" | "epic" | "legendary";
 

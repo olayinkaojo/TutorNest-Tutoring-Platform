@@ -1,4 +1,4 @@
-import { kv } from "https://deno.land/x/deno_kv_oauthv2@v0.0.2/mod.ts";
+import * as kv from "./kv_store.tsx";
 import { getUserBadges, addBadgeToUser } from "./badge-service.tsx";
 import { getTopicProgress } from "./subject-progress-service.tsx";
 

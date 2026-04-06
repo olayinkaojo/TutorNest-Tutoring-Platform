@@ -30,11 +30,21 @@ import roleManagementRoutes from './role-management-routes.tsx';
 import assessmentsRoutes from './assessments-routes.tsx';
 import curriculumRoutes from './curriculum-routes.tsx';
 import triviaRoutes from './trivia-routes.tsx';
+import extendedTriviaRoutes from './extended-trivia-routes.tsx';
+import { achievementRoutes } from './achievement-routes.tsx';
+import { topicRoutes } from './topic-routes.tsx';
+import { teacherRoutes } from './teacher-routes.tsx';
+import { teacherQuestionRoutes } from './teacher-question-routes.tsx';
+import { analyticsRoutes } from './analytics-routes.tsx';
+import { sessionAssignmentRoutes } from './session-assignment-routes.tsx';
+import { liveCollaborationRoutes } from './live-collaboration-routes.tsx';
 import tutorSessionReportsRoutes from './tutor-session-reports-routes.tsx';
 import paymentRoutes from './payment-routes.tsx';
 import { upsertProfile, getProfile } from './db.tsx';
 import liveSessionRoutes from './live-session-routes.tsx';
 import payoutRoutes from './payout-routes.tsx';
+import { videoRoutes } from './video-routes.tsx';
+import { screenShareRoutes } from './screen-share-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
 import paymentPlansRoutes from './payment-plans-routes.tsx';
 
@@ -391,6 +401,30 @@ app.route('/make-server-cbd74580/curriculum', curriculumRoutes);
 // Register trivia routes
 app.route('/make-server-cbd74580/trivia', triviaRoutes);
 
+// Register extended trivia routes (daily challenges, time attack, battles)
+app.route('/make-server-cbd74580/trivia-extended', extendedTriviaRoutes);
+
+// Register achievement routes (badges, leaderboards, stats)
+app.route('/make-server-cbd74580/achievements', achievementRoutes);
+
+// Register topic/learning paths routes
+app.route('/make-server-cbd74580/topics', topicRoutes);
+
+// Register teacher routes (profiles, classes, management)
+app.route('/make-server-cbd74580/teacher', teacherRoutes);
+
+// Register teacher question & assignment routes
+app.route('/make-server-cbd74580/teacher', teacherQuestionRoutes);
+
+// Register analytics routes
+app.route('/make-server-cbd74580/analytics', analyticsRoutes);
+
+// Register session assignment (workflow) routes
+app.route('/make-server-cbd74580', sessionAssignmentRoutes);
+
+// Register live collaboration (whiteboard) routes
+app.route('/make-server-cbd74580', liveCollaborationRoutes);
+
 // Register tutor session reports routes
 app.route('/make-server-cbd74580/tutor-session-reports', tutorSessionReportsRoutes);
 
@@ -408,6 +442,12 @@ app.route('/make-server-cbd74580/payouts', payoutRoutes);
 
 // Register invoice routes
 app.route('/make-server-cbd74580/invoices', invoiceRoutes);
+
+// Register video conference routes
+app.route('/make-server-cbd74580', videoRoutes);
+
+// Register screen sharing routes
+app.route('/make-server-cbd74580', screenShareRoutes);
 
 // TEST ROUTE - Direct subscription tiers endpoint
 app.get('/make-server-cbd74580/subscription-tiers-test', async (c) => {
@@ -625,12 +665,12 @@ app.post('/make-server-cbd74580/signup', async (c) => {
 
     const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Step 1: Create user (unconfirmed) via admin client
+    // Step 1: Create user (auto-confirmed) via admin client
     const { data, error } = await adminSupabase.auth.admin.createUser({
       email,
       password,
       user_metadata: { name },
-      email_confirm: false,
+      email_confirm: true,
     });
 
     if (error) {
@@ -644,60 +684,32 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       return c.json({ error: 'Failed to create account - no user data returned' }, 500);
     }
 
-    // Step 2: Generate a confirmation link via admin API
-    const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
-      type: 'signup',
-      email,
-      password,
-      options: { data: { name } },
-    });
-
-    if (linkError || !linkData?.properties?.action_link) {
-      console.error('Failed to generate confirmation link:', linkError);
-      // Don't fail signup — user can request a new link from sign-in page
-    } else {
-      // Step 3: Send confirmation email via Resend API directly
-      const resendKey = Deno.env.get('RESEND_API_KEY');
-      if (resendKey && linkData.properties.action_link) {
-        const confirmUrl = linkData.properties.action_link;
-        const emailRes = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'TutorNest <noreply@tutornest.org>',
-            to: [email],
-            subject: 'Confirm your TutorNest account',
-            html: `
-              <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px">
-                <h2 style="color:#625d9c;margin-bottom:8px">Welcome to TutorNest!</h2>
-                <p style="color:#444;margin-bottom:24px">Hi ${name}, please confirm your email address to activate your account.</p>
-                <a href="${confirmUrl}"
-                   style="display:inline-block;background:#625d9c;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">
-                  Confirm Email Address
-                </a>
-                <p style="color:#888;font-size:13px;margin-top:24px">
-                  Or copy this link into your browser:<br/>
-                  <span style="color:#625d9c;word-break:break-all">${confirmUrl}</span>
-                </p>
-                <p style="color:#bbb;font-size:12px;margin-top:32px">
-                  If you didn't create a TutorNest account, you can safely ignore this email.
-                </p>
-              </div>
-            `,
-          }),
-        });
-        if (!emailRes.ok) {
-          const emailErr = await emailRes.text();
-          console.error('Resend email failed:', emailErr);
-        } else {
-          console.log('Confirmation email sent via Resend for:', email);
-        }
-      } else {
-        console.warn('RESEND_API_KEY not set — confirmation email not sent');
-      }
+    // Step 2: Send a welcome email (non-blocking — account is already confirmed above)
+    // NOTE: Do NOT call generateLink({ type: 'signup' }) here — it resets the user back to
+    // unconfirmed and causes the "Email not confirmed" sign-in error.
+    try {
+      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.com';
+      await sendEmail({
+        to: email,
+        subject: `Welcome to TutorNest, ${name}!`,
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+            <h2 style="color:#625d9c">Welcome to TutorNest! 🎉</h2>
+            <p>Hi ${name},</p>
+            <p>Your account has been created and you can sign in immediately — no confirmation needed.</p>
+            <p style="margin:24px 0">
+              <a href="${appUrl}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
+                Sign In to TutorNest
+              </a>
+            </p>
+            <p style="color:#666;font-size:14px">If you did not create this account, please ignore this email.</p>
+          </div>
+        `,
+      });
+      console.log('✅ Welcome email sent to:', email);
+    } catch (emailErr: any) {
+      // Non-fatal — don't fail signup if welcome email fails
+      console.warn('⚠️ Could not send welcome email:', emailErr.message);
     }
 
     console.log('User created successfully for:', email);
@@ -754,13 +766,36 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       // Don't fail the signup if KV store fails
     }
 
-    // Account created — confirmation email sent by Supabase. No auto-login.
-    console.log('Signup successful, confirmation email sent for:', email);
+    // Step 3: Force-confirm the email via updateUserById.
+    // email_confirm:true in createUser is sometimes ignored depending on project settings —
+    // this explicit update guarantees email_confirmed_at is set before we try to sign in.
+    const { error: confirmError } = await adminSupabase.auth.admin.updateUserById(
+      data.user.id,
+      { email_confirm: true },
+    );
+    if (confirmError) {
+      console.warn('⚠️ Could not force-confirm email:', confirmError.message);
+    } else {
+      console.log('✅ Email confirmed for user:', data.user.id);
+    }
+
+    // Step 4: Sign the user in server-side and return the session so the frontend
+    // can call setSession() directly — no separate sign-in call needed on the client.
+    const anonSupabase = createClient(supabaseUrl, anonKey);
+    const { data: signInData, error: signInError } = await anonSupabase.auth.signInWithPassword({ email, password });
+    if (signInError || !signInData?.session) {
+      console.warn('⚠️ Server-side sign-in after signup failed:', signInError?.message);
+    } else {
+      console.log('✅ Server-side sign-in successful for:', email);
+    }
+
+    console.log('Signup successful for:', email);
     return c.json({
       success: true,
-      requiresEmailConfirmation: true,
+      requiresEmailConfirmation: false,
       userId: data.user.id,
       isAdmin,
+      session: signInData?.session ?? null,
     });
   } catch (error: any) {
     console.error('Signup error (outer catch):', error);

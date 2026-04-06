@@ -766,12 +766,27 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       // Don't fail the signup if KV store fails
     }
 
-    // Step 3: Sign the user in server-side and return the session so the frontend
+    // Step 3: Force-confirm the email via updateUserById.
+    // email_confirm:true in createUser is sometimes ignored depending on project settings —
+    // this explicit update guarantees email_confirmed_at is set before we try to sign in.
+    const { error: confirmError } = await adminSupabase.auth.admin.updateUserById(
+      data.user.id,
+      { email_confirm: true },
+    );
+    if (confirmError) {
+      console.warn('⚠️ Could not force-confirm email:', confirmError.message);
+    } else {
+      console.log('✅ Email confirmed for user:', data.user.id);
+    }
+
+    // Step 4: Sign the user in server-side and return the session so the frontend
     // can call setSession() directly — no separate sign-in call needed on the client.
     const anonSupabase = createClient(supabaseUrl, anonKey);
     const { data: signInData, error: signInError } = await anonSupabase.auth.signInWithPassword({ email, password });
     if (signInError || !signInData?.session) {
       console.warn('⚠️ Server-side sign-in after signup failed:', signInError?.message);
+    } else {
+      console.log('✅ Server-side sign-in successful for:', email);
     }
 
     console.log('Signup successful for:', email);
