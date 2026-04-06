@@ -14,6 +14,11 @@ import { BattleArena } from './trivia/BattleArena';
 import AchievementPanel from './achievements/AchievementPanel';
 import AchievementNotification from './achievements/AchievementNotification';
 import LeaderboardAchievements from './achievements/LeaderboardAchievements';
+import TopicGrid from './learning/TopicGrid';
+import LearningPath from './learning/LearningPath';
+import TopicDetails from './learning/TopicDetails';
+import LearningPathProgress from './learning/LearningPathProgress';
+import SubjectLeaderboard from './learning/SubjectLeaderboard';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { NotificationCenter } from './NotificationCenter';
@@ -441,6 +446,7 @@ export function StudentDashboard({ initialProfile, onSignOut }: { initialProfile
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="gamification">Trivia & Rewards</TabsTrigger>
             <TabsTrigger value="achievements">Achievements</TabsTrigger>
+            <TabsTrigger value="learning-paths">Learning Paths</TabsTrigger>
           </TabsList>
 
           {/* Performance Tab - DEFAULT ACTIVE */}
@@ -935,6 +941,19 @@ export function StudentDashboard({ initialProfile, onSignOut }: { initialProfile
                 leaderboard={[]}
                 currentUserId={profile.userId}
                 limit={50}
+              />
+            </div>
+          </TabsContent>
+
+          {/* Learning Paths Tab */}
+          <TabsContent value="learning-paths">
+            <div className="space-y-6">
+              <TopicGrid />
+              <LearningPathProgress 
+                activePaths={[]}
+                recommendedTopics={[]}
+                onPathClick={(topicId) => console.log('Path clicked:', topicId)}
+                onRecommendedClick={(topicId) => console.log('Recommended clicked:', topicId)}
               />
             </div>
           </TabsContent>
