@@ -30,11 +30,21 @@ import roleManagementRoutes from './role-management-routes.tsx';
 import assessmentsRoutes from './assessments-routes.tsx';
 import curriculumRoutes from './curriculum-routes.tsx';
 import triviaRoutes from './trivia-routes.tsx';
+import extendedTriviaRoutes from './extended-trivia-routes.tsx';
+import { achievementRoutes } from './achievement-routes.tsx';
+import { topicRoutes } from './topic-routes.tsx';
+import { teacherRoutes } from './teacher-routes.tsx';
+import { teacherQuestionRoutes } from './teacher-question-routes.tsx';
+import { analyticsRoutes } from './analytics-routes.tsx';
+import { sessionAssignmentRoutes } from './session-assignment-routes.tsx';
+import { liveCollaborationRoutes } from './live-collaboration-routes.tsx';
 import tutorSessionReportsRoutes from './tutor-session-reports-routes.tsx';
 import paymentRoutes from './payment-routes.tsx';
 import { upsertProfile, getProfile } from './db.tsx';
 import liveSessionRoutes from './live-session-routes.tsx';
 import payoutRoutes from './payout-routes.tsx';
+import { videoRoutes } from './video-routes.tsx';
+import { screenShareRoutes } from './screen-share-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
 import paymentPlansRoutes from './payment-plans-routes.tsx';
 
@@ -391,6 +401,30 @@ app.route('/make-server-cbd74580/curriculum', curriculumRoutes);
 // Register trivia routes
 app.route('/make-server-cbd74580/trivia', triviaRoutes);
 
+// Register extended trivia routes (daily challenges, time attack, battles)
+app.route('/make-server-cbd74580/trivia-extended', extendedTriviaRoutes);
+
+// Register achievement routes (badges, leaderboards, stats)
+app.route('/make-server-cbd74580/achievements', achievementRoutes);
+
+// Register topic/learning paths routes
+app.route('/make-server-cbd74580/topics', topicRoutes);
+
+// Register teacher routes (profiles, classes, management)
+app.route('/make-server-cbd74580/teacher', teacherRoutes);
+
+// Register teacher question & assignment routes
+app.route('/make-server-cbd74580/teacher', teacherQuestionRoutes);
+
+// Register analytics routes
+app.route('/make-server-cbd74580/analytics', analyticsRoutes);
+
+// Register session assignment (workflow) routes
+app.route('/make-server-cbd74580', sessionAssignmentRoutes);
+
+// Register live collaboration (whiteboard) routes
+app.route('/make-server-cbd74580', liveCollaborationRoutes);
+
 // Register tutor session reports routes
 app.route('/make-server-cbd74580/tutor-session-reports', tutorSessionReportsRoutes);
 
@@ -408,6 +442,12 @@ app.route('/make-server-cbd74580/payouts', payoutRoutes);
 
 // Register invoice routes
 app.route('/make-server-cbd74580/invoices', invoiceRoutes);
+
+// Register video conference routes
+app.route('/make-server-cbd74580', videoRoutes);
+
+// Register screen sharing routes
+app.route('/make-server-cbd74580', screenShareRoutes);
 
 // TEST ROUTE - Direct subscription tiers endpoint
 app.get('/make-server-cbd74580/subscription-tiers-test', async (c) => {
@@ -625,12 +665,12 @@ app.post('/make-server-cbd74580/signup', async (c) => {
 
     const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Step 1: Create user (unconfirmed) via admin client
+    // Step 1: Create user (auto-confirmed) via admin client
     const { data, error } = await adminSupabase.auth.admin.createUser({
       email,
       password,
       user_metadata: { name },
-      email_confirm: false,
+      email_confirm: true,
     });
 
     if (error) {
@@ -656,47 +696,18 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       console.error('Failed to generate confirmation link:', linkError);
       // Don't fail signup — user can request a new link from sign-in page
     } else {
-      // Step 3: Send confirmation email via Resend API directly
-      const resendKey = Deno.env.get('RESEND_API_KEY');
-      if (resendKey && linkData.properties.action_link) {
-        const confirmUrl = linkData.properties.action_link;
-        const emailRes = await fetch('https://api.resend.com/emails', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${resendKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            from: 'TutorNest <noreply@tutornest.org>',
-            to: [email],
-            subject: 'Confirm your TutorNest account',
-            html: `
-              <div style="font-family:sans-serif;max-width:520px;margin:0 auto;padding:32px 24px">
-                <h2 style="color:#625d9c;margin-bottom:8px">Welcome to TutorNest!</h2>
-                <p style="color:#444;margin-bottom:24px">Hi ${name}, please confirm your email address to activate your account.</p>
-                <a href="${confirmUrl}"
-                   style="display:inline-block;background:#625d9c;color:#fff;text-decoration:none;padding:12px 28px;border-radius:8px;font-weight:600;font-size:15px">
-                  Confirm Email Address
-                </a>
-                <p style="color:#888;font-size:13px;margin-top:24px">
-                  Or copy this link into your browser:<br/>
-                  <span style="color:#625d9c;word-break:break-all">${confirmUrl}</span>
-                </p>
-                <p style="color:#bbb;font-size:12px;margin-top:32px">
-                  If you didn't create a TutorNest account, you can safely ignore this email.
-                </p>
-              </div>
-            `,
-          }),
-        });
-        if (!emailRes.ok) {
-          const emailErr = await emailRes.text();
-          console.error('Resend email failed:', emailErr);
-        } else {
-          console.log('Confirmation email sent via Resend for:', email);
-        }
+      // Step 3: Send professional tutor verification email via sendEmail service
+      const verificationLink = `${Deno.env.get('VITE_APP_URL') || 'https://tutornest.com'}/verify-email?token=${data.user.id}`;
+      const emailResult = await sendEmail({
+        to: email,
+        subject: emailTemplates.emailVerification(name, verificationLink).subject,
+        html: emailTemplates.emailVerification(name, verificationLink).html,
+      });
+      
+      if (!emailResult.success) {
+        console.warn('⚠️ Failed to send tutor verification email:', emailResult.error);
       } else {
-        console.warn('RESEND_API_KEY not set — confirmation email not sent');
+        console.log('✅ Tutor verification email sent to:', email);
       }
     }
 
@@ -754,11 +765,12 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       // Don't fail the signup if KV store fails
     }
 
-    // Account created — confirmation email sent by Supabase. No auto-login.
-    console.log('Signup successful, confirmation email sent for:', email);
+    // Account created — user can log in immediately (email_confirm: true = auto-confirmed)
+    // Email sent for engagement/notification purposes
+    console.log('Signup successful, email sent for:', email);
     return c.json({
       success: true,
-      requiresEmailConfirmation: true,
+      requiresEmailConfirmation: false,
       userId: data.user.id,
       isAdmin,
     });

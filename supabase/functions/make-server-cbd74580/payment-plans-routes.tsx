@@ -1,7 +1,7 @@
 // =====================================================
 // PAYMENT PLANS ROUTES - Supabase Edge Functions
 // =====================================================
-// Complete payment system with Paystack integration
+// Complete payment system with Flutterwave integration
 // Handles: initialization, verification, webhooks, and booking generation
 
 import { Hono } from 'npm:hono';
@@ -32,24 +32,23 @@ interface InitiatePaymentRequest {
   subject?: string;
 }
 
-interface PaystackInitResponse {
-  status: boolean;
+interface FlutterwaveInitResponse {
+  status: string;
   message: string;
   data: {
-    authorization_url: string;
-    access_code: string;
-    reference: string;
+    link: string;
+    payment_link: string;
   };
 }
 
-interface PaystackVerifyResponse {
-  status: boolean;
+interface FlutterwaveVerifyResponse {
+  status: string;
   message: string;
   data: {
     reference: string;
     amount: number;
-    status: 'success' | 'failed';
-    paid_at: string;
+    status: 'successful' | 'failed';
+    created_at: string;
     customer: {
       email: string;
     };
@@ -73,61 +72,67 @@ function generatePaymentReference(): string {
   return `TNP-${timestamp}-${random}`.toUpperCase();
 }
 
-async function initializePaystackPayment(
+async function initializeFlutterwavePayment(
   email: string,
   amount: number,
   reference: string,
   metadata: Record<string, any>
-): Promise<PaystackInitResponse> {
-  const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY');
+): Promise<FlutterwaveInitResponse> {
+  const FLUTTERWAVE_SECRET = Deno.env.get('FLUTTERWAVE_SECRET_KEY');
   
-  if (!PAYSTACK_SECRET) {
-    throw new Error('Paystack secret key not configured');
+  if (!FLUTTERWAVE_SECRET) {
+    throw new Error('Flutterwave secret key not configured');
   }
 
-  const response = await fetch('https://api.paystack.co/transaction/initialize', {
+  const response = await fetch('https://api.flutterwave.com/v3/payments', {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${PAYSTACK_SECRET}`,
+      'Authorization': `Bearer ${FLUTTERWAVE_SECRET}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({
-      email,
-      amount: amount * 100, // Paystack expects amount in kobo (₦1 = 100 kobo)
-      reference,
-      currency: 'NGN', // Explicitly set Nigerian Naira
-      channels: ['card', 'bank', 'ussd', 'qr', 'mobile_money', 'bank_transfer'], // Enable all payment methods including card
-      callback_url: `${Deno.env.get('FRONTEND_URL') || 'http://localhost:3000'}/payment/verify`,
-      metadata,
+      tx_ref: reference,
+      amount,
+      currency: 'NGN',
+      customer: {
+        email,
+      },
+      payment_options: 'card,banktransfer',
+      redirect_url: `${Deno.env.get('FRONTEND_URL') || 'http://localhost:3000'}/payment/verify`,
+      meta: metadata,
+      customizations: {
+        title: 'TutorNest',
+        logo: 'https://tutornest.com/logo.png',
+      },
     }),
   });
 
   const data = await response.json();
   
-  if (!data.status) {
+  if (data.status !== 'success') {
     throw new Error(data.message || 'Failed to initialize payment');
   }
 
   return data;
 }
 
-async function verifyPaystackPayment(reference: string): Promise<PaystackVerifyResponse> {
-  const PAYSTACK_SECRET = Deno.env.get('PAYSTACK_SECRET_KEY');
+async function verifyFlutterwavePayment(reference: string): Promise<FlutterwaveVerifyResponse> {
+  const FLUTTERWAVE_SECRET = Deno.env.get('FLUTTERWAVE_SECRET_KEY');
   
-  if (!PAYSTACK_SECRET) {
-    throw new Error('Paystack secret key not configured');
+  if (!FLUTTERWAVE_SECRET) {
+    throw new Error('Flutterwave secret key not configured');
   }
 
-  const response = await fetch(`https://api.paystack.co/transaction/verify/${reference}`, {
+  const response = await fetch(`https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${reference}`, {
     method: 'GET',
     headers: {
-      'Authorization': `Bearer ${PAYSTACK_SECRET}`,
+      'Authorization': `Bearer ${FLUTTERWAVE_SECRET}`,
     },
   });
 
   const data = await response.json();
   
-  if (!data.status) {
+  if (data.status !== 'success') {
     throw new Error(data.message || 'Failed to verify payment');
   }
 
@@ -309,8 +314,8 @@ app.post('/make-server-cbd74580/payments/initiate', async (c) => {
       return c.json({ error: 'Failed to create payment record' }, 500);
     }
 
-    // Initialize Paystack payment
-    const paystackResponse = await initializePaystackPayment(
+    // Initialize Flutterwave payment
+    const flutterwaveResponse = await initializeFlutterwavePayment(
       user.email!,
       plan.price_naira,
       paymentReference,
@@ -318,24 +323,16 @@ app.post('/make-server-cbd74580/payments/initiate', async (c) => {
         payment_id: payment.id,
         user_id: user.id,
         tutor_id: tutorId,
-        plan_type: planType,
-        custom_fields: [
-          {
-            display_name: 'Plan',
-            variable_name: 'plan',
-            value: plan.name,
-          },
-        ],
+        plan_type: plan.name,
       }
     );
 
-    // Update payment record with Paystack details
+    // Update payment record with Flutterwave details
     await supabase
       .from('payments')
       .update({
-        paystack_reference: paystackResponse.data.reference,
-        paystack_access_code: paystackResponse.data.access_code,
-        paystack_authorization_url: paystackResponse.data.authorization_url,
+        flutterwave_reference: flutterwaveResponse.data.reference,
+        flutterwave_payment_link: flutterwaveResponse.data.link || flutterwaveResponse.data.payment_link,
         payment_status: 'processing',
       })
       .eq('id', payment.id);
@@ -344,8 +341,7 @@ app.post('/make-server-cbd74580/payments/initiate', async (c) => {
       success: true,
       payment_id: payment.id,
       reference: paymentReference,
-      authorization_url: paystackResponse.data.authorization_url,
-      access_code: paystackResponse.data.access_code,
+      authorization_url: flutterwaveResponse.data.link || flutterwaveResponse.data.payment_link,
     });
 
   } catch (error: any) {
@@ -403,16 +399,16 @@ app.get('/make-server-cbd74580/payments/verify/:reference', async (c) => {
       });
     }
 
-    // Verify with Paystack
-    const paystackData = await verifyPaystackPayment(reference);
+    // Verify with Flutterwave
+    const flutterwaveData = await verifyFlutterwavePayment(reference);
 
-    if (paystackData.data.status !== 'success') {
+    if (flutterwaveData.data.status !== 'successful') {
       // Update payment as failed
       await supabase
         .from('payments')
         .update({
           payment_status: 'failed',
-          failed_reason: 'Payment not successful on Paystack',
+          failed_reason: 'Payment not successful on Flutterwave',
         })
         .eq('id', payment.id);
 
@@ -427,7 +423,7 @@ app.get('/make-server-cbd74580/payments/verify/:reference', async (c) => {
       .from('payments')
       .update({
         payment_status: 'paid',
-        paid_at: new Date(paystackData.data.paid_at).toISOString(),
+        paid_at: new Date(flutterwaveData.data.created_at).toISOString(),
       })
       .eq('id', payment.id);
 

@@ -665,12 +665,12 @@ app.post('/make-server-cbd74580/signup', async (c) => {
 
     const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Step 1: Create user (unconfirmed) via admin client
+    // Step 1: Create user (auto-confirmed) via admin client
     const { data, error } = await adminSupabase.auth.admin.createUser({
       email,
       password,
       user_metadata: { name },
-      email_confirm: false,
+      email_confirm: true,
     });
 
     if (error) {
@@ -765,7 +765,7 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       // Don't fail the signup if KV store fails
     }
 
-    // Account created — user can log in immediately (email_confirm: false)
+    // Account created — user can log in immediately (email_confirm: true = auto-confirmed)
     // Email sent for engagement/notification purposes
     console.log('Signup successful, email sent for:', email);
     return c.json({

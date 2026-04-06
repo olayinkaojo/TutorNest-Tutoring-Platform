@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
+import { sendEmail, emailTemplates } from './email-service.tsx';
 
 export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) => Promise<string | null>) {
 
@@ -100,7 +101,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         const { data, error: authError } = await supabase.auth.admin.createUser({
           email: finalStudentEmail,
           password: password,
-          email_confirm: true, // Auto-confirm since parent is creating it
+          email_confirm: false,
           user_metadata: {
             role: 'student',
             firstName: child.firstName,
@@ -279,7 +280,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: email,
         password: password,
-        email_confirm: true,
+        email_confirm: false,
         user_metadata: {
           role: 'student',
           firstName: firstName,
@@ -322,6 +323,20 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       await kv.set(`user:${authData.user.id}`, studentProfile);
       console.log('✅ Independent student profile saved to KV store');
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
+
+      // Send email verification
+      const verificationLink = `${Deno.env.get('VITE_APP_URL') || 'https://tutornest.com'}/verify-email?token=${authData.user.id}`;
+      const emailResult = await sendEmail({
+        to: email,
+        subject: emailTemplates.emailVerification(firstName, verificationLink).subject,
+        html: emailTemplates.emailVerification(firstName, verificationLink).html,
+      });
+      
+      if (!emailResult.success) {
+        console.warn('⚠️ Failed to send verification email:', emailResult.error);
+      } else {
+        console.log('✅ Verification email sent to', email);
+      }
 
       // Create welcome notification
       const notificationId = `notification:${Date.now()}`;
@@ -425,7 +440,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       const { data: authData, error: authError } = await supabase.auth.admin.createUser({
         email: email,
         password: password,
-        email_confirm: true, // Auto-confirm email
+        email_confirm: false,
         user_metadata: {
           role: 'student',
           firstName: firstName,
@@ -477,8 +492,64 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString() // 7 days
       });
 
-      // TODO: Send email to parent with link invitation
-      // Email would contain a link like: /parent/link-student?token={linkToken}
+      // Send email to student with verification link
+      const studentVerificationLink = `${Deno.env.get('VITE_APP_URL') || 'https://tutornest.com'}/verify-email?token=${authData.user.id}`;
+      const studentEmailResult = await sendEmail({
+        to: email,
+        subject: emailTemplates.emailVerification(firstName, studentVerificationLink).subject,
+        html: emailTemplates.emailVerification(firstName, studentVerificationLink).html,
+      });
+      
+      if (!studentEmailResult.success) {
+        console.warn('⚠️ Failed to send student verification email:', studentEmailResult.error);
+      } else {
+        console.log('✅ Student verification email sent to', email);
+      }
+
+      // Send email to parent with linking invitation
+      const parentLinkUrl = `${Deno.env.get('VITE_APP_URL') || 'https://tutornest.com'}/parent/link-student?token=${studentProfile.parentLinkToken}&studentId=${authData.user.id}`;
+      const parentInviteEmail = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+          <div style="background-color: #625d9c; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
+            <h1>Link Your Child's TutorNest Account</h1>
+          </div>
+          
+          <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px;">
+            <p>Hi there,</p>
+            
+            <p>${firstName} ${lastName} has created a TutorNest account and would like you to approve it.</p>
+            
+            <p>As their parent/guardian, you'll need to verify this account link to allow them to access TutorNest tutoring sessions.</p>
+            
+            <div style="text-align: center; margin: 30px 0;">
+              <a href="${parentLinkUrl}" style="display: inline-block; background-color: #625d9c; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+                Link & Approve Account
+              </a>
+            </div>
+            
+            <p style="color: #666; font-size: 14px;">
+              Or copy this link:<br>
+              <span style="word-break: break-all; color: #0066cc;">${parentLinkUrl}</span>
+            </p>
+            
+            <p style="color: #999; font-size: 12px; margin-top: 20px;">
+              This link will expire in 7 days. If you didn't request this or don't recognize ${firstName} ${lastName}, you can safely ignore this email.
+            </p>
+          </div>
+        </div>
+      `;
+      
+      const parentEmailResult = await sendEmail({
+        to: parentEmail,
+        subject: `${firstName} ${lastName} wants to use TutorNest - Approve Account`,
+        html: parentInviteEmail,
+      });
+      
+      if (!parentEmailResult.success) {
+        console.warn('⚠️ Failed to send parent invitation email:', parentEmailResult.error);
+      } else {
+        console.log('✅ Parent invitation email sent to', parentEmail);
+      }
 
       // Auto-login user after signup
       console.log('Signing in dependent student to get session token...');

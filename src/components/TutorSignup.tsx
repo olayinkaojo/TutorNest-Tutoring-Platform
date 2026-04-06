@@ -419,8 +419,15 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
           throw new Error('Failed to create account');
         }
 
-        // Email confirmation required — show check-your-email screen
-        setEmailConfirmationSent(true);
+        // Account auto-confirmed — sign in immediately
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+        if (signInError) {
+          // Sign-in failed after account creation — show sign-in screen as fallback
+          setEmailConfirmationSent(true);
+          return;
+        }
+
+        onSignupComplete?.();
         return;
       } else {
         // Existing user updating their tutor profile

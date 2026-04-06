@@ -164,8 +164,15 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
         throw new Error('Failed to create account');
       }
 
-      // Email confirmation required — show check-your-email screen
-      setEmailConfirmationSent(true);
+      // Account auto-confirmed — sign in immediately
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+      if (signInError) {
+        // Fallback: show "go to sign in" screen
+        setEmailConfirmationSent(true);
+        return;
+      }
+
+      onSignupSuccess?.();
 
     } catch (err: any) {
       console.error('Signup error:', err);
