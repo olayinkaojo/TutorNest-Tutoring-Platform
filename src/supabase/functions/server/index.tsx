@@ -43,6 +43,8 @@ import paymentRoutes from './payment-routes.tsx';
 import { upsertProfile, getProfile } from './db.tsx';
 import liveSessionRoutes from './live-session-routes.tsx';
 import payoutRoutes from './payout-routes.tsx';
+import { videoRoutes } from './video-routes.tsx';
+import { screenShareRoutes } from './screen-share-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
 import paymentPlansRoutes from './payment-plans-routes.tsx';
 
@@ -440,6 +442,12 @@ app.route('/make-server-cbd74580/payouts', payoutRoutes);
 
 // Register invoice routes
 app.route('/make-server-cbd74580/invoices', invoiceRoutes);
+
+// Register video conference routes
+app.route('/make-server-cbd74580', videoRoutes);
+
+// Register screen sharing routes
+app.route('/make-server-cbd74580', screenShareRoutes);
 
 // TEST ROUTE - Direct subscription tiers endpoint
 app.get('/make-server-cbd74580/subscription-tiers-test', async (c) => {
