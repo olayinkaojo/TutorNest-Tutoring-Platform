@@ -684,31 +684,32 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       return c.json({ error: 'Failed to create account - no user data returned' }, 500);
     }
 
-    // Step 2: Generate a confirmation link via admin API
-    const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
-      type: 'signup',
-      email,
-      password,
-      options: { data: { name } },
-    });
-
-    if (linkError || !linkData?.properties?.action_link) {
-      console.error('Failed to generate confirmation link:', linkError);
-      // Don't fail signup — user can request a new link from sign-in page
-    } else {
-      // Step 3: Send professional tutor verification email via sendEmail service
-      const verificationLink = `${Deno.env.get('VITE_APP_URL') || 'https://tutornest.com'}/verify-email?token=${data.user.id}`;
-      const emailResult = await sendEmail({
+    // Step 2: Send a welcome email (non-blocking — account is already confirmed above)
+    // NOTE: Do NOT call generateLink({ type: 'signup' }) here — it resets the user back to
+    // unconfirmed and causes the "Email not confirmed" sign-in error.
+    try {
+      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.com';
+      await sendEmail({
         to: email,
-        subject: emailTemplates.emailVerification(name, verificationLink).subject,
-        html: emailTemplates.emailVerification(name, verificationLink).html,
+        subject: `Welcome to TutorNest, ${name}!`,
+        html: `
+          <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
+            <h2 style="color:#625d9c">Welcome to TutorNest! 🎉</h2>
+            <p>Hi ${name},</p>
+            <p>Your account has been created and you can sign in immediately — no confirmation needed.</p>
+            <p style="margin:24px 0">
+              <a href="${appUrl}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
+                Sign In to TutorNest
+              </a>
+            </p>
+            <p style="color:#666;font-size:14px">If you did not create this account, please ignore this email.</p>
+          </div>
+        `,
       });
-      
-      if (!emailResult.success) {
-        console.warn('⚠️ Failed to send tutor verification email:', emailResult.error);
-      } else {
-        console.log('✅ Tutor verification email sent to:', email);
-      }
+      console.log('✅ Welcome email sent to:', email);
+    } catch (emailErr: any) {
+      // Non-fatal — don't fail signup if welcome email fails
+      console.warn('⚠️ Could not send welcome email:', emailErr.message);
     }
 
     console.log('User created successfully for:', email);
