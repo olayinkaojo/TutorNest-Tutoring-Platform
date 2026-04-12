@@ -12,11 +12,11 @@ import { TutorDashboard } from './components/TutorDashboard';
 import { TutorSignup } from './components/TutorSignup';
 import { StudentSignup } from './components/StudentSignup';
 import { ParentSignup } from './components/ParentSignup';
+import { AuthBackground } from './components/AuthBackground';
 import { getSupabaseClient } from './utils/supabase/client';
 import { projectId } from './utils/supabase/info';
 import { logger } from './utils/logger';
 import { GoogleCalendarSetup } from './components/GoogleCalendarSetup';
-import wallpaperBg from 'figma:asset/c2a495c4aec3903270b747684d5b5dd5d609b3da.png';
 
 interface UserProfile {
   id: string;
@@ -269,14 +269,7 @@ export default function App() {
 
   if (loading) {
     return (
-      <div 
-        className="min-h-screen flex items-center justify-center"
-        style={{
-          backgroundImage: `url(${wallpaperBg})`,
-          backgroundRepeat: 'repeat',
-          backgroundSize: '400px 400px',
-        }}
-      >
+      <AuthBackground className="flex items-center justify-center">
         <div className="text-center bg-white/95 backdrop-blur-sm p-8 rounded-2xl shadow-xl">
           <div 
             className="w-16 h-16 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-4"
@@ -284,7 +277,7 @@ export default function App() {
           ></div>
           <p className="text-gray-600">Loading...</p>
         </div>
-      </div>
+      </AuthBackground>
     );
   }
 

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import wallpaperBg from '../assets/c2a495c4aec3903270b747684d5b5dd5d609b3da.png';
+import { AuthBackground } from './AuthBackground';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -232,12 +232,7 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
 
   if (success && signupType === 'independent') {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4"
-      style={{
-        backgroundImage: `linear-gradient(to bottom right, rgba(245,243,255,0.93), rgba(255,255,255,0.93), rgba(240,253,244,0.93)), url(${wallpaperBg})`,
-        backgroundRepeat: 'no-repeat, repeat',
-        backgroundSize: 'cover, 350px 350px',
-      }}>
+      <AuthBackground className="flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
@@ -261,18 +256,13 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
             </Button>
           </CardContent>
         </Card>
-      </div>
+      </AuthBackground>
     );
   }
 
   if (success && signupType === 'dependent' && awaitingParentLink) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4"
-      style={{
-        backgroundImage: `linear-gradient(to bottom right, rgba(245,243,255,0.93), rgba(255,255,255,0.93), rgba(240,253,244,0.93)), url(${wallpaperBg})`,
-        backgroundRepeat: 'no-repeat, repeat',
-        backgroundSize: 'cover, 350px 350px',
-      }}>
+      <AuthBackground className="flex items-center justify-center p-4">
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
@@ -320,19 +310,12 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
             </div>
           </CardContent>
         </Card>
-      </div>
+      </AuthBackground>
     );
   }
 
   return (
-    <div
-      className="min-h-screen"
-      style={{
-        backgroundImage: `linear-gradient(to bottom right, rgba(245,243,255,0.93), rgba(255,255,255,0.93), rgba(240,253,244,0.93)), url(${wallpaperBg})`,
-        backgroundRepeat: 'no-repeat, repeat',
-        backgroundSize: 'cover, 350px 350px',
-      }}
-    >
+    <AuthBackground className="py-8 px-4">
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <TutorNestLogo />
@@ -355,7 +338,7 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
                 {/* Personal Information */}
                 <div className="space-y-4">
                   <h3 className="font-medium text-lg">Personal Information</h3>
-                  
+
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-2">
                       <Label htmlFor="firstName">First Name *</Label>
@@ -367,7 +350,7 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
                         required
                       />
                     </div>
-                    
+
                     <div className="space-y-2">
                       <Label htmlFor="lastName">Last Name *</Label>
                       <Input
@@ -391,13 +374,10 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
                       required
                     />
                     {age !== null && (
-                      <p className="text-sm text-gray-600">
-                        Age: {age} years old
-                      </p>
+                      <p className="text-sm text-gray-600">Age: {age} years old</p>
                     )}
                   </div>
 
-                  {/* Age-based alerts */}
                   {age !== null && age < 13 && (
                     <Alert variant="destructive">
                       <AlertCircle className="size-4" />
@@ -429,13 +409,11 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
                   )}
                 </div>
 
-                {/* Only show rest of form if age is valid */}
                 {age !== null && age >= 13 && (
                   <>
-                    {/* Account Information */}
                     <div className="space-y-4">
                       <h3 className="font-medium text-lg">Account Information</h3>
-                      
+
                       <div className="space-y-2">
                         <Label htmlFor="email">Email *</Label>
                         <Input
@@ -473,7 +451,6 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
                         />
                       </div>
 
-                      {/* Parent email for dependent students */}
                       {signupType === 'dependent' && (
                         <div className="space-y-2">
                           <Label htmlFor="parentEmail">Parent/Guardian Email *</Label>
@@ -492,10 +469,9 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
                       )}
                     </div>
 
-                    {/* Learning Information */}
                     <div className="space-y-4">
                       <h3 className="font-medium text-lg">Learning Information (Optional)</h3>
-                      
+
                       <div className="space-y-2">
                         <Label htmlFor="subjects">Subjects</Label>
                         <Input
@@ -547,6 +523,6 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
           </Card>
         </div>
       </div>
-    </div>
+    </AuthBackground>
   );
 }

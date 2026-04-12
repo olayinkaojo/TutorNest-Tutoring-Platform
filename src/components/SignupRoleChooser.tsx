@@ -1,7 +1,7 @@
 import { Users, GraduationCap, BookOpen } from 'lucide-react';
-import wallpaperBg from '../assets/c2a495c4aec3903270b747684d5b5dd5d609b3da.png';
 import TutorNestLogo from './TutorNestLogo';
 import { Button } from './ui/button';
+import { AuthBackground } from './AuthBackground';
 
 interface SignupRoleChooserProps {
   onParentSelected: () => void;
@@ -41,14 +41,7 @@ export function SignupRoleChooser({
   ];
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4"
-      style={{
-        backgroundImage: `linear-gradient(to bottom right, rgba(245,243,255,0.93), rgba(255,255,255,0.93), rgba(240,253,244,0.93)), url(${wallpaperBg})`,
-        backgroundRepeat: 'no-repeat, repeat',
-        backgroundSize: 'cover, 350px 350px',
-      }}
-    >
+    <AuthBackground className="flex items-center justify-center p-4">
       <div className="w-full max-w-4xl">
         <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8">
           {/* Logo */}
@@ -98,6 +91,6 @@ export function SignupRoleChooser({
           </div>
         </div>
       </div>
-    </div>
+    </AuthBackground>
   );
 }

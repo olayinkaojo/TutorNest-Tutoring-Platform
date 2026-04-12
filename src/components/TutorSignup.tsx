@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import wallpaperBg from '../assets/c2a495c4aec3903270b747684d5b5dd5d609b3da.png';
+import { AuthBackground } from './AuthBackground';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { Button } from './ui/button';
@@ -571,14 +571,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   );
 
   return (
-    <div
-      className="min-h-screen py-8 px-4"
-      style={{
-        backgroundImage: `linear-gradient(to bottom right, rgba(245,243,255,0.93), rgba(255,255,255,0.93), rgba(240,253,244,0.93)), url(${wallpaperBg})`,
-        backgroundRepeat: 'no-repeat, repeat',
-        backgroundSize: 'cover, 350px 350px',
-      }}
-    >
+    <AuthBackground className="py-8 px-4">
       <div className="max-w-4xl mx-auto">
         {/* Logo */}
         <div className="flex justify-center mb-6">
@@ -1279,6 +1272,6 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         </div>
         )}
       </div>
-    </div>
+    </AuthBackground>
   );
 }

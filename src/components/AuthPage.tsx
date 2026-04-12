@@ -1,11 +1,11 @@
 import { useState, useRef } from 'react';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { Mail, Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
-import wallpaperBg from '../assets/c2a495c4aec3903270b747684d5b5dd5d609b3da.png';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Alert, AlertDescription } from './ui/alert';
 import TutorNestLogo from './TutorNestLogo';
+import { AuthBackground } from './AuthBackground';
 
 const supabase = getSupabaseClient();
 
@@ -165,14 +165,7 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
   };
 
   return (
-    <div
-      className="min-h-screen flex items-center justify-center p-4 sm:p-6 md:p-8"
-      style={{
-        backgroundImage: `linear-gradient(to bottom right, rgba(245,243,255,0.93), rgba(255,255,255,0.93), rgba(240,253,244,0.93)), url(${wallpaperBg})`,
-        backgroundRepeat: 'no-repeat, repeat',
-        backgroundSize: 'cover, 350px 350px',
-      }}
-    >
+    <AuthBackground className="flex items-center justify-center p-4 sm:p-6 md:p-8">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8">
           {/* Logo — 5 rapid clicks activates staff login */}
@@ -472,6 +465,6 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
         </p>
         
       </div>
-    </div>
+    </AuthBackground>
   );
 }
