@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import type { Session } from '@supabase/supabase-js';
+import { Navigate, Route, Routes, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { AdminDashboard } from './components/AdminDashboard';
 import ErrorBoundary from './components/ErrorBoundary';
 import { Button } from './components/ui/button';
@@ -31,146 +32,60 @@ interface UserProfile {
 const supabase = getSupabaseClient();
 
 export default function App() {
+  const location = useLocation();
+  const navigate = useNavigate();
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [loading, setLoading] = useState(true);
-  const [showTutorSignup, setShowTutorSignup] = useState(false);
-  const [showStudentSignup, setShowStudentSignup] = useState(false);
-  const [showParentSignup, setShowParentSignup] = useState(false);
-  const [showRoleChooser, setShowRoleChooser] = useState(false);
-  const [showLanding, setShowLanding] = useState(true);
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [signupData, setSignupData] = useState<{ email: string; password: string; name: string; phone?: string } | null>(null);
-  // True when the URL contains Google OAuth callback params (?code=&state=)
-  const [googleOAuthCallback, setGoogleOAuthCallback] = useState(false);
   const [staffMode, setStaffMode] = useState(false);
-
-  const applyRouteFromLocation = (pathname: string, search: string) => {
-    const params = new URLSearchParams(search);
-
-    // Preserve legacy deep links while moving to path-based navigation.
-    const legacySignup = params.get('signup');
-    if (legacySignup === 'tutor') {
-      setShowLanding(false);
-      setShowRoleChooser(false);
-      setShowTutorSignup(true);
-      setShowStudentSignup(false);
-      setShowParentSignup(false);
-      return;
-    }
-    if (legacySignup === 'student') {
-      setShowLanding(false);
-      setShowRoleChooser(false);
-      setShowTutorSignup(false);
-      setShowStudentSignup(true);
-      setShowParentSignup(false);
-      return;
-    }
-
-    if (pathname === '/') {
-      setShowLanding(true);
-      setShowRoleChooser(false);
-      setShowTutorSignup(false);
-      setShowStudentSignup(false);
-      setShowParentSignup(false);
-      return;
-    }
-
-    if (pathname === '/auth') {
-      setShowLanding(false);
-      setShowRoleChooser(false);
-      setShowTutorSignup(false);
-      setShowStudentSignup(false);
-      setShowParentSignup(false);
-      return;
-    }
-
-    if (pathname === '/signup') {
-      setShowLanding(false);
-      setShowRoleChooser(true);
-      setShowTutorSignup(false);
-      setShowStudentSignup(false);
-      setShowParentSignup(false);
-      return;
-    }
-
-    if (pathname === '/signup/tutor') {
-      setShowLanding(false);
-      setShowRoleChooser(false);
-      setShowTutorSignup(true);
-      setShowStudentSignup(false);
-      setShowParentSignup(false);
-      return;
-    }
-
-    if (pathname === '/signup/student') {
-      setShowLanding(false);
-      setShowRoleChooser(false);
-      setShowTutorSignup(false);
-      setShowStudentSignup(true);
-      setShowParentSignup(false);
-      return;
-    }
-
-    if (pathname === '/signup/parent') {
-      setShowLanding(false);
-      setShowRoleChooser(false);
-      setShowTutorSignup(false);
-      setShowStudentSignup(false);
-      setShowParentSignup(true);
-      return;
-    }
-
-    // Any non-mapped public path defaults to auth screen.
-    setShowLanding(false);
-    setShowRoleChooser(false);
-    setShowTutorSignup(false);
-    setShowStudentSignup(false);
-    setShowParentSignup(false);
-  };
 
   const navigateTo = (path: string, options?: { replace?: boolean }) => {
     const { replace = false } = options || {};
-    const current = `${window.location.pathname}${window.location.search}`;
+    const current = `${location.pathname}${location.search}`;
     if (current === path) return;
-    if (replace) {
-      window.history.replaceState({}, document.title, path);
-    } else {
-      window.history.pushState({}, document.title, path);
+    navigate(path, { replace });
+  };
+
+  const getDashboardTabFromPath = (role: string) => {
+    const segments = location.pathname.split('/').filter(Boolean);
+    if (segments.length >= 3 && segments[0] === 'dashboard' && segments[1] === role) {
+      return decodeURIComponent(segments[2]);
     }
-    applyRouteFromLocation(window.location.pathname, window.location.search);
+    return undefined;
+  };
+
+  const buildDashboardPath = (role: string, tab?: string) => {
+    if (!tab) return `/dashboard/${role}`;
+    return `/dashboard/${role}/${encodeURIComponent(tab)}`;
   };
 
   useEffect(() => {
-    const urlParams = new URLSearchParams(window.location.search);
+    const urlParams = new URLSearchParams(location.search);
 
-    applyRouteFromLocation(window.location.pathname, window.location.search);
-
-    const handlePopState = () => {
-      applyRouteFromLocation(window.location.pathname, window.location.search);
-    };
-
-    window.addEventListener('popstate', handlePopState);
-
-    // Detect Google OAuth callback (?code=xxx&state=xxx)
-    if (urlParams.get('code') && urlParams.get('state')) {
-      setGoogleOAuthCallback(true);
-      setShowLanding(false);
+    // Preserve legacy deep links.
+    if (!session) {
+      if (urlParams.get('signup') === 'tutor' && location.pathname !== '/signup/tutor') {
+        navigate('/signup/tutor', { replace: true });
+        return;
+      }
+      if (urlParams.get('signup') === 'student' && location.pathname !== '/signup/student') {
+        navigate('/signup/student', { replace: true });
+        return;
+      }
     }
 
     // Secret staff access via ?staff in the URL — strip it immediately so it's not bookmarkable
     if (urlParams.has('staff')) {
       setStaffMode(true);
-      setShowLanding(false);
       urlParams.delete('staff');
       const newSearch = urlParams.toString();
-      window.history.replaceState(
-        {},
-        document.title,
-        newSearch ? `${window.location.pathname}?${newSearch}` : window.location.pathname
-      );
+      navigate(`${location.pathname}${newSearch ? `?${newSearch}` : ''}`, { replace: true });
     }
-    
+  }, [location.pathname, location.search, navigate, session]);
+
+  useEffect(() => {
     // Check for existing session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session);
@@ -197,30 +112,29 @@ export default function App() {
 
     return () => {
       subscription.unsubscribe();
-      window.removeEventListener('popstate', handlePopState);
     };
   }, []);
 
   useEffect(() => {
     if (!session) {
-      if (window.location.pathname.startsWith('/dashboard') || window.location.pathname === '/select-role') {
+      if (location.pathname.startsWith('/dashboard') || location.pathname === '/select-role') {
         navigateTo('/auth', { replace: true });
       }
       return;
     }
 
     if (!profile || !profile.role) {
-      if (window.location.pathname !== '/select-role') {
+      if (location.pathname !== '/select-role') {
         navigateTo('/select-role', { replace: true });
       }
       return;
     }
 
     const rolePath = `/dashboard/${profile.role}`;
-    if (window.location.pathname !== rolePath) {
+    if (!location.pathname.startsWith(`${rolePath}/`) && location.pathname !== rolePath) {
       navigateTo(rolePath, { replace: true });
     }
-  }, [session, profile]);
+  }, [session, profile, location.pathname]);
 
   const fetchProfile = async (accessToken: string) => {
     try {
@@ -361,12 +275,6 @@ export default function App() {
       if (currentSession) {
         setSession(currentSession);
         await fetchProfile(currentSession.access_token);
-        
-        // Reset all signup flags to ensure we show the dashboard
-        setShowTutorSignup(false);
-        setShowStudentSignup(false);
-        setShowParentSignup(false);
-        setShowRoleChooser(false);
         setSignupData(null);
       } else {
         window.location.reload();
@@ -395,6 +303,76 @@ export default function App() {
     }
   };
 
+  const isGoogleOAuthCallback =
+    new URLSearchParams(location.search).has('code') &&
+    new URLSearchParams(location.search).has('state');
+
+  const DashboardRouteRenderer = () => {
+    const { role, tab } = useParams();
+
+    if (!profile || !profile.role) return null;
+
+    if (!role || role !== profile.role) {
+      return <Navigate to={buildDashboardPath(profile.role, tab)} replace />;
+    }
+
+    const decodedTab = tab ? decodeURIComponent(tab) : undefined;
+
+    return (
+      <ErrorBoundary>
+        {profile.role === 'admin' && (
+          <AdminDashboard
+            profile={profile}
+            onSignOut={handleSignOut}
+            availableRoles={availableRoles}
+            onRoleSwitch={handleRoleSwitch}
+            initialTab={decodedTab}
+            onTabChange={(nextTab) => navigateTo(buildDashboardPath('admin', nextTab))}
+          />
+        )}
+        {profile.role === 'parent' && (
+          <ParentDashboard
+            profile={profile}
+            onSignOut={handleSignOut}
+            availableRoles={availableRoles}
+            onRoleSwitch={handleRoleSwitch}
+            onBecomeTutor={() => navigateTo('/become-tutor')}
+            initialTab={decodedTab}
+            onTabChange={(nextTab) => navigateTo(buildDashboardPath('parent', nextTab))}
+          />
+        )}
+        {profile.role === 'student' && (
+          <StudentDashboard
+            initialProfile={profile}
+            onSignOut={handleSignOut}
+            initialTab={decodedTab}
+            onTabChange={(nextTab) => navigateTo(buildDashboardPath('student', nextTab))}
+          />
+        )}
+        {profile.role === 'tutor' && (
+          <TutorDashboard
+            profile={profile}
+            onSignOut={handleSignOut}
+            availableRoles={availableRoles}
+            onRoleSwitch={handleRoleSwitch}
+            onRoleAdded={handleRoleAdded}
+            initialTab={decodedTab}
+            onTabChange={(nextTab) => navigateTo(buildDashboardPath('tutor', nextTab))}
+          />
+        )}
+        {!['admin', 'parent', 'student', 'tutor'].includes(profile.role) && (
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <h2 className="mb-4">Unknown Role: {profile.role}</h2>
+              <p className="text-gray-600 mb-4">Please contact support.</p>
+              <Button onClick={handleSignOut}>Sign Out</Button>
+            </div>
+          </div>
+        )}
+      </ErrorBoundary>
+    );
+  };
+
 
   if (loading) {
     return (
@@ -410,134 +388,147 @@ export default function App() {
     );
   }
 
-  // Not signed in
   if (!session) {
-    if (showLanding) {
-      return (
-        <ErrorBoundary>
-          <LandingPage
-            onSignIn={() => navigateTo('/auth')}
-            onSignUp={() => {
-              navigateTo('/signup');
-            }}
-            onBecomeTutor={() => {
-              navigateTo('/signup/tutor');
-            }}
-          />
-        </ErrorBoundary>
-      );
-    }
-
-    // Show role chooser if requested
-    if (showRoleChooser) {
-      return (
-        <ErrorBoundary>
-          <SignupRoleChooser
-            onParentSelected={() => {
-              navigateTo('/signup/parent');
-            }}
-            onStudentSelected={() => {
-              navigateTo('/signup/student');
-            }}
-            onTutorSelected={() => {
-              navigateTo('/signup/tutor');
-            }}
-            onBackToSignIn={() => {
-              navigateTo('/auth');
-            }}
-          />
-        </ErrorBoundary>
-      );
-    }
-    
-    // Show tutor signup page if requested
-    if (showTutorSignup) {
-      return (
-        <ErrorBoundary>
-          <TutorSignup 
-            onBackToSignIn={() => {
-              setSignupData(null);
-              navigateTo('/auth');
-            }}
-            initialData={signupData}
-            session={session}
-            existingProfile={profile}
-            onSignupComplete={handleSignupSuccess}
-          />
-        </ErrorBoundary>
-      );
-    } else if (showStudentSignup) {
-      return (
-        <ErrorBoundary>
-          <StudentSignup 
-            onBackToSignIn={() => {
-              setSignupData(null);
-              navigateTo('/auth');
-            }}
-            initialData={signupData}
-            onSignupSuccess={handleSignupSuccess}
-          />
-        </ErrorBoundary>
-      );
-    } else if (showParentSignup) {
-      return (
-        <ErrorBoundary>
-          <ParentSignup 
-            onBackToSignIn={() => {
-              setSignupData(null);
-              navigateTo('/auth');
-            }}
-            initialData={signupData}
-            onSignupSuccess={handleSignupSuccess}
-          />
-        </ErrorBoundary>
-      );
-    }
-    
     return (
-      <ErrorBoundary>
-        <AuthPage
-          staffMode={staffMode}
-          onBecomeTutor={() => navigateTo('/signup/tutor')}
-          onBecomeStudent={() => navigateTo('/signup/student')}
-          onSignupClicked={() => navigateTo('/signup')}
-          onTutorSignupWithData={(data) => {
-            setSignupData(data);
-            navigateTo('/signup/tutor');
-          }}
-          onStudentSignupWithData={(data) => {
-            setSignupData(data);
-            navigateTo('/signup/student');
-          }}
-          onParentSignupWithData={(data) => {
-            setSignupData(data);
-            navigateTo('/signup/parent');
-          }}
+      <Routes>
+        <Route
+          path="/"
+          element={
+            <ErrorBoundary>
+              <LandingPage
+                onSignIn={() => navigateTo('/auth')}
+                onSignUp={() => navigateTo('/signup')}
+                onBecomeTutor={() => navigateTo('/signup/tutor')}
+              />
+            </ErrorBoundary>
+          }
         />
-      </ErrorBoundary>
+        <Route
+          path="/auth"
+          element={
+            <ErrorBoundary>
+              <AuthPage
+                staffMode={staffMode}
+                onBecomeTutor={() => navigateTo('/signup/tutor')}
+                onBecomeStudent={() => navigateTo('/signup/student')}
+                onSignupClicked={() => navigateTo('/signup')}
+                onTutorSignupWithData={(data) => {
+                  setSignupData(data);
+                  navigateTo('/signup/tutor');
+                }}
+                onStudentSignupWithData={(data) => {
+                  setSignupData(data);
+                  navigateTo('/signup/student');
+                }}
+                onParentSignupWithData={(data) => {
+                  setSignupData(data);
+                  navigateTo('/signup/parent');
+                }}
+              />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/signup"
+          element={
+            <ErrorBoundary>
+              <SignupRoleChooser
+                onParentSelected={() => navigateTo('/signup/parent')}
+                onStudentSelected={() => navigateTo('/signup/student')}
+                onTutorSelected={() => navigateTo('/signup/tutor')}
+                onBackToSignIn={() => navigateTo('/auth')}
+              />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/signup/tutor"
+          element={
+            <ErrorBoundary>
+              <TutorSignup
+                onBackToSignIn={() => {
+                  setSignupData(null);
+                  navigateTo('/auth');
+                }}
+                initialData={signupData}
+                session={session}
+                existingProfile={profile}
+                onSignupComplete={handleSignupSuccess}
+              />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/signup/student"
+          element={
+            <ErrorBoundary>
+              <StudentSignup
+                onBackToSignIn={() => {
+                  setSignupData(null);
+                  navigateTo('/auth');
+                }}
+                initialData={signupData}
+                onSignupSuccess={handleSignupSuccess}
+              />
+            </ErrorBoundary>
+          }
+        />
+        <Route
+          path="/signup/parent"
+          element={
+            <ErrorBoundary>
+              <ParentSignup
+                onBackToSignIn={() => {
+                  setSignupData(null);
+                  navigateTo('/auth');
+                }}
+                initialData={signupData}
+                onSignupSuccess={handleSignupSuccess}
+              />
+            </ErrorBoundary>
+          }
+        />
+        <Route path="*" element={<Navigate to="/auth" replace />} />
+      </Routes>
     );
   }
 
-  // Signed in but no profile/role selected
   if (!profile || !profile.role) {
     return (
-      <ErrorBoundary>
-        <RoleSelection
-          session={session}
-          currentProfile={profile}
-          onComplete={handleProfileComplete}
-          onTutorSelected={() => {
-            // Don't sign out - keep the user logged in and just show tutor signup
-            setShowTutorSignup(true);
-          }}
+      <Routes>
+        <Route
+          path="/select-role"
+          element={
+            <ErrorBoundary>
+              <RoleSelection
+                session={session}
+                currentProfile={profile}
+                onComplete={handleProfileComplete}
+                onTutorSelected={() => navigateTo('/become-tutor')}
+              />
+            </ErrorBoundary>
+          }
         />
-      </ErrorBoundary>
+        <Route
+          path="/become-tutor"
+          element={
+            <ErrorBoundary>
+              <TutorSignup
+                onBackToSignIn={() => navigateTo('/select-role')}
+                initialData={signupData}
+                session={session}
+                existingProfile={profile}
+                onSignupComplete={handleSignupSuccess}
+              />
+            </ErrorBoundary>
+          }
+        />
+        <Route path="*" element={<Navigate to="/select-role" replace />} />
+      </Routes>
     );
   }
 
-  // Google OAuth callback — tutor returned from Google authorization
-  // GoogleCalendarSetup handles the token exchange via its own useEffect
-  if (googleOAuthCallback && session) {
+  if (isGoogleOAuthCallback && session) {
     return (
       <ErrorBoundary>
         <div className="min-h-screen flex items-center justify-center bg-gray-50">
@@ -546,8 +537,7 @@ export default function App() {
               session={session}
               onConnectionChange={(connected) => {
                 if (connected) {
-                  // Token exchanged — clear callback flag and go to dashboard
-                  setGoogleOAuthCallback(false);
+                  navigateTo(`/dashboard/${profile.role}`, { replace: true });
                 }
               }}
             />
@@ -555,8 +545,7 @@ export default function App() {
               <button
                 className="text-sm text-gray-500 underline"
                 onClick={() => {
-                  setGoogleOAuthCallback(false);
-                  window.history.replaceState({}, document.title, window.location.pathname);
+                  navigateTo(`/dashboard/${profile.role}`, { replace: true });
                 }}
               >
                 Back to dashboard
@@ -568,72 +557,25 @@ export default function App() {
     );
   }
 
-  // If user is logged in and wants to complete tutor signup
-  if (showTutorSignup && session && profile) {
-    return (
-      <ErrorBoundary>
-        <TutorSignup 
-          onBackToSignIn={() => {
-            setShowTutorSignup(false);
-            setSignupData(null);
-          }}
-          initialData={signupData}
-          session={session}
-          existingProfile={profile}
-          onSignupComplete={() => {
-            setShowTutorSignup(false);
-            // Reload the page to refresh with new tutor role
-            window.location.reload();
-          }}
-        />
-      </ErrorBoundary>
-    );
-  }
-
-  // Show appropriate dashboard based on role
   return (
-    <ErrorBoundary>
-      {profile.role === 'admin' && (
-        <AdminDashboard 
-          profile={profile} 
-          onSignOut={handleSignOut}
-          availableRoles={availableRoles}
-          onRoleSwitch={handleRoleSwitch}
-        />
-      )}
-      {profile.role === 'parent' && (
-        <ParentDashboard 
-          profile={profile} 
-          onSignOut={handleSignOut}
-          availableRoles={availableRoles}
-          onRoleSwitch={handleRoleSwitch}
-          onBecomeTutor={() => setShowTutorSignup(true)}
-        />
-      )}
-      {profile.role === 'student' && (
-        <StudentDashboard 
-          initialProfile={profile} 
-          onSignOut={handleSignOut}
-        />
-      )}
-      {profile.role === 'tutor' && (
-        <TutorDashboard 
-          profile={profile} 
-          onSignOut={handleSignOut}
-          availableRoles={availableRoles}
-          onRoleSwitch={handleRoleSwitch}
-          onRoleAdded={handleRoleAdded}
-        />
-      )}
-      {!['admin', 'parent', 'student', 'tutor'].includes(profile.role) && (
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center">
-            <h2 className="mb-4">Unknown Role: {profile.role}</h2>
-            <p className="text-gray-600 mb-4">Please contact support.</p>
-            <Button onClick={handleSignOut}>Sign Out</Button>
-          </div>
-        </div>
-      )}
-    </ErrorBoundary>
+    <Routes>
+      <Route
+        path="/become-tutor"
+        element={
+          <ErrorBoundary>
+            <TutorSignup
+              onBackToSignIn={() => navigateTo(buildDashboardPath(profile.role), { replace: true })}
+              initialData={signupData}
+              session={session}
+              existingProfile={profile}
+              onSignupComplete={() => navigateTo(buildDashboardPath(profile.role), { replace: true })}
+            />
+          </ErrorBoundary>
+        }
+      />
+      <Route path="/dashboard/:role" element={<DashboardRouteRenderer />} />
+      <Route path="/dashboard/:role/:tab" element={<DashboardRouteRenderer />} />
+      <Route path="*" element={<Navigate to={buildDashboardPath(profile.role)} replace />} />
+    </Routes>
   );
 }

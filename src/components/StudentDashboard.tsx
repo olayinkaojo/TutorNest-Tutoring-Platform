@@ -85,9 +85,21 @@ interface UserProfile {
 interface StudentDashboardProps {
   profile: UserProfile;
   onSignOut: () => void;
+  initialTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
-export function StudentDashboard({ initialProfile, onSignOut }: { initialProfile: UserProfile; onSignOut: () => void }) {
+export function StudentDashboard({
+  initialProfile,
+  onSignOut,
+  initialTab,
+  onTabChange,
+}: {
+  initialProfile: UserProfile;
+  onSignOut: () => void;
+  initialTab?: string;
+  onTabChange?: (tab: string) => void;
+}) {
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile>(initialProfile);
@@ -107,6 +119,31 @@ export function StudentDashboard({ initialProfile, onSignOut }: { initialProfile
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [progressOverTime, setProgressOverTime] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('performance');
+
+  const validTabs = new Set([
+    'performance',
+    'overview',
+    'sessions',
+    'reports',
+    'curriculum',
+    'messages',
+    'documents',
+    'gamification',
+    'achievements',
+    'learning-paths',
+    'bookshop',
+    'resources',
+  ]);
+
+  useEffect(() => {
+    if (initialTab && validTabs.has(initialTab) && initialTab !== activeTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    onTabChange?.(activeTab);
+  }, [activeTab]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

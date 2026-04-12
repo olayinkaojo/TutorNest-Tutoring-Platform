@@ -69,9 +69,19 @@ interface TutorDashboardProps {
   availableRoles?: string[];
   onRoleSwitch?: (role: string) => void;
   onRoleAdded?: () => void;
+  initialTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
-export function TutorDashboard({ profile, onSignOut, availableRoles, onRoleSwitch, onRoleAdded }: TutorDashboardProps) {
+export function TutorDashboard({
+  profile,
+  onSignOut,
+  availableRoles,
+  onRoleSwitch,
+  onRoleAdded,
+  initialTab,
+  onTabChange,
+}: TutorDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<any>(null);
@@ -96,6 +106,32 @@ export function TutorDashboard({ profile, onSignOut, availableRoles, onRoleSwitc
   // Assessment form state
   const [showAssessmentForm, setShowAssessmentForm] = useState(false);
   const [assessmentBooking, setAssessmentBooking] = useState<any>(null);
+
+  const validTabs = new Set([
+    'overview',
+    'profile',
+    'invitations',
+    'availability',
+    'bookings',
+    'history',
+    'performance',
+    'payouts',
+    'gamification',
+    'reporting',
+    'reviews',
+    'bookshop',
+    'content',
+  ]);
+
+  useEffect(() => {
+    if (initialTab && validTabs.has(initialTab) && initialTab !== activeTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    onTabChange?.(activeTab);
+  }, [activeTab]);
 
   // Debug log for available roles
   useEffect(() => {

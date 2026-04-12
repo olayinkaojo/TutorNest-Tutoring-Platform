@@ -53,9 +53,18 @@ interface AdminDashboardProps {
   onSignOut: () => void;
   availableRoles?: string[];
   onRoleSwitch?: (role: string) => void;
+  initialTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
-export function AdminDashboard({ profile, onSignOut, availableRoles, onRoleSwitch }: AdminDashboardProps) {
+export function AdminDashboard({
+  profile,
+  onSignOut,
+  availableRoles,
+  onRoleSwitch,
+  initialTab,
+  onTabChange,
+}: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<any>(null);
@@ -69,6 +78,32 @@ export function AdminDashboard({ profile, onSignOut, availableRoles, onRoleSwitc
     unreadNotifications: 0
   });
   const [loadingStats, setLoadingStats] = useState(true);
+
+  const validTabs = new Set([
+    'overview',
+    'alerts',
+    'notifications',
+    'users',
+    'verification',
+    'analytics',
+    'activity',
+    'disputes',
+    'coupons',
+    'taxreports',
+    'childprofiles',
+    'curriculum',
+    'resources',
+  ]);
+
+  useEffect(() => {
+    if (initialTab && validTabs.has(initialTab) && initialTab !== activeTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    onTabChange?.(activeTab);
+  }, [activeTab]);
 
   // Helper function to get fresh access token
   const getAccessToken = async (): Promise<string | null> => {

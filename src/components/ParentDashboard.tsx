@@ -56,9 +56,19 @@ interface ParentDashboardProps {
   availableRoles?: string[];
   onRoleSwitch?: (role: string) => void;
   onBecomeTutor?: () => void; // Add callback for becoming a tutor
+  initialTab?: string;
+  onTabChange?: (tab: string) => void;
 }
 
-export function ParentDashboard({ profile, onSignOut, availableRoles = [], onRoleSwitch, onBecomeTutor }: ParentDashboardProps) {
+export function ParentDashboard({
+  profile,
+  onSignOut,
+  availableRoles = [],
+  onRoleSwitch,
+  onBecomeTutor,
+  initialTab,
+  onTabChange,
+}: ParentDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<any>(null);
@@ -74,6 +84,33 @@ export function ParentDashboard({ profile, onSignOut, availableRoles = [], onRol
   const [selectedYears, setSelectedYears] = useState<number[]>([new Date().getFullYear()]);
   const [selectedMonths, setSelectedMonths] = useState<number[]>([new Date().getMonth() + 1]);
   const [showRoleCongrats, setShowRoleCongrats] = useState(false);
+
+  const validTabs = new Set([
+    'overview',
+    'find-tutors',
+    'bookings',
+    'progress',
+    'session-reports',
+    'curriculum',
+    'messages',
+    'documents',
+    'bookshop',
+    'resources',
+    'payments',
+    'reviews',
+    'credits',
+    'invoices',
+  ]);
+
+  useEffect(() => {
+    if (initialTab && validTabs.has(initialTab) && initialTab !== activeTab) {
+      setActiveTab(initialTab);
+    }
+  }, [initialTab]);
+
+  useEffect(() => {
+    onTabChange?.(activeTab);
+  }, [activeTab]);
   const [stats, setStats] = useState({
     totalChildren: 0,
     lessonsScheduled: 0,
