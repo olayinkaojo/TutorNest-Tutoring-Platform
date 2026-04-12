@@ -13,6 +13,7 @@ import { TutorSignup } from './components/TutorSignup';
 import { StudentSignup } from './components/StudentSignup';
 import { ParentSignup } from './components/ParentSignup';
 import { AuthBackground } from './components/AuthBackground';
+import { LandingPage } from './components/LandingPage';
 import { getSupabaseClient } from './utils/supabase/client';
 import { projectId } from './utils/supabase/info';
 import { logger } from './utils/logger';
@@ -37,6 +38,7 @@ export default function App() {
   const [showStudentSignup, setShowStudentSignup] = useState(false);
   const [showParentSignup, setShowParentSignup] = useState(false);
   const [showRoleChooser, setShowRoleChooser] = useState(false);
+  const [showLanding, setShowLanding] = useState(true);
   const [availableRoles, setAvailableRoles] = useState<string[]>([]);
   const [signupData, setSignupData] = useState<{ email: string; password: string; name: string; phone?: string } | null>(null);
   // True when the URL contains Google OAuth callback params (?code=&state=)
@@ -50,11 +52,13 @@ export default function App() {
     // Detect Google OAuth callback (?code=xxx&state=xxx)
     if (urlParams.get('code') && urlParams.get('state')) {
       setGoogleOAuthCallback(true);
+      setShowLanding(false);
     }
 
     // Secret staff access via ?staff in the URL — strip it immediately so it's not bookmarkable
     if (urlParams.has('staff')) {
       setStaffMode(true);
+      setShowLanding(false);
       urlParams.delete('staff');
       const newSearch = urlParams.toString();
       window.history.replaceState({}, document.title, newSearch ? `?${newSearch}` : window.location.pathname);
@@ -63,8 +67,10 @@ export default function App() {
     // Check URL params for tutor signup
     if (urlParams.get('signup') === 'tutor') {
       setShowTutorSignup(true);
+      setShowLanding(false);
     } else if (urlParams.get('signup') === 'student') {
       setShowStudentSignup(true);
+      setShowLanding(false);
     }
     
     // Check for existing session
@@ -283,6 +289,24 @@ export default function App() {
 
   // Not signed in
   if (!session) {
+    if (showLanding) {
+      return (
+        <ErrorBoundary>
+          <LandingPage
+            onSignIn={() => setShowLanding(false)}
+            onSignUp={() => {
+              setShowLanding(false);
+              setShowRoleChooser(true);
+            }}
+            onBecomeTutor={() => {
+              setShowLanding(false);
+              setShowTutorSignup(true);
+            }}
+          />
+        </ErrorBoundary>
+      );
+    }
+
     // Show role chooser if requested
     if (showRoleChooser) {
       return (
@@ -300,7 +324,10 @@ export default function App() {
               setShowRoleChooser(false);
               setShowTutorSignup(true);
             }}
-            onBackToSignIn={() => setShowRoleChooser(false)}
+            onBackToSignIn={() => {
+              setShowRoleChooser(false);
+              setShowLanding(false);
+            }}
           />
         </ErrorBoundary>
       );
@@ -314,6 +341,7 @@ export default function App() {
             onBackToSignIn={() => {
               setShowTutorSignup(false);
               setSignupData(null);
+              setShowLanding(false);
             }}
             initialData={signupData}
             session={session}
@@ -329,6 +357,7 @@ export default function App() {
             onBackToSignIn={() => {
               setShowStudentSignup(false);
               setSignupData(null);
+              setShowLanding(false);
             }}
             initialData={signupData}
             onSignupSuccess={handleSignupSuccess}
@@ -342,6 +371,7 @@ export default function App() {
             onBackToSignIn={() => {
               setShowParentSignup(false);
               setSignupData(null);
+              setShowLanding(false);
             }}
             initialData={signupData}
             onSignupSuccess={handleSignupSuccess}

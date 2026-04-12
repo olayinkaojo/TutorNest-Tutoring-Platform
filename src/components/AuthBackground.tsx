@@ -16,7 +16,7 @@ export function AuthBackground({ children, className = '' }: AuthBackgroundProps
           backgroundImage: `url(${wallpaperBg})`,
           backgroundRepeat: 'repeat',
           backgroundSize: '350px 350px',
-          opacity: 0.62,
+          opacity: 0.86,
         }}
       />
       <div
@@ -24,7 +24,7 @@ export function AuthBackground({ children, className = '' }: AuthBackgroundProps
         className="absolute inset-0"
         style={{
           backgroundImage:
-            'linear-gradient(to bottom right, rgba(245,243,255,0.52), rgba(255,255,255,0.58), rgba(240,253,244,0.52))',
+            'linear-gradient(to bottom right, rgba(245,243,255,0.28), rgba(255,255,255,0.34), rgba(240,253,244,0.28))',
         }}
       />
       <div className="relative z-10">{children}</div>
