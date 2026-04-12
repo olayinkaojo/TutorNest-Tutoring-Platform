@@ -67,6 +67,38 @@ export function SessionBookingCalendar({
     fetchTutors();
   }, []);
 
+  const isTutorVerified = (tutor: any) => {
+    const verificationStatus = String(tutor.verificationStatus || '').toLowerCase();
+    if (verificationStatus === 'verified') return true;
+
+    // Some payloads may expose boolean verification fields instead.
+    return tutor.isVerified === true || tutor.verified === true;
+  };
+
+  const normalizeTutors = (rawTutors: any[]): Tutor[] => {
+    return (rawTutors || [])
+      .filter((tutor: any) => isTutorVerified(tutor))
+      .map((tutor: any) => {
+        const id = tutor.id || tutor.userId;
+        if (!id) return null;
+
+        const name =
+          tutor.name ||
+          tutor.fullName ||
+          `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim() ||
+          'Unknown Tutor';
+
+        return {
+          id,
+          name,
+          subjects: tutor.subjects || [],
+          hourlyRate: Number(tutor.hourlyRate || 25),
+          availability: tutor.availability,
+        };
+      })
+      .filter(Boolean) as Tutor[];
+  };
+
   useEffect(() => {
     if (selectedDate && selectedTutor) {
       fetchAvailableSlots();
@@ -87,12 +119,32 @@ export function SessionBookingCalendar({
         }
       );
 
-      if (!response.ok) {
+      if (response.ok) {
+        const data = await response.json();
+        const normalized = normalizeTutors(data.tutors || []);
+
+        if (normalized.length > 0) {
+          setTutors(normalized);
+          return;
+        }
+      }
+
+      // Fallback: search endpoint is less restrictive and already powers tutor discovery.
+      const fallbackResponse = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/search/tutors?minPrice=0&maxPrice=10000&minRating=0&dbsRequired=false`,
+        {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      if (!fallbackResponse.ok) {
         throw new Error('Failed to fetch tutors');
       }
 
-      const data = await response.json();
-      setTutors(data.tutors || []);
+      const fallbackData = await fallbackResponse.json();
+      setTutors(normalizeTutors(fallbackData.tutors || []));
     } catch (err: any) {
       console.error('Error fetching tutors:', err);
       setError('Failed to load tutors. Please try again.');

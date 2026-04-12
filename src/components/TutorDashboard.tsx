@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { UpcomingLessonsCard } from './UpcomingLessonsCard';
 import { MultiSelectFilter, SelectedFilterBadges } from './MultiSelectFilter';
 import { StudentAssessmentForm } from './StudentAssessmentForm';
@@ -83,6 +83,7 @@ export function TutorDashboard({
   onTabChange,
 }: TutorDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const hasMountedTabSync = useRef(false);
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<any>(null);
   const [students, setStudents] = useState<any[]>([]);
@@ -130,8 +131,13 @@ export function TutorDashboard({
   }, [initialTab]);
 
   useEffect(() => {
+    // Skip first run so URL-derived tab isn't overwritten by default.
+    if (!hasMountedTabSync.current) {
+      hasMountedTabSync.current = true;
+      return;
+    }
     onTabChange?.(activeTab);
-  }, [activeTab]);
+  }, [activeTab, onTabChange]);
 
   // Debug log for available roles
   useEffect(() => {

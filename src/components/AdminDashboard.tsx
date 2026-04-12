@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { AdminUserManagement } from './AdminUserManagement';
 import { AdminVerificationDashboard } from './AdminVerificationDashboard';
 import { AdminAnalytics } from './AdminAnalytics';
@@ -66,6 +66,7 @@ export function AdminDashboard({
   onTabChange,
 }: AdminDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const hasMountedTabSync = useRef(false);
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<any>(null);
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
@@ -102,8 +103,13 @@ export function AdminDashboard({
   }, [initialTab]);
 
   useEffect(() => {
+    // Skip first run so URL-derived tab isn't overwritten by default.
+    if (!hasMountedTabSync.current) {
+      hasMountedTabSync.current = true;
+      return;
+    }
     onTabChange?.(activeTab);
-  }, [activeTab]);
+  }, [activeTab, onTabChange]);
 
   // Helper function to get fresh access token
   const getAccessToken = async (): Promise<string | null> => {

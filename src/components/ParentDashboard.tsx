@@ -22,7 +22,7 @@ import { BookingManager } from './BookingManager';
 import { Chatroom } from './Chatroom';
 import { DocumentManager } from './DocumentManager';
 import { ResourcesHub } from './ResourcesHub';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -70,6 +70,7 @@ export function ParentDashboard({
   onTabChange,
 }: ParentDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const hasMountedTabSync = useRef(false);
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<any>(null);
   const [showAddChildDialog, setShowAddChildDialog] = useState(false);
@@ -109,8 +110,13 @@ export function ParentDashboard({
   }, [initialTab]);
 
   useEffect(() => {
+    // Skip first run so URL-derived tab state is not overwritten by default "overview".
+    if (!hasMountedTabSync.current) {
+      hasMountedTabSync.current = true;
+      return;
+    }
     onTabChange?.(activeTab);
-  }, [activeTab]);
+  }, [activeTab, onTabChange]);
   const [stats, setStats] = useState({
     totalChildren: 0,
     lessonsScheduled: 0,

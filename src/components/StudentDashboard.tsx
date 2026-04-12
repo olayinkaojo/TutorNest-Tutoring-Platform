@@ -25,7 +25,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { MobileNavigation } from './MobileNavigation';
 import { StudentAssessmentsList } from './StudentAssessmentsList';
 import TutorNestLogo from './TutorNestLogo';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import {
   LineChart,
   Line,
@@ -101,6 +101,7 @@ export function StudentDashboard({
   onTabChange?: (tab: string) => void;
 }) {
   const supabase = getSupabaseClient();
+  const hasMountedTabSync = useRef(false);
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile>(initialProfile);
   const [loading, setLoading] = useState(false);
@@ -142,8 +143,13 @@ export function StudentDashboard({
   }, [initialTab]);
 
   useEffect(() => {
+    // Skip first run so URL-derived tab isn't overwritten by default.
+    if (!hasMountedTabSync.current) {
+      hasMountedTabSync.current = true;
+      return;
+    }
     onTabChange?.(activeTab);
-  }, [activeTab]);
+  }, [activeTab, onTabChange]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

@@ -1965,10 +1965,10 @@ app.get('/make-server-cbd74580/search/tutors', async (c) => {
     const minRating = parseFloat(c.req.query('minRating') || '0');
     const dbsRequired = c.req.query('dbsRequired') === 'true';
 
-    // Get all tutors (removed verification status filter to make all tutors live and visible)
+    // Only return admin-verified tutors.
     const allUsers = await kv.getByPrefix('user:');
     let tutors = allUsers.filter((user: any) => 
-      user.role === 'tutor'
+      user.role === 'tutor' && user.verificationStatus === 'verified'
     );
 
     // Apply filters

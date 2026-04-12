@@ -92,7 +92,7 @@ app.get('/tutors', async (c) => {
   try {
     const allTutors = await db.getProfilesByRole('tutor');
     const tutors = allTutors
-      .filter((u: any) => u.verificationStatus === 'verified' || u.verificationStatus === 'approved')
+      .filter((u: any) => u.verificationStatus === 'verified')
       .map((tutor: any) => ({
         id: tutor.id,
         name: tutor.fullName || tutor.name || 'Unknown Tutor',
