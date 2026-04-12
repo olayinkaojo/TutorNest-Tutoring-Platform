@@ -80,6 +80,7 @@ interface UserProfile {
   learningGoals?: string[];
   full_name?: string;
   name?: string;
+  linkedChildId?: string;
 }
 
 interface StudentDashboardProps {
@@ -120,6 +121,7 @@ export function StudentDashboard({
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [progressOverTime, setProgressOverTime] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('performance');
+  const academicStudentId = profile.linkedChildId || profile.id || profile.userId;
 
   const validTabs = new Set([
     'performance',
@@ -168,7 +170,7 @@ export function StudentDashboard({
 
     setLoading(true);
     try {
-      const studentId = profile.id || profile.userId;
+      const studentId = academicStudentId;
 
       // Load bookings/sessions
       const bookingsResponse = await fetch(
@@ -636,7 +638,7 @@ export function StudentDashboard({
                   </CardHeader>
                   <CardContent>
                     <StudentAssessmentsList 
-                      studentId={profile.id || profile.userId}
+                      studentId={academicStudentId}
                       accessToken={session.access_token}
                     />
                   </CardContent>

@@ -30,9 +30,46 @@ app.get('/bookings', async (c) => {
     const { data: { user } } = await supabase.auth.getUser(accessToken);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    // If a specific student/tutor ID is requested (e.g. parent viewing child's bookings),
-    // use that — otherwise default to the authenticated user's own ID.
-    const targetId = c.req.query('studentId') || c.req.query('tutorId') || user.id;
+    const requesterProfile = await kv.get(`user:${user.id}`) as any;
+    const requestedStudentId = c.req.query('studentId');
+    const requestedTutorId = c.req.query('tutorId');
+
+    // Resolve and authorize the target ID.
+    let targetId = user.id;
+
+    if (requestedTutorId) {
+      const canAccessTutorBookings = requestedTutorId === user.id || requesterProfile?.role === 'admin';
+      if (!canAccessTutorBookings) {
+        return c.json({ error: 'Unauthorized to view tutor bookings' }, 403);
+      }
+      targetId = requestedTutorId;
+    } else if (requestedStudentId) {
+      let childRecord = await kv.get(`child:${requestedStudentId}`) as any;
+      let resolvedStudentId = requestedStudentId;
+
+      // If caller passed a student auth account ID, map to linked child where applicable.
+      if (!childRecord) {
+        const requestedStudentProfile = await kv.get(`user:${requestedStudentId}`) as any;
+        if (requestedStudentProfile?.role === 'student' && requestedStudentProfile?.linkedChildId) {
+          resolvedStudentId = requestedStudentProfile.linkedChildId;
+          childRecord = await kv.get(`child:${resolvedStudentId}`) as any;
+        }
+      }
+
+      const canAccessAsParent = !!childRecord && childRecord.parentId === user.id;
+      const canAccessOwnStudent = requestedStudentId === user.id;
+      const canAccessLinkedStudent = requesterProfile?.role === 'student' && requesterProfile?.linkedChildId === resolvedStudentId;
+      const canAccessAsAdmin = requesterProfile?.role === 'admin';
+
+      if (!canAccessAsParent && !canAccessOwnStudent && !canAccessLinkedStudent && !canAccessAsAdmin) {
+        return c.json({ error: 'Unauthorized to view student bookings' }, 403);
+      }
+
+      targetId = resolvedStudentId;
+    } else if (requesterProfile?.role === 'student' && requesterProfile?.linkedChildId) {
+      // Dependent students default to their linked child record for academic bookings.
+      targetId = requesterProfile.linkedChildId;
+    }
 
     const bookings = await db.getBookingsByUserId(targetId);
     return c.json({ bookings });

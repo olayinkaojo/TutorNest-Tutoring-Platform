@@ -5,6 +5,17 @@ import { sendEmail, emailTemplates } from './email-service.tsx';
 
 export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) => Promise<string | null>) {
 
+  const generateStrongPassword = (length = 14) => {
+    const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz23456789!@#$%^&*';
+    const values = new Uint32Array(length);
+    crypto.getRandomValues(values);
+    let result = '';
+    for (let i = 0; i < length; i++) {
+      result += chars[values[i] % chars.length];
+    }
+    return result;
+  };
+
   // Enable student login for a child profile (Parent-initiated)
   app.post('/make-server-cbd74580/student-auth/enable-login', async (c) => {
     try {
@@ -87,8 +98,8 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       }
 
       // Generate secure password if requested
-      const password = generatePassword 
-        ? `${child.firstName}${Math.random().toString(36).slice(-8)}!`
+      const password = generatePassword
+        ? generateStrongPassword()
         : body.password;
 
       if (!password) {
@@ -586,8 +597,11 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         return c.json({ error: 'Only parent accounts can accept link requests' }, 403);
       }
 
-      // Verify parent email matches
-      if (parentProfile.email !== linkRequest.parentEmail) {
+      // Verify parent email matches (case-insensitive).
+      if (
+        String(parentProfile.email || '').toLowerCase() !==
+        String(linkRequest.parentEmail || '').toLowerCase()
+      ) {
         return c.json({ error: 'Parent email does not match the requested email' }, 403);
       }
 
@@ -597,8 +611,8 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         return c.json({ error: 'Student profile not found' }, 404);
       }
 
-      // Create child profile for this student
-      const childId = `child:${Date.now()}`;
+      // Create child profile for this student using normalized ID/key format.
+      const childId = crypto.randomUUID();
       const childProfile = {
         id: childId,
         parentId: parentId,
@@ -616,7 +630,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         linkedFromStudentSignup: true
       };
 
-      await kv.set(childId, childProfile);
+      await kv.set(`child:${childId}`, childProfile);
 
       // Update student profile
       studentProfile.linkedChildId = childId;
@@ -765,6 +779,8 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         return c.json({ error: 'Student login not enabled' }, 400);
       }
 
+      const effectivePassword = newPassword || generateStrongPassword();
+
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -773,7 +789,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       // Update password
       const { error: updateError } = await supabase.auth.admin.updateUserById(
         child.studentUserId,
-        { password: newPassword }
+        { password: effectivePassword }
       );
 
       if (updateError) {
@@ -794,6 +810,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
 
       return c.json({ 
         success: true,
+        temporaryPassword: newPassword ? undefined : effectivePassword,
         message: 'Student password reset successfully'
       });
     } catch (error: any) {

@@ -32,6 +32,7 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
   const [studentEmail, setStudentEmail] = useState('');
   const [generateEmail, setGenerateEmail] = useState(true);
   const [generatedPassword, setGeneratedPassword] = useState('');
+  const [resetPassword, setResetPassword] = useState('');
   const [copied, setCopied] = useState(false);
 
   const handleEnableLogin = async () => {
@@ -115,16 +116,10 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
   };
 
   const handleResetPassword = async () => {
-    const newPassword = prompt('Enter new password for student:');
-    if (!newPassword) return;
-
-    if (newPassword.length < 6) {
-      alert('Password must be at least 6 characters');
-      return;
-    }
-
     setLoading(true);
     setError('');
+    setSuccess('');
+    setResetPassword('');
 
     try {
       const response = await fetch(
@@ -136,8 +131,7 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
             'Content-Type': 'application/json'
           },
           body: JSON.stringify({
-            childId: child.id,
-            newPassword: newPassword
+              childId: child.id
           })
         }
       );
@@ -148,10 +142,10 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
         throw new Error(data.error || 'Failed to reset password');
       }
 
-      alert('Password reset successfully!');
+      setSuccess('Temporary password generated successfully. Share it securely with your child.');
+      setResetPassword(data.temporaryPassword || 'Password reset completed.');
     } catch (err: any) {
       setError(err.message);
-      alert(`Error: ${err.message}`);
     } finally {
       setLoading(false);
     }
@@ -178,7 +172,7 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
             disabled={loading}
           >
             <Key className="size-4 mr-1" />
-            Reset Password
+            Generate New Password
           </Button>
           <Button
             variant="outline"
@@ -323,6 +317,28 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
         <Alert variant="destructive" className="mt-2">
           <AlertCircle className="size-4" />
           <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      {success && resetPassword && (
+        <Alert className="mt-2">
+          <Check className="size-4" />
+          <AlertDescription>
+            <div className="space-y-1">
+              <p className="font-medium">{success}</p>
+              <div className="flex items-center gap-2">
+                <span className="text-sm">Temporary Password:</span>
+                <span className="font-mono font-bold text-sm">{resetPassword}</span>
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  onClick={() => copyToClipboard(resetPassword)}
+                >
+                  {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                </Button>
+              </div>
+            </div>
+          </AlertDescription>
         </Alert>
       )}
     </div>
