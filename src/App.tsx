@@ -45,9 +45,112 @@ export default function App() {
   const [googleOAuthCallback, setGoogleOAuthCallback] = useState(false);
   const [staffMode, setStaffMode] = useState(false);
 
+  const applyRouteFromLocation = (pathname: string, search: string) => {
+    const params = new URLSearchParams(search);
+
+    // Preserve legacy deep links while moving to path-based navigation.
+    const legacySignup = params.get('signup');
+    if (legacySignup === 'tutor') {
+      setShowLanding(false);
+      setShowRoleChooser(false);
+      setShowTutorSignup(true);
+      setShowStudentSignup(false);
+      setShowParentSignup(false);
+      return;
+    }
+    if (legacySignup === 'student') {
+      setShowLanding(false);
+      setShowRoleChooser(false);
+      setShowTutorSignup(false);
+      setShowStudentSignup(true);
+      setShowParentSignup(false);
+      return;
+    }
+
+    if (pathname === '/') {
+      setShowLanding(true);
+      setShowRoleChooser(false);
+      setShowTutorSignup(false);
+      setShowStudentSignup(false);
+      setShowParentSignup(false);
+      return;
+    }
+
+    if (pathname === '/auth') {
+      setShowLanding(false);
+      setShowRoleChooser(false);
+      setShowTutorSignup(false);
+      setShowStudentSignup(false);
+      setShowParentSignup(false);
+      return;
+    }
+
+    if (pathname === '/signup') {
+      setShowLanding(false);
+      setShowRoleChooser(true);
+      setShowTutorSignup(false);
+      setShowStudentSignup(false);
+      setShowParentSignup(false);
+      return;
+    }
+
+    if (pathname === '/signup/tutor') {
+      setShowLanding(false);
+      setShowRoleChooser(false);
+      setShowTutorSignup(true);
+      setShowStudentSignup(false);
+      setShowParentSignup(false);
+      return;
+    }
+
+    if (pathname === '/signup/student') {
+      setShowLanding(false);
+      setShowRoleChooser(false);
+      setShowTutorSignup(false);
+      setShowStudentSignup(true);
+      setShowParentSignup(false);
+      return;
+    }
+
+    if (pathname === '/signup/parent') {
+      setShowLanding(false);
+      setShowRoleChooser(false);
+      setShowTutorSignup(false);
+      setShowStudentSignup(false);
+      setShowParentSignup(true);
+      return;
+    }
+
+    // Any non-mapped public path defaults to auth screen.
+    setShowLanding(false);
+    setShowRoleChooser(false);
+    setShowTutorSignup(false);
+    setShowStudentSignup(false);
+    setShowParentSignup(false);
+  };
+
+  const navigateTo = (path: string, options?: { replace?: boolean }) => {
+    const { replace = false } = options || {};
+    const current = `${window.location.pathname}${window.location.search}`;
+    if (current === path) return;
+    if (replace) {
+      window.history.replaceState({}, document.title, path);
+    } else {
+      window.history.pushState({}, document.title, path);
+    }
+    applyRouteFromLocation(window.location.pathname, window.location.search);
+  };
+
   useEffect(() => {
-    // Check URL params for signup routing
     const urlParams = new URLSearchParams(window.location.search);
+
+    applyRouteFromLocation(window.location.pathname, window.location.search);
+
+    const handlePopState = () => {
+      applyRouteFromLocation(window.location.pathname, window.location.search);
+    };
+
+    window.addEventListener('popstate', handlePopState);
 
     // Detect Google OAuth callback (?code=xxx&state=xxx)
     if (urlParams.get('code') && urlParams.get('state')) {
@@ -61,16 +164,11 @@ export default function App() {
       setShowLanding(false);
       urlParams.delete('staff');
       const newSearch = urlParams.toString();
-      window.history.replaceState({}, document.title, newSearch ? `?${newSearch}` : window.location.pathname);
-    }
-
-    // Check URL params for tutor signup
-    if (urlParams.get('signup') === 'tutor') {
-      setShowTutorSignup(true);
-      setShowLanding(false);
-    } else if (urlParams.get('signup') === 'student') {
-      setShowStudentSignup(true);
-      setShowLanding(false);
+      window.history.replaceState(
+        {},
+        document.title,
+        newSearch ? `${window.location.pathname}?${newSearch}` : window.location.pathname
+      );
     }
     
     // Check for existing session
@@ -97,8 +195,32 @@ export default function App() {
       }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      subscription.unsubscribe();
+      window.removeEventListener('popstate', handlePopState);
+    };
   }, []);
+
+  useEffect(() => {
+    if (!session) {
+      if (window.location.pathname.startsWith('/dashboard') || window.location.pathname === '/select-role') {
+        navigateTo('/auth', { replace: true });
+      }
+      return;
+    }
+
+    if (!profile || !profile.role) {
+      if (window.location.pathname !== '/select-role') {
+        navigateTo('/select-role', { replace: true });
+      }
+      return;
+    }
+
+    const rolePath = `/dashboard/${profile.role}`;
+    if (window.location.pathname !== rolePath) {
+      navigateTo(rolePath, { replace: true });
+    }
+  }, [session, profile]);
 
   const fetchProfile = async (accessToken: string) => {
     try {
@@ -257,6 +379,7 @@ export default function App() {
 
   const handleSignOut = async () => {
     await supabase.auth.signOut();
+    navigateTo('/auth', { replace: true });
   };
 
   const handleProfileComplete = () => {
@@ -293,14 +416,12 @@ export default function App() {
       return (
         <ErrorBoundary>
           <LandingPage
-            onSignIn={() => setShowLanding(false)}
+            onSignIn={() => navigateTo('/auth')}
             onSignUp={() => {
-              setShowLanding(false);
-              setShowRoleChooser(true);
+              navigateTo('/signup');
             }}
             onBecomeTutor={() => {
-              setShowLanding(false);
-              setShowTutorSignup(true);
+              navigateTo('/signup/tutor');
             }}
           />
         </ErrorBoundary>
@@ -313,20 +434,16 @@ export default function App() {
         <ErrorBoundary>
           <SignupRoleChooser
             onParentSelected={() => {
-              setShowRoleChooser(false);
-              setShowParentSignup(true);
+              navigateTo('/signup/parent');
             }}
             onStudentSelected={() => {
-              setShowRoleChooser(false);
-              setShowStudentSignup(true);
+              navigateTo('/signup/student');
             }}
             onTutorSelected={() => {
-              setShowRoleChooser(false);
-              setShowTutorSignup(true);
+              navigateTo('/signup/tutor');
             }}
             onBackToSignIn={() => {
-              setShowRoleChooser(false);
-              setShowLanding(false);
+              navigateTo('/auth');
             }}
           />
         </ErrorBoundary>
@@ -339,9 +456,8 @@ export default function App() {
         <ErrorBoundary>
           <TutorSignup 
             onBackToSignIn={() => {
-              setShowTutorSignup(false);
               setSignupData(null);
-              setShowLanding(false);
+              navigateTo('/auth');
             }}
             initialData={signupData}
             session={session}
@@ -355,9 +471,8 @@ export default function App() {
         <ErrorBoundary>
           <StudentSignup 
             onBackToSignIn={() => {
-              setShowStudentSignup(false);
               setSignupData(null);
-              setShowLanding(false);
+              navigateTo('/auth');
             }}
             initialData={signupData}
             onSignupSuccess={handleSignupSuccess}
@@ -369,9 +484,8 @@ export default function App() {
         <ErrorBoundary>
           <ParentSignup 
             onBackToSignIn={() => {
-              setShowParentSignup(false);
               setSignupData(null);
-              setShowLanding(false);
+              navigateTo('/auth');
             }}
             initialData={signupData}
             onSignupSuccess={handleSignupSuccess}
@@ -384,20 +498,20 @@ export default function App() {
       <ErrorBoundary>
         <AuthPage
           staffMode={staffMode}
-          onBecomeTutor={() => setShowTutorSignup(true)}
-          onBecomeStudent={() => setShowStudentSignup(true)}
-          onSignupClicked={() => setShowRoleChooser(true)}
+          onBecomeTutor={() => navigateTo('/signup/tutor')}
+          onBecomeStudent={() => navigateTo('/signup/student')}
+          onSignupClicked={() => navigateTo('/signup')}
           onTutorSignupWithData={(data) => {
             setSignupData(data);
-            setShowTutorSignup(true);
+            navigateTo('/signup/tutor');
           }}
           onStudentSignupWithData={(data) => {
             setSignupData(data);
-            setShowStudentSignup(true);
+            navigateTo('/signup/student');
           }}
           onParentSignupWithData={(data) => {
             setSignupData(data);
-            setShowParentSignup(true);
+            navigateTo('/signup/parent');
           }}
         />
       </ErrorBoundary>
