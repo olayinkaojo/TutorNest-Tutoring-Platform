@@ -156,8 +156,19 @@ app.post('/bookings', async (c) => {
       return c.json({ error: 'Tutor or student not found' }, 404);
     }
 
-    // Generate Google Meet link
-    const googleMeetLink = await generateGoogleMeetLink(date, startTime, endTime, tutor, student);
+    // Look up parent to get their email for the calendar invite
+    const parent = student.parentId ? await kv.get(`user:${student.parentId}`) as any : null;
+    const parentEmail = parent?.email || '';
+    const tutorEmail = tutor.email || '';
+    const tutorName = tutor.fullName || tutor.name || 'Tutor';
+    const studentName = `${student.firstName} ${student.lastName}`;
+
+    // Create a real Google Calendar event with Meet link using the tutor's connected calendar.
+    // Falls back to a generic Meet URL if the tutor hasn't connected their calendar.
+    const { meetLink, eventId } = await createCalendarEventForBooking(
+      tutorId, tutorName, tutorEmail, studentName, parentEmail,
+      date, startTime, endTime, notes || ''
+    );
 
     // Create booking
     const bookingId = `${Date.now()}_${tutorId}_${studentId}`;
@@ -173,23 +184,20 @@ app.post('/bookings', async (c) => {
       price,
       notes: notes || '',
       status: 'confirmed',
-      tutorName: tutor.fullName || tutor.name || 'Unknown Tutor',
-      studentName: `${student.firstName} ${student.lastName}`,
+      tutorName,
+      studentName,
       createdAt: new Date().toISOString(),
-      googleCalendarTutorEventId: null,
+      googleCalendarTutorEventId: eventId,
       googleCalendarStudentEventId: null,
-      googleMeetLink: googleMeetLink || `https://meet.google.com/new`, // Fallback to generic meet link
+      googleMeetLink: meetLink || 'https://meet.google.com/new',
     };
 
     await kv.set(`booking:${bookingId}`, booking);
 
-    // TODO: Send calendar invites via Google Calendar API
-    // TODO: Send notification emails
-
-    return c.json({ 
-      success: true, 
+    return c.json({
+      success: true,
       booking,
-      message: 'Booking created successfully. Calendar invites will be sent shortly.' 
+      message: 'Booking created successfully.'
     });
   } catch (error: any) {
     console.error('Error creating booking:', error);
@@ -258,28 +266,107 @@ app.post('/bookings/:bookingId/cancel', async (c) => {
 
 export default app;
 
-// Helper function to generate Google Meet link
-async function generateGoogleMeetLink(date: string, startTime: string, endTime: string, tutor: any, student: any): Promise<string | null> {
+// Creates a real Google Calendar event on the tutor's calendar with a Google Meet link.
+// Adds the parent as an attendee so they receive an email invite (which blocks their calendar on accept).
+// Returns the real Meet link and Calendar event ID, or nulls if the tutor hasn't connected their calendar.
+async function createCalendarEventForBooking(
+  tutorId: string,
+  tutorName: string,
+  tutorEmail: string,
+  studentName: string,
+  parentEmail: string,
+  date: string,
+  startTime: string,
+  endTime: string,
+  notes: string,
+): Promise<{ meetLink: string | null; eventId: string | null }> {
   try {
-    // Generate a unique meeting code
-    const meetingCode = generateMeetingCode();
-    const meetLink = `https://meet.google.com/${meetingCode}`;
-    
-    // In production, you would use Google Calendar API to create an actual meeting
-    // For now, we'll generate a consistent meeting code based on the booking details
-    return meetLink;
-  } catch (error) {
-    console.error('Error generating Google Meet link:', error);
-    return null;
-  }
-}
+    const tokens = await kv.get(`google_calendar_tokens:${tutorId}`) as any;
+    if (!tokens?.accessToken) {
+      console.log('Tutor has not connected Google Calendar — skipping calendar event creation');
+      return { meetLink: null, eventId: null };
+    }
 
-// Helper function to generate meeting code
-function generateMeetingCode(): string {
-  // Generate a Google Meet-style code (xxx-xxxx-xxx)
-  const chars = 'abcdefghijklmnopqrstuvwxyz';
-  const segment1 = Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  const segment2 = Array.from({ length: 4 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  const segment3 = Array.from({ length: 3 }, () => chars[Math.floor(Math.random() * chars.length)]).join('');
-  return `${segment1}-${segment2}-${segment3}`;
+    // Refresh access token if expiring within 5 minutes
+    let googleAccessToken = tokens.accessToken;
+    if (tokens.expiresAt && Date.now() >= tokens.expiresAt - 300000) {
+      const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+      const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+      if (clientId && clientSecret && tokens.refreshToken) {
+        const refreshRes = await fetch('https://oauth2.googleapis.com/token', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+          body: new URLSearchParams({
+            refresh_token: tokens.refreshToken,
+            client_id: clientId,
+            client_secret: clientSecret,
+            grant_type: 'refresh_token',
+          }),
+        });
+        if (refreshRes.ok) {
+          const refreshed = await refreshRes.json();
+          googleAccessToken = refreshed.access_token;
+          await kv.set(`google_calendar_tokens:${tutorId}`, {
+            ...tokens,
+            accessToken: refreshed.access_token,
+            expiresAt: Date.now() + (refreshed.expires_in * 1000),
+            refreshToken: refreshed.refresh_token || tokens.refreshToken,
+          });
+        }
+      }
+    }
+
+    const attendees: { email: string }[] = [];
+    if (tutorEmail) attendees.push({ email: tutorEmail });
+    if (parentEmail) attendees.push({ email: parentEmail });
+
+    const event = {
+      summary: `TutorNest: ${tutorName} & ${studentName}`,
+      description: `TutorNest tutoring session\n\nStudent: ${studentName}\nTutor: ${tutorName}${notes ? `\n\nNotes: ${notes}` : ''}`,
+      start: { dateTime: `${date}T${startTime}:00`, timeZone: 'Africa/Lagos' },
+      end: { dateTime: `${date}T${endTime}:00`, timeZone: 'Africa/Lagos' },
+      attendees,
+      reminders: {
+        useDefault: false,
+        overrides: [
+          { method: 'email', minutes: 24 * 60 },
+          { method: 'popup', minutes: 30 },
+        ],
+      },
+      conferenceData: {
+        createRequest: {
+          requestId: crypto.randomUUID(),
+          conferenceSolutionKey: { type: 'hangoutsMeet' },
+        },
+      },
+    };
+
+    const response = await fetch(
+      'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1&sendUpdates=all',
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(event),
+      },
+    );
+
+    if (!response.ok) {
+      console.error('Google Calendar event creation failed:', await response.text());
+      return { meetLink: null, eventId: null };
+    }
+
+    const createdEvent = await response.json();
+    const meetLink = createdEvent.conferenceData?.entryPoints?.find(
+      (ep: any) => ep.entryPointType === 'video'
+    )?.uri || null;
+
+    console.log('✅ Google Calendar event created:', createdEvent.id, '| Meet:', meetLink);
+    return { meetLink, eventId: createdEvent.id || null };
+  } catch (error: any) {
+    console.error('Error creating Google Calendar event:', error.message);
+    return { meetLink: null, eventId: null };
+  }
 }
