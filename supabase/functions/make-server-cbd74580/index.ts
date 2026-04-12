@@ -1508,10 +1508,39 @@ app.get('/make-server-cbd74580/admin/verifications/pending', async (c) => {
 
     console.log(`Found ${pending.length} pending verifications`);
 
+    const adminSupabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+
     // Fetch user profiles for each verification
     const pendingWithProfiles = await Promise.all(
       pending.map(async (verification: any) => {
-        const userProfile = await kv.get(`user:${verification.userId}`);
+        let userProfile = await kv.get(`user:${verification.userId}`) as any;
+
+        // If no KV profile exists, fall back to Supabase auth user metadata
+        // so the admin always sees at least the name and email
+        if (!userProfile) {
+          try {
+            const { data: { user: authUser } } = await adminSupabase.auth.admin.getUserById(verification.userId);
+            if (authUser) {
+              const metaName = authUser.user_metadata?.name || authUser.user_metadata?.full_name || '';
+              userProfile = {
+                id: authUser.id,
+                userId: authUser.id,
+                email: authUser.email,
+                name: metaName,
+                full_name: metaName,
+                fullName: metaName,
+                role: 'tutor',
+                _fromAuthFallback: true,
+              };
+            }
+          } catch (authErr: any) {
+            console.warn(`Could not fetch auth user for ${verification.userId}:`, authErr.message);
+          }
+        }
+
         return {
           ...verification,
           profile: userProfile,
