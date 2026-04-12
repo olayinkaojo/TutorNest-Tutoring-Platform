@@ -116,10 +116,10 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
 
       // ── Fetch from both KV (legacy) and DB (new) in parallel ──────────────
       const [
-        kvUsers, kvBookings, kvPayments, kvAlerts, kvNotifications,
+        dbProfiles, kvBookings, kvPayments, kvAlerts, kvNotifications,
         dbBookings, dbPayments,
       ] = await Promise.all([
-        kv.getByPrefix('user:'),
+        db.getAllProfilesForAdmin(),
         kv.getByPrefix('booking:'),
         kv.getByPrefix('payment:'),
         kv.getByPrefix('alert:'),
@@ -164,7 +164,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       ];
 
       // ── Compute stats ──────────────────────────────────────────────────────
-      const allTutors = kvUsers.filter((u: any) => u.role === 'tutor');
+      const allTutors = dbProfiles.filter((u: any) => u.role === 'tutor');
       const activeTutorsCount = allTutors.filter((u: any) =>
         u.verificationStatus === 'verified'
       ).length;
@@ -214,20 +214,16 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       // Fetch from KV (legacy) and DB (new) in parallel
-      const [kvUsers, kvBookings, kvPayments, allVerifications, dbBookings, dbPayments, dbProfiles] =
+      const [dbProfiles, kvBookings, kvPayments, allVerifications, dbBookings, dbPayments] =
         await Promise.all([
-          kv.getByPrefix('user:'),
+          db.getAllProfilesForAdmin().catch(() => [] as any[]),
           kv.getByPrefix('booking:'),
           kv.getByPrefix('payment:'),
           kv.getByPrefix('verification:'),
           db.getAllBookingsForAdmin(),
           db.getAllPaymentsForAdmin(),
-          db.getAllProfilesForAdmin().catch(() => [] as any[]),
         ]);
-
-      // Merge users (DB profiles take precedence for deduplication)
-      const dbProfileIds = new Set(dbProfiles.map((p: any) => p.id));
-      const allUsers = [...kvUsers.filter((u: any) => !dbProfileIds.has(u.id || u.userId)), ...dbProfiles];
+      const allUsers = dbProfiles;
 
       // Merge bookings and payments
       const kvBookingIds = new Set(kvBookings.map((b: any) => b.id));
@@ -395,7 +391,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
 
       // If no audit logs, create some sample activity from recent data
       if (activity.length === 0) {
-        const allUsers = await kv.getByPrefix('user:');
+        const allUsers = await db.getAllProfilesForAdmin();
         const allBookings = await kv.getByPrefix('booking:');
         
         const recentUsers = allUsers
@@ -445,7 +441,9 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       // Get all users
-      const allUsers = await kv.getByPrefix('user:');
+      // Source of truth for admin user list: DB profiles table only.
+      // This excludes stale legacy KV-only users.
+      const allUsers = await db.getAllProfilesForAdmin();
       const allBookings = await kv.getByPrefix('booking:');
       const allPayments = await kv.getByPrefix('payment:');
 
@@ -503,7 +501,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const allUsers = await kv.getByPrefix('user:');
+      const allUsers = await db.getAllProfilesForAdmin();
       
       // Enhance users with additional admin data
       const enhancedUsers = allUsers.map((user: any) => ({
@@ -826,7 +824,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       // Get recent activities
-      const allUsers = await kv.getByPrefix('user:');
+      const allUsers = await db.getAllProfilesForAdmin();
       const allBookings = await kv.getByPrefix('booking:');
       
       const activities: any[] = [];
@@ -890,8 +888,8 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       // Get all children
       const allChildren = await kv.getByPrefix('child:');
       
-      // Get all parent users
-      const allParents = await kv.getByPrefix('user:');
+      // Get all parent users from DB profiles only
+      const allParents = await db.getAllProfilesForAdmin();
       const parentMap = new Map();
       allParents.forEach((parent: any) => {
         if (parent.role === 'parent') {
@@ -978,7 +976,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       // Get all parents
-      const allUsers = await kv.getByPrefix('user:');
+      const allUsers = await db.getAllProfilesForAdmin();
       const parents = allUsers.filter((u: any) => u.role === 'parent');
 
       const summaries = [];
@@ -1488,7 +1486,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       // Get all tutors with pending verification
-      const allUsers = await kv.getByPrefix('user:');
+      const allUsers = await db.getAllProfilesForAdmin();
       const pendingTutors = allUsers.filter((u: any) => 
         u.role === 'tutor' && u.verificationStatus === 'pending'
       );
@@ -1500,7 +1498,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         
         verifications.push({
           userId: tutor.id || tutor.userId,
-          name: `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim(),
+          name: getDisplayName(tutor),
           email: tutor.email,
           subjects: tutor.subjects || [],
           qualifications: tutor.qualifications || '',
