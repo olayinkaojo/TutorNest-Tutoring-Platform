@@ -810,7 +810,8 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
 
       return c.json({ 
         success: true,
-        temporaryPassword: newPassword ? undefined : effectivePassword,
+        temporaryPassword: effectivePassword,
+        password: effectivePassword,
         message: 'Student password reset successfully'
       });
     } catch (error: any) {
