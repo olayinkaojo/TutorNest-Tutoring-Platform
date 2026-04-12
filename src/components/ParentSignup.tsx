@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import wallpaperBg from '../assets/c2a495c4aec3903270b747684d5b5dd5d609b3da.png';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
@@ -180,7 +181,14 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 py-8 px-4">
+    <div
+      className="min-h-screen py-8 px-4"
+      style={{
+        backgroundImage: `linear-gradient(to bottom right, rgba(245,243,255,0.93), rgba(255,255,255,0.93), rgba(240,253,244,0.93)), url(${wallpaperBg})`,
+        backgroundRepeat: 'no-repeat, repeat',
+        backgroundSize: 'cover, 350px 350px',
+      }}
+    >
       <div className="max-w-2xl mx-auto">
         {/* Logo */}
         <div className="flex justify-center mb-6">

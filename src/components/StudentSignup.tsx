@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import wallpaperBg from '../assets/c2a495c4aec3903270b747684d5b5dd5d609b3da.png';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
@@ -231,7 +232,12 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
 
   if (success && signupType === 'independent') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4"
+      style={{
+        backgroundImage: `linear-gradient(to bottom right, rgba(245,243,255,0.93), rgba(255,255,255,0.93), rgba(240,253,244,0.93)), url(${wallpaperBg})`,
+        backgroundRepeat: 'no-repeat, repeat',
+        backgroundSize: 'cover, 350px 350px',
+      }}>
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
@@ -261,7 +267,12 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
 
   if (success && signupType === 'dependent' && awaitingParentLink) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 flex items-center justify-center p-4">
+      <div className="min-h-screen flex items-center justify-center p-4"
+      style={{
+        backgroundImage: `linear-gradient(to bottom right, rgba(245,243,255,0.93), rgba(255,255,255,0.93), rgba(240,253,244,0.93)), url(${wallpaperBg})`,
+        backgroundRepeat: 'no-repeat, repeat',
+        backgroundSize: 'cover, 350px 350px',
+      }}>
         <Card className="w-full max-w-md">
           <CardHeader className="text-center">
             <div className="mx-auto mb-4 w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center">
@@ -314,7 +325,14 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50">
+    <div
+      className="min-h-screen"
+      style={{
+        backgroundImage: `linear-gradient(to bottom right, rgba(245,243,255,0.93), rgba(255,255,255,0.93), rgba(240,253,244,0.93)), url(${wallpaperBg})`,
+        backgroundRepeat: 'no-repeat, repeat',
+        backgroundSize: 'cover, 350px 350px',
+      }}
+    >
       <div className="container mx-auto px-4 py-8">
         <div className="flex justify-between items-center mb-8">
           <TutorNestLogo />
