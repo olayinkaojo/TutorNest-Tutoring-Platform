@@ -761,6 +761,107 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       console.log('✅ Initial profile saved to KV store:', JSON.stringify(initialProfile, null, 2));
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
+      // If signing up as a tutor, immediately create a verification record so the admin dashboard picks them up
+      if (initialProfile.role === 'tutor') {
+        await kv.set(`verification:${data.user.id}`, {
+          userId: data.user.id,
+          status: 'pending',
+          submittedAt: new Date().toISOString(),
+          reviewedAt: null,
+          reviewedBy: null,
+          rejectionReason: null,
+          appeals: [],
+        });
+        console.log('✅ Verification record created for tutor:', data.user.id);
+
+        // Send "application received" email to the tutor
+        try {
+          await sendEmail({
+            to: email,
+            subject: 'Your TutorNest Application Has Been Received',
+            html: `
+              <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+                <!-- Header -->
+                <div style="background:linear-gradient(135deg,#625d9c 0%,#4e4a7a 100%);padding:40px 32px;text-align:center">
+                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px">TutorNest</h1>
+                  <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:15px">Connecting students with great tutors</p>
+                </div>
+
+                <!-- Body -->
+                <div style="padding:40px 32px">
+                  <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#111827">Application Received! 🎉</h2>
+                  <p style="margin:0 0 24px;font-size:16px;color:#374151">Hi <strong>${name}</strong>,</p>
+
+                  <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
+                    Thank you for applying to become a tutor on TutorNest. We're excited to have you on board and have received your application successfully.
+                  </p>
+
+                  <!-- Status box -->
+                  <div style="background:#faf5ff;border-left:4px solid #625d9c;border-radius:0 8px 8px 0;padding:20px 24px;margin:0 0 28px">
+                    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#625d9c;text-transform:uppercase;letter-spacing:0.5px">Application Status</p>
+                    <p style="margin:0;font-size:18px;font-weight:700;color:#111827">Pending Review</p>
+                  </div>
+
+                  <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
+                    Our team carefully reviews every application to ensure the highest quality of tutors for our students. Here's what happens next:
+                  </p>
+
+                  <!-- Steps -->
+                  <table style="width:100%;border-collapse:collapse;margin:0 0 28px">
+                    <tr>
+                      <td style="width:40px;vertical-align:top;padding:0 16px 20px 0">
+                        <div style="width:32px;height:32px;border-radius:50%;background:#625d9c;color:white;font-weight:700;font-size:14px;text-align:center;line-height:32px">1</div>
+                      </td>
+                      <td style="vertical-align:top;padding:0 0 20px">
+                        <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:15px">Email Confirmation</p>
+                        <p style="margin:0;color:#6b7280;font-size:14px;line-height:1.5">Confirm your email address using the link we sent separately.</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="width:40px;vertical-align:top;padding:0 16px 20px 0">
+                        <div style="width:32px;height:32px;border-radius:50%;background:#625d9c;color:white;font-weight:700;font-size:14px;text-align:center;line-height:32px">2</div>
+                      </td>
+                      <td style="vertical-align:top;padding:0 0 20px">
+                        <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:15px">Profile Review (24–48 hours)</p>
+                        <p style="margin:0;color:#6b7280;font-size:14px;line-height:1.5">Our team will verify your qualifications, experience, and background information.</p>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="width:40px;vertical-align:top;padding:0 16px 0 0">
+                        <div style="width:32px;height:32px;border-radius:50%;background:#5d9827;color:white;font-weight:700;font-size:14px;text-align:center;line-height:32px">3</div>
+                      </td>
+                      <td style="vertical-align:top">
+                        <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:15px">Get Approved &amp; Start Teaching</p>
+                        <p style="margin:0;color:#6b7280;font-size:14px;line-height:1.5">Once approved, you'll receive a confirmation email and gain full access to your tutor dashboard, where you can start accepting bookings.</p>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px 20px;margin:0 0 28px">
+                    <p style="margin:0;font-size:14px;color:#166534;line-height:1.5">
+                      <strong>In the meantime:</strong> Make sure you've confirmed your email address so we can contact you about your application. You can also sign in to view your pending dashboard.
+                    </p>
+                  </div>
+
+                  <p style="margin:0;font-size:15px;color:#374151;line-height:1.6">
+                    If you have any questions, don't hesitate to reply to this email. We're happy to help.
+                  </p>
+                </div>
+
+                <!-- Footer -->
+                <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:24px 32px;text-align:center">
+                  <p style="margin:0 0 8px;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} TutorNest. All rights reserved.</p>
+                  <p style="margin:0;font-size:13px;color:#9ca3af">You're receiving this because you applied to become a TutorNest tutor.</p>
+                </div>
+              </div>
+            `,
+          });
+          console.log('✅ Application received email sent to tutor:', email);
+        } catch (emailErr: any) {
+          console.warn('⚠️ Could not send application received email:', emailErr.message);
+        }
+      }
+
       // Also write to proper profiles table (dual-write during migration)
       try {
         await upsertProfile(data.user.id, initialProfile);
@@ -1396,6 +1497,12 @@ app.get('/make-server-cbd74580/admin/verifications/pending', async (c) => {
     // TODO: Add admin role check
     // For now, any authenticated user can access (you should add role-based access control)
 
+    // Verify admin role
+    const requestingUser = await kv.get(`user:${userId}`) as any;
+    if (!requestingUser || requestingUser.role !== 'admin') {
+      return c.json({ error: 'Admin access required' }, 403);
+    }
+
     const verifications = await kv.getByPrefix('verification:');
     const pending = verifications.filter((v: any) => v.status === 'pending');
 
@@ -1405,13 +1512,6 @@ app.get('/make-server-cbd74580/admin/verifications/pending', async (c) => {
     const pendingWithProfiles = await Promise.all(
       pending.map(async (verification: any) => {
         const userProfile = await kv.get(`user:${verification.userId}`);
-        console.log(`Verification for user ${verification.userId}:`, {
-          hasProfile: !!userProfile,
-          firstName: userProfile?.firstName,
-          lastName: userProfile?.lastName,
-          subjects: userProfile?.subjects,
-          yearGroups: userProfile?.yearGroups,
-        });
         return {
           ...verification,
           profile: userProfile,
@@ -1477,10 +1577,153 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
 
     await kv.set(`user:${targetUserId}`, updatedProfile);
 
-    return c.json({ 
-      success: true, 
+    // Send outcome email to the tutor
+    const tutorEmail = userProfile.email;
+    const tutorName = userProfile.fullName || userProfile.full_name || userProfile.name || 'Tutor';
+    if (tutorEmail) {
+      try {
+        if (action === 'approve') {
+          await sendEmail({
+            to: tutorEmail,
+            subject: 'Congratulations — You\'re Approved to Tutor on TutorNest! 🎉',
+            html: `
+              <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+                <!-- Header -->
+                <div style="background:linear-gradient(135deg,#5d9827 0%,#4a7a1f 100%);padding:40px 32px;text-align:center">
+                  <div style="width:64px;height:64px;background:rgba(255,255,255,0.2);border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center">
+                    <span style="font-size:32px">✅</span>
+                  </div>
+                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px">TutorNest</h1>
+                  <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:15px">You're officially a TutorNest Tutor!</p>
+                </div>
+
+                <!-- Body -->
+                <div style="padding:40px 32px">
+                  <h2 style="margin:0 0 16px;font-size:24px;font-weight:700;color:#111827">Welcome to the team, ${tutorName}! 🎉</h2>
+
+                  <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
+                    We're thrilled to let you know that your TutorNest tutor application has been <strong style="color:#5d9827">reviewed and approved</strong>. You can now access your full tutor dashboard and start accepting bookings from students.
+                  </p>
+
+                  <!-- Status badge -->
+                  <div style="background:#f0fdf4;border:2px solid #5d9827;border-radius:10px;padding:20px 24px;margin:0 0 28px;text-align:center">
+                    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#5d9827;text-transform:uppercase;letter-spacing:0.5px">Application Status</p>
+                    <p style="margin:0;font-size:22px;font-weight:700;color:#166534">✅ Approved & Active</p>
+                  </div>
+
+                  <p style="margin:0 0 16px;font-size:15px;color:#374151;font-weight:600">Here's what you can do right now:</p>
+
+                  <!-- Feature grid -->
+                  <table style="width:100%;border-collapse:collapse;margin:0 0 28px">
+                    <tr>
+                      <td style="padding:0 8px 16px 0;vertical-align:top;width:50%">
+                        <div style="background:#faf5ff;border-radius:8px;padding:16px">
+                          <p style="margin:0 0 6px;font-size:20px">📅</p>
+                          <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:14px">Connect Your Calendar</p>
+                          <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.4">Link your Google Calendar so bookings automatically appear and generate a Meet link.</p>
+                        </div>
+                      </td>
+                      <td style="padding:0 0 16px 8px;vertical-align:top;width:50%">
+                        <div style="background:#faf5ff;border-radius:8px;padding:16px">
+                          <p style="margin:0 0 6px;font-size:20px">💳</p>
+                          <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:14px">Set Up Payouts</p>
+                          <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.4">Add your bank details in the Payouts tab to receive your 80% session earnings.</p>
+                        </div>
+                      </td>
+                    </tr>
+                    <tr>
+                      <td style="padding:0 8px 0 0;vertical-align:top;width:50%">
+                        <div style="background:#faf5ff;border-radius:8px;padding:16px">
+                          <p style="margin:0 0 6px;font-size:20px">🎓</p>
+                          <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:14px">Start Accepting Students</p>
+                          <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.4">Parents can now find and book sessions with you. Your profile is live.</p>
+                        </div>
+                      </td>
+                      <td style="padding:0 0 0 8px;vertical-align:top;width:50%">
+                        <div style="background:#faf5ff;border-radius:8px;padding:16px">
+                          <p style="margin:0 0 6px;font-size:20px">📊</p>
+                          <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:14px">Track Your Earnings</p>
+                          <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.4">Monitor sessions, earnings, and payout history from your dashboard.</p>
+                        </div>
+                      </td>
+                    </tr>
+                  </table>
+
+                  <!-- CTA Button -->
+                  <div style="text-align:center;margin:0 0 28px">
+                    <a href="${Deno.env.get('VITE_APP_URL') || 'https://tutornest.org'}" style="display:inline-block;background:#625d9c;color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 36px;border-radius:10px">
+                      Go to My Dashboard →
+                    </a>
+                  </div>
+
+                  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:16px 20px;margin:0 0 24px">
+                    <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5">
+                      <strong>Earnings reminder:</strong> You keep <strong>80%</strong> of every session fee. TutorNest retains a 20% platform fee that covers payment processing, support, and student matching.
+                    </p>
+                  </div>
+
+                  <p style="margin:0;font-size:15px;color:#374151;line-height:1.6">
+                    Welcome aboard — we're glad to have you. If you have any questions as you get started, simply reply to this email.
+                  </p>
+                </div>
+
+                <!-- Footer -->
+                <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:24px 32px;text-align:center">
+                  <p style="margin:0 0 8px;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} TutorNest. All rights reserved.</p>
+                  <p style="margin:0;font-size:13px;color:#9ca3af">This email was sent because your tutor application was approved.</p>
+                </div>
+              </div>
+            `,
+          });
+          console.log('✅ Approval email sent to tutor:', tutorEmail);
+        } else if (action === 'reject') {
+          await sendEmail({
+            to: tutorEmail,
+            subject: 'Update on Your TutorNest Application',
+            html: `
+              <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
+                <div style="background:linear-gradient(135deg,#625d9c 0%,#4e4a7a 100%);padding:40px 32px;text-align:center">
+                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff">TutorNest</h1>
+                </div>
+                <div style="padding:40px 32px">
+                  <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#111827">Hi ${tutorName},</h2>
+                  <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
+                    Thank you for applying to TutorNest. After carefully reviewing your application, we're unable to approve your profile at this time.
+                  </p>
+                  ${rejectionReason ? `
+                  <div style="background:#fef2f2;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;padding:16px 20px;margin:0 0 24px">
+                    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px">Reason</p>
+                    <p style="margin:0;font-size:15px;color:#374151">${rejectionReason}</p>
+                  </div>` : ''}
+                  <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
+                    If you believe this decision was made in error, or if you'd like to address the concerns raised, you may submit an appeal through your TutorNest account. Our team will be happy to reconsider your application with any additional information you provide.
+                  </p>
+                  <div style="text-align:center;margin:0 0 28px">
+                    <a href="${Deno.env.get('VITE_APP_URL') || 'https://tutornest.org'}" style="display:inline-block;background:#625d9c;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 32px;border-radius:10px">
+                      Submit an Appeal
+                    </a>
+                  </div>
+                  <p style="margin:0;font-size:15px;color:#374151;line-height:1.6">
+                    We appreciate the time you invested in your application and wish you all the best.
+                  </p>
+                </div>
+                <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:24px 32px;text-align:center">
+                  <p style="margin:0;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} TutorNest. All rights reserved.</p>
+                </div>
+              </div>
+            `,
+          });
+          console.log('✅ Rejection email sent to tutor:', tutorEmail);
+        }
+      } catch (emailErr: any) {
+        console.warn('⚠️ Could not send outcome email to tutor:', emailErr.message);
+      }
+    }
+
+    return c.json({
+      success: true,
       verification: updatedVerification,
-      profile: updatedProfile 
+      profile: updatedProfile
     });
   } catch (error: any) {
     console.error('Error reviewing verification:', error);
@@ -3015,10 +3258,9 @@ app.get('/make-server-cbd74580/payouts/dashboard', async (c) => {
     };
 
     const earnings = tutorBookings.map((booking: any) => {
-      // Get the rate based on the subject of the session
-      const subjectRate = getSubjectRate(booking.subject || '');
-      const grossAmount = subjectRate;
-      
+      // Use the actual booking price if available, otherwise fall back to subject rate
+      const grossAmount = booking.price ? parseFloat(booking.price) : getSubjectRate(booking.subject || '');
+
       // Tutor receives 80%, TutorNest takes 20%
       const platformFee = (grossAmount * 0.20).toFixed(2);
       const netAmount = (grossAmount * 0.80).toFixed(2);
@@ -3033,21 +3275,31 @@ app.get('/make-server-cbd74580/payouts/dashboard', async (c) => {
         grossAmount: grossAmount.toFixed(2),
         platformFee,
         netAmount,
-        status: 'paid',
-        payoutDate: booking.payoutDate || new Date().toISOString(),
+        status: booking.payoutStatus === 'paid' ? 'paid' : 'pending',
+        payoutDate: booking.paidOutAt || null,
       };
     });
 
     const settings = await kv.get(`payout_settings:${userId}`) as any || {
       schedule: 'weekly',
       minimumAmount: '50',
-      bankAccountLast4: '1234',
     };
 
     const totalEarnings = earnings.reduce((sum, e) => sum + parseFloat(e.netAmount), 0).toFixed(2);
-    const pendingPayout = '45.50';
+
+    // Pending payout = net earnings from sessions not yet paid out
+    const pendingPayout = earnings
+      .filter((e) => e.status !== 'paid')
+      .reduce((sum, e) => sum + parseFloat(e.netAmount), 0)
+      .toFixed(2);
+
+    const currentMonth = new Date().getMonth();
+    const currentYear = new Date().getFullYear();
     const paidThisMonth = earnings
-      .filter((e) => new Date(e.date).getMonth() === new Date().getMonth())
+      .filter((e) => {
+        const d = new Date(e.date);
+        return e.status === 'paid' && d.getMonth() === currentMonth && d.getFullYear() === currentYear;
+      })
       .reduce((sum, e) => sum + parseFloat(e.netAmount), 0)
       .toFixed(2);
 
@@ -3061,7 +3313,17 @@ app.get('/make-server-cbd74580/payouts/dashboard', async (c) => {
       nextPayoutDate: nextPayoutDate.toISOString(),
     };
 
-    const payouts = [];
+    // Fetch real payout history from KV store
+    const rawPayouts = await kv.get(`tutor_payouts:${userId}`) as any[] || [];
+    const payouts = rawPayouts.map((p: any) => ({
+      id: p.id,
+      period: p.paidAt ? new Date(p.paidAt).toLocaleDateString('en-GB', { month: 'long', year: 'numeric' }) : 'Unknown',
+      amount: p.amount?.toFixed(2) || '0.00',
+      status: 'paid',
+      scheduledDate: p.paidAt || new Date().toISOString(),
+      paidDate: p.paidAt || null,
+      earningsCount: p.bookingsCount || 0,
+    }));
 
     return c.json({ earnings, payouts, stats, settings });
   } catch (error: any) {

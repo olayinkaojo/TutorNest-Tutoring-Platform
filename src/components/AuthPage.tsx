@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { Mail, Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
 import { Button } from './ui/button';
@@ -17,9 +17,9 @@ interface AuthPageProps {
   onSignupClicked?: () => void;
 }
 
-export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData, onStudentSignupWithData, onParentSignupWithData, onSignupClicked }: AuthPageProps = {}) {
+export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData, onStudentSignupWithData, onParentSignupWithData, onSignupClicked, staffMode }: AuthPageProps & { staffMode?: boolean } = {}) {
   const [mode, setMode] = useState<'signin' | 'reset'>('signin');
-  const [email, setEmail] = useState('');
+  const [email, setEmail] = useState(staffMode ? 'admin@tutornest.com' : '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
@@ -27,7 +27,28 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
-  const [showAdminInfo, setShowAdminInfo] = useState(false);
+  const [isStaffMode, setIsStaffMode] = useState(!!staffMode);
+
+  // Secret: click the logo 5 times within 2 seconds to reveal staff login
+  const logoClickCount = useRef(0);
+  const logoClickTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const handleLogoClick = () => {
+    logoClickCount.current += 1;
+    if (logoClickTimer.current) clearTimeout(logoClickTimer.current);
+
+    if (logoClickCount.current >= 5) {
+      logoClickCount.current = 0;
+      setIsStaffMode(true);
+      setEmail('admin@tutornest.com');
+      setTimeout(() => document.getElementById('password')?.focus(), 100);
+      return;
+    }
+
+    logoClickTimer.current = setTimeout(() => {
+      logoClickCount.current = 0;
+    }, 2000);
+  };
 
   const validateEmail = (email: string) => {
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
@@ -146,19 +167,31 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
     <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 flex items-center justify-center p-4 sm:p-6 md:p-8">
       <div className="w-full max-w-md">
         <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8">
-          {/* Logo */}
+          {/* Logo — 5 rapid clicks activates staff login */}
           <div className="flex justify-center mb-6 sm:mb-8">
-            <TutorNestLogo />
+            <button type="button" onClick={handleLogoClick} className="focus:outline-none select-none">
+              <TutorNestLogo />
+            </button>
           </div>
 
           {/* Title */}
           <h1 className="text-center mb-6 sm:mb-8 text-gray-900">
-            {mode === 'reset'
+            {isStaffMode
+              ? 'Staff Login'
+              : mode === 'reset'
               ? 'Reset Password'
-              : mode === 'signup'
-              ? 'Create Account'
               : 'Login or Create Account'}
           </h1>
+
+          {/* Staff mode indicator */}
+          {isStaffMode && (
+            <Alert className="mb-4 bg-amber-50 border-amber-200">
+              <Shield className="h-4 w-4 text-amber-600" />
+              <AlertDescription className="text-amber-800 text-sm">
+                <strong>Staff access.</strong> Enter your admin credentials below.
+              </AlertDescription>
+            </Alert>
+          )}
 
           {/* Demo Credentials Info */}
           {mode === 'signin' && !error && !success && (
@@ -283,7 +316,7 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
 
           {/* Mode Toggle */}
           <div className="mt-4 text-center text-sm">
-            {mode === 'signin' && (
+            {mode === 'signin' && !isStaffMode && (
               <>
                 <button
                   onClick={() => onSignupClicked?.()}
@@ -302,6 +335,15 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
                 </button>
               </>
             )}
+            {mode === 'signin' && isStaffMode && (
+              <button
+                onClick={() => setMode('reset')}
+                className="hover:underline"
+                style={{ color: '#625d9c' }}
+              >
+                Forgot password?
+              </button>
+            )}
             {mode === 'reset' && (
               <button
                 onClick={() => setMode('signin')}
@@ -313,53 +355,8 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
             )}
           </div>
 
-          {/* Admin Login Link - Discrete */}
-          {mode === 'signin' && (
-            <div className="mt-6 text-center space-y-2">
-              <button
-                onClick={() => {
-                  setEmail('admin@tutornest.com');
-                  setError('');
-                  setSuccess('');
-                  // Focus on password field after a brief delay
-                  setTimeout(() => {
-                    document.getElementById('password')?.focus();
-                  }, 100);
-                }}
-                className="text-xs text-gray-400 hover:text-gray-600 transition-colors block mx-auto"
-              >
-                Staff Login
-              </button>
-              {email === 'admin@tutornest.com' && (
-                <button
-                  onClick={() => {
-                    setMode('reset');
-                    setEmail('admin@tutornest.com');
-                  }}
-                  className="text-xs hover:underline block mx-auto"
-                  style={{ color: '#625d9c' }}
-                >
-                  Forgot admin password? Reset it here
-                </button>
-              )}
-            </div>
-          )}
-
-          {/* Admin Signup Helper */}
-          {mode === 'signup' && email.toLowerCase().includes('admin@') && (
-            <Alert className="mt-4 bg-blue-50 border-blue-200">
-              <Shield className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800">
-                <strong>Admin Account Detected</strong>
-                <p className="text-sm mt-1">
-                  You're creating an admin account. You'll have full access to the admin dashboard with all management features.
-                </p>
-              </AlertDescription>
-            </Alert>
-          )}
-
-          {/* Social Auth */}
-          {mode !== 'reset' && (
+          {/* Social Auth — hidden in staff mode */}
+          {mode !== 'reset' && !isStaffMode && (
             <>
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">

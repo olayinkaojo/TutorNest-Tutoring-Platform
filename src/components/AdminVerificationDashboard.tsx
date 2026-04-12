@@ -208,7 +208,10 @@ export function AdminVerificationDashboard({ session }: AdminVerificationDashboa
                       <div className="flex items-start justify-between">
                         <div className="flex-1">
                           <p className="font-medium">
-                            {verification.profile?.firstName} {verification.profile?.lastName}
+                            {verification.profile?.fullName || verification.profile?.full_name || verification.profile?.name ||
+                              ((verification.profile?.firstName || verification.profile?.lastName)
+                                ? `${verification.profile?.firstName ?? ''} ${verification.profile?.lastName ?? ''}`.trim()
+                                : 'Unknown Tutor')}
                           </p>
                           <p className="text-sm text-gray-600">{verification.profile?.email}</p>
                           <div className="flex gap-2 mt-2">
@@ -259,12 +262,16 @@ export function AdminVerificationDashboard({ session }: AdminVerificationDashboa
 
                     <div className="grid md:grid-cols-2 gap-4">
                       <div>
-                        <Label>Hourly Rate</Label>
-                        <p className="mt-1">£{selectedVerification.profile?.hourlyRate || 'Not specified'}/hour</p>
+                        <Label>Session Rate</Label>
+                        <p className="mt-1">
+                          {(selectedVerification.profile?.hourly_rate || selectedVerification.profile?.hourlyRate)
+                            ? `₦${Number(selectedVerification.profile?.hourly_rate || selectedVerification.profile?.hourlyRate).toLocaleString()}/session`
+                            : 'Not specified'}
+                        </p>
                       </div>
                       <div>
-                        <Label>Availability</Label>
-                        <p className="mt-1">{selectedVerification.profile?.availability || 'Not specified'}</p>
+                        <Label>Teaching Format</Label>
+                        <p className="mt-1">{selectedVerification.profile?.teaching_format || selectedVerification.profile?.teachingFormat || 'Not specified'}</p>
                       </div>
                     </div>
 
@@ -290,18 +297,18 @@ export function AdminVerificationDashboard({ session }: AdminVerificationDashboa
                       </div>
                     </div>
 
-                    <div>
-                      <Label>Year Groups / Levels</Label>
-                      <div className="flex flex-wrap gap-2 mt-2">
-                        {selectedVerification.profile?.yearGroups && selectedVerification.profile.yearGroups.length > 0 ? (
-                          selectedVerification.profile.yearGroups.map((year: string) => (
-                            <Badge key={year} variant="outline">
-                              {year}
-                            </Badge>
-                          ))
-                        ) : (
-                          <p className="text-sm text-gray-500">No year groups specified</p>
-                        )}
+                    <div className="grid md:grid-cols-2 gap-4">
+                      <div>
+                        <Label>Years of Experience</Label>
+                        <p className="mt-1">
+                          {selectedVerification.profile?.experience_years || selectedVerification.profile?.experienceYears
+                            ? `${selectedVerification.profile?.experience_years || selectedVerification.profile?.experienceYears} year(s)`
+                            : 'Not specified'}
+                        </p>
+                      </div>
+                      <div>
+                        <Label>Location</Label>
+                        <p className="mt-1">{selectedVerification.profile?.location || 'Not specified'}</p>
                       </div>
                     </div>
 
@@ -319,24 +326,8 @@ export function AdminVerificationDashboard({ session }: AdminVerificationDashboa
                         <p className="mt-1">{selectedVerification.profile?.phone || 'Not provided'}</p>
                       </div>
                       <div>
-                        <Label>Location</Label>
-                        <p className="mt-1">{selectedVerification.profile?.location || 'Not provided'}</p>
-                      </div>
-                      <div>
-                        <Label>Experience Years</Label>
-                        <p className="mt-1">{selectedVerification.profile?.experience_years || selectedVerification.profile?.experienceYears || 'Not specified'}</p>
-                      </div>
-                      <div>
-                        <Label>Teaching Format</Label>
-                        <p className="mt-1">{selectedVerification.profile?.teaching_format || selectedVerification.profile?.teachingFormat || 'Not specified'}</p>
-                      </div>
-                      <div>
                         <Label>Group Size Preference</Label>
                         <p className="mt-1">{selectedVerification.profile?.group_size || selectedVerification.profile?.groupSize || 'Not specified'}</p>
-                      </div>
-                      <div>
-                        <Label>Travel Radius</Label>
-                        <p className="mt-1">{selectedVerification.profile?.travel_radius || selectedVerification.profile?.travelRadius ? `${selectedVerification.profile?.travel_radius || selectedVerification.profile?.travelRadius} miles` : 'Not specified'}</p>
                       </div>
                     </div>
 

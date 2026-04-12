@@ -7,6 +7,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { CheckCircle, AlertCircle, User, BookOpen, Award, Shield } from 'lucide-react';
 import TutorNestLogo from './TutorNestLogo';
 
@@ -306,7 +307,10 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   };
 
   const validateStep3 = () => {
-    // Step 3 only has age groups selection now, which is optional
+    if (selectedAgeGroups.length === 0) {
+      setError('Please select at least one age group you can teach');
+      return false;
+    }
     return true;
   };
 
@@ -347,9 +351,24 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
       let tutorSession = session; // Use existing session if user is logged in
       let userId = session?.user?.id;
 
+      // Merge "Others" free-text values into their respective arrays (used in both paths)
+      const finalSubjects = selectedSubjects.includes('Others') && otherSubject.trim()
+        ? [...selectedSubjects.filter(s => s !== 'Others'), otherSubject.trim()]
+        : selectedSubjects;
+      const finalLearningDifficulties = selectedLearningDifficulties.includes('Others') && otherLearningDifficulty.trim()
+        ? [...selectedLearningDifficulties.filter(s => s !== 'Others'), otherLearningDifficulty.trim()]
+        : selectedLearningDifficulties;
+      const finalMethodologies = selectedMethodologies.includes('Others') && otherMethodology.trim()
+        ? [...selectedMethodologies.filter(s => s !== 'Others'), otherMethodology.trim()]
+        : selectedMethodologies;
+      const finalLanguages = selectedLanguages.includes('Others') && otherLanguage.trim()
+        ? [...selectedLanguages.filter(s => s !== 'Others'), otherLanguage.trim()]
+        : selectedLanguages;
+
       // If user is NOT already logged in, create a new account with full profile in one call
       if (!isExistingUser) {
         console.log('Creating new tutor account for:', email);
+
         const tutorProfileData = {
           full_name: fullName,
           email,
@@ -360,7 +379,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
           experience_years: experienceYears ? parseInt(experienceYears) : null,
           qualifications,
           teaching_style: teachingStyle,
-          subjects: selectedSubjects,
+          subjects: finalSubjects,
           age_groups: selectedAgeGroups,
           classes: selectedClasses,
           teaching_format: teachingFormat,
@@ -368,9 +387,9 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
           travel_radius: travelRadius ? parseFloat(travelRadius) : null,
           max_students: maxStudents ? parseInt(maxStudents) : null,
           exam_boards: selectedExamBoards,
-          learning_difficulties: selectedLearningDifficulties,
-          methodologies: selectedMethodologies,
-          languages: selectedLanguages,
+          learning_difficulties: finalLearningDifficulties,
+          methodologies: finalMethodologies,
+          languages: finalLanguages,
           dbs_checked: dbsChecked,
           has_insurance: hasInsurance,
           verificationStatus: 'pending',
@@ -446,7 +465,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         experience_years: experienceYears ? parseInt(experienceYears) : null,
         qualifications,
         teaching_style: teachingStyle,
-        subjects: selectedSubjects,
+        subjects: finalSubjects,
         age_groups: selectedAgeGroups,
         classes: selectedClasses,
         teaching_format: teachingFormat,
@@ -454,9 +473,9 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         travel_radius: travelRadius ? parseFloat(travelRadius) : null,
         max_students: maxStudents ? parseInt(maxStudents) : null,
         exam_boards: selectedExamBoards,
-        learning_difficulties: selectedLearningDifficulties,
-        methodologies: selectedMethodologies,
-        languages: selectedLanguages,
+        learning_difficulties: finalLearningDifficulties,
+        methodologies: finalMethodologies,
+        languages: finalLanguages,
         dbs_checked: dbsChecked,
         has_insurance: hasInsurance,
         verificationStatus: 'pending',
@@ -885,7 +904,15 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                         <button
                           key={ageGroup}
                           type="button"
-                          onClick={() => toggleItem(ageGroup, selectedAgeGroups, setSelectedAgeGroups)}
+                          onClick={() => {
+                            const isRemoving = selectedAgeGroups.includes(ageGroup);
+                            toggleItem(ageGroup, selectedAgeGroups, setSelectedAgeGroups);
+                            // Remove classes that belong to this age group when it's deselected
+                            if (isRemoving) {
+                              const removedClasses = CLASS_OPTIONS[ageGroup] || [];
+                              setSelectedClasses(prev => prev.filter(c => !removedClasses.includes(c)));
+                            }
+                          }}
                           className={`px-3 py-1.5 rounded-full text-sm transition-all ${
                             selectedAgeGroups.includes(ageGroup)
                               ? 'bg-[#5d9827] text-white hover:bg-[#4d8217]'
@@ -921,6 +948,37 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                         ))
                       ))}
                     </div>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <Label>Teaching Format *</Label>
+                    <p className="text-xs text-gray-500 mt-1 mb-2">How do you prefer to deliver sessions?</p>
+                    <Select value={teachingFormat} onValueChange={setTeachingFormat}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select format" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {TEACHING_FORMATS.map(format => (
+                          <SelectItem key={format} value={format}>{format}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label>Group Size Preference *</Label>
+                    <p className="text-xs text-gray-500 mt-1 mb-2">What session types do you offer?</p>
+                    <Select value={groupSize} onValueChange={setGroupSize}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select group size" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {GROUP_SIZES.map(size => (
+                          <SelectItem key={size} value={size}>{size}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
               </CardContent>
@@ -1067,6 +1125,45 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                 <CardDescription>Complete your registration</CardDescription>
               </CardHeader>
               <CardContent className="space-y-6">
+                {/* Optional declarations */}
+                <div>
+                  <p className="text-sm font-medium text-gray-700 mb-3">Optional declarations (helps your profile stand out)</p>
+                  <div className="space-y-3">
+                    <div className="flex items-start gap-3 p-4 border rounded-lg bg-gray-50">
+                      <input
+                        type="checkbox"
+                        id="dbsChecked"
+                        checked={dbsChecked}
+                        onChange={(e) => setDbsChecked(e.target.checked)}
+                        className="mt-1 w-4 h-4 text-[#625d9c] border-gray-300 rounded focus:ring-[#625d9c]"
+                      />
+                      <Label htmlFor="dbsChecked" className="cursor-pointer">
+                        <strong>I hold a valid DBS / Police Clearance certificate</strong>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Tick this if you have a current Disclosure and Barring Service (DBS) check or equivalent police clearance. You may be asked to upload evidence during verification.
+                        </p>
+                      </Label>
+                    </div>
+
+                    <div className="flex items-start gap-3 p-4 border rounded-lg bg-gray-50">
+                      <input
+                        type="checkbox"
+                        id="hasInsurance"
+                        checked={hasInsurance}
+                        onChange={(e) => setHasInsurance(e.target.checked)}
+                        className="mt-1 w-4 h-4 text-[#625d9c] border-gray-300 rounded focus:ring-[#625d9c]"
+                      />
+                      <Label htmlFor="hasInsurance" className="cursor-pointer">
+                        <strong>I have professional indemnity / tutor insurance</strong>
+                        <p className="text-sm text-gray-600 mt-1">
+                          Tick this if you carry your own professional liability insurance as a tutor.
+                        </p>
+                      </Label>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Required agreements */}
                 <div className="space-y-4">
                   <div className="flex items-start gap-3 p-4 border-2 border-[#625d9c] rounded-lg bg-purple-50">
                     <input

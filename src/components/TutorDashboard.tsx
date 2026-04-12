@@ -282,10 +282,10 @@ export function TutorDashboard({ profile, onSignOut, availableRoles, onRoleSwitc
           .map(s => s.studentId);
         const activeStudentsCount = paidStudentIds.length;
 
-        // Calculate total earnings from completed lessons
+        // Calculate tutor's net earnings (80%) from completed lessons
         const earnings = bookings
           .filter((b: any) => b.status === 'completed')
-          .reduce((sum: number, b: any) => sum + (parseFloat(b.price) || 0), 0);
+          .reduce((sum: number, b: any) => sum + (parseFloat(b.price) || 0) * 0.8, 0);
 
         setStats({
           activeStudents: activeStudentsCount,

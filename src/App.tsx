@@ -41,6 +41,7 @@ export default function App() {
   const [signupData, setSignupData] = useState<{ email: string; password: string; name: string; phone?: string } | null>(null);
   // True when the URL contains Google OAuth callback params (?code=&state=)
   const [googleOAuthCallback, setGoogleOAuthCallback] = useState(false);
+  const [staffMode, setStaffMode] = useState(false);
 
   useEffect(() => {
     // Check URL params for signup routing
@@ -49,6 +50,14 @@ export default function App() {
     // Detect Google OAuth callback (?code=xxx&state=xxx)
     if (urlParams.get('code') && urlParams.get('state')) {
       setGoogleOAuthCallback(true);
+    }
+
+    // Secret staff access via ?staff in the URL — strip it immediately so it's not bookmarkable
+    if (urlParams.has('staff')) {
+      setStaffMode(true);
+      urlParams.delete('staff');
+      const newSearch = urlParams.toString();
+      window.history.replaceState({}, document.title, newSearch ? `?${newSearch}` : window.location.pathname);
     }
 
     // Check URL params for tutor signup
@@ -350,8 +359,9 @@ export default function App() {
     
     return (
       <ErrorBoundary>
-        <AuthPage 
-          onBecomeTutor={() => setShowTutorSignup(true)} 
+        <AuthPage
+          staffMode={staffMode}
+          onBecomeTutor={() => setShowTutorSignup(true)}
           onBecomeStudent={() => setShowStudentSignup(true)}
           onSignupClicked={() => setShowRoleChooser(true)}
           onTutorSignupWithData={(data) => {
