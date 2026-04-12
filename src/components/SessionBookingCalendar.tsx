@@ -530,7 +530,7 @@ export function SessionBookingCalendar({
                 </Button>
 
                 <p className="text-xs text-center text-gray-500">
-                  Choose a plan and pay securely with Paystack
+                  Choose a plan and pay securely with Flutterwave
                 </p>
               </CardContent>
             </Card>

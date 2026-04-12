@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
@@ -73,6 +73,12 @@ export function BookSessionWithPayment({
   const [processing, setProcessing] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState<{ sessions: number; planName: string } | null>(null);
+  const [showPlans, setShowPlans] = useState(false);
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setShowPlans(true));
+    return () => cancelAnimationFrame(frame);
+  }, []);
 
   const confirmPayment = async (reference: string, planName: string) => {
     const confirmRes = await fetch(
@@ -231,22 +237,42 @@ export function BookSessionWithPayment({
   // ─── Plan selector ───────────────────────────────────────────────────────
   return (
     <Dialog open onOpenChange={(open) => { if (!open) onCancel?.(); }}>
-      <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle className="text-2xl">Choose Your Tutoring Plan</DialogTitle>
-          <DialogDescription>
+      <DialogContent className="max-w-3xl max-h-[86vh] overflow-y-auto p-0">
+        <div className="p-6 md:p-7 border-b bg-gradient-to-r from-indigo-50 via-white to-green-50 relative overflow-hidden">
+          <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full bg-indigo-200/30 blur-2xl" />
+          <div className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-emerald-200/30 blur-2xl" />
+          <DialogHeader>
+            <DialogTitle className="text-xl md:text-2xl">Choose Your Tutoring Plan</DialogTitle>
+            <DialogDescription className="mt-1">
             Book sessions with <span className="font-semibold" style={{ color: '#625d9c' }}>{tutorName}</span>
             {subject ? ` for ${subject}` : ''}
-          </DialogDescription>
-        </DialogHeader>
+            </DialogDescription>
+          </DialogHeader>
 
-        <Alert className="bg-blue-50 border-blue-200">
+          <div className="mt-4 grid sm:grid-cols-3 gap-2 text-sm relative z-10">
+            <div className="rounded-lg border bg-white/90 backdrop-blur px-3 py-2 shadow-sm">
+              <div className="text-xs text-gray-500">Student</div>
+              <div className="font-medium text-gray-900 truncate">{studentName}</div>
+            </div>
+            <div className="rounded-lg border bg-white/90 backdrop-blur px-3 py-2 shadow-sm">
+              <div className="text-xs text-gray-500">Start Date</div>
+              <div className="font-medium text-gray-900">
+                {new Date(startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+              </div>
+            </div>
+            <div className="rounded-lg border bg-white/90 backdrop-blur px-3 py-2 shadow-sm">
+              <div className="text-xs text-gray-500">Start Time</div>
+              <div className="font-medium text-gray-900">{startTime}</div>
+            </div>
+          </div>
+        </div>
+
+        <div className="p-5 md:p-6 space-y-4">
+
+        <Alert className="bg-blue-50 border-blue-200 py-2.5">
           <AlertCircle className="h-4 w-4 text-blue-600" />
-          <AlertDescription className="text-blue-900">
-            <strong>Student:</strong> {studentName}
-            {subject && <> &bull; <strong>Subject:</strong> {subject}</>}
-            &bull; <strong>Start:</strong>{' '}
-            {new Date(startDate).toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' })} at {startTime}
+          <AlertDescription className="text-blue-900 text-sm">
+            Choose a plan below and complete payment securely.
           </AlertDescription>
         </Alert>
 
@@ -258,8 +284,8 @@ export function BookSessionWithPayment({
         )}
 
         {/* Plans grid */}
-        <div className="grid md:grid-cols-3 gap-6 mt-2">
-          {PLANS.map((plan) => {
+        <div className="grid md:grid-cols-3 gap-4 mt-1">
+          {PLANS.map((plan, index) => {
             const isPopular = plan.planType === 'once_weekly';
             const isBestValue = plan.planType === 'twice_weekly';
             const isProcessing = processing === plan.id;
@@ -268,71 +294,73 @@ export function BookSessionWithPayment({
             return (
               <Card
                 key={plan.id}
-                className={`relative transition-all hover:shadow-lg ${isPopular || isBestValue ? 'border-[#625d9c]' : ''}`}
+                className={`relative transition-all duration-200 hover:shadow-lg hover:-translate-y-0.5 ${isPopular || isBestValue ? 'border-[#625d9c] shadow-sm ring-1 ring-indigo-100' : 'border-gray-200'}`}
+                  style={{
+                    opacity: showPlans ? 1 : 0,
+                    transform: showPlans ? 'translateY(0px)' : 'translateY(8px)',
+                    transition: `opacity 320ms ease, transform 320ms ease`,
+                    transitionDelay: `${index * 70}ms`,
+                  }}
               >
                 {isPopular && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="px-4 py-1 bg-[#625d9c] hover:bg-[#625d9c]/90">Most Popular</Badge>
+                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                    <Badge className="px-2.5 py-0.5 text-[11px] sm:text-xs bg-[#625d9c] hover:bg-[#625d9c]/90">Most Popular</Badge>
                   </div>
                 )}
                 {isBestValue && (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2">
-                    <Badge className="px-4 py-1 bg-[#5d9827] hover:bg-[#5d9827]/90">Best Value</Badge>
+                  <div className="absolute -top-2.5 left-1/2 -translate-x-1/2">
+                    <Badge className="px-2.5 py-0.5 text-[11px] sm:text-xs bg-[#5d9827] hover:bg-[#5d9827]/90">Best Value</Badge>
                   </div>
                 )}
 
-                <CardHeader>
-                  <CardTitle className="text-xl">{plan.name}</CardTitle>
-                  <CardDescription>{plan.description}</CardDescription>
+                    <CardHeader className="pb-2.5">
+                  <CardTitle className="text-lg">{plan.name}</CardTitle>
+                    <CardDescription className="text-xs min-h-0 sm:min-h-[2.5rem]">{plan.description}</CardDescription>
                 </CardHeader>
 
-                <CardContent className="space-y-4">
-                  <div className="text-center py-4">
-                    <div className="text-3xl font-bold" style={{ color: '#625d9c' }}>
+                <CardContent className="space-y-3">
+                    <div className="text-center py-2.5 rounded-lg border" style={{ backgroundColor: '#f7f7fc' }}>
+                    <div className="text-2xl font-bold" style={{ color: '#625d9c' }}>
                       {formatNaira(plan.price)}
                     </div>
-                    <div className="text-sm text-muted-foreground mt-1">
+                    <div className="text-xs text-muted-foreground mt-0.5">
                       {plan.sessions > 1 ? `${formatNaira(perSession)} per session` : 'flat rate'}
                     </div>
                   </div>
 
-                  <div className="space-y-3">
+                    <div className="space-y-2.5">
                     <div className="flex items-start gap-2">
-                      <Calendar className="w-5 h-5 text-[#5d9827] mt-0.5 shrink-0" />
-                      <div className="text-sm">
+                      <Calendar className="w-4 h-4 text-[#5d9827] mt-0.5 shrink-0" />
+                        <div className="text-[11px] sm:text-xs leading-relaxed">
                         <div className="font-semibold">{plan.sessions} Session{plan.sessions > 1 ? 's' : ''}</div>
                         <div className="text-muted-foreground">
-                          {plan.sessionsPerWeek}× per week{plan.weeks > 1 ? ` for ${plan.weeks} weeks` : ''}
+                          {plan.sessionsPerWeek}× weekly{plan.weeks > 1 ? ` • ${plan.weeks} weeks` : ''}
                         </div>
                       </div>
                     </div>
 
                     <div className="flex items-start gap-2">
-                      <Clock className="w-5 h-5 text-blue-600 mt-0.5 shrink-0" />
-                      <div className="text-sm">
+                      <Clock className="w-4 h-4 text-blue-600 mt-0.5 shrink-0" />
+                        <div className="text-[11px] sm:text-xs leading-relaxed">
                         <div className="font-semibold">60-minute sessions</div>
-                        <div className="text-muted-foreground">Full hour of focused learning</div>
+                        <div className="text-muted-foreground">Focused, structured lesson time</div>
                       </div>
                     </div>
 
                     <div className="flex items-start gap-2">
-                      <Check className="w-5 h-5 text-[#625d9c] mt-0.5 shrink-0" />
-                      <div className="text-sm">
-                        <div className="font-semibold">
-                          {plan.planType === 'trial' ? 'Pick your time' : 'Calendar blocked'}
-                        </div>
+                      <Check className="w-4 h-4 text-[#625d9c] mt-0.5 shrink-0" />
+                        <div className="text-[11px] sm:text-xs leading-relaxed">
+                          <div className="font-semibold">Calendar scheduling included</div>
                         <div className="text-muted-foreground">
-                          {plan.planType === 'trial'
-                            ? 'Choose any available slot'
-                            : 'All sessions auto-scheduled & locked in'}
+                            {plan.planType === 'trial' ? 'Single-slot booking' : 'Recurring plan schedule'}
                         </div>
                       </div>
                     </div>
 
                     {plan.planType !== 'trial' && (
                       <div className="flex items-start gap-2">
-                        <TrendingUp className="w-5 h-5 text-orange-600 mt-0.5 shrink-0" />
-                        <div className="text-sm">
+                        <TrendingUp className="w-4 h-4 text-orange-600 mt-0.5 shrink-0" />
+                          <div className="text-[11px] sm:text-xs leading-relaxed">
                           <div className="font-semibold">Progress tracking</div>
                           <div className="text-muted-foreground">Monitor improvement over the term</div>
                         </div>
@@ -341,9 +369,9 @@ export function BookSessionWithPayment({
                   </div>
                 </CardContent>
 
-                <CardFooter>
+                <CardFooter className="pt-1">
                   <Button
-                    className="w-full"
+                      className="w-full shadow-sm h-10 sm:h-11"
                     size="lg"
                     onClick={() => handleSelectPlan(plan)}
                     disabled={!!processing}
@@ -363,27 +391,15 @@ export function BookSessionWithPayment({
         </div>
 
         {/* Footer info */}
-        <div className="mt-4 p-4 bg-muted rounded-lg">
-          <div className="grid md:grid-cols-2 gap-3 text-sm">
-            <div className="flex items-start gap-2">
-              <Check className="w-4 h-4 text-[#5d9827] mt-0.5 shrink-0" />
-              <div>
-                <div className="font-semibold">Secure Payment</div>
-                <div className="text-muted-foreground">Protected by Paystack — card, bank, USSD accepted</div>
-              </div>
-            </div>
-            <div className="flex items-start gap-2">
-              <Check className="w-4 h-4 text-[#5d9827] mt-0.5 shrink-0" />
-              <div>
-                <div className="font-semibold">Nigerian Naira (₦)</div>
-                <div className="text-muted-foreground">Any card charged at the current Naira rate</div>
-              </div>
-            </div>
-          </div>
+        <div className="rounded-lg border bg-gray-50 px-3.5 py-3 text-xs text-gray-600 grid grid-cols-1 sm:grid-cols-3 gap-1.5 sm:gap-3">
+          <span className="inline-flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#5d9827]" /> Secure checkout</span>
+          <span className="inline-flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#5d9827]" /> NGN pricing</span>
+          <span className="inline-flex items-center gap-1.5"><Check className="w-3.5 h-3.5 text-[#5d9827]" /> Instant scheduling</span>
         </div>
 
-        <div className="flex justify-center pt-2">
+        <div className="flex justify-center pt-1">
           <Button variant="ghost" onClick={onCancel} disabled={!!processing}>Cancel</Button>
+        </div>
         </div>
       </DialogContent>
     </Dialog>
