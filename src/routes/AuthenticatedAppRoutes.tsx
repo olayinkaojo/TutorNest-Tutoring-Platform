@@ -146,7 +146,10 @@ export function AuthenticatedAppRoutes({
               initialData={signupData}
               session={session}
               existingProfile={profile}
-              onSignupComplete={onSignupSuccess}
+              onSignupComplete={async () => {
+                await onSignupSuccess();
+                navigateTo(buildDashboardPath('tutor'), { replace: true });
+              }}
             />
           </ErrorBoundary>
         }

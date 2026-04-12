@@ -111,18 +111,31 @@ app.post('/add-role', async (c) => {
     // Add the new role
     const updatedRoles = [...existingRoles, newRole];
     await kv.set(`user_roles:${userId}`, updatedRoles);
-    
-    // Store role-specific data if provided
-    if (roleData) {
-      const profileKey = `profile_${newRole}_${userId}`;
-      await kv.set(profileKey, {
-        ...roleData,
-        userId,
-        role: newRole,
-        createdAt: new Date().toISOString(),
-        status: newRole === 'tutor' ? 'pending_approval' : 'active',
-      });
-    }
+
+    // Build a role-specific profile from existing user profile plus requested role data.
+    const baseProfile = (await kv.get(`user:${userId}`)) as any || {};
+    const nowIso = new Date().toISOString();
+
+    const roleProfile = {
+      ...baseProfile,
+      ...(roleData || {}),
+      id: baseProfile.id || userId,
+      userId,
+      role: newRole,
+      createdAt: baseProfile.createdAt || nowIso,
+      updatedAt: nowIso,
+      createdVia: roleData?.createdVia || 'add_role_feature',
+      // Policy: parent role is immediately active; tutor role requires admin verification.
+      status: newRole === 'tutor' ? 'pending_approval' : 'active',
+      onboardingComplete: newRole === 'parent' ? true : !!baseProfile.onboardingComplete,
+      verificationStatus:
+        newRole === 'tutor'
+          ? (baseProfile.verificationStatus === 'verified' ? 'verified' : 'pending')
+          : (baseProfile.verificationStatus || null),
+    };
+
+    const profileKey = `profile_${newRole}_${userId}`;
+    await kv.set(profileKey, roleProfile);
 
     console.log(`Added role ${newRole} to user ${userId}`);
     console.log(`User now has roles:`, updatedRoles);

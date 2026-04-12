@@ -130,7 +130,10 @@ export function ParentDashboard({
   // Check if this is the first time seeing multi-role congratulations
   useEffect(() => {
     // Use user-specific key to track if they've seen the congratulations message
-    const userCongratsKey = `tutornest_role_congrats_${profile.id || profile.userId}`;
+    const userId = profile.id || profile.userId;
+    if (!userId) return;
+
+    const userCongratsKey = `tutornest_role_congrats_parent_to_tutor_${userId}`;
     const hasSeenCongrats = localStorage.getItem(userCongratsKey);
     
     // Show congratulations if:
@@ -139,14 +142,14 @@ export function ParentDashboard({
     // 3. User can't become a tutor (meaning they already are one)
     if (!hasSeenCongrats && !canBecomeTutor && availableRoles.length > 1) {
       setShowRoleCongrats(true);
+      // Mark as shown immediately so this appears only once across future sign-ins.
+      localStorage.setItem(userCongratsKey, 'true');
     }
   }, [availableRoles, canBecomeTutor, profile.id, profile.userId]);
 
   // Handler to dismiss the congratulations message
   const handleDismissCongrats = () => {
     setShowRoleCongrats(false);
-    const userCongratsKey = `tutornest_role_congrats_${profile.id || profile.userId}`;
-    localStorage.setItem(userCongratsKey, 'true');
   };
 
   // Debug log for available roles

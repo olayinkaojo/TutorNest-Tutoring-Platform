@@ -103,6 +103,7 @@ export function TutorDashboard({
   const [isAddingParentRole, setIsAddingParentRole] = useState(false);
   const [parentRoleError, setParentRoleError] = useState<string | null>(null);
   const [parentRoleSuccess, setParentRoleSuccess] = useState(false);
+  const [showRoleCongrats, setShowRoleCongrats] = useState(false);
 
   // Assessment form state
   const [showAssessmentForm, setShowAssessmentForm] = useState(false);
@@ -567,16 +568,20 @@ export function TutorDashboard({
 
       if (response.ok) {
         setParentRoleSuccess(true);
-        
-        // Wait a bit for backend to process, then refresh
+
+        // Wait briefly for role propagation, then switch to Parent dashboard.
         setTimeout(() => {
-          if (onRoleAdded) {
-            // Use callback to refresh data without full page reload
-            onRoleAdded();
-          } else {
-            // Fallback to page reload if no callback provided
-            window.location.href = window.location.pathname + window.location.search;
+          if (onRoleSwitch) {
+            onRoleSwitch('parent');
+            return;
           }
+
+          if (onRoleAdded) {
+            onRoleAdded();
+            return;
+          }
+
+          window.location.href = window.location.pathname + window.location.search;
         }, 1500);
       } else {
         setParentRoleError(data.error || 'Failed to add parent role');
@@ -591,6 +596,24 @@ export function TutorDashboard({
 
   // Check if user can become a parent (doesn't already have parent role)
   const canBecomeParent = !availableRoles?.includes('parent');
+
+  useEffect(() => {
+    const userId = profile.id || profile.userId;
+    if (!userId) return;
+
+    const congratsKey = `tutornest_role_congrats_tutor_to_parent_${userId}`;
+    const alreadyShown = localStorage.getItem(congratsKey) === 'true';
+
+    if (!canBecomeParent && availableRoles && availableRoles.length > 1 && !alreadyShown) {
+      setShowRoleCongrats(true);
+      // Mark as shown immediately so it is one-time across sign-ins.
+      localStorage.setItem(congratsKey, 'true');
+    }
+  }, [availableRoles, canBecomeParent, profile.id, profile.userId]);
+
+  const handleDismissCongrats = () => {
+    setShowRoleCongrats(false);
+  };
 
   // Debug logging
   useEffect(() => {
@@ -785,7 +808,7 @@ export function TutorDashboard({
         )}
 
         {/* Role Switcher Info Card - Show when user has multiple roles */}
-        {session && !canBecomeParent && availableRoles && availableRoles.length > 1 && (
+        {session && !canBecomeParent && availableRoles && availableRoles.length > 1 && showRoleCongrats && (
           <Card className="mb-6 border-blue-200 bg-blue-50">
             <CardContent className="pt-6">
               <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
@@ -803,17 +826,27 @@ export function TutorDashboard({
                     Switch between your Tutor and Parent dashboards anytime using the <strong>Role Switcher</strong> in the top-right corner of your screen.
                   </p>
                 </div>
-                {onRoleSwitch && (
+                <div className="flex gap-2 w-full md:w-auto">
+                  {onRoleSwitch && (
+                    <Button
+                      onClick={() => onRoleSwitch('parent')}
+                      className="w-full md:w-auto text-white h-10 px-6"
+                      style={{ backgroundColor: '#625d9c' }}
+                    >
+                      <User className="w-4 h-4 mr-2" />
+                      Switch to Parent Dashboard
+                      <ArrowRight className="w-4 h-4 ml-2" />
+                    </Button>
+                  )}
                   <Button
-                    onClick={() => onRoleSwitch('parent')}
-                    className="w-full md:w-auto text-white h-10 px-6"
-                    style={{ backgroundColor: '#625d9c' }}
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleDismissCongrats}
+                    className="md:w-auto"
                   >
-                    <User className="w-4 h-4 mr-2" />
-                    Switch to Parent Dashboard
-                    <ArrowRight className="w-4 h-4 ml-2" />
+                    Dismiss
                   </Button>
-                )}
+                </div>
               </div>
             </CardContent>
           </Card>
