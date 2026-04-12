@@ -34,6 +34,67 @@ function calculateAge(dateOfBirth: string): number {
   return age;
 }
 
+function getDisplayName(user: any): string {
+  const firstName = user?.firstName?.trim();
+  const lastName = user?.lastName?.trim();
+  const fullName = user?.fullName?.trim();
+  const name = user?.name?.trim();
+
+  if (firstName || lastName) {
+    return `${firstName || ''} ${lastName || ''}`.trim();
+  }
+
+  if (fullName) return fullName;
+  if (name) return name;
+  if (user?.email) return user.email.split('@')[0];
+  return 'Unknown Tutor';
+}
+
+function getInitials(displayName: string, email?: string): string {
+  const parts = displayName.split(/\s+/).filter(Boolean);
+  if (parts.length > 1) {
+    return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
+  }
+
+  if (parts.length === 1 && parts[0]) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+
+  if (email) {
+    return email.slice(0, 2).toUpperCase();
+  }
+
+  return 'UT';
+}
+
+function buildTutorSummary(user: any) {
+  return {
+    fullName: getDisplayName(user),
+    phone: user.phone || '',
+    location: user.location || '',
+    bio: user.bio || '',
+    hourlyRate: user.hourlyRate ?? user.hourly_rate ?? null,
+    experienceYears: user.experienceYears ?? user.experience_years ?? null,
+    qualifications: user.qualifications || '',
+    teachingStyle: user.teachingStyle || user.teaching_style || '',
+    subjects: user.subjects || [],
+    ageGroups: user.ageGroups || user.age_groups || [],
+    classes: user.classes || [],
+    teachingFormat: user.teachingFormat || user.teaching_format || '',
+    groupSize: user.groupSize || user.group_size || '',
+    travelRadius: user.travelRadius ?? user.travel_radius ?? null,
+    maxStudents: user.maxStudents ?? user.max_students ?? null,
+    examBoards: user.examBoards || user.exam_boards || [],
+    learningDifficulties: user.learningDifficulties || user.learning_difficulties || [],
+    methodologies: user.methodologies || [],
+    languages: user.languages || [],
+    dbsChecked: user.dbsChecked ?? user.dbs_checked ?? false,
+    hasInsurance: user.hasInsurance ?? user.has_insurance ?? false,
+    verificationStatus: user.verificationStatus || 'pending',
+    onboardingComplete: user.onboardingComplete ?? false,
+  };
+}
+
 export function adminRoutes(app: Hono, getUserId: (token: string | null) => Promise<string | null>) {
   
   // Admin Dashboard Overview Stats
@@ -447,13 +508,16 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       // Enhance users with additional admin data
       const enhancedUsers = allUsers.map((user: any) => ({
         ...user,
+        displayName: getDisplayName(user),
+        initials: getInitials(getDisplayName(user), user.email),
         status: user.suspended ? 'suspended' : user.banned ? 'banned' : user.deleted ? 'deleted' : 'active',
         verificationStatus: user.verificationStatus || (user.role === 'tutor' ? 'pending' : 'verified'),
         totalSessions: user.totalSessions || 0,
         totalSpent: user.totalSpent || 0,
         flagCount: user.flagCount || 0,
         notes: user.adminNotes || '',
-        lastLogin: user.lastLogin || user.createdAt
+        lastLogin: user.lastLogin || user.createdAt,
+        profileSummary: user.role === 'tutor' ? buildTutorSummary(user) : undefined,
       }));
       
       // Sort by creation date (newest first)

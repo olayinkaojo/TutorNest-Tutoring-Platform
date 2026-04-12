@@ -42,6 +42,9 @@ interface AdminUserManagementProps {
 }
 
 function getUserDisplayName(user: any): string {
+  const displayName = user?.displayName?.trim();
+  if (displayName) return displayName;
+
   const firstName = user?.firstName?.trim();
   const lastName = user?.lastName?.trim();
   const fullName = user?.fullName?.trim();
@@ -62,6 +65,9 @@ function getUserDisplayName(user: any): string {
 }
 
 function getUserInitials(user: any): string {
+  const initials = user?.initials?.trim();
+  if (initials) return initials;
+
   const firstName = user?.firstName?.trim();
   const lastName = user?.lastName?.trim();
   const fullName = user?.fullName?.trim() || user?.name?.trim();
@@ -82,6 +88,26 @@ function getUserInitials(user: any): string {
   return 'UT';
 }
 
+function formatValue(value: any): string {
+  if (Array.isArray(value)) {
+    return value.length ? value.join(', ') : 'Not specified';
+  }
+
+  if (typeof value === 'boolean') {
+    return value ? 'Yes' : 'No';
+  }
+
+  if (value === null || value === undefined || value === '') {
+    return 'Not specified';
+  }
+
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? String(value) : 'Not specified';
+  }
+
+  return String(value);
+}
+
 export function AdminUserManagement({ session }: AdminUserManagementProps) {
   const [users, setUsers] = useState<any[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
@@ -92,6 +118,38 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
+
+  const tutorFields = selectedUser?.role === 'tutor'
+    ? [
+        { label: 'Full Name', value: selectedUser.displayName || getUserDisplayName(selectedUser) },
+        { label: 'Email', value: selectedUser.email },
+        { label: 'Phone Number', value: selectedUser.profileSummary?.phone || selectedUser.phone },
+        { label: 'Location', value: selectedUser.profileSummary?.location || selectedUser.location },
+        { label: 'Bio', value: selectedUser.profileSummary?.bio || selectedUser.bio },
+        { label: 'Hourly Rate', value: selectedUser.profileSummary?.hourlyRate ?? selectedUser.hourlyRate ?? selectedUser.hourly_rate ? `₦${Number(selectedUser.profileSummary?.hourlyRate ?? selectedUser.hourlyRate ?? selectedUser.hourly_rate).toLocaleString()} / session` : '' },
+        { label: 'Experience Years', value: selectedUser.profileSummary?.experienceYears ?? selectedUser.experienceYears ?? selectedUser.experience_years },
+        { label: 'Qualifications', value: selectedUser.profileSummary?.qualifications || selectedUser.qualifications },
+        { label: 'Teaching Style', value: selectedUser.profileSummary?.teachingStyle || selectedUser.teachingStyle || selectedUser.teaching_style },
+        { label: 'Subjects', value: selectedUser.profileSummary?.subjects || selectedUser.subjects },
+        { label: 'Age Groups', value: selectedUser.profileSummary?.ageGroups || selectedUser.ageGroups || selectedUser.age_groups },
+        { label: 'Classes', value: selectedUser.profileSummary?.classes || selectedUser.classes },
+        { label: 'Teaching Format', value: selectedUser.profileSummary?.teachingFormat || selectedUser.teachingFormat || selectedUser.teaching_format },
+        { label: 'Group Size Preference', value: selectedUser.profileSummary?.groupSize || selectedUser.groupSize || selectedUser.group_size },
+        { label: 'Travel Radius', value: selectedUser.profileSummary?.travelRadius ?? selectedUser.travelRadius ?? selectedUser.travel_radius ? `${selectedUser.profileSummary?.travelRadius ?? selectedUser.travelRadius ?? selectedUser.travel_radius} km` : '' },
+        { label: 'Maximum Students', value: selectedUser.profileSummary?.maxStudents ?? selectedUser.maxStudents ?? selectedUser.max_students },
+        { label: 'Exam Boards', value: selectedUser.profileSummary?.examBoards || selectedUser.examBoards || selectedUser.exam_boards },
+        { label: 'Learning Difficulties Support', value: selectedUser.profileSummary?.learningDifficulties || selectedUser.learningDifficulties || selectedUser.learning_difficulties },
+        { label: 'Teaching Methodologies', value: selectedUser.profileSummary?.methodologies || selectedUser.methodologies },
+        { label: 'Languages Spoken', value: selectedUser.profileSummary?.languages || selectedUser.languages },
+        { label: 'DBS Checked', value: selectedUser.profileSummary?.dbsChecked ?? selectedUser.dbsChecked ?? selectedUser.dbs_checked },
+        { label: 'Insurance', value: selectedUser.profileSummary?.hasInsurance ?? selectedUser.hasInsurance ?? selectedUser.has_insurance },
+        { label: 'Verification Status', value: selectedUser.profileSummary?.verificationStatus || selectedUser.verificationStatus },
+        { label: 'Onboarding Complete', value: selectedUser.profileSummary?.onboardingComplete ?? selectedUser.onboardingComplete },
+        { label: 'Status', value: selectedUser.status },
+        { label: 'Created At', value: selectedUser.createdAt },
+        { label: 'Updated At', value: selectedUser.updatedAt },
+      ]
+    : [];
 
   useEffect(() => {
     loadUsers();
@@ -591,41 +649,30 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
                         </div>
                       </div>
 
-                      {selectedUser.role === 'tutor' && (
-                        <div className="grid sm:grid-cols-2 gap-3 text-sm">
-                          <div className="rounded-lg border p-3">
-                            <p className="text-gray-500 text-xs mb-1">Rate</p>
-                            <p className="font-medium">{selectedUser.hourlyRate ? `₦${selectedUser.hourlyRate}/hour` : 'Not specified'}</p>
-                          </div>
-                          <div className="rounded-lg border p-3">
-                            <p className="text-gray-500 text-xs mb-1">Teaching Format</p>
-                            <p className="font-medium">{selectedUser.teachingFormat || selectedUser.teaching_format || 'Not specified'}</p>
-                          </div>
-                          <div className="rounded-lg border p-3">
-                            <p className="text-gray-500 text-xs mb-1">Experience</p>
-                            <p className="font-medium">
-                              {selectedUser.experienceYears || selectedUser.experience_years
-                                ? `${selectedUser.experienceYears || selectedUser.experience_years} year(s)`
-                                : 'Not specified'}
-                            </p>
-                          </div>
-                          <div className="rounded-lg border p-3">
-                            <p className="text-gray-500 text-xs mb-1">Location</p>
-                            <p className="font-medium">{selectedUser.location || 'Not specified'}</p>
-                          </div>
-                        </div>
-                      )}
-
                       <div>
-                        <p className="text-sm font-medium mb-2">Bio</p>
-                        <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-700 whitespace-pre-wrap">
-                          {selectedUser.bio || 'No bio provided'}
+                        <p className="text-sm font-medium mb-2">Tutor Profile Fields</p>
+                        <div className="grid gap-3 sm:grid-cols-2">
+                          {tutorFields.map((field) => (
+                            <div key={field.label} className="rounded-lg border p-3">
+                              <p className="text-gray-500 text-xs mb-1">{field.label}</p>
+                              <p className="font-medium whitespace-pre-wrap break-words">{formatValue(field.value)}</p>
+                            </div>
+                          ))}
                         </div>
                       </div>
 
                       {selectedUser.role === 'tutor' && (
                         <div>
-                          <p className="text-sm font-medium mb-2">Qualifications</p>
+                          <p className="text-sm font-medium mb-2">Raw Tutor Bio</p>
+                          <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-700 whitespace-pre-wrap">
+                            {selectedUser.bio || 'No bio provided'}
+                          </div>
+                        </div>
+                      )}
+
+                      {selectedUser.role === 'tutor' && (
+                        <div>
+                          <p className="text-sm font-medium mb-2">Raw Qualifications</p>
                           <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-700 whitespace-pre-wrap">
                             {selectedUser.qualifications || 'No qualifications provided'}
                           </div>
