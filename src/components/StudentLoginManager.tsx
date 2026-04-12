@@ -142,8 +142,12 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
         throw new Error(data.error || 'Failed to reset password');
       }
 
+      if (!data.temporaryPassword) {
+        throw new Error('Password reset completed, but no temporary password was returned. Please try again.');
+      }
+
       setSuccess('Temporary password generated successfully. Share it securely with your child.');
-      setResetPassword(data.temporaryPassword || 'Password reset completed.');
+      setResetPassword(data.temporaryPassword);
     } catch (err: any) {
       setError(err.message);
     } finally {
