@@ -493,7 +493,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       }
 
       // Send email to parent with linking invitation
-      const parentLinkUrl = `${Deno.env.get('VITE_APP_URL') || 'https://tutornest.com'}/parent/link-student?token=${studentProfile.parentLinkToken}&studentId=${authData.user.id}`;
+      const parentLinkUrl = `${Deno.env.get('VITE_APP_URL') || 'https://tutornest.org'}/parent/link-student?token=${studentProfile.parentLinkToken}&studentId=${authData.user.id}`;
       const parentInviteEmail = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background-color: #625d9c; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
