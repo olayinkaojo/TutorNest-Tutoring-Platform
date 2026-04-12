@@ -5,6 +5,7 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Alert, AlertDescription } from './ui/alert';
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
 import { 
   Search, 
   Filter,
@@ -40,6 +41,47 @@ interface AdminUserManagementProps {
   session: any;
 }
 
+function getUserDisplayName(user: any): string {
+  const firstName = user?.firstName?.trim();
+  const lastName = user?.lastName?.trim();
+  const fullName = user?.fullName?.trim();
+  const name = user?.name?.trim();
+
+  if (firstName || lastName) {
+    return `${firstName || ''} ${lastName || ''}`.trim();
+  }
+
+  if (fullName) return fullName;
+  if (name) return name;
+
+  if (user?.email) {
+    return user.email.split('@')[0];
+  }
+
+  return 'Unknown Tutor';
+}
+
+function getUserInitials(user: any): string {
+  const firstName = user?.firstName?.trim();
+  const lastName = user?.lastName?.trim();
+  const fullName = user?.fullName?.trim() || user?.name?.trim();
+
+  if (firstName || lastName) {
+    return `${(firstName || '')[0] || ''}${(lastName || '')[0] || ''}`.toUpperCase();
+  }
+
+  if (fullName) {
+    const parts = fullName.split(/\s+/).filter(Boolean);
+    return parts.slice(0, 2).map((part) => part[0]).join('').toUpperCase();
+  }
+
+  if (user?.email) {
+    return user.email.slice(0, 2).toUpperCase();
+  }
+
+  return 'UT';
+}
+
 export function AdminUserManagement({ session }: AdminUserManagementProps) {
   const [users, setUsers] = useState<any[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
@@ -49,6 +91,7 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
   const [statusFilter, setStatusFilter] = useState('all');
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
+  const [selectedUser, setSelectedUser] = useState<any>(null);
 
   useEffect(() => {
     loadUsers();
@@ -89,6 +132,8 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
       filtered = filtered.filter(user => 
         user.firstName?.toLowerCase().includes(query) ||
         user.lastName?.toLowerCase().includes(query) ||
+        user.fullName?.toLowerCase().includes(query) ||
+        user.name?.toLowerCase().includes(query) ||
         user.email?.toLowerCase().includes(query)
       );
     }
@@ -200,13 +245,13 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
             <div className="flex items-start gap-4 flex-1">
               <Avatar className="w-12 h-12">
                 <AvatarFallback style={{ backgroundColor: getRoleColor(user.role), color: 'white' }}>
-                  {user.firstName?.[0]}{user.lastName?.[0]}
+                  {getUserInitials(user)}
                 </AvatarFallback>
               </Avatar>
 
               <div className="flex-1">
                 <div className="flex items-center gap-2 mb-1">
-                  <h4>{user.firstName} {user.lastName}</h4>
+                  <h4>{getUserDisplayName(user)}</h4>
                   <span>{getStatusBadge()}</span>
                 </div>
 
@@ -264,7 +309,7 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={() => setSelectedUser(user)}>
                   <Eye className="w-4 h-4 mr-2" />
                   View Profile
                 </DropdownMenuItem>
@@ -349,6 +394,79 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
         </Card>
       </div>
 
+      {/* Tutor Browser */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Tutor Profiles</CardTitle>
+          <CardDescription>
+            Quick browser for all tutors on the platform. Open any profile to review verification, subjects, and details.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {users.filter(user => user.role === 'tutor').length === 0 ? (
+            <div className="py-10 text-center text-gray-500">
+              <Users className="w-10 h-10 mx-auto mb-3 text-gray-300" />
+              <p>No tutor profiles found</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {users
+                .filter(user => user.role === 'tutor')
+                .map((user) => (
+                  <div key={`tutor-browser-${user.userId}`} className="rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+                    <div className="flex items-start gap-3">
+                      <Avatar className="w-12 h-12">
+                        <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
+                          {getUserInitials(user)}
+                        </AvatarFallback>
+                      </Avatar>
+                      <div className="min-w-0 flex-1">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <h4 className="truncate">{getUserDisplayName(user)}</h4>
+                            <p className="text-xs text-gray-500 truncate">{user.email}</p>
+                          </div>
+                          {user.verificationStatus === 'verified' ? (
+                            <Badge style={{ backgroundColor: '#dcfce7', color: '#166534' }}>Verified</Badge>
+                          ) : (
+                            <Badge variant="secondary" style={{ backgroundColor: '#fef3c7', color: '#92400e' }}>Pending</Badge>
+                          )}
+                        </div>
+
+                        <div className="mt-3 flex flex-wrap gap-1.5">
+                          {Array.isArray(user.subjects) && user.subjects.slice(0, 3).map((subject: string) => (
+                            <Badge key={`${user.userId}-${subject}`} variant="secondary" className="text-[11px]">
+                              {subject}
+                            </Badge>
+                          ))}
+                          {Array.isArray(user.subjects) && user.subjects.length === 0 && (
+                            <span className="text-xs text-gray-500">No subjects listed</span>
+                          )}
+                        </div>
+
+                        <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
+                          <span>{user.hourlyRate ? `₦${user.hourlyRate}/hr` : 'Rate not set'}</span>
+                          <span>{user.dbsStatus === 'verified' ? 'DBS verified' : 'DBS pending'}</span>
+                        </div>
+
+                        <Button
+                          className="mt-4 w-full"
+                          variant="outline"
+                          size="sm"
+                          onClick={() => setSelectedUser(user)}
+                        >
+                          <Eye className="w-4 h-4 mr-2" />
+                          View Profile
+                        </Button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Search and Filters */}
       <Card>
         <CardContent className="pt-6">
@@ -423,6 +541,153 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
           ))
         )}
       </div>
+
+      <Dialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
+        <DialogContent className="max-w-3xl max-h-[88vh] overflow-y-auto">
+          {selectedUser && (
+            <>
+              <DialogHeader>
+                <DialogTitle>
+                  {getUserDisplayName(selectedUser)}
+                </DialogTitle>
+                <DialogDescription>
+                  {selectedUser.role === 'tutor' ? 'Tutor profile and verification details' : 'User profile details'}
+                </DialogDescription>
+              </DialogHeader>
+
+              <div className="grid gap-6 md:grid-cols-[1.2fr_0.8fr]">
+                <div className="space-y-4">
+                  <Card>
+                    <CardContent className="pt-6 space-y-4">
+                      <div className="flex items-start gap-4">
+                        <Avatar className="w-16 h-16">
+                          <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
+                            {getUserInitials(selectedUser)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <div className="flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="text-xl font-semibold">{getUserDisplayName(selectedUser)}</h3>
+                            <Badge variant="outline" style={{ backgroundColor: '#f5f3ff', color: '#625d9c' }}>
+                              {selectedUser.role ? selectedUser.role.charAt(0).toUpperCase() + selectedUser.role.slice(1) : 'Unknown'}
+                            </Badge>
+                            {selectedUser.role === 'tutor' && (
+                              <Badge
+                                variant="secondary"
+                                style={{
+                                  backgroundColor: selectedUser.verificationStatus === 'verified' ? '#dcfce7' : '#fef3c7',
+                                  color: selectedUser.verificationStatus === 'verified' ? '#166534' : '#92400e',
+                                }}
+                              >
+                                {selectedUser.verificationStatus === 'verified' ? 'Verified Tutor' : 'Verification Pending'}
+                              </Badge>
+                            )}
+                          </div>
+                          <p className="text-sm text-gray-600 mt-1">{selectedUser.email}</p>
+                          <p className="text-sm text-gray-500 mt-1">
+                            Joined {new Date(selectedUser.createdAt || Date.now()).toLocaleDateString()}
+                            {selectedUser.lastLogin && ` • Last login ${new Date(selectedUser.lastLogin).toLocaleDateString()}`}
+                          </p>
+                        </div>
+                      </div>
+
+                      {selectedUser.role === 'tutor' && (
+                        <div className="grid sm:grid-cols-2 gap-3 text-sm">
+                          <div className="rounded-lg border p-3">
+                            <p className="text-gray-500 text-xs mb-1">Rate</p>
+                            <p className="font-medium">{selectedUser.hourlyRate ? `₦${selectedUser.hourlyRate}/hour` : 'Not specified'}</p>
+                          </div>
+                          <div className="rounded-lg border p-3">
+                            <p className="text-gray-500 text-xs mb-1">Teaching Format</p>
+                            <p className="font-medium">{selectedUser.teachingFormat || selectedUser.teaching_format || 'Not specified'}</p>
+                          </div>
+                          <div className="rounded-lg border p-3">
+                            <p className="text-gray-500 text-xs mb-1">Experience</p>
+                            <p className="font-medium">
+                              {selectedUser.experienceYears || selectedUser.experience_years
+                                ? `${selectedUser.experienceYears || selectedUser.experience_years} year(s)`
+                                : 'Not specified'}
+                            </p>
+                          </div>
+                          <div className="rounded-lg border p-3">
+                            <p className="text-gray-500 text-xs mb-1">Location</p>
+                            <p className="font-medium">{selectedUser.location || 'Not specified'}</p>
+                          </div>
+                        </div>
+                      )}
+
+                      <div>
+                        <p className="text-sm font-medium mb-2">Bio</p>
+                        <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-700 whitespace-pre-wrap">
+                          {selectedUser.bio || 'No bio provided'}
+                        </div>
+                      </div>
+
+                      {selectedUser.role === 'tutor' && (
+                        <div>
+                          <p className="text-sm font-medium mb-2">Qualifications</p>
+                          <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-700 whitespace-pre-wrap">
+                            {selectedUser.qualifications || 'No qualifications provided'}
+                          </div>
+                        </div>
+                      )}
+                    </CardContent>
+                  </Card>
+                </div>
+
+                <div className="space-y-4">
+                  <Card>
+                    <CardContent className="pt-6 space-y-4">
+                      <div>
+                        <p className="text-sm font-medium mb-2">Subjects</p>
+                        <div className="flex flex-wrap gap-2">
+                          {Array.isArray(selectedUser.subjects) && selectedUser.subjects.length > 0 ? (
+                            selectedUser.subjects.map((subject: string) => (
+                              <Badge key={subject} variant="secondary">{subject}</Badge>
+                            ))
+                          ) : (
+                            <span className="text-sm text-gray-500">No subjects listed</span>
+                          )}
+                        </div>
+                      </div>
+
+                      <div className="grid grid-cols-2 gap-3 text-sm">
+                        <div className="rounded-lg border p-3">
+                          <p className="text-gray-500 text-xs mb-1">Total Sessions</p>
+                          <p className="font-medium">{selectedUser.totalSessions || 0}</p>
+                        </div>
+                        <div className="rounded-lg border p-3">
+                          <p className="text-gray-500 text-xs mb-1">Total Spent</p>
+                          <p className="font-medium">{selectedUser.totalSpent ? `₦${Number(selectedUser.totalSpent).toLocaleString()}` : '₦0'}</p>
+                        </div>
+                        <div className="rounded-lg border p-3">
+                          <p className="text-gray-500 text-xs mb-1">Verification</p>
+                          <p className="font-medium">{selectedUser.verificationStatus || 'N/A'}</p>
+                        </div>
+                        <div className="rounded-lg border p-3">
+                          <p className="text-gray-500 text-xs mb-1">Status</p>
+                          <p className="font-medium">{selectedUser.status || 'active'}</p>
+                        </div>
+                      </div>
+
+                      <div>
+                        <p className="text-sm font-medium mb-2">Profile Notes</p>
+                        <div className="rounded-lg border bg-gray-50 p-4 text-sm text-gray-700 whitespace-pre-wrap min-h-24">
+                          {selectedUser.notes || 'No admin notes available'}
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+
+                  <Button className="w-full" variant="outline" onClick={() => setSelectedUser(null)}>
+                    Close Profile
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }
