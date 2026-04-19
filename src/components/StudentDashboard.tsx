@@ -167,6 +167,66 @@ export function StudentDashboard({
     }
   }, [session]);
 
+  // Monitor for progress improvements and notify tutors
+  useEffect(() => {
+    if (!session?.access_token || assessments.length < 2) return;
+
+    const checkProgressImprovement = async () => {
+      try {
+        // Sort assessments by date to find recent ones
+        const sortedAssessments = [...assessments].sort(
+          (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+        );
+
+        // Compare latest assessment with previous one
+        if (sortedAssessments.length >= 2) {
+          const latest = sortedAssessments[0];
+          const previous = sortedAssessments[1];
+
+          // Calculate average scores for each assessment
+          const latestScore = (
+            latest.understanding + 
+            latest.participation + 
+            latest.homeworkCompletion + 
+            latest.attentiveness + 
+            latest.improvement
+          ) / 5;
+
+          const previousScore = (
+            previous.understanding + 
+            previous.participation + 
+            previous.homeworkCompletion + 
+            previous.attentiveness + 
+            previous.improvement
+          ) / 5;
+
+          // Calculate improvement percentage
+          const improvementPct = previousScore > 0 
+            ? ((latestScore - previousScore) / previousScore) * 100 
+            : 0;
+
+          // Notify if improvement >= 5%
+          if (improvementPct >= 5) {
+            await studentAPI.notifyProgressImprovement(
+              session.access_token,
+              academicStudentId,
+              previousScore,
+              latestScore,
+              latest.subject || 'General',
+              latest.tutorId
+            );
+
+            console.log(`Progress improvement detected: ${improvementPct.toFixed(1)}% in ${latest.subject}`);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking progress improvement:', error);
+      }
+    };
+
+    checkProgressImprovement();
+  }, [assessments, session?.access_token, academicStudentId]);
+
   const loadStudentData = async () => {
     if (!session?.access_token) return;
 

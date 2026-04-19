@@ -902,6 +902,104 @@ function generateRecommendations(stats: any, reports: any[]) {
   return recommendations;
 }
 
+// Notify tutor of student progress improvement
+app.post('/students/:studentId/notify-progress', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const currentUserId = await getUserId(accessToken);
+    if (!currentUserId) {
+      return c.json({ error: 'Invalid or expired token' }, 401);
+    }
+
+    const studentId = c.req.param('studentId');
+    const body = await c.req.json() as Record<string, unknown>;
+
+    // Validate request
+    const { previousScore, currentScore, subject, improvementPercentage, tutorId } = body;
+
+    if (!previousScore || !currentScore || !subject || !improvementPercentage) {
+      return c.json({
+        error: 'Missing required fields: previousScore, currentScore, subject, improvementPercentage',
+      }, 400);
+    }
+
+    // Security: Student or admin can notify tutors of progress
+    if (currentUserId !== studentId && currentUserId !== 'admin') {
+      return c.json({ error: 'Unauthorized to report this student progress' }, 403);
+    }
+
+    const improvementPct = Number(improvementPercentage);
+
+    // Only notify if improvement meets threshold (5%)
+    if (improvementPct < 5) {
+      return c.json({
+        success: false,
+        reason: 'Improvement below 5% threshold',
+        improvementPercentage: improvementPct,
+      });
+    }
+
+    // Get student info
+    const student = await kv.get(`student:${studentId}`) as any;
+    const studentName = student?.name || 'Student';
+
+    // Notify tutor(s) of progress
+    const targetTutorId = tutorId as string || 'all-tutors';
+
+    const notification = {
+      id: `prog-${studentId}-${Date.now()}`,
+      userId: tutorId || 'admin-group',
+      type: 'progress',
+      title: 'Student Progress Alert',
+      message: `${studentName} improved ${improvementPct.toFixed(1)}% in ${subject}! (${previousScore} → ${currentScore})`,
+      priority: improvementPct >= 10 ? 'high' : 'medium',
+      actionUrl: `#student/${studentId}/progress`,
+      metadata: {
+        studentId,
+        studentName,
+        subject,
+        previousScore: Number(previousScore),
+        currentScore: Number(currentScore),
+        improvementPercentage: improvementPct,
+        timestamp: new Date().toISOString(),
+        tutorId: tutorId || 'all',
+      },
+      createdAt: new Date().toISOString(),
+      readAt: null,
+    };
+
+    await kv.set(`notification:${notification.id}`, notification);
+
+    // Also track progress milestone in student record
+    const progressRecord = await kv.get(`progress:${studentId}`) as any || {};
+    if (!progressRecord.milestones) progressRecord.milestones = [];
+
+    progressRecord.milestones.push({
+      date: new Date().toISOString(),
+      subject,
+      previousScore: Number(previousScore),
+      currentScore: Number(currentScore),
+      improvementPercentage: improvementPct,
+    });
+
+    await kv.set(`progress:${studentId}`, progressRecord);
+
+    return c.json({
+      success: true,
+      message: 'Progress notification sent to tutor',
+      notification,
+      improvementPercentage: improvementPct,
+    });
+  } catch (error: any) {
+    console.error('Error notifying progress:', error);
+    return c.json({ error: error.message || 'Failed to notify progress' }, 500);
+  }
+});
+
 }  // Close reportsNotificationsRoutes function
 
 export default reportsNotificationsRoutes;
