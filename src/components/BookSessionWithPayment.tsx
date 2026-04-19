@@ -213,7 +213,7 @@ export function BookSessionWithPayment({
               with <span className="font-semibold">{tutorName}</span>.
             </p>
             <p className="text-sm text-gray-500">
-              Starting <strong>{new Date(startDate).toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> at <strong>{startTime}</strong>
+              Starting <strong>{new Date(startDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> at <strong>{startTime}</strong>
             </p>
             <Alert className="bg-blue-50 border-blue-200 text-left">
               <AlertCircle className="h-4 w-4 text-blue-600" />
@@ -257,7 +257,7 @@ export function BookSessionWithPayment({
             <div className="rounded-lg border bg-white/90 backdrop-blur px-3 py-2 shadow-sm">
               <div className="text-xs text-gray-500">Start Date</div>
               <div className="font-medium text-gray-900">
-                {new Date(startDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                {new Date(startDate + 'T12:00:00').toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
               </div>
             </div>
             <div className="rounded-lg border bg-white/90 backdrop-blur px-3 py-2 shadow-sm">

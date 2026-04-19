@@ -169,7 +169,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
 
   // Step 2: Professional Info
   const [bio, setBio] = useState('');
-  const [hourlyRate, setHourlyRate] = useState('20000'); // Fixed flat rate per session in Naira
+  const hourlyRate = '20000'; // Platform-fixed rate — tutors cannot change this
   const [experienceYears, setExperienceYears] = useState('');
   const [qualifications, setQualifications] = useState('');
   const [teachingStyle, setTeachingStyle] = useState('');
@@ -300,7 +300,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   };
 
   const validateStep2 = () => {
-    if (!bio || !hourlyRate || !qualifications || selectedSubjects.length === 0 || !experienceYears) {
+    if (!bio || !qualifications || selectedSubjects.length === 0 || !experienceYears) {
       setError('Please fill in all required fields and select at least one subject');
       return false;
     }
