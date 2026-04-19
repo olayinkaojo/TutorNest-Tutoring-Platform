@@ -123,6 +123,9 @@ export function StudentDashboard({
   const [performanceData, setPerformanceData] = useState<any[]>([]);
   const [progressOverTime, setProgressOverTime] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('performance');
+  const [newReportsCount, setNewReportsCount] = useState(0);
+  const [progressImprovement, setProgressImprovement] = useState<{ subject: string; improvement: number } | null>(null);
+  const [lastReportCheck, setLastReportCheck] = useState<Date | null>(null);
   const academicStudentId = profile.linkedChildId || profile.id || profile.userId;
 
   const validTabs = new Set([
@@ -205,8 +208,13 @@ export function StudentDashboard({
             ? ((latestScore - previousScore) / previousScore) * 100 
             : 0;
 
-          // Notify if improvement >= 5%
+          // Update badge if significant improvement
           if (improvementPct >= 5) {
+            setProgressImprovement({
+              subject: latest.subject || 'General',
+              improvement: improvementPct,
+            });
+
             await studentAPI.notifyProgressImprovement(
               session.access_token,
               academicStudentId,
@@ -226,6 +234,46 @@ export function StudentDashboard({
 
     checkProgressImprovement();
   }, [assessments, session?.access_token, academicStudentId]);
+
+  // Monitor for new session reports
+  useEffect(() => {
+    if (!session?.access_token) return;
+
+    const checkForNewReports = async () => {
+      try {
+        // Get all completed bookings (which should have reports)
+        const allBookings = await studentAPI.getStudentBookings(session.access_token, academicStudentId);
+        const completedBookings = allBookings.filter((b: any) => b.status === 'completed');
+
+        // Get reports for completed bookings
+        if (completedBookings.length > 0) {
+          const reports = await studentAPI.getReportsForBookings(
+            session.access_token,
+            completedBookings.map((b: any) => b.id)
+          );
+
+          // Count unviewed reports
+          const unviewedReports = reports.filter((r: any) => 
+            !r.viewedBy || !r.viewedBy.includes(academicStudentId)
+          );
+
+          if (unviewedReports.length > 0) {
+            setNewReportsCount(unviewedReports.length);
+            setLastReportCheck(new Date());
+          } else {
+            setNewReportsCount(0);
+          }
+        }
+      } catch (error) {
+        console.error('Error checking for new reports:', error);
+      }
+    };
+
+    // Check for new reports when completed sessions change
+    if (completedSessions.length > 0) {
+      checkForNewReports();
+    }
+  }, [completedSessions, session?.access_token, academicStudentId]);
 
   const loadStudentData = async () => {
     if (!session?.access_token) return;
@@ -520,10 +568,24 @@ export function StudentDashboard({
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
           <TabsList className="mb-4 hidden lg:inline-flex">
-            <TabsTrigger value="performance">Performance</TabsTrigger>
+            <TabsTrigger value="performance">
+              Performance
+              {progressImprovement && (
+                <Badge className="ml-2 bg-green-500 text-white text-xs">
+                  +{progressImprovement.improvement.toFixed(1)}%
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="sessions">My Sessions</TabsTrigger>
-            <TabsTrigger value="reports">Session Reports</TabsTrigger>
+            <TabsTrigger value="reports">
+              Session Reports
+              {newReportsCount > 0 && (
+                <Badge className="ml-2 bg-blue-500 text-white text-xs">
+                  {newReportsCount} new
+                </Badge>
+              )}
+            </TabsTrigger>
             <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
             <TabsTrigger value="messages">Messages</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
