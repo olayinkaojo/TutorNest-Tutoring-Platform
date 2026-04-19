@@ -79,6 +79,7 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [loading, setLoading] = useState(true);
   const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     if (session?.access_token) {
@@ -89,6 +90,7 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
 
   const fetchPlatformStats = async () => {
     try {
+      setError(null);
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/platform-overview`,
         {
@@ -101,11 +103,16 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
       if (response.ok) {
         const data = await response.json();
         setStats(data.stats);
+      } else if (response.status === 404) {
+        console.error('API error: 404 - Endpoint not deployed');
+        setError('API error: 404 - Dashboard endpoint not yet deployed. Please ensure Supabase functions are deployed.');
       } else {
-        console.error('Failed to fetch platform stats');
+        console.error('Failed to fetch platform stats:', response.status);
+        setError(`Failed to load statistics (HTTP ${response.status})`);
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching platform stats:', error);
+      setError(`Error: ${error.message || 'Failed to fetch data'}`);
     } finally {
       setLoading(false);
     }
@@ -142,12 +149,30 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
     );
   }
 
-  if (!stats) {
+  if (error || !stats) {
     return (
-      <Card>
-        <CardContent className="py-12 text-center text-gray-500">
-          <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-          <p>Unable to load platform statistics</p>
+      <Card className="border-orange-200 bg-orange-50">
+        <CardContent className="py-12 text-center">
+          <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-orange-600" />
+          <p className="text-orange-800 font-medium mb-2">
+            {error || 'Unable to load platform statistics'}
+          </p>
+          <p className="text-sm text-orange-700 mb-4">
+            {error?.includes('404') 
+              ? 'The dashboard endpoint needs to be deployed. Contact your administrator or run `supabase functions deploy`.'
+              : 'Please check your connection and try again.'}
+          </p>
+          <Button 
+            variant="outline" 
+            onClick={() => {
+              setLoading(true);
+              setError(null);
+              fetchPlatformStats();
+            }}
+            className="mt-2"
+          >
+            Retry
+          </Button>
         </CardContent>
       </Card>
     );
