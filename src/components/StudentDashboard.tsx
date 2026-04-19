@@ -5,6 +5,7 @@ import { DocumentManager } from './DocumentManager';
 import { ResourcesHub } from './ResourcesHub';
 import { CurriculumPDFViewer } from './CurriculumPDFViewer';
 import { SessionReportsViewer } from './SessionReportsViewer';
+import ErrorBoundary from './ErrorBoundary';
 import { TriviaGame } from './TriviaGame';
 import { TriviaLeaderboard } from './TriviaLeaderboard';
 import { GamificationSystem } from './GamificationSystem';
@@ -25,6 +26,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { MobileNavigation } from './MobileNavigation';
 import { StudentAssessmentsList } from './StudentAssessmentsList';
 import TutorNestLogo from './TutorNestLogo';
+import studentAPI from '../utils/student-api-client';
 import { useState, useEffect, useRef } from 'react';
 import {
   LineChart,
@@ -172,80 +174,56 @@ export function StudentDashboard({
     try {
       const studentId = academicStudentId;
 
-      // Load bookings/sessions
-      const bookingsResponse = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings?studentId=${studentId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
+      // Load bookings using studentAPI
+      const allBookings = await studentAPI.getStudentBookings(session.access_token, studentId);
+      
+      const now = new Date();
+      const upcoming = allBookings.filter((b: any) => 
+        new Date(b.date) >= now && (b.status === 'confirmed' || b.status === 'pending')
       );
+      const completed = allBookings.filter((b: any) => b.status === 'completed');
 
-      if (bookingsResponse.ok) {
-        const bookingsData = await bookingsResponse.json();
-        const allBookings = bookingsData.bookings || [];
+      setUpcomingSessions(upcoming);
+      setCompletedSessions(completed);
+
+      setStats({
+        totalSessions: allBookings.length,
+        completedSessions: completed.length,
+        upcomingSessions: upcoming.length,
+        averageScore: 0 // Will be calculated from assessments
+      });
+
+      // Load assessments using studentAPI
+      const studentAssessments = await studentAPI.getStudentAssessments(session.access_token, studentId);
+      setAssessments(studentAssessments);
+
+      // Calculate average score
+      if (studentAssessments.length > 0) {
+        const totalScore = studentAssessments.reduce((sum: number, a: any) => {
+          const avgScore = (
+            a.understanding + 
+            a.participation + 
+            a.homeworkCompletion + 
+            a.attentiveness + 
+            a.improvement
+          ) / 5;
+          return sum + avgScore;
+        }, 0);
+        const averageScore = Math.round(totalScore / studentAssessments.length);
         
-        const now = new Date();
-        const upcoming = allBookings.filter((b: any) => 
-          new Date(b.date) >= now && (b.status === 'confirmed' || b.status === 'pending')
-        );
-        const completed = allBookings.filter((b: any) => b.status === 'completed');
-
-        setUpcomingSessions(upcoming);
-        setCompletedSessions(completed);
-
-        setStats({
-          totalSessions: allBookings.length,
-          completedSessions: completed.length,
-          upcomingSessions: upcoming.length,
-          averageScore: 0 // Will be calculated from assessments
-        });
+        setStats((prev: any) => ({
+          ...prev,
+          averageScore
+        }));
       }
 
-      // Load assessments
-      const assessmentsResponse = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/assessments/student/${studentId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
+      // Process assessments for performance data by subject
+      const subjectPerformance = processSubjectPerformance(studentAssessments);
+      setPerformanceData(subjectPerformance);
 
-      if (assessmentsResponse.ok) {
-        const assessmentsData = await assessmentsResponse.json();
-        const studentAssessments = assessmentsData.assessments || [];
-        setAssessments(studentAssessments);
-
-        // Calculate average score
-        if (studentAssessments.length > 0) {
-          const totalScore = studentAssessments.reduce((sum: number, a: any) => {
-            const avgScore = (
-              a.understanding + 
-              a.participation + 
-              a.homeworkCompletion + 
-              a.attentiveness + 
-              a.improvement
-            ) / 5;
-            return sum + avgScore;
-          }, 0);
-          const averageScore = Math.round(totalScore / studentAssessments.length);
-          
-          setStats((prev: any) => ({
-            ...prev,
-            averageScore
-          }));
-        }
-
-        // Process assessments for performance data by subject
-        const subjectPerformance = processSubjectPerformance(studentAssessments);
-        setPerformanceData(subjectPerformance);
-
-        // Process assessments for progress over time
-        const timeProgress = processProgressOverTime(studentAssessments);
-        setProgressOverTime(timeProgress);
-      }
+      // Process assessments for progress over time
+      const timeProgress = processProgressOverTime(studentAssessments);
+      setProgressOverTime(timeProgress);
 
     } catch (err) {
       console.error('Error loading student data:', err);
@@ -496,7 +474,8 @@ export function StudentDashboard({
 
           {/* Performance Tab - DEFAULT ACTIVE */}
           <TabsContent value="performance">
-            <div className="space-y-6">
+            <ErrorBoundary>
+              <div className="space-y-6">
               {/* Overall Performance Card */}
               <Card>
                 <CardHeader>
@@ -645,11 +624,13 @@ export function StudentDashboard({
                 </Card>
               )}
             </div>
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Overview Tab */}
           <TabsContent value="overview">
-            <div className="grid lg:grid-cols-2 gap-6">
+            <ErrorBoundary>
+              <div className="grid lg:grid-cols-2 gap-6">
               {/* Upcoming Sessions */}
               <Card>
                 <CardHeader>
@@ -743,11 +724,13 @@ export function StudentDashboard({
                 </CardContent>
               </Card>
             </div>
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Sessions Tab */}
           <TabsContent value="sessions">
-            <Card>
+            <ErrorBoundary>
+              <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
                   <Video className="w-5 h-5" style={{ color: '#625d9c' }} />
@@ -831,23 +814,27 @@ export function StudentDashboard({
                 )}
               </CardContent>
             </Card>
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Session Reports Tab */}
           <TabsContent value="reports">
-            {session && (
-              <SessionReportsViewer 
+            <ErrorBoundary>
+              {session && (
+                <SessionReportsViewer 
                 userId={profile.id || profile.userId}
                 accessToken={session.access_token}
                 viewType="student"
               />
-            )}
+              )}
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Curriculum Tab */}
           <TabsContent value="curriculum">
-            {session && profile.gradeLevel ? (
-              <CurriculumPDFViewer 
+            <ErrorBoundary>
+              {session && profile.gradeLevel ? (
+                <CurriculumPDFViewer 
                 gradeLevel={profile.gradeLevel || profile.grade || 'year_1'}
                 accessToken={session.access_token}
                 studentName={studentName}
@@ -860,12 +847,14 @@ export function StudentDashboard({
                 </CardContent>
               </Card>
             )}
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Messages Tab */}
           <TabsContent value="messages">
-            {session ? (
-              <Chatroom 
+            <ErrorBoundary>
+              {session ? (
+                <Chatroom 
                 session={session}
                 userId={profile.id || profile.userId}
                 userName={studentName}
@@ -879,12 +868,14 @@ export function StudentDashboard({
                 </CardContent>
               </Card>
             )}
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Documents Tab */}
           <TabsContent value="documents">
-            {session ? (
-              <DocumentManager 
+            <ErrorBoundary>
+              {session ? (
+                <DocumentManager 
                 session={session}
                 userId={profile.id || profile.userId}
                 userRole="student"
@@ -897,19 +888,23 @@ export function StudentDashboard({
                 </CardContent>
               </Card>
             )}
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Bookshop Tab */}
           <TabsContent value="bookshop">
-            {session && (
-              <Bookshop session={session} subscriptionTier="basic" />
-            )}
+            <ErrorBoundary>
+              {session && (
+                <Bookshop session={session} subscriptionTier="basic" />
+              )}
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Resources Tab */}
           <TabsContent value="resources">
-            {session ? (
-              <ResourcesHub
+            <ErrorBoundary>
+              {session ? (
+                <ResourcesHub
                 session={session}
                 userId={profile.id || profile.userId}
                 userRole="student"
@@ -923,11 +918,13 @@ export function StudentDashboard({
                 </CardContent>
               </Card>
             )}
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Gamification Tab */}
           <TabsContent value="gamification">
-            <div className="space-y-6">
+            <ErrorBoundary>
+              <div className="space-y-6">
               {/* World-Class Trivia Section */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
                 {/* Daily Challenge */}
@@ -964,10 +961,12 @@ export function StudentDashboard({
               {/* Main Gamification System */}
               <GamificationSystem key={gamificationKey} userId={profile.userId} userType="student" />
             </div>
+            </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="achievements">
-            <div className="space-y-6">
+            <ErrorBoundary>
+              <div className="space-y-6">
               {/* Achievement Notification */}
               <AchievementNotification
                 badge={null}
@@ -988,11 +987,13 @@ export function StudentDashboard({
                 limit={50}
               />
             </div>
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Learning Paths Tab */}
           <TabsContent value="learning-paths">
-            <div className="space-y-6">
+            <ErrorBoundary>
+              <div className="space-y-6">
               <TopicGrid />
               <LearningPathProgress 
                 activePaths={[]}
@@ -1001,6 +1002,7 @@ export function StudentDashboard({
                 onRecommendedClick={(topicId) => console.log('Recommended clicked:', topicId)}
               />
             </div>
+            </ErrorBoundary>
           </TabsContent>
         </Tabs>
       </main>
