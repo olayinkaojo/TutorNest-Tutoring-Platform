@@ -6,6 +6,8 @@ import { AdminActivityFeed } from './AdminActivityFeed';
 import { AdminDisputeHandler } from './AdminDisputeHandler';
 import { CouponManager } from './CouponManager';
 import { TaxReportsManager } from './TaxReportsManager';
+import { AdminPaymentMonitoring } from './AdminPaymentMonitoring';
+import { AdminPayoutBatchManager } from './AdminPayoutBatchManager';
 import { RoleSwitcher } from './RoleSwitcher';
 import { CurriculumUploader } from './admin/CurriculumUploader';
 import { ResourcesUploader } from './admin/ResourcesUploader';
@@ -93,6 +95,8 @@ export function AdminDashboard({
     'disputes',
     'coupons',
     'taxreports',
+    'payments',
+    'payouts',
     'childprofiles',
     'curriculum',
     'resources',
@@ -373,6 +377,8 @@ export function AdminDashboard({
             <TabsTrigger value="disputes">Disputes</TabsTrigger>
             <TabsTrigger value="coupons">Coupons</TabsTrigger>
             <TabsTrigger value="taxreports">Tax Reports</TabsTrigger>
+            <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="payouts">Payouts</TabsTrigger>
             <TabsTrigger value="childprofiles">Child Profiles</TabsTrigger>
             <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
@@ -445,6 +451,14 @@ export function AdminDashboard({
 
           <TabsContent value="taxreports">
             <TaxReportsManager adminId={profile.id || profile.userId} />
+          </TabsContent>
+
+          <TabsContent value="payments">
+            <AdminPaymentMonitoring />
+          </TabsContent>
+
+          <TabsContent value="payouts">
+            <AdminPayoutBatchManager />
           </TabsContent>
 
           <TabsContent value="childprofiles">
