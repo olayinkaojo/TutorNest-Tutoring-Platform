@@ -703,34 +703,14 @@ app.post('/payments/initiate-plan', async (c) => {
 
     if (!FLUTTERWAVE_SECRET_KEY) return c.json({ error: 'Payment not configured yet' }, 503);
 
+    // Generate a unique reference — this is passed directly to the Flutterwave
+    // inline checkout JS popup on the frontend. No API call to Flutterwave is
+    // needed at this stage; the popup handles payment collection itself.
     const reference = `TNP_${crypto.randomUUID().replace(/-/g, '')}`;
-
-    // Initialize transaction with Flutterwave
-    const flutterwaveRes = await fetch('https://api.flutterwave.com/v3/payments', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        tx_ref: reference,
-        amount: plan.price,
-        currency: 'NGN',
-        customer: { email },
-        payment_options: 'card,banktransfer',
-        meta: { planType, tutorId, studentId, userId, startDate, startTime, subject, planName: plan.name },
-      }),
-    });
-
-    const flutterwaveData = await flutterwaveRes.json() as any;
-    if (flutterwaveData.status !== 'success' || !flutterwaveData.data) {
-      console.error('Flutterwave init failed:', flutterwaveData.message);
-      return c.json({ error: 'Failed to initialize payment with Flutterwave' }, 500);
-    }
 
     const paymentId = crypto.randomUUID();
 
-    // Write to proper payments table
+    // Persist a pending payment record so confirm-plan can find it later
     await db.createPayment({
       id: paymentId,
       userId,
@@ -748,7 +728,6 @@ app.post('/payments/initiate-plan', async (c) => {
     return c.json({
       success: true,
       reference,
-      authorizationUrl: flutterwaveData.data.link || flutterwaveData.data.payment_link,
       amount: plan.price,
       planName: plan.name,
       sessions: plan.sessions,
