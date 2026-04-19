@@ -134,7 +134,7 @@ export function SessionBookingCalendar({
           languages: tutor.languages || [],
           methodologies: tutor.methodologies || [],
           ageGroups: tutor.ageGroups || [],
-          rating: tutor.rating || tutor.averageRating || undefined,
+          rating: tutor.rating != null ? Number(tutor.rating) : tutor.averageRating != null ? Number(tutor.averageRating) : undefined,
         } as Tutor;
       })
       .filter(Boolean) as Tutor[];
@@ -307,9 +307,9 @@ export function SessionBookingCalendar({
                     <MapPin className="w-3 h-3" />{tutor.location}
                   </span>
                 )}
-                {tutor.rating !== undefined && (
+                {tutor.rating !== undefined && !isNaN(Number(tutor.rating)) && (
                   <span className="flex items-center gap-1">
-                    <Star className="w-3 h-3 text-amber-500 fill-amber-500" />{tutor.rating.toFixed(1)}
+                    <Star className="w-3 h-3 text-amber-500 fill-amber-500" />{Number(tutor.rating).toFixed(1)}
                   </span>
                 )}
               </div>
