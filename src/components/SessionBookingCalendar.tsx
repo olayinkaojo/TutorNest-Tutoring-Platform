@@ -122,7 +122,7 @@ export function SessionBookingCalendar({
           id,
           name,
           subjects: tutor.subjects || [],
-          hourlyRate: Number(tutor.hourlyRate || 25),
+          hourlyRate: Number(tutor.hourlyRate || 20000),
           availability: tutor.availability,
           bio: tutor.bio || tutor.about || tutor.profileBio || '',
           experienceYears: tutor.experienceYears || tutor.experience || undefined,

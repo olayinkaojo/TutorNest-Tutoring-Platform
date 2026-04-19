@@ -57,7 +57,7 @@ app.use('*', cors({
   origin: (origin) => {
     // Always allow localhost on any port (development)
     if (origin && /^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
-    // Always allow tutornest.com and any subdomain (production)
+    // Always allow tutornest.org and any subdomain (production)
     if (origin && /https?:\/\/(.*\.)?tutornest\.com$/.test(origin)) return origin;
     // Allow any explicitly configured origin
     if (allowedOrigins.includes(origin)) return origin;
@@ -688,7 +688,7 @@ app.post('/make-server-cbd74580/signup', async (c) => {
     // NOTE: Do NOT call generateLink({ type: 'signup' }) here — it resets the user back to
     // unconfirmed and causes the "Email not confirmed" sign-in error.
     try {
-      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.com';
+      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
       await sendEmail({
         to: email,
         subject: `Welcome to TutorNest, ${name}!`,
@@ -715,7 +715,7 @@ app.post('/make-server-cbd74580/signup', async (c) => {
     console.log('User created successfully for:', email);
 
     // Detect admin email and auto-assign role
-    const isAdmin = email.toLowerCase().includes('admin@') || email.toLowerCase() === 'admin@tutornest.com';
+    const isAdmin = email.toLowerCase().includes('admin@') || email.toLowerCase() === 'admin@tutornest.org';
 
     // Create initial user profile in KV store
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -2008,7 +2008,7 @@ app.post('/make-server-cbd74580/invitations/send', async (c) => {
       const studentName = studentInfo?.full_name || studentInfo?.name || 'A student';
       
       if (tutorEmail) {
-        const acceptLink = `${Deno.env.get('FRONTEND_URL') || 'https://tutornest.com'}/invitations`;
+        const acceptLink = `${Deno.env.get('FRONTEND_URL') || 'https://tutornest.org'}/invitations`;
         const emailData = emailTemplates.tutorBookingNotification(
           tutorData?.full_name || 'Tutor',
           parentName,
@@ -2542,7 +2542,7 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
 
     // Send confirmation emails to parent and tutor
     try {
-      const dailyRoomLink = `https://daily.co/${booking.roomName}` || `${Deno.env.get('FRONTEND_URL') || 'https://tutornest.com'}/session/${bookingId}`;
+      const dailyRoomLink = `https://daily.co/${booking.roomName}` || `${Deno.env.get('FRONTEND_URL') || 'https://tutornest.org'}/session/${bookingId}`;
       
       if (parentEmail) {
         const parentEmailData = emailTemplates.bookingConfirmation(
@@ -3555,7 +3555,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
     const supabase = getSupabaseClient();
     const testTutors = [
       {
-        email: 'sarah.mathematics@tutornest.com',
+        email: 'sarah.mathematics@tutornest.org',
         password: 'test1234',
         firstName: 'Sarah',
         lastName: 'Thompson',
@@ -3570,7 +3570,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 245
       },
       {
-        email: 'james.physics@tutornest.com',
+        email: 'james.physics@tutornest.org',
         password: 'test1234',
         firstName: 'James',
         lastName: 'Chen',
@@ -3585,7 +3585,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 189
       },
       {
-        email: 'emily.english@tutornest.com',
+        email: 'emily.english@tutornest.org',
         password: 'test1234',
         firstName: 'Emily',
         lastName: 'Parker',
@@ -3600,7 +3600,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 312
       },
       {
-        email: 'david.science@tutornest.com',
+        email: 'david.science@tutornest.org',
         password: 'test1234',
         firstName: 'David',
         lastName: 'Williams',
@@ -3615,7 +3615,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 156
       },
       {
-        email: 'maria.languages@tutornest.com',
+        email: 'maria.languages@tutornest.org',
         password: 'test1234',
         firstName: 'Maria',
         lastName: 'Rodriguez',

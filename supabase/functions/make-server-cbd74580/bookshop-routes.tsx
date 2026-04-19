@@ -301,7 +301,7 @@ app.post('/purchase/initialize', async (c) => {
     const paymentResult = await PaymentProcessor.initializeFlutterwavePayment({
       type: 'bookshop',
       userId: user.id,
-      email: 'placeholder@tutornest.com', // In production, get from user profile
+      email: 'placeholder@tutornest.org', // In production, get from user profile
       amount: totalPrice,
       currency: 'GBP',
       description: `Purchase: ${bookTitles.join(', ')}`,

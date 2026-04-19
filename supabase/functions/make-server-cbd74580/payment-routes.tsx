@@ -6,6 +6,7 @@ import * as db from './db.tsx';
 const app = new Hono();
 
 const FLUTTERWAVE_SECRET_KEY = Deno.env.get('FLUTTERWAVE_SECRET_KEY') ?? '';
+const FLUTTERWAVE_ENCRYPTION_KEY = Deno.env.get('FLUTTERWAVE_ENCRYPTION_KEY') ?? '';
 const FLUTTERWAVE_WEBHOOK_SECRET = Deno.env.get('FLUTTERWAVE_WEBHOOK_SECRET') ?? '';
 const PLATFORM_FEE_PERCENTAGE = 20;
 
@@ -110,7 +111,7 @@ app.post('/payments/initialize', async (c) => {
         customizations: {
           title: 'TutorNest Session Booking',
           description: `Booking for ${subject ?? 'Tutoring Session'}`,
-          logo: 'https://tutornest.com/logo.png',
+          logo: 'https://tutornest.org/logo.png',
         },
         meta: {
           bookingId,
@@ -120,7 +121,7 @@ app.post('/payments/initialize', async (c) => {
           userId,
           ...metadata,
         },
-        redirect_url: `${c.req.header('origin') ?? 'https://tutornest.com'}/payment/callback`,
+        redirect_url: `${c.req.header('origin') ?? 'https://tutornest.org'}/payment/callback`,
       }),
     });
 
@@ -609,7 +610,7 @@ app.get('/payments/:paymentId/invoice', async (c) => {
       from: {
         name: 'TutorNest',
         address: 'Lagos, Nigeria',
-        email: 'billing@tutornest.com',
+        email: 'billing@tutornest.org',
       },
       to: {
         name: payer?.fullName || payer?.name || 'Customer',

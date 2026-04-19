@@ -76,7 +76,7 @@ export async function initializeFlutterwavePayment(
       customizations: {
         title: `TutorNest - ${getPaymentTypeDisplayName(request.type)}`,
         description: request.description,
-        logo: 'https://tutornest.com/logo.png',
+        logo: 'https://tutornest.org/logo.png',
       },
       meta: {
         paymentId,
@@ -84,7 +84,7 @@ export async function initializeFlutterwavePayment(
         userId: request.userId,
         ...request.metadata,
       },
-      redirect_url: request.redirectUrl || 'https://tutornest.com/payment/callback',
+      redirect_url: request.redirectUrl || 'https://tutornest.org/payment/callback',
     };
 
     console.log(`[UnifiedPaymentProcessor] Initializing ${request.type} payment`, {
