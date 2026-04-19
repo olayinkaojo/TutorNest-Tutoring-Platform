@@ -591,4 +591,128 @@ export const emailTemplates = {
       </div>
     `,
   }),
+
+  // Tutor verification approval
+  tutorVerificationApproved: (tutorName: string, dashboardLink: string) => ({
+    subject: "🎉 Congratulations! Your TutorNest Verification is Approved",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #625d9c 0%, #5d9827 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 28px;">🎉 Welcome to TutorNest!</h1>
+          <p style="margin: 10px 0 0 0; font-size: 18px;">Your Verification is Approved</p>
+        </div>
+        
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p style="font-size: 16px; color: #333;">Hi ${tutorName},</p>
+          
+          <p style="font-size: 15px; color: #555; line-height: 1.6;">
+            Excellent news! Your application to become a tutor on TutorNest has been <strong>approved</strong> after careful review of your qualifications and credentials.
+          </p>
+          
+          <div style="background-color: #e8f5e9; border-left: 4px solid #5d9827; padding: 20px; margin: 25px 0; border-radius: 4px;">
+            <p style="margin: 0 0 15px 0; font-weight: bold; color: #2e7d32; font-size: 16px;">✅ You are now verified and can start tutoring!</p>
+            <p style="margin: 0; color: #555; font-size: 14px; line-height: 1.5;">
+              Your profile is now visible to students and parents who are looking for a tutor with your expertise. You can start accepting bookings immediately.
+            </p>
+          </div>
+          
+          <p style="font-size: 15px; color: #555; margin-top: 25px; margin-bottom: 15px;"><strong>What's Next:</strong></p>
+          <ul style="color: #555; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 25px;">
+            <li>Complete your tutor profile with your bio, rates, and availability</li>
+            <li>Set up your payment methods in the dashboard</li>
+            <li>Start accepting bookings from students</li>
+            <li>Provide excellent sessions and build your rating</li>
+            <li>Earn competitive payments weekly</li>
+          </ul>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${dashboardLink}" style="display: inline-block; background: linear-gradient(135deg, #625d9c 0%, #5d9827 100%); color: white; padding: 14px 40px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+              Go to Your Dashboard
+            </a>
+          </div>
+          
+          <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 25px 0; border-radius: 4px;">
+            <p style="margin: 0; color: #856404; font-size: 14px; font-weight: bold;">💡 Pro Tip:</p>
+            <p style="margin: 5px 0 0 0; color: #856404; font-size: 13px;">
+              Complete your profile thoroughly and add a professional photo to attract more students!
+            </p>
+          </div>
+          
+          <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
+            If you have any questions or need assistance, feel free to reach out to our support team at support@tutornest.org or visit our Help Center.
+          </p>
+          
+          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
+            <p style="margin: 0 0 5px 0;">We're excited to have you as part of the TutorNest community!</p>
+            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    `,
+  }),
+
+  // Tutor verification rejection
+  tutorVerificationRejected: (tutorName: string, rejectionReason: string, dashboardLink: string) => ({
+    subject: "Application Review: Next Steps for Your TutorNest Verification",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background-color: #f44336; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 24px;">⏸️ Verification Status</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">We Need More Information</p>
+        </div>
+        
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p style="font-size: 16px; color: #333;">Hi ${tutorName},</p>
+          
+          <p style="font-size: 15px; color: #555; line-height: 1.6;">
+            Thank you for applying to become a tutor on TutorNest. We've carefully reviewed your application and qualifications.
+          </p>
+          
+          <div style="background-color: #ffebee; border-left: 4px solid #f44336; padding: 20px; margin: 25px 0; border-radius: 4px;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #c62828; font-size: 15px;">⚠️ Your Application Status</p>
+            <p style="margin: 0; color: #555; font-size: 14px; line-height: 1.5;">
+              We've decided not to approve your verification at this time. Below you'll find the specific reason(s).
+            </p>
+          </div>
+          
+          <p style="font-size: 15px; color: #555; margin: 25px 0 10px 0; font-weight: bold;">Reason for Decision:</p>
+          <div style="background-color: #fff9c4; border-left: 4px solid #fbc02d; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
+            <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.6;">
+              ${rejectionReason}
+            </p>
+          </div>
+          
+          <p style="font-size: 15px; color: #555; margin: 25px 0 15px 0; font-weight: bold;">What You Can Do:</p>
+          <ul style="color: #555; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 25px;">
+            <li><strong>Address the issues:</strong> Review the reason(s) above and gather any additional documentation or qualifications needed</li>
+            <li><strong>Resubmit your application:</strong> Once you've addressed the concerns, you can resubmit your verification</li>
+            <li><strong>Contact support:</strong> If you'd like clarification or have questions, our team is here to help</li>
+            <li><strong>Appeal:</strong> If you believe there's been a misunderstanding, you can submit an appeal</li>
+          </ul>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${dashboardLink}" style="display: inline-block; background-color: #625d9c; color: white; padding: 14px 40px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+              Update Your Application
+            </a>
+          </div>
+          
+          <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 25px 0; border-radius: 4px;">
+            <p style="margin: 0; color: #0d47a1; font-size: 14px; font-weight: bold;">ℹ️ We Want You to Succeed</p>
+            <p style="margin: 5px 0 0 0; color: #0d47a1; font-size: 13px; line-height: 1.5;">
+              Becoming a tutor on TutorNest requires high standards to ensure quality education for our students. We believe in your potential and would love to see your application resubmitted.
+            </p>
+          </div>
+          
+          <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
+            Have questions? Contact our support team at support@tutornest.org and we'll be happy to guide you through the process.
+          </p>
+          
+          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
+            <p style="margin: 0 0 5px 0;">We look forward to reviewing your updated application!</p>
+            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    `,
+  }),
 };

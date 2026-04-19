@@ -261,8 +261,8 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
 
       setSuccess(
         reviewData.action === 'approve'
-          ? 'Tutor verified successfully!'
-          : 'Application rejected.'
+          ? '✅ Tutor verified successfully! Congratulatory email has been sent.'
+          : '❌ Application rejected. Rejection notification has been sent to the tutor.'
       );
 
       await fetchVerifications();

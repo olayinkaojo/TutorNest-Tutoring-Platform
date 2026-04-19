@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
+import { sendEmail, emailTemplates } from './email-service.tsx';
 
 // Helper function to format timestamp
 function formatTimestamp(timestamp: string): string {
@@ -1651,6 +1652,33 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         severity: 'info',
         metadata: { action, rejectionReason }
       });
+
+      // Send email notification
+      if (action === 'approve' && tutor.email) {
+        const emailData = emailTemplates.tutorVerificationApproved(
+          tutor.fullName || tutor.name || 'Tutor',
+          `${typeof window !== 'undefined' ? window.location.origin : 'https://tutornest.org'}/tutor-dashboard`
+        );
+        await sendEmail({
+          to: tutor.email,
+          subject: emailData.subject,
+          html: emailData.html,
+          replyTo: 'support@tutornest.org'
+        });
+      } else if (action === 'reject' && tutor.email) {
+        // Send rejection email as well
+        const emailData = emailTemplates.tutorVerificationRejected(
+          tutor.fullName || tutor.name || 'Tutor',
+          rejectionReason,
+          `${typeof window !== 'undefined' ? window.location.origin : 'https://tutornest.org'}/tutor-dashboard`
+        );
+        await sendEmail({
+          to: tutor.email,
+          subject: emailData.subject,
+          html: emailData.html,
+          replyTo: 'support@tutornest.org'
+        });
+      }
 
       return c.json({ success: true });
     } catch (error: any) {
