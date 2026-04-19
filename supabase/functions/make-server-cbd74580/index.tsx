@@ -251,8 +251,8 @@ contentLibraryRoutes(app, getUserId);
 // Register progress analytics routes
 progressAnalyticsRoutes(app, getUserId);
 
-// Register notifications routes - DISABLED: Using unified notifications in reports-notifications-routes.tsx instead
-// notificationsRoutes(app, getUserId);
+// Register notifications routes
+notificationsRoutes(app, getUserId);
 
 // Register messaging routes
 messagingRoutes(app, getUserId);
@@ -379,7 +379,7 @@ app.route('/make-server-cbd74580', bookingRoutes);
 app.route('/make-server-cbd74580', smartMatchingRoutes);
 
 // Register reports and notifications routes
-app.route('/make-server-cbd74580', reportsNotificationsRoutes);
+reportsNotificationsRoutes(app, getUserId);
 
 // Register trust & safety routes
 app.route('/make-server-cbd74580/moderation', contentModerationRoutes);

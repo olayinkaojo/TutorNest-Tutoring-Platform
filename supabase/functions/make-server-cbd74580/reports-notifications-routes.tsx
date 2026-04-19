@@ -1,8 +1,9 @@
 import { Hono } from 'npm:hono';
 import * as kv from './kv_store.tsx';
 
-const app = new Hono();
-
+// Create a route handler function that can receive getUserId
+export function reportsNotificationsRoutes(app: Hono, getUserId: Function) {
+  
 // TEST ROUTE - Verify notifications endpoint is accessible
 app.get('/notifications/test', async (c) => {
   console.log('=== NOTIFICATIONS TEST ENDPOINT CALLED ===');
@@ -21,6 +22,12 @@ app.post('/bookings/:bookingId/report', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
+    // Verify user and get their ID
+    const currentUserId = await getUserId(accessToken);
+    if (!currentUserId) {
+      return c.json({ error: 'Invalid or expired token' }, 401);
+    }
+
     const bookingId = c.req.param('bookingId');
     const reportData = await c.req.json() as Record<string, unknown>;
 
@@ -34,6 +41,12 @@ app.post('/bookings/:bookingId/report', async (c) => {
     const booking = await kv.get(`booking:${bookingId}`) as any;
     if (!booking) {
       return c.json({ error: 'Booking not found' }, 404);
+    }
+
+    // Security: Verify that only the tutor for this booking can submit reports
+    if (booking.tutorId !== currentUserId) {
+      console.warn(`⚠️ Unauthorized report submission attempt - User ${currentUserId} tried to submit report for tutor ${booking.tutorId}`);
+      return c.json({ error: 'Only the tutor assigned to this booking can submit reports' }, 403);
     }
 
     // Sanitize text fields to prevent XSS
@@ -547,7 +560,7 @@ async function createNotification(data: any) {
     read: false,
     createdAt: new Date().toISOString(),
   };
-  await kv.set(notificationId, notification);
+  await kv.set(`notification:${notificationId}`, notification);
   return notification;
 }
 
@@ -825,4 +838,6 @@ function generateRecommendations(stats: any, reports: any[]) {
   return recommendations;
 }
 
-export default app;
+}  // Close reportsNotificationsRoutes function
+
+export default reportsNotificationsRoutes;
