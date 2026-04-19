@@ -53,6 +53,8 @@ import { TutorReviewsTab } from './TutorReviewsTab';
 import { TutorSessionReports } from './TutorSessionReports';
 import { TutorStatsSection } from './tutor/TutorStatsSection';
 import { TutorOverviewTab } from './tutor/TutorOverviewTab';
+import { StudentProgressWidget } from './StudentProgressWidget';
+import tutorAPI from '../utils/tutor-api-client';
 
 interface UserProfile {
   id: string;

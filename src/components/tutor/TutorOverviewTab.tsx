@@ -2,6 +2,7 @@ import { Users } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { UpcomingLessonsCard } from '../UpcomingLessonsCard';
+import { StudentProgressWidget } from '../StudentProgressWidget';
 
 interface Student {
   id: string;
@@ -12,6 +13,7 @@ interface Student {
 
 interface Session {
   access_token: string;
+  user?: { id: string };
 }
 
 interface TutorOverviewTabProps {
@@ -50,17 +52,28 @@ export function TutorOverviewTab({
               <p className="mb-4">Loading students...</p>
             </div>
           ) : students.length > 0 ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {students.map((student) => (
-                <div key={student.id} className="bg-white p-4 rounded-lg shadow-md">
-                  <div className="flex items-center">
-                    <Users className="w-8 h-8 mr-2 text-gray-500" />
-                    <div>
-                      <p className="text-sm font-bold">{student.full_name}</p>
-                      <p className="text-xs text-gray-500">Lessons: {student.totalLessons}</p>
-                      <p className="text-xs text-gray-500">Upcoming: {student.upcomingLessons}</p>
+                <div key={student.id}>
+                  {session && session.user?.id ? (
+                    <StudentProgressWidget
+                      tutorId={session.user.id}
+                      studentId={student.id}
+                      accessToken={session.access_token}
+                      studentName={student.full_name}
+                    />
+                  ) : (
+                    <div className="bg-white p-4 rounded-lg shadow-md">
+                      <div className="flex items-center">
+                        <Users className="w-8 h-8 mr-2 text-gray-500" />
+                        <div>
+                          <p className="text-sm font-bold">{student.full_name}</p>
+                          <p className="text-xs text-gray-500">Lessons: {student.totalLessons}</p>
+                          <p className="text-xs text-gray-500">Upcoming: {student.upcomingLessons}</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                  )}
                 </div>
               ))}
             </div>
