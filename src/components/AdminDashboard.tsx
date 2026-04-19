@@ -39,6 +39,8 @@ import { AdminDashboardHealthCheck } from './AdminDashboardHealthCheck';
 import { PlatformOverview } from './admin/PlatformOverview';
 import { SystemAlertsPanel } from './SystemAlertsPanel';
 import { ChildProfileManagement } from './admin/ChildProfileManagement';
+import { AdminMetricsWidget } from './AdminMetricsWidget';
+import adminAPI from '../utils/admin-api-client';
 
 interface UserProfile {
   id?: string;
@@ -378,6 +380,11 @@ export function AdminDashboard({
 
           <TabsContent value="overview">
             <div className="space-y-6">
+              {/* Platform Metrics Widget */}
+              {session && (
+                <AdminMetricsWidget accessToken={session.access_token} />
+              )}
+
               {/* Health Check Tool */}
               {session && <AdminDashboardHealthCheck session={session} />}
 
