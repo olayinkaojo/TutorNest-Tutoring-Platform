@@ -84,6 +84,7 @@ export interface BookingRow {
   subject: string | null;
   status: string;
   paymentStatus: string;
+  meetLink?: string;
 }
 
 export async function createBooking(booking: BookingRow): Promise<void> {
@@ -165,6 +166,7 @@ export async function getBookingsByUserId(userId: string): Promise<BookingRow[]>
     subject: row.subject,
     status: row.status,
     paymentStatus: row.payment_status,
+    meetLink: row.meet_link ?? undefined,
   }));
 }
 

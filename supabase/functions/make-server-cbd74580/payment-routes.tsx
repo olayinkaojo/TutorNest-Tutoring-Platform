@@ -2,6 +2,7 @@ import { Hono } from 'npm:hono';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
+import { sendEmail, emailTemplates } from './email-service.tsx';
 
 const app = new Hono();
 
@@ -876,7 +877,7 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
       endTime,
       duration: 60,
       subject: payment.subject,
-      status: 'scheduled',
+      status: 'confirmed',
       paymentStatus: 'paid',
     });
     bookingIds.push(bookingId);
@@ -893,7 +894,7 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
   const tutorAmount = payment.amount * 0.8;
   await db.incrementTutorBalance(payment.tutorId, tutorAmount);
 
-  // Notify tutor
+  // Notify tutor (in-app)
   await db.createNotification({
     userId: payment.tutorId,
     type: 'payment_received',
@@ -901,28 +902,107 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
     message: `You have a new ${plan.name} booking — ${plan.sessions} sessions starting ${payment.startDate}. Expected earnings: ₦${tutorAmount.toLocaleString()}.`,
   });
 
-  // ── Create Google Meet link (non-fatal) ────────────────────────────────────
-  // We create ONE calendar event for the first session. The resulting Meet URL
-  // is stored on ALL bookings so tutor and student use the same room every week.
+  // ── Create Google Meet link, falling back to Jitsi ────────────────────────
+  // We create ONE link shared across ALL sessions in the plan so both parties
+  // use the same virtual room every week.
+  let meetLink: string | null = null;
   try {
     const googleToken = await getGoogleToken(payment.tutorId);
     if (googleToken) {
       const firstDate = bookingDates[0].toISOString().split('T')[0];
-      const meetLink = await createMeetEvent(googleToken, {
+      meetLink = await createMeetEvent(googleToken, {
         date: firstDate,
         startTime: payment.startTime,
         endTime,
         subject: payment.subject,
         sessionLabel: `${plan.name} (${plan.sessions} sessions) — TutorNest`,
       });
-      if (meetLink) {
-        await db.updateBookingsMeetLink(bookingIds, meetLink);
-        console.log(`Meet link created for payment ${payment.id}:`, meetLink);
-      }
     }
   } catch (calendarErr: any) {
-    // Non-fatal — bookings are already confirmed, Meet link is optional
     console.warn('Google Calendar Meet link creation skipped:', calendarErr.message);
+  }
+
+  // Jitsi fallback — always available, no account needed
+  if (!meetLink) {
+    const roomSlug = payment.reference.replace('TNP_', '').slice(0, 16).toLowerCase();
+    meetLink = `https://meet.jit.si/TutorNest-${roomSlug}`;
+    console.log('Using Jitsi fallback meet link:', meetLink);
+  }
+
+  // Stamp meet link on all booking rows
+  await db.updateBookingsMeetLink(bookingIds, meetLink);
+  console.log(`Meet link set for payment ${payment.id}:`, meetLink);
+
+  // ── Send professional emails (non-fatal) ───────────────────────────────────
+  try {
+    const [parentProfile, tutorProfile, studentProfile] = await Promise.all([
+      db.getProfile(payment.userId),
+      db.getProfile(payment.tutorId),
+      db.getProfile(payment.studentId),
+    ]);
+
+    const parentName  = parentProfile?.fullName  || parentProfile?.name  || 'Parent';
+    const tutorName   = tutorProfile?.fullName   || tutorProfile?.name   || 'Tutor';
+    const studentName = studentProfile?.fullName || studentProfile?.name || 'Student';
+    const parentEmail = parentProfile?.email;
+    const tutorEmail  = tutorProfile?.email;
+
+    const subjectLabel = payment.subject || 'General Tutoring';
+    const formattedAmount = `₦${payment.amount.toLocaleString()}`;
+    const tutorEarnings   = `₦${tutorAmount.toLocaleString()}`;
+    const dashboardLink   = 'https://www.tutornest.org/dashboard';
+
+    // Format start date nicely — e.g. "Monday, 21 April 2026"
+    const startDateObj = new Date(payment.startDate + 'T12:00:00');
+    const formattedStartDate = startDateObj.toLocaleDateString('en-GB', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    });
+
+    // Format time — e.g. "10:00 AM"
+    const [h, m] = payment.startTime.split(':').map(Number);
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const hour12 = h % 12 || 12;
+    const formattedTime = `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
+
+    // Email parent
+    if (parentEmail) {
+      const parentTemplate = emailTemplates.planBookingConfirmationParent(
+        parentName,
+        studentName,
+        tutorName,
+        plan.name,
+        plan.sessions,
+        subjectLabel,
+        formattedStartDate,
+        formattedTime,
+        meetLink,
+        dashboardLink,
+        payment.reference,
+        formattedAmount,
+      );
+      await sendEmail({ to: parentEmail, ...parentTemplate });
+    }
+
+    // Email tutor
+    if (tutorEmail) {
+      const tutorTemplate = emailTemplates.planBookingNotificationTutor(
+        tutorName,
+        parentName,
+        studentName,
+        plan.name,
+        plan.sessions,
+        subjectLabel,
+        formattedStartDate,
+        formattedTime,
+        meetLink,
+        dashboardLink,
+        tutorEarnings,
+      );
+      await sendEmail({ to: tutorEmail, ...tutorTemplate });
+    }
+  } catch (emailErr: any) {
+    // Non-fatal — bookings are confirmed; email failure must not roll anything back
+    console.error('Post-booking email error (non-fatal):', emailErr.message);
   }
 
   return { sessionsCreated: bookingIds.length, bookingIds };

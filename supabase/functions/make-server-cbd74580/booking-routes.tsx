@@ -34,7 +34,41 @@ app.get('/bookings', async (c) => {
     // use that — otherwise default to the authenticated user's own ID.
     const targetId = c.req.query('studentId') || c.req.query('tutorId') || user.id;
 
-    const bookings = await db.getBookingsByUserId(targetId);
+    const rawBookings = await db.getBookingsByUserId(targetId);
+
+    // Enrich each booking with tutor/student display names and meet link.
+    // Collect unique profile IDs, fetch in parallel, then map onto rows.
+    const profileIds = [
+      ...new Set(rawBookings.flatMap((b) => [b.tutorId, b.studentId, b.userId].filter(Boolean))),
+    ];
+    const profileMap: Record<string, any> = {};
+    if (profileIds.length > 0) {
+      await Promise.all(
+        profileIds.map(async (id) => {
+          try {
+            const p = await db.getProfile(id);
+            if (p) profileMap[id] = p;
+          } catch (_) { /* non-fatal */ }
+        }),
+      );
+    }
+
+    const bookings = rawBookings.map((b) => {
+      const tutor   = profileMap[b.tutorId]   ?? {};
+      const student = profileMap[b.studentId] ?? {};
+      const parent  = profileMap[b.userId]    ?? {};
+      return {
+        ...b,
+        tutorName:      tutor.fullName   || tutor.name   || 'Tutor',
+        studentName:    student.fullName || student.name || 'Student',
+        parentName:     parent.fullName  || parent.name  || '',
+        parentId:       b.userId,
+        googleMeetLink: b.meetLink ?? null,
+        price:          String(20000),   // platform fixed rate per session
+        createdAt:      new Date().toISOString(), // best-effort; not stored on row
+      };
+    });
+
     return c.json({ bookings });
   } catch (error: any) {
     console.error('Error fetching bookings:', error);
