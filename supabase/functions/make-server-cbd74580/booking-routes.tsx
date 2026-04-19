@@ -290,6 +290,63 @@ app.post('/bookings', async (c) => {
   }
 });
 
+// Calculate refund for a booking (extracted logic, used before cancellation)
+app.post('/bookings/:bookingId/calculate-refund', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const bookingId = c.req.param('bookingId');
+    const booking = await kv.get(`booking:${bookingId}`) as any;
+
+    if (!booking) {
+      return c.json({ error: 'Booking not found' }, 404);
+    }
+
+    if (booking.status !== 'confirmed') {
+      return c.json({ error: 'Booking cannot be cancelled' }, 400);
+    }
+
+    // Calculate refund based on cancellation policy
+    const bookingDateTime = new Date(`${booking.date}T${booking.startTime}`);
+    const now = new Date();
+    const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    
+    const price = parseFloat(booking.price);
+    let refundPercentage = 0;
+    let refundAmount = '0.00';
+    let policy = '';
+    
+    if (hoursUntilBooking > 24) {
+      refundPercentage = 100;
+      refundAmount = price.toFixed(2);
+      policy = 'Full refund - cancelled >24 hours before booking';
+    } else if (hoursUntilBooking > 0) {
+      refundPercentage = 50;
+      refundAmount = (price * 0.5).toFixed(2);
+      policy = 'Half refund - cancelled <24 hours before booking';
+    } else {
+      refundPercentage = 0;
+      refundAmount = '0.00';
+      policy = 'No refund - booking has already started';
+    }
+
+    return c.json({ 
+      refundAmount,
+      refundPercentage,
+      policy,
+      bookingId,
+      price: booking.price,
+      hoursUntilBooking: Math.max(0, hoursUntilBooking).toFixed(2)
+    });
+  } catch (error: any) {
+    console.error('Error calculating refund:', error);
+    return c.json({ error: error.message || 'Failed to calculate refund' }, 500);
+  }
+});
+
 // Cancel a booking
 app.post('/bookings/:bookingId/cancel', async (c) => {
   try {
@@ -309,26 +366,17 @@ app.post('/bookings/:bookingId/cancel', async (c) => {
       return c.json({ error: 'Booking cannot be cancelled' }, 400);
     }
 
-    // Calculate refund
-    const bookingDateTime = new Date(`${booking.date}T${booking.startTime}`);
-    const now = new Date();
-    const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    const price = parseFloat(booking.price);
-    let refundAmount = '0.00';
-    
-    if (hoursUntilBooking > 24) {
-      refundAmount = price.toFixed(2); // 100% refund
-    } else if (hoursUntilBooking > 0) {
-      refundAmount = (price * 0.5).toFixed(2); // 50% refund
-    }
+    // Get refund calculation
+    const refundCalc = await calculateBookingRefund(booking);
 
     // Update booking
     const updatedBooking = {
       ...booking,
       status: 'cancelled',
       cancelledAt: new Date().toISOString(),
-      refundAmount,
+      refundAmount: refundCalc.refundAmount,
+      refundPercentage: refundCalc.refundPercentage,
+      refundPolicy: refundCalc.policy,
       cancellationReason: 'Cancelled by user'
     };
 
@@ -349,7 +397,75 @@ app.post('/bookings/:bookingId/cancel', async (c) => {
   }
 });
 
+// Get session reports for multiple bookings (batch endpoint)
+app.get('/bookings/:ids/reports', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    // Extract booking IDs from path or query
+    const idsParam = c.req.param('ids') || c.req.query('ids') || '';
+    const bookingIds = idsParam.split(',').map(id => id.trim()).filter(Boolean);
+
+    if (bookingIds.length === 0) {
+      return c.json({ error: 'No booking IDs provided' }, 400);
+    }
+
+    // Fetch all reports concurrently
+    const reports = await Promise.all(
+      bookingIds.map(async (bookingId) => {
+        try {
+          const report = await kv.get(`session_report_${bookingId}`) as any;
+          return report || { bookingId, error: 'Report not found' };
+        } catch (err) {
+          return { bookingId, error: 'Failed to fetch report' };
+        }
+      })
+    );
+
+    return c.json({ 
+      bookingIds,
+      count: reports.length,
+      reports: reports.filter(r => !r.error),
+      missing: reports.filter(r => r.error)
+    });
+  } catch (error: any) {
+    console.error('Error fetching batch reports:', error);
+    return c.json({ error: error.message || 'Failed to fetch reports' }, 500);
+  }
+});
+
 export default app;
+
+// Helper function to calculate booking refund
+async function calculateBookingRefund(booking: any) {
+  const bookingDateTime = new Date(`${booking.date}T${booking.startTime}`);
+  const now = new Date();
+  const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+  
+  const price = parseFloat(booking.price);
+  let refundPercentage = 0;
+  let refundAmount = '0.00';
+  let policy = '';
+  
+  if (hoursUntilBooking > 24) {
+    refundPercentage = 100;
+    refundAmount = price.toFixed(2);
+    policy = 'Full refund - cancelled >24 hours before booking';
+  } else if (hoursUntilBooking > 0) {
+    refundPercentage = 50;
+    refundAmount = (price * 0.5).toFixed(2);
+    policy = 'Half refund - cancelled <24 hours before booking';
+  } else {
+    refundPercentage = 0;
+    refundAmount = '0.00';
+    policy = 'No refund - booking has already started';
+  }
+
+  return { refundAmount, refundPercentage, policy };
+}
 
 // Creates a real Google Calendar event on the tutor's calendar with a Google Meet link.
 // Adds the parent as an attendee so they receive an email invite (which blocks their calendar on accept).
