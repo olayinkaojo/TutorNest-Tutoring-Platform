@@ -5,13 +5,15 @@ import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
 import { Avatar, AvatarFallback } from './ui/avatar';
-import { 
-  Send, 
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
+import {
+  Send,
   MessageSquare,
   AlertCircle,
   Users,
   Search,
   Shield,
+  Plus,
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
@@ -47,6 +49,12 @@ interface ChatroomProps {
   userRole: string;
 }
 
+interface Contact {
+  id: string;
+  name: string;
+  role: string;
+}
+
 export function Chatroom({ session, userId, userName, userRole }: ChatroomProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
@@ -55,6 +63,11 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const [showNewConvDialog, setShowNewConvDialog] = useState(false);
+  const [contacts, setContacts] = useState<Contact[]>([]);
+  const [contactSearch, setContactSearch] = useState('');
+  const [contactsLoading, setContactsLoading] = useState(false);
+  const [startingConv, setStartingConv] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout>();
 
@@ -212,7 +225,124 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
     return otherParticipantName?.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
+  const loadContacts = async () => {
+    setContactsLoading(true);
+    try {
+      const url = userRole === 'parent'
+        ? `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutors`
+        : `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`;
+      const res = await fetch(url, {
+        headers: { 'Authorization': `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      if (userRole === 'parent') {
+        const tutors: Contact[] = (data.tutors || data || []).map((t: any) => ({
+          id: t.userId || t.id,
+          name: t.fullName || t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() || 'Tutor',
+          role: 'tutor',
+        })).filter((c: Contact) => c.id && c.id !== userId);
+        setContacts(tutors);
+      } else {
+        // For tutors: extract unique parents from bookings
+        const bookings: any[] = data.bookings || data || [];
+        const seen = new Set<string>();
+        const parents: Contact[] = [];
+        for (const b of bookings) {
+          const parentId = b.parentId || b.userId;
+          if (parentId && parentId !== userId && !seen.has(parentId)) {
+            seen.add(parentId);
+            parents.push({ id: parentId, name: b.parentName || b.userName || 'Parent', role: 'parent' });
+          }
+        }
+        setContacts(parents);
+      }
+    } catch (err) {
+      console.error('Error loading contacts:', err);
+    } finally {
+      setContactsLoading(false);
+    }
+  };
+
+  const startConversation = async (contact: Contact) => {
+    setStartingConv(true);
+    try {
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/conversations/get-or-create`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ participantId: contact.id, participantName: contact.name, participantRole: contact.role }),
+        }
+      );
+      if (!res.ok) { toast.error('Failed to start conversation'); return; }
+      const data = await res.json();
+      setShowNewConvDialog(false);
+      setContactSearch('');
+      await loadConversations();
+      if (data.conversation) {
+        setSelectedConversation(data.conversation);
+        loadMessages(data.conversation.id);
+      }
+    } catch (err) {
+      toast.error('Failed to start conversation');
+    } finally {
+      setStartingConv(false);
+    }
+  };
+
+  const filteredContacts = contacts.filter(c =>
+    !contactSearch || c.name.toLowerCase().includes(contactSearch.toLowerCase())
+  );
+
   return (
+    <>
+    <Dialog open={showNewConvDialog} onOpenChange={(open) => { setShowNewConvDialog(open); if (!open) setContactSearch(''); }}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Start a New Conversation</DialogTitle>
+        </DialogHeader>
+        <div className="space-y-3">
+          <div className="relative">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <Input
+              placeholder="Search by name..."
+              value={contactSearch}
+              onChange={(e) => setContactSearch(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <ScrollArea className="h-60">
+            {contactsLoading ? (
+              <p className="text-sm text-center py-4 text-gray-500">Loading contacts...</p>
+            ) : filteredContacts.length === 0 ? (
+              <p className="text-sm text-center py-4 text-gray-500">No contacts found</p>
+            ) : (
+              <div className="divide-y">
+                {filteredContacts.map(contact => (
+                  <button
+                    key={contact.id}
+                    onClick={() => startConversation(contact)}
+                    disabled={startingConv}
+                    className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 text-left transition-colors"
+                  >
+                    <Avatar>
+                      <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
+                        {contact.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                      </AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm">{contact.name}</p>
+                      <p className="text-xs text-gray-500 capitalize">{contact.role}</p>
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </ScrollArea>
+        </div>
+      </DialogContent>
+    </Dialog>
     <Card className="h-[600px] flex flex-col">
       <CardHeader className="border-b">
         <div className="flex items-center justify-between">
@@ -245,7 +375,7 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
       <CardContent className="flex-1 p-0 flex overflow-hidden">
         {/* Conversations List */}
         <div className="w-1/3 border-r flex flex-col">
-          <div className="p-4 border-b">
+          <div className="p-4 border-b space-y-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
@@ -255,6 +385,15 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
                 className="pl-10"
               />
             </div>
+            <Button
+              size="sm"
+              className="w-full text-white"
+              style={{ backgroundColor: '#625d9c' }}
+              onClick={() => { setShowNewConvDialog(true); loadContacts(); }}
+            >
+              <Plus className="w-4 h-4 mr-1" />
+              New Conversation
+            </Button>
           </div>
           
           <ScrollArea className="flex-1">
@@ -462,5 +601,6 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
         </div>
       </CardContent>
     </Card>
+    </>
   );
 }

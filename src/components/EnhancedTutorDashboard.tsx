@@ -1,4 +1,5 @@
 import TutorNestLogo from './TutorNestLogo';
+import { Chatroom } from './Chatroom';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { NotificationCenter } from './NotificationCenter';
@@ -259,6 +260,7 @@ export function EnhancedTutorDashboard({ profile, onSignOut }: EnhancedTutorDash
             <TabsTrigger value="schedule">Schedule</TabsTrigger>
             <TabsTrigger value="insights">Teaching Insights</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
+            <TabsTrigger value="messages">Messages</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -648,6 +650,20 @@ export function EnhancedTutorDashboard({ profile, onSignOut }: EnhancedTutorDash
                 </CardContent>
               </Card>
             </div>
+          </TabsContent>
+
+          {/* Messages Tab */}
+          <TabsContent value="messages">
+            {session ? (
+              <Chatroom
+                session={session}
+                userId={profile.userId || profile.id || ''}
+                userName={`${profile.firstName || ''} ${profile.lastName || ''}`.trim() || 'Tutor'}
+                userRole="tutor"
+              />
+            ) : (
+              <div className="text-center py-12 text-gray-500">Loading messages...</div>
+            )}
           </TabsContent>
         </Tabs>
       </main>

@@ -1024,7 +1024,7 @@ export function ParentDashboard({
 
           {/* Invoices Tab */}
           <TabsContent value="invoices">
-            <InvoiceManager userId={profile.id || profile.userId} />
+            <InvoiceManager userId={profile.id || profile.userId} session={session} />
           </TabsContent>
         </Tabs>
       </main>

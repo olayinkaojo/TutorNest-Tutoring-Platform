@@ -1005,6 +1005,118 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
     console.error('Post-booking email error (non-fatal):', emailErr.message);
   }
 
+  // ── Auto-generate invoice (non-fatal) ─────────────────────────────────────
+  try {
+    const [parentProfile, tutorProfile] = await Promise.all([
+      db.getProfile(payment.userId),
+      db.getProfile(payment.tutorId),
+    ]);
+    const resolvedTutorName =
+      tutorProfile?.fullName || tutorProfile?.full_name || tutorProfile?.name || 'Tutor';
+    const resolvedParentName =
+      parentProfile?.fullName || parentProfile?.full_name || parentProfile?.name || 'Parent';
+    const parentEmail = parentProfile?.email || '';
+
+    const now = new Date().toISOString();
+    const invoiceTimestamp = Date.now().toString().slice(-8);
+    const invoiceRandom = Math.floor(Math.random() * 1000).toString().padStart(3, '0');
+    const invoiceNumber = `INV-${invoiceTimestamp}-${invoiceRandom}`;
+    const invoiceId = crypto.randomUUID();
+
+    const invoice = {
+      id: invoiceId,
+      invoiceNumber,
+      paymentId: payment.id,
+      paymentReference: payment.reference,
+      // Parties
+      parentId: payment.userId,
+      studentId: payment.studentId,
+      tutorId: payment.tutorId,
+      tutorName: resolvedTutorName,
+      studentName: payment.studentName || '',
+      userName: resolvedParentName,
+      userEmail: parentEmail,
+      subject: payment.subject || 'General Tutoring',
+      // Line items
+      items: [{
+        description: `${plan.name} — ${payment.subject || 'Tutoring'} with ${resolvedTutorName} (${plan.sessions} session${plan.sessions > 1 ? 's' : ''})`,
+        quantity: plan.sessions,
+        unitPrice: Math.round(payment.amount / plan.sessions),
+        total: payment.amount,
+      }],
+      // Amounts
+      subtotal: payment.amount,
+      vatRate: 0,
+      vatAmount: 0,
+      discounts: [],
+      totalDiscounts: 0,
+      total: payment.amount,
+      currency: 'NGN',
+      currencySymbol: '₦',
+      // Payment
+      paymentMethod: 'Card (Flutterwave)',
+      // Status & dates
+      status: 'paid',
+      issueDate: now,
+      dueDate: now,
+      paidDate: now,
+      createdAt: now,
+      issuedBy: 'TutorNest Platform',
+    };
+
+    await kv.set(`invoice:${invoiceId}`, invoice);
+    // Map each booking to this invoice
+    for (const bId of bookingIds) {
+      await kv.set(`booking_invoice:${bId}`, invoiceId);
+    }
+    // Map payment to invoice
+    await kv.set(`payment_invoice:${payment.id}`, invoiceId);
+    // Append to parent's invoice list (idempotent)
+    const userInvoices: string[] = (await kv.get(`user_invoices:${payment.userId}`)) || [];
+    if (!userInvoices.includes(invoiceId)) {
+      userInvoices.push(invoiceId);
+      await kv.set(`user_invoices:${payment.userId}`, userInvoices);
+    }
+    console.log(`Invoice auto-created: ${invoiceNumber} for payment ${payment.id}`);
+  } catch (invoiceErr: any) {
+    console.error('Invoice auto-creation error (non-fatal):', invoiceErr.message);
+  }
+
+  // ── Auto-create parent ↔ tutor conversation (non-fatal) ───────────────────
+  try {
+    const [parentProfile, tutorProfile] = await Promise.all([
+      db.getProfile(payment.userId),
+      db.getProfile(payment.tutorId),
+    ]);
+    const resolvedTutorName =
+      tutorProfile?.fullName || tutorProfile?.full_name || tutorProfile?.name || 'Tutor';
+    const resolvedParentName =
+      parentProfile?.fullName || parentProfile?.full_name || parentProfile?.name || 'Parent';
+
+    const sortedIds = [payment.userId, payment.tutorId].sort();
+    const conversationId = `conversation:${sortedIds[0]}:${sortedIds[1]}`;
+    const existing = await kv.get(conversationId);
+    if (!existing) {
+      await kv.set(conversationId, {
+        id: conversationId,
+        participants: sortedIds,
+        participantRoles: {
+          [payment.userId]: 'parent',
+          [payment.tutorId]: 'tutor',
+        },
+        participantNames: {
+          [payment.userId]: resolvedParentName,
+          [payment.tutorId]: resolvedTutorName,
+        },
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      });
+      console.log(`Conversation auto-created between parent ${payment.userId} and tutor ${payment.tutorId}`);
+    }
+  } catch (convErr: any) {
+    console.error('Conversation auto-creation error (non-fatal):', convErr.message);
+  }
+
   return { sessionsCreated: bookingIds.length, bookingIds, paymentId: payment.id };
 }
 
