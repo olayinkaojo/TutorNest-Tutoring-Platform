@@ -253,8 +253,8 @@ export const parentAPI = {
     accessToken: string,
     bookingId: string,
     reason?: string
-  ): Promise<{ success: boolean; refundAmount: number }> {
-    const response = await makeRequest<{ success: boolean; refundAmount: number }>(
+  ): Promise<{ success: boolean; refundAmount: number; refundPercentage: number }> {
+    const response = await makeRequest<{ success: boolean; refundAmount: number; refundPercentage: number }>(
       `/bookings/${bookingId}/cancel`,
       accessToken,
       {
@@ -270,8 +270,8 @@ export const parentAPI = {
   async calculateRefund(
     accessToken: string,
     bookingId: string
-  ): Promise<{ refundAmount: number; percentage: number }> {
-    const response = await makeRequest<{ refundAmount: number; percentage: number }>(
+  ): Promise<{ refundAmount: number; refundPercentage: number; policy: string }> {
+    const response = await makeRequest<{ refundAmount: number; refundPercentage: number; policy: string }>(
       `/bookings/${bookingId}/calculate-refund`,
       accessToken
     );

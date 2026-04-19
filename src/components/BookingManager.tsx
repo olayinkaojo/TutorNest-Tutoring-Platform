@@ -76,25 +76,12 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
     setError('');
 
     try {
-      const params = studentId ? `?studentId=${studentId}` : '';
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings${params}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch bookings');
-      }
-
-      const data = await response.json();
-      setBookings(data.bookings || []);
+      // Use API client instead of hardcoded fetch
+      const bookingsList = await parentAPI.getBookings(session.access_token, studentId || '');
+      setBookings(bookingsList);
 
       // Fetch reports for all bookings at once (batch instead of individual)
-      const bookingIds = (data.bookings || []).map((b: Booking) => b.id);
+      const bookingIds = bookingsList.map((b: Booking) => b.id);
       
       if (bookingIds.length > 0) {
         try {
@@ -124,19 +111,16 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
     return canCancel(booking);
   };
 
-  const calculateRefund = (booking: Booking) => {
-    const bookingDateTime = new Date(`${booking.date}T${booking.startTime}`);
-    const now = new Date();
-    const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    const price = parseFloat(booking.price);
-    
-    if (hoursUntilBooking > 24) {
-      return price.toFixed(2); // 100% refund
-    } else if (hoursUntilBooking > 0) {
-      return (price * 0.5).toFixed(2); // 50% refund
-    } else {
-      return '0.00'; // No refund
+  const calculateRefund = async (booking: Booking): Promise<{ amount: string; percentage: number } | null> => {
+    try {
+      const refundData = await parentAPI.calculateRefund(session.access_token, booking.id);
+      return {
+        amount: refundData.refundAmount.toFixed(2),
+        percentage: refundData.refundPercentage,
+      };
+    } catch (err) {
+      console.error('Error calculating refund:', err);
+      return null;
     }
   };
 
@@ -147,29 +131,37 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
     setError('');
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings/${selectedBooking.id}/cancel`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
+      // Get refund info from backend before cancelling
+      const refundData = await parentAPI.calculateRefund(session.access_token, selectedBooking.id);
+      
+      // Show confirmation with actual refund amount
+      const confirmed = window.confirm(
+        `Are you sure you want to cancel this booking?\n\nRefund Amount: ₦${refundData.refundAmount.toFixed(2)} (${refundData.refundPercentage}%)`
       );
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to cancel booking');
+      
+      if (!confirmed) {
+        setCancelling(false);
+        return;
       }
 
-      setSuccess('Booking cancelled successfully. Refund will be processed shortly.');
-      setShowCancelConfirm(false);
-      setSelectedBooking(null);
-      await fetchBookings();
+      // Cancel the booking (backend handles refund calculation)
+      const response = await parentAPI.cancelBooking(
+        session.access_token,
+        selectedBooking.id,
+        'Cancelled by parent'
+      );
+
+      if (response.success) {
+        setSuccess(`Booking cancelled successfully. Refund of ₦${response.refundAmount.toFixed(2)} will be processed shortly.`);
+        setShowCancelConfirm(false);
+        setSelectedBooking(null);
+        await fetchBookings();
+      } else {
+        throw new Error('Failed to cancel booking');
+      }
     } catch (err: any) {
       console.error('Error cancelling booking:', err);
-      setError(err.message);
+      setError(err.message || 'Failed to cancel booking');
     } finally {
       setCancelling(false);
     }

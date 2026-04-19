@@ -54,7 +54,8 @@
     "sonner": "^2.0.3",
     "tailwind-merge": "*",
     "tw-animate-css": "^1.3.8",
-    "vaul": "^1.1.2"
+    "vaul": "^1.1.2",
+    "zod": "^3.25.76"
   },
   "devDependencies": {
     "@playwright/test": "^1.59.1",
