@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from './ui/card';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Check, Calendar, Clock, TrendingUp, Loader2, AlertCircle, CheckCircle } from 'lucide-react';
@@ -199,53 +199,51 @@ export function BookSessionWithPayment({
   // ─── Success screen ──────────────────────────────────────────────────────
   if (success) {
     return (
-      <Dialog open onOpenChange={(open) => { if (!open) onSuccess?.(success.sessions); }}>
-        <DialogContent className="max-w-md text-center">
-          <div className="py-6 space-y-4">
-            <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ backgroundColor: '#f0f4ff' }}>
-              <CheckCircle className="w-9 h-9" style={{ color: '#625d9c' }} />
-            </div>
-            <h2 className="text-xl font-bold">Booking Confirmed!</h2>
-            <p className="text-gray-600">
-              <span className="font-semibold">{success.sessions} session{success.sessions > 1 ? 's' : ''}</span> have been scheduled
-              with <span className="font-semibold">{tutorName}</span>.
-            </p>
-            <p className="text-sm text-gray-500">
-              Starting <strong>{new Date(startDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> at <strong>{startTime}</strong>
-            </p>
-            <Alert className="bg-blue-50 border-blue-200 text-left">
-              <AlertCircle className="h-4 w-4 text-blue-600" />
-              <AlertDescription className="text-blue-800 text-sm">
-                Calendar invites will be sent to both you and your tutor.
-              </AlertDescription>
-            </Alert>
-            <Button
-              className="w-full text-white"
-              style={{ backgroundColor: '#625d9c' }}
-              onClick={() => onSuccess?.(success.sessions)}
-            >
-              View My Bookings
-            </Button>
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md text-center p-8 space-y-4">
+          <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ backgroundColor: '#f0f4ff' }}>
+            <CheckCircle className="w-9 h-9" style={{ color: '#625d9c' }} />
           </div>
-        </DialogContent>
-      </Dialog>
+          <h2 className="text-xl font-bold">Booking Confirmed!</h2>
+          <p className="text-gray-600">
+            <span className="font-semibold">{success.sessions} session{success.sessions > 1 ? 's' : ''}</span> have been scheduled
+            with <span className="font-semibold">{tutorName}</span>.
+          </p>
+          <p className="text-sm text-gray-500">
+            Starting <strong>{new Date(startDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</strong> at <strong>{startTime}</strong>
+          </p>
+          <Alert className="bg-blue-50 border-blue-200 text-left">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 text-sm">
+              Calendar invites will be sent to both you and your tutor.
+            </AlertDescription>
+          </Alert>
+          <Button
+            className="w-full text-white"
+            style={{ backgroundColor: '#625d9c' }}
+            onClick={() => onSuccess?.(success.sessions)}
+          >
+            View My Bookings
+          </Button>
+        </div>
+      </div>
     );
   }
 
   // ─── Plan selector ───────────────────────────────────────────────────────
   return (
-    <Dialog open onOpenChange={(open) => { if (!open) onCancel?.(); }}>
-      <DialogContent className="max-w-3xl max-h-[86vh] overflow-y-auto p-0">
-        <div className="p-6 md:p-7 border-b bg-gradient-to-r from-indigo-50 via-white to-green-50 relative overflow-hidden">
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="p-6 md:p-7 border-b bg-gradient-to-r from-indigo-50 via-white to-green-50 relative overflow-hidden rounded-t-2xl">
           <div className="absolute -top-10 -right-10 w-28 h-28 rounded-full bg-indigo-200/30 blur-2xl" />
           <div className="absolute -bottom-8 -left-8 w-24 h-24 rounded-full bg-emerald-200/30 blur-2xl" />
-          <DialogHeader>
-            <DialogTitle className="text-xl md:text-2xl">Choose Your Tutoring Plan</DialogTitle>
-            <DialogDescription className="mt-1">
-            Book sessions with <span className="font-semibold" style={{ color: '#625d9c' }}>{tutorName}</span>
-            {subject ? ` for ${subject}` : ''}
-            </DialogDescription>
-          </DialogHeader>
+          <div className="relative z-10">
+            <h2 className="text-xl md:text-2xl font-bold text-gray-900">Choose Your Tutoring Plan</h2>
+            <p className="mt-1 text-sm text-gray-500">
+              Book sessions with <span className="font-semibold" style={{ color: '#625d9c' }}>{tutorName}</span>
+              {subject ? ` for ${subject}` : ''}
+            </p>
+          </div>
 
           <div className="mt-4 grid sm:grid-cols-3 gap-2 text-sm relative z-10">
             <div className="rounded-lg border bg-white/90 backdrop-blur px-3 py-2 shadow-sm">
@@ -399,7 +397,7 @@ export function BookSessionWithPayment({
           <Button variant="ghost" onClick={onCancel} disabled={!!processing}>Cancel</Button>
         </div>
         </div>
-      </DialogContent>
-    </Dialog>
+      </div>
+    </div>
   );
 }
