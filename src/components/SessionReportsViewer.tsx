@@ -32,9 +32,12 @@ import {
   BookOpen,
   MessageSquare,
   User,
-  Download
+  Download,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
+import { useRealtimeReports, WebSocketEvents } from '../hooks/useWebSocket';
 
 interface SessionReport {
   id: string;
@@ -85,6 +88,16 @@ export function SessionReportsViewer({
   const [filterTutor, setFilterTutor] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedStudent, setSelectedStudent] = useState(initialStudentId || 'all');
+
+  // Real-time updates via WebSocket
+  const handleRealtimeUpdate = (type: string, data: unknown) => {
+    if (type === WebSocketEvents.REPORT_SUBMITTED || type === WebSocketEvents.REPORT_UPDATED) {
+      // Refresh reports when new report is submitted
+      fetchReports();
+    }
+  };
+
+  const { isConnected } = useRealtimeReports(userId, accessToken, handleRealtimeUpdate);
 
   useEffect(() => {
     fetchReports();
@@ -175,7 +188,7 @@ export function SessionReportsViewer({
 
   return (
     <div className="space-y-6">
-      {/* Header */}
+      {/* Header with Connection Status */}
       <div className="flex items-center justify-between">
         <div>
           <h2 className="mb-2">
@@ -188,6 +201,20 @@ export function SessionReportsViewer({
             {viewType === 'parent' && 'Track your children\'s progress through detailed tutor feedback'}
             {viewType === 'student' && 'Review feedback and insights from your tutoring sessions'}
           </p>
+          {/* Connection Status Indicator */}
+          <div className="text-xs text-gray-500 flex items-center gap-2 mt-2">
+            {isConnected ? (
+              <>
+                <Wifi className="w-3 h-3 text-green-600" />
+                <span>Real-time updates active</span>
+              </>
+            ) : (
+              <>
+                <WifiOff className="w-3 h-3 text-gray-400" />
+                <span>Connecting...</span>
+              </>
+            )}
+          </div>
         </div>
         {filteredReports.length > 0 && (
           <Button onClick={exportToPDF} variant="outline">
