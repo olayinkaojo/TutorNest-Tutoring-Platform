@@ -106,6 +106,7 @@ export function TutorDashboard({
   const [parentRoleError, setParentRoleError] = useState<string | null>(null);
   const [parentRoleSuccess, setParentRoleSuccess] = useState(false);
   const [showRoleCongrats, setShowRoleCongrats] = useState(false);
+  const [showVerificationCongrats, setShowVerificationCongrats] = useState(false);
 
   // Assessment form state
   const [showAssessmentForm, setShowAssessmentForm] = useState(false);
@@ -162,6 +163,21 @@ export function TutorDashboard({
       localStorage.removeItem(congratsKey);
     }
   }, [profile.id, profile.userId]);
+
+  // Check if tutor was just verified and show congratulations
+  useEffect(() => {
+    if (!profile.id && !profile.userId) return;
+
+    const userId = profile.id || profile.userId;
+    const verificationCongratsKey = `tutornest_verification_congrats_${userId}`;
+    const hasSeenVerificationCongrats = localStorage.getItem(verificationCongratsKey);
+
+    // Check if profile shows verification is complete
+    if (!hasSeenVerificationCongrats && profile.verificationStatus === 'approved') {
+      setShowVerificationCongrats(true);
+      localStorage.setItem(verificationCongratsKey, 'true');
+    }
+  }, [profile.id, profile.userId, profile.verificationStatus]);
 
   // Get session for TutorInvitations
   useEffect(() => {
@@ -628,8 +644,12 @@ export function TutorDashboard({
     }
   }, [availableRoles, canBecomeParent, profile.id, profile.userId]);
 
-  const handleDismissCongrats = () => {
-    setShowRoleCongrats(false);
+  const handleDismissCongrats = (type: 'role' | 'verification' = 'role') => {
+    if (type === 'role') {
+      setShowRoleCongrats(false);
+    } else {
+      setShowVerificationCongrats(false);
+    }
   };
 
   // Debug logging
@@ -858,12 +878,44 @@ export function TutorDashboard({
                   <Button
                     variant="ghost"
                     size="sm"
-                    onClick={handleDismissCongrats}
+                    onClick={() => handleDismissCongrats('role')}
                     className="md:w-auto"
                   >
                     Dismiss
                   </Button>
                 </div>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
+        {/* Verification Congratulations Card - Show when tutor is verified */}
+        {session && profile.verificationStatus === 'approved' && showVerificationCongrats && (
+          <Card className="mb-6 border-green-200 bg-green-50">
+            <CardContent className="pt-6">
+              <div className="flex flex-col md:flex-row items-start md:items-center gap-4">
+                <div 
+                  className="p-3 rounded-lg flex-shrink-0"
+                  style={{ backgroundColor: '#10b98120' }}
+                >
+                  <CheckCircle className="w-8 h-8" style={{ color: '#10b981' }} />
+                </div>
+                <div className="flex-1">
+                  <h3 className="text-lg mb-1" style={{ color: '#10b981' }}>
+                    Congratulations! You're verified! 🎊
+                  </h3>
+                  <p className="text-sm text-gray-700">
+                    Your tutor profile has been verified and approved. You can now start accepting bookings and building your student base.
+                  </p>
+                </div>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => handleDismissCongrats('verification')}
+                  className="md:w-auto"
+                >
+                  Dismiss
+                </Button>
               </div>
             </CardContent>
           </Card>
