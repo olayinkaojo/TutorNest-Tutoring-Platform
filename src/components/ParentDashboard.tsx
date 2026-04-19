@@ -797,10 +797,11 @@ export function ParentDashboard({
                 </TabsList>
 
                 <TabsContent value="book-session">
-                  <SessionBookingCalendar 
-                    session={session} 
+                  <SessionBookingCalendar
+                    session={session}
                     activeChildId={activeChildId}
                     childName={activeChild ? `${activeChild.firstName} ${activeChild.lastName}` : undefined}
+                    childSubjects={activeChild?.subjects ?? []}
                   />
                 </TabsContent>
 

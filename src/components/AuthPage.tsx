@@ -74,7 +74,7 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
       setLoading(true);
       try {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: window.location.origin,
+          redirectTo: `${window.location.origin}`,
         });
 
         if (error) throw error;
@@ -138,10 +138,11 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
     setLoading(true);
 
     try {
+      const projectId = import.meta.env.VITE_SUPABASE_PROJECT_ID || 'wevmvbskunhnhuxzaqoz';
       const { error } = await supabase.auth.signInWithOAuth({
         provider: provider === 'apple' ? 'apple' : provider,
         options: {
-          redirectTo: `${window.location.origin}`,
+          redirectTo: `https://${projectId}.supabase.co/auth/v1/callback`,
         },
       });
 
