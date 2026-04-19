@@ -41,6 +41,7 @@ import { CreditsManager } from './CreditsManager';
 import { InvoiceManager } from './InvoiceManager';
 import { SubscriptionsPage } from './SubscriptionsPage';
 import { PaymentMethodManager } from './PaymentMethodManager';
+import { ParentPaymentsDashboard } from './ParentPaymentsDashboard';
 
 interface UserProfile {
   id: string;
@@ -1003,7 +1004,7 @@ export function ParentDashboard({
           {/* Payments Tab */}
           <TabsContent value="payments">
             {session && (
-              <PaymentMethodManager session={session} />
+              <ParentPaymentsDashboard accessToken={session.access_token} />
             )}
           </TabsContent>
 
