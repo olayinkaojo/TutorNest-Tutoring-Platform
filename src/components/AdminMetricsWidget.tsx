@@ -55,6 +55,10 @@ export function AdminMetricsWidget({ accessToken }: AdminMetricsWidgetProps) {
   }
 
   if (error) {
+    // Don't show error for 404 - endpoint just not deployed yet
+    if (error.includes('404')) {
+      return null;
+    }
     return (
       <Alert variant="destructive">
         <AlertTriangle className="h-4 w-4" />

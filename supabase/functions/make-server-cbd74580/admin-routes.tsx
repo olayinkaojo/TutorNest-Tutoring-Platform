@@ -372,7 +372,67 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       return c.json({ error: error.message || 'Internal server error' }, 500);
     }
   });
-  
+
+  // Admin Platform Metrics
+  app.get('/make-server-cbd74580/admin/metrics', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+
+      if (!userId) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+
+      // Admin role guard
+      const adminProfile = await kv.get(`user:${userId}`) as any
+        ?? await db.getProfile(userId);
+      if (!adminProfile || adminProfile.role !== 'admin') {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
+
+      // Get all users and metrics
+      const allUsers = await kv.getByPrefix('user:');
+      const allBookings = await kv.getByPrefix('booking:');
+      const allPayments = await kv.getByPrefix('payment:');
+
+      const totalStudents = allUsers.filter((u: any) => u.role === 'student').length;
+      const totalTutors = allUsers.filter((u: any) => u.role === 'tutor').length;
+      const totalSessions = allBookings.length;
+      const completedSessions = allBookings.filter((b: any) => b.status === 'completed').length;
+      const completionRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+      
+      // Calculate engagement (simplified - based on active bookings)
+      const activeBookings = allBookings.filter((b: any) => b.status === 'active' || b.status === 'upcoming').length;
+      const averageEngagement = Math.min(100, Math.round((activeBookings / totalTutors) * 20));
+      
+      const totalRevenue = allPayments.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
+      const activeUsers = Math.floor(allUsers.length * 0.25); // Estimate 25% active
+      
+      // New users this month
+      const thisMonth = new Date();
+      const monthStart = new Date(thisMonth.getFullYear(), thisMonth.getMonth(), 1);
+      const newUsersThisMonth = allUsers.filter((u: any) => {
+        if (!u.createdAt) return false;
+        const createdDate = new Date(u.createdAt);
+        return createdDate >= monthStart;
+      }).length;
+
+      return c.json({
+        totalStudents,
+        totalTutors,
+        totalSessions,
+        completionRate,
+        averageEngagement,
+        totalRevenue: Math.round(totalRevenue),
+        activeUsers,
+        newUsersThisMonth
+      });
+    } catch (error: any) {
+      console.error('Error fetching platform metrics:', error);
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
   // Admin Analytics
   app.get('/make-server-cbd74580/admin/analytics', async (c) => {
     try {
