@@ -125,6 +125,9 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
         { label: 'Email', value: selectedUser.email },
         { label: 'Phone Number', value: selectedUser.profileSummary?.phone || selectedUser.phone },
         { label: 'Location', value: selectedUser.profileSummary?.location || selectedUser.location },
+        { label: 'Professional Headline', value: selectedUser.profileSummary?.headline || selectedUser.headline },
+        { label: 'Education Level', value: selectedUser.profileSummary?.educationLevel || selectedUser.educationLevel || selectedUser.education_level },
+        { label: 'Institution', value: selectedUser.profileSummary?.institution || selectedUser.institution },
         { label: 'Bio', value: selectedUser.profileSummary?.bio || selectedUser.bio },
         { label: 'Hourly Rate', value: selectedUser.profileSummary?.hourlyRate ?? selectedUser.hourlyRate ?? selectedUser.hourly_rate ? `₦${Number(selectedUser.profileSummary?.hourlyRate ?? selectedUser.hourlyRate ?? selectedUser.hourly_rate).toLocaleString()} / session` : '' },
         { label: 'Experience Years', value: selectedUser.profileSummary?.experienceYears ?? selectedUser.experienceYears ?? selectedUser.experience_years },
@@ -619,6 +622,13 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
                     <CardContent className="pt-6 space-y-4">
                       <div className="flex items-start gap-4">
                         <Avatar className="w-16 h-16">
+                          {(selectedUser.photo_url || selectedUser.photoUrl) && (
+                            <img
+                              src={selectedUser.photo_url || selectedUser.photoUrl}
+                              alt="Profile photo"
+                              className="w-full h-full object-cover rounded-full"
+                            />
+                          )}
                           <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
                             {getUserInitials(selectedUser)}
                           </AvatarFallback>

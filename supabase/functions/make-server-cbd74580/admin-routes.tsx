@@ -445,16 +445,35 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       const allUsers = await kv.getByPrefix('user:');
       
       // Enhance users with additional admin data
-      const enhancedUsers = allUsers.map((user: any) => ({
-        ...user,
-        status: user.suspended ? 'suspended' : user.banned ? 'banned' : user.deleted ? 'deleted' : 'active',
-        verificationStatus: user.verificationStatus || (user.role === 'tutor' ? 'pending' : 'verified'),
-        totalSessions: user.totalSessions || 0,
-        totalSpent: user.totalSpent || 0,
-        flagCount: user.flagCount || 0,
-        notes: user.adminNotes || '',
-        lastLogin: user.lastLogin || user.createdAt
-      }));
+      const enhancedUsers = allUsers.map((user: any) => {
+        const resolvedName =
+          user.full_name || user.fullName || user.name ||
+          `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown';
+        return {
+          ...user,
+          displayName: resolvedName,
+          status: user.suspended ? 'suspended' : user.banned ? 'banned' : user.deleted ? 'deleted' : 'active',
+          verificationStatus: user.verificationStatus || (user.role === 'tutor' ? 'pending' : 'verified'),
+          totalSessions: user.totalSessions || 0,
+          totalSpent: user.totalSpent || 0,
+          flagCount: user.flagCount || 0,
+          notes: user.adminNotes || '',
+          lastLogin: user.lastLogin || user.createdAt,
+          // Ensure all tutor profile fields are surfaced for admin display
+          photo_url: user.photo_url || user.photoUrl || null,
+          photoUrl: user.photo_url || user.photoUrl || null,
+          headline: user.headline || '',
+          education_level: user.education_level || user.educationLevel || '',
+          educationLevel: user.education_level || user.educationLevel || '',
+          institution: user.institution || '',
+          experience_years: user.experience_years ?? user.experienceYears ?? null,
+          experienceYears: user.experience_years ?? user.experienceYears ?? null,
+          dbs_checked: user.dbs_checked === true || user.dbsChecked === true,
+          dbsChecked: user.dbs_checked === true || user.dbsChecked === true,
+          has_insurance: user.has_insurance === true || user.hasInsurance === true,
+          hasInsurance: user.has_insurance === true || user.hasInsurance === true,
+        };
+      });
       
       // Sort by creation date (newest first)
       const sortedUsers = enhancedUsers.sort((a: any, b: any) => {
@@ -1434,16 +1453,12 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       for (const tutor of pendingTutors) {
         const verification = await kv.get(`verification:${tutor.id || tutor.userId}`) as any;
         
+        const resolvedName =
+          tutor.full_name || tutor.fullName || tutor.name ||
+          `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim() || 'Unknown Tutor';
+
         verifications.push({
           userId: tutor.id || tutor.userId,
-          name: `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim(),
-          email: tutor.email,
-          subjects: tutor.subjects || [],
-          qualifications: tutor.qualifications || '',
-          experience: tutor.experience || '',
-          bio: tutor.bio || '',
-          hasDbsCheck: tutor.dbs_checked || false,
-          hasInsurance: tutor.has_insurance || false,
           submittedAt: tutor.createdAt,
           kycStatus: verification?.kycStatus || 'pending',
           dbsStatus: verification?.dbsStatus || 'pending',
@@ -1451,7 +1466,47 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
             dbs: tutor.dbsCertificateUrl || null,
             qualifications: tutor.qualificationCertificates || [],
             insurance: tutor.insuranceDocumentUrl || null
-          }
+          },
+          profile: {
+            ...tutor,
+            fullName: resolvedName,
+            full_name: resolvedName,
+            email: tutor.email,
+            phone: tutor.phone || tutor.phone_number || '',
+            location: tutor.location || '',
+            headline: tutor.headline || '',
+            bio: tutor.bio || '',
+            education_level: tutor.education_level || tutor.educationLevel || '',
+            institution: tutor.institution || '',
+            hourly_rate: tutor.hourly_rate || tutor.hourlyRate || null,
+            hourlyRate: tutor.hourly_rate || tutor.hourlyRate || null,
+            experience_years: tutor.experience_years ?? tutor.experienceYears ?? null,
+            experienceYears: tutor.experience_years ?? tutor.experienceYears ?? null,
+            qualifications: tutor.qualifications || '',
+            teaching_style: tutor.teaching_style || tutor.teachingStyle || '',
+            teachingStyle: tutor.teaching_style || tutor.teachingStyle || '',
+            subjects: tutor.subjects || [],
+            age_groups: tutor.age_groups || tutor.ageGroups || [],
+            ageGroups: tutor.age_groups || tutor.ageGroups || [],
+            classes: tutor.classes || [],
+            teaching_format: tutor.teaching_format || tutor.teachingFormat || '',
+            teachingFormat: tutor.teaching_format || tutor.teachingFormat || '',
+            group_size: tutor.group_size || tutor.groupSize || '',
+            groupSize: tutor.group_size || tutor.groupSize || '',
+            exam_boards: tutor.exam_boards || tutor.examBoards || [],
+            examBoards: tutor.exam_boards || tutor.examBoards || [],
+            learning_difficulties: tutor.learning_difficulties || tutor.learningDifficulties || [],
+            learningDifficulties: tutor.learning_difficulties || tutor.learningDifficulties || [],
+            methodologies: tutor.methodologies || [],
+            languages: tutor.languages || [],
+            dbs_checked: tutor.dbs_checked === true || tutor.dbsChecked === true,
+            dbsChecked: tutor.dbs_checked === true || tutor.dbsChecked === true,
+            has_insurance: tutor.has_insurance === true || tutor.hasInsurance === true,
+            hasInsurance: tutor.has_insurance === true || tutor.hasInsurance === true,
+            hasDbsCheck: tutor.dbs_checked === true || tutor.dbsChecked === true,
+            photo_url: tutor.photo_url || tutor.photoUrl || null,
+            photoUrl: tutor.photo_url || tutor.photoUrl || null,
+          },
         });
       }
 

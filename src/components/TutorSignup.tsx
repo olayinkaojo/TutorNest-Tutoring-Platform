@@ -149,6 +149,9 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   const [emailExists, setEmailExists] = useState(false);
   const [isExistingUser, setIsExistingUser] = useState(false);
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
+  const [photoPreview, setPhotoPreview] = useState<string | null>(null);
+  const [photoUploading, setPhotoUploading] = useState(false);
 
   // Step 1: Account Info - Pre-fill if initial data, session, or existing profile is provided
   const [email, setEmail] = useState(
@@ -216,6 +219,48 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   const [hasInsurance, setHasInsurance] = useState(false);
   const [agreeBackgroundCheck, setAgreeBackgroundCheck] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
+
+  const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
+      setError('Please upload a JPG, PNG, or WebP image.');
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setError('Photo must be under 5 MB.');
+      return;
+    }
+    setPhotoFile(file);
+    setPhotoPreview(URL.createObjectURL(file));
+    setError('');
+  };
+
+  const uploadPhoto = async (userId: string): Promise<string | null> => {
+    if (!photoFile) return null;
+    setPhotoUploading(true);
+    try {
+      const ext = photoFile.name.split('.').pop();
+      const path = `${userId}/passport.${ext}`;
+      const bucketName = 'tutor-photos';
+      const { data: buckets } = await supabase.storage.listBuckets();
+      const exists = buckets?.some((b: any) => b.name === bucketName);
+      if (!exists) {
+        await supabase.storage.createBucket(bucketName, { public: true });
+      }
+      const { error: upErr } = await supabase.storage
+        .from(bucketName)
+        .upload(path, photoFile, { upsert: true, contentType: photoFile.type });
+      if (upErr) throw upErr;
+      const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(path);
+      return urlData.publicUrl ?? null;
+    } catch (err: any) {
+      console.warn('Photo upload failed:', err.message);
+      return null;
+    } finally {
+      setPhotoUploading(false);
+    }
+  };
 
   const toggleItem = (item: string, list: string[], setList: (items: string[]) => void) => {
     if (list.includes(item)) {
@@ -388,7 +433,10 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
       if (!isExistingUser) {
         console.log('Creating new tutor account for:', email);
 
-        const tutorProfileData = {
+        // For new users: sign up first to get userId, then upload photo
+        // We'll include photo_url as a placeholder and update after signup if needed.
+        // For simplicity: create account, get userId from response, then upload photo and patch profile.
+        const tutorProfileData: any = {
           full_name: fullName,
           email,
           phone,
@@ -420,6 +468,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         };
 
         let signupResponse;
+        // Note: photo upload happens after signup using the returned userId
         try {
           signupResponse = await fetch(
             `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/signup`,
@@ -460,6 +509,22 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
           throw new Error('Failed to create account');
         }
 
+        // If a photo was selected, upload it now using the new userId
+        if (photoFile && signupData.userId) {
+          const photoUrl = await uploadPhoto(signupData.userId);
+          if (photoUrl && signupData.accessToken) {
+            // Patch the profile with the photo URL
+            await fetch(
+              `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profiles/${signupData.userId}`,
+              {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${signupData.accessToken}` },
+                body: JSON.stringify({ photo_url: photoUrl }),
+              }
+            ).catch(() => {});
+          }
+        }
+
         // Email confirmation required — show the "check your email" screen
         setEmailConfirmationSent(true);
         return;
@@ -476,8 +541,14 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         throw new Error('No access token available to create profile');
       }
 
+      // Upload photo for existing users (userId is already known)
+      let existingUserPhotoUrl: string | null = null;
+      if (photoFile && userId) {
+        existingUserPhotoUrl = await uploadPhoto(userId);
+      }
+
       // Existing user: update profile via backend
-      const profileData = {
+      const profileData: any = {
         full_name: fullName,
         email,
         phone,
@@ -506,6 +577,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         verificationStatus: 'pending',
         role: 'tutor',
         onboardingComplete: true,
+        ...(existingUserPhotoUrl ? { photo_url: existingUserPhotoUrl } : {}),
       };
 
       const profileResponse = await fetch(
@@ -791,6 +863,53 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                     </div>
                   </>
                 )}
+
+                {/* Passport Photo */}
+                <div>
+                  <Label>Passport Photo</Label>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Upload a clear headshot (JPG, PNG or WebP, max 5 MB). Displayed to parents when booking and to admins during verification.
+                  </p>
+                  <div className="flex items-center gap-4">
+                    {photoPreview ? (
+                      <img
+                        src={photoPreview}
+                        alt="Preview"
+                        className="w-20 h-20 rounded-full object-cover border-2 border-[#625d9c]"
+                      />
+                    ) : (
+                      <div
+                        className="w-20 h-20 rounded-full bg-gray-100 flex items-center justify-center border-2 border-dashed border-gray-300"
+                      >
+                        <User className="w-8 h-8 text-gray-400" />
+                      </div>
+                    )}
+                    <div>
+                      <label
+                        htmlFor="photoUpload"
+                        className="cursor-pointer inline-flex items-center gap-2 px-4 py-2 rounded-md text-sm font-medium border border-[#625d9c] text-[#625d9c] hover:bg-[#f0edfb] transition-colors"
+                      >
+                        {photoPreview ? 'Change Photo' : 'Upload Photo'}
+                        <input
+                          id="photoUpload"
+                          type="file"
+                          accept="image/jpeg,image/png,image/webp"
+                          className="hidden"
+                          onChange={handlePhotoChange}
+                        />
+                      </label>
+                      {photoPreview && (
+                        <button
+                          type="button"
+                          onClick={() => { setPhotoFile(null); setPhotoPreview(null); }}
+                          className="block mt-1 text-xs text-gray-500 hover:text-red-500"
+                        >
+                          Remove
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                </div>
               </CardContent>
             </Card>
           )}
@@ -1309,7 +1428,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                   className="text-white"
                   style={{ backgroundColor: '#5d9827' }}
                 >
-                  {loading ? 'Creating Account...' : 'Complete Registration'}
+                  {photoUploading ? 'Uploading Photo...' : loading ? 'Creating Account...' : 'Complete Registration'}
                 </Button>
               )}
             </div>

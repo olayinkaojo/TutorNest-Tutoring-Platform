@@ -251,13 +251,33 @@ export function AdminVerificationDashboard({ session }: AdminVerificationDashboa
                   </TabsList>
 
                   <TabsContent value="details" className="space-y-6 mt-6">
-                    <div>
-                      <h2 style={{ color: '#625d9c' }}>
-                        {selectedVerification.profile?.firstName && selectedVerification.profile?.lastName 
-                          ? `${selectedVerification.profile.firstName} ${selectedVerification.profile.lastName}`
-                          : selectedVerification.profile?.fullName || selectedVerification.profile?.full_name || 'Unknown Tutor'}
-                      </h2>
-                      <p className="text-gray-600">{selectedVerification.profile?.email}</p>
+                    <div className="flex items-start gap-4">
+                      {selectedVerification.profile?.photo_url || selectedVerification.profile?.photoUrl ? (
+                        <img
+                          src={selectedVerification.profile.photo_url || selectedVerification.profile.photoUrl}
+                          alt="Passport photo"
+                          className="w-20 h-20 rounded-full object-cover border-2 border-purple-200 flex-shrink-0"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                          <User className="w-10 h-10 text-purple-400" />
+                        </div>
+                      )}
+                      <div>
+                        <h2 style={{ color: '#625d9c' }}>
+                          {selectedVerification.profile?.fullName || selectedVerification.profile?.full_name || 'Unknown Tutor'}
+                        </h2>
+                        {selectedVerification.profile?.headline && (
+                          <p className="text-sm italic text-gray-600 mt-0.5">{selectedVerification.profile.headline}</p>
+                        )}
+                        <p className="text-gray-600 text-sm mt-1">{selectedVerification.profile?.email}</p>
+                        {(selectedVerification.profile?.education_level || selectedVerification.profile?.educationLevel) && (
+                          <p className="text-sm text-gray-500 mt-0.5">
+                            {selectedVerification.profile.education_level || selectedVerification.profile.educationLevel}
+                            {selectedVerification.profile?.institution ? ` · ${selectedVerification.profile.institution}` : ''}
+                          </p>
+                        )}
+                      </div>
                     </div>
 
                     <div className="grid md:grid-cols-2 gap-4">

@@ -75,6 +75,8 @@ interface Tutor {
   hasInsurance?: boolean;
   // Engagement
   rating?: number;
+  // Photo
+  photoUrl?: string;
 }
 
 interface TimeSlot {
@@ -171,6 +173,8 @@ export function SessionBookingCalendar({
           // Safeguarding
           dbsChecked:   tutor.dbsChecked   === true || tutor.dbs_checked   === true || tutor.dbs === true,
           hasInsurance: tutor.hasInsurance === true || tutor.has_insurance  === true,
+          // Photo
+          photoUrl: tutor.photoUrl || tutor.photo_url || null,
           // Engagement
           hourlyRate: 20000,
           availability: tutor.availability,
@@ -337,12 +341,20 @@ export function SessionBookingCalendar({
           {/* ── Header ── */}
           <div className="p-6 border-b bg-gradient-to-r from-purple-50 to-indigo-50 rounded-t-2xl">
             <div className="flex items-start gap-4">
-              <div
-                className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0"
-                style={{ backgroundColor: '#625d9c' }}
-              >
-                {initials}
-              </div>
+              {tutor.photoUrl ? (
+                <img
+                  src={tutor.photoUrl}
+                  alt={tutor.name}
+                  className="w-16 h-16 rounded-full object-cover flex-shrink-0 border-2 border-white shadow"
+                />
+              ) : (
+                <div
+                  className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0"
+                  style={{ backgroundColor: '#625d9c' }}
+                >
+                  {initials}
+                </div>
+              )}
               <div className="flex-1 min-w-0">
                 <h2 className="text-xl font-bold text-gray-900">{tutor.name}</h2>
                 {tutor.headline && (
@@ -556,12 +568,20 @@ export function SessionBookingCalendar({
         >
           <div className="flex items-start gap-3">
             {/* Avatar */}
-            <div
-              className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
-              style={{ backgroundColor: '#625d9c' }}
-            >
-              {tutor.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-            </div>
+            {tutor.photoUrl ? (
+              <img
+                src={tutor.photoUrl}
+                alt={tutor.name}
+                className="w-11 h-11 rounded-full object-cover flex-shrink-0 border border-gray-200"
+              />
+            ) : (
+              <div
+                className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
+                style={{ backgroundColor: '#625d9c' }}
+              >
+                {tutor.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+              </div>
+            )}
 
             <div className="flex-1 min-w-0">
               {/* Name + safeguarding badges */}
