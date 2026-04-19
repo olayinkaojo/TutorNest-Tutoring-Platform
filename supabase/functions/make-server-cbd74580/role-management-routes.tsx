@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
+import { sendEmail, emailTemplates } from './email-service.tsx';
 
 const app = new Hono();
 
@@ -126,6 +127,39 @@ app.post('/add-role', async (c) => {
 
     console.log(`Added role ${newRole} to user ${userId}`);
     console.log(`User now has roles:`, updatedRoles);
+
+    // Send congratulations email
+    const userProfile = await kv.get(`user:${userId}`) as any;
+    if (userProfile?.email) {
+      const emailData = emailTemplates.roleAdditionCongratulations(
+        userProfile.fullName || userProfile.name || 'User',
+        newRole,
+        `https://tutornest.org/dashboard`
+      );
+      await sendEmail({
+        to: userProfile.email,
+        subject: emailData.subject,
+        html: emailData.html,
+        replyTo: 'support@tutornest.org'
+      });
+    }
+
+    // If adding tutor role, also send verification pending email
+    if (newRole === 'tutor' && userProfile?.email) {
+      const verificationEmailData = emailTemplates.tutorVerificationPending(
+        userProfile.fullName || userProfile.name || 'Tutor',
+        `https://tutornest.org/tutor-dashboard`
+      );
+      // Small delay to avoid overwhelming the email service
+      setTimeout(async () => {
+        await sendEmail({
+          to: userProfile.email,
+          subject: verificationEmailData.subject,
+          html: verificationEmailData.html,
+          replyTo: 'support@tutornest.org'
+        });
+      }, 1000);
+    }
 
     return c.json({
       success: true,

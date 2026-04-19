@@ -439,6 +439,10 @@ export function ParentDashboard({
 
       if (response.ok) {
         setTutorRoleSuccess(true);
+        // Mark that congratulations should show on tutor dashboard first load
+        const userId = profile.id || profile.userId;
+        localStorage.setItem(`tutornest_show_tutor_congrats_${userId}`, 'true');
+        
         setTimeout(() => {
           // Instead of redirecting to signup, switch to the tutor role
           // This will show the TutorDashboard where they can complete their profile

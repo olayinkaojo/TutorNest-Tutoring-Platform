@@ -148,6 +148,21 @@ export function TutorDashboard({
     console.log('TutorDashboard - Should show RoleSwitcher?', availableRoles && availableRoles.length > 1);
   }, [availableRoles]);
 
+  // Check if should show congratulations for newly added tutor role
+  useEffect(() => {
+    if (!profile.id && !profile.userId) return;
+
+    const userId = profile.id || profile.userId;
+    const congratsKey = `tutornest_show_tutor_congrats_${userId}`;
+    const shouldShow = localStorage.getItem(congratsKey);
+
+    if (shouldShow) {
+      setShowRoleCongrats(true);
+      // Clear the flag so it doesn't show again
+      localStorage.removeItem(congratsKey);
+    }
+  }, [profile.id, profile.userId]);
+
   // Get session for TutorInvitations
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session } }) => {

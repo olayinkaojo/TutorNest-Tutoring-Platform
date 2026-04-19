@@ -715,4 +715,132 @@ export const emailTemplates = {
       </div>
     `,
   }),
+
+  // Tutor verification pending (for new tutor signups or role additions)
+  tutorVerificationPending: (tutorName: string, dashboardLink: string) => ({
+    subject: "Welcome to TutorNest! Your Verification is Under Review",
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #625d9c 0%, #8b7cb8 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 26px;">Welcome to TutorNest! 👋</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">Your Tutor Application is Under Review</p>
+        </div>
+        
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p style="font-size: 16px; color: #333;">Hi ${tutorName},</p>
+          
+          <p style="font-size: 15px; color: #555; line-height: 1.6;">
+            Excellent! We've received your tutor application and we're excited to have you join the TutorNest community. Our verification team is currently reviewing your qualifications and credentials.
+          </p>
+          
+          <div style="background-color: #f0f4ff; border-left: 4px solid #625d9c; padding: 20px; margin: 25px 0; border-radius: 4px;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #625d9c; font-size: 15px;">⏳ Verification Timeline</p>
+            <p style="margin: 0; color: #555; font-size: 14px; line-height: 1.5;">
+              We typically complete verification within <strong>2-5 business days</strong>. You'll receive an email as soon as your verification is complete.
+            </p>
+          </div>
+          
+          <p style="font-size: 15px; color: #555; margin: 25px 0 15px 0; font-weight: bold;">While You Wait:</p>
+          <ul style="color: #555; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 25px;">
+            <li>Complete your tutor profile with bio, rates, and availability</li>
+            <li>Upload professional profile photo and credentials</li>
+            <li>Set up your payment methods</li>
+            <li>Explore our tutor resources and guidelines</li>
+            <li>Join the TutorNest tutor community</li>
+          </ul>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${dashboardLink}" style="display: inline-block; background: linear-gradient(135deg, #625d9c 0%, #8b7cb8 100%); color: white; padding: 14px 40px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+              Go to Your Dashboard
+            </a>
+          </div>
+          
+          <div style="background-color: #fef3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 25px 0; border-radius: 4px;">
+            <p style="margin: 0; color: #856404; font-size: 14px; font-weight: bold;">📋 Pro Tips:</p>
+            <ul style="margin: 5px 0 0 0; color: #856404; font-size: 13px; padding-left: 20px;">
+              <li>A complete profile increases verification speed</li>
+              <li>Professional photo helps build student trust</li>
+              <li>Clear teaching rates and availability are essential</li>
+            </ul>
+          </div>
+          
+          <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
+            Have questions about the verification process? Reply to this email or contact our support team at support@tutornest.org. We're here to help!
+          </p>
+          
+          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
+            <p style="margin: 0 0 5px 0;">We're excited to get you started! 🚀</p>
+            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    `,
+  }),
+
+  // Role addition congratulations (when parent becomes tutor or tutor becomes parent)
+  roleAdditionCongratulations: (userName: string, newRole: string, dashboardLink: string) => ({
+    subject: `🎉 Welcome to Your New ${newRole === 'tutor' ? 'Tutor' : 'Parent'} Role!`,
+    html: `
+      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
+        <div style="background: linear-gradient(135deg, #5d9827 0%, #4CAF50 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
+          <h1 style="margin: 0; font-size: 28px;">🎉 Congratulations!</h1>
+          <p style="margin: 10px 0 0 0; font-size: 16px;">You're now a ${newRole}</p>
+        </div>
+        
+        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
+          <p style="font-size: 16px; color: #333;">Hi ${userName},</p>
+          
+          <p style="font-size: 15px; color: #555; line-height: 1.6;">
+            Fantastic! You've successfully added the <strong>${newRole}</strong> role to your TutorNest account. You now have access to ${newRole === 'tutor' ? 'tutor dashboards, booking management, and earning opportunities' : 'parent dashboards, student management, and learning tools'}.
+          </p>
+          
+          <div style="background-color: #e8f5e9; border-left: 4px solid #5d9827; padding: 20px; margin: 25px 0; border-radius: 4px;">
+            <p style="margin: 0 0 10px 0; font-weight: bold; color: #2e7d32; font-size: 15px;">✅ What's New:</p>
+            <p style="margin: 0; color: #555; font-size: 14px; line-height: 1.5;">
+              ${newRole === 'tutor' 
+                ? 'You can now offer tutoring services, manage student bookings, and earn competitive payments. Your profile will be visible to students once verification is complete.' 
+                : 'You can now find and book tutors for your children, manage student profiles, and track learning progress.'}
+            </p>
+          </div>
+          
+          <p style="font-size: 15px; color: #555; margin: 25px 0 15px 0; font-weight: bold;">Getting Started:</p>
+          <ul style="color: #555; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 25px;">
+            ${newRole === 'tutor' ? `
+              <li>Complete your tutor profile with qualifications and experience</li>
+              <li>Set your teaching rates and availability</li>
+              <li>Wait for verification (typically 2-5 business days)</li>
+              <li>Start accepting bookings from students!</li>
+            ` : `
+              <li>Add your children to your parent account</li>
+              <li>Browse qualified tutors in your area</li>
+              <li>Book tutoring sessions that fit your schedule</li>
+              <li>Monitor your children's learning progress</li>
+            `}
+          </ul>
+          
+          <div style="text-align: center; margin: 30px 0;">
+            <a href="${dashboardLink}" style="display: inline-block; background: linear-gradient(135deg, #5d9827 0%, #4CAF50 100%); color: white; padding: 14px 40px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
+              Go to ${newRole === 'tutor' ? 'Tutor' : 'Parent'} Dashboard
+            </a>
+          </div>
+          
+          <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 25px 0; border-radius: 4px;">
+            <p style="margin: 0; color: #0d47a1; font-size: 14px; font-weight: bold;">ℹ️ Switch Between Roles</p>
+            <p style="margin: 5px 0 0 0; color: #0d47a1; font-size: 13px; line-height: 1.5;">
+              You can easily switch between your ${newRole === 'tutor' ? 'parent and tutor' : 'tutor and parent'} roles anytime from your dashboard. Simply use the role switcher in your account menu.
+            </p>
+          </div>
+          
+          <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
+            Have questions or need assistance? Our support team is always available at support@tutornest.org.
+          </p>
+          
+          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
+            <p style="margin: 0 0 5px 0;">Welcome to your new TutorNest experience! 🚀</p>
+            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+          </div>
+        </div>
+      </div>
+    `,
+  }),
 };
