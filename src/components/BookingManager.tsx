@@ -9,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { PostSessionReport } from './PostSessionReport';
 import { ViewSessionReport } from './ViewSessionReport';
 import { parentAPI } from '../utils/api-client';
+import { useRealtimeBookings, WebSocketEvents } from '../hooks/useWebSocket';
 import {
   Calendar,
   Clock,
@@ -22,6 +23,8 @@ import {
   Ban,
   FileText,
   BookOpen,
+  Wifi,
+  WifiOff,
 } from 'lucide-react';
 
 interface BookingManagerProps {
@@ -63,12 +66,43 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
   const [showViewReport, setShowViewReport] = useState<Booking | null>(null);
   const [bookingReports, setBookingReports] = useState<Record<string, any>>({});
 
+  // Real-time updates via WebSocket
+  const handleRealtimeUpdate = (type: string, data: unknown) => {
+    switch (type) {
+      case WebSocketEvents.BOOKING_CREATED:
+        setSuccess('New booking created');
+        fetchBookings();
+        break;
+
+      case WebSocketEvents.BOOKING_CONFIRMED:
+        setSuccess('Booking confirmed');
+        fetchBookings();
+        break;
+
+      case WebSocketEvents.BOOKING_CANCELLED:
+        setSuccess('Booking cancelled');
+        fetchBookings();
+        break;
+
+      case WebSocketEvents.BOOKING_UPDATED:
+        setSuccess('Booking updated');
+        fetchBookings();
+        break;
+
+      case WebSocketEvents.REPORT_SUBMITTED:
+        setSuccess('Session report submitted by tutor');
+        fetchBookings();
+        break;
+
+      default:
+        break;
+    }
+  };
+
+  const { isConnected } = useRealtimeBookings(studentId || userId, session.access_token, handleRealtimeUpdate);
+
   useEffect(() => {
     fetchBookings();
-
-    // Poll for booking updates every 30 seconds
-    const interval = setInterval(fetchBookings, 30000);
-    return () => clearInterval(interval);
   }, [studentId]);
 
   const fetchBookings = async () => {
@@ -515,14 +549,15 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
         </Alert>
       )}
 
-      <Tabs defaultValue="upcoming">
-        <TabsList>
-          <TabsTrigger value="upcoming">
-            Upcoming ({upcomingBookings.length})
-          </TabsTrigger>
-          <TabsTrigger value="past">
-            Past ({pastBookings.length})
-          </TabsTrigger>
+      <div className="flex items-center justify-between">
+        <Tabs defaultValue="upcoming">
+          <TabsList>
+            <TabsTrigger value="upcoming">
+              Upcoming ({upcomingBookings.length})
+            </TabsTrigger>
+            <TabsTrigger value="past">
+              Past ({pastBookings.length})
+            </TabsTrigger>
         </TabsList>
 
         <TabsContent value="upcoming" className="space-y-4 mt-4">
@@ -555,6 +590,22 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
           )}
         </TabsContent>
       </Tabs>
+
+      {/* Connection Status Indicator */}
+      <div className="text-xs text-gray-500 flex items-center gap-2">
+        {isConnected ? (
+          <>
+            <Wifi className="w-3 h-3 text-green-600" />
+            <span>Real-time updates active</span>
+          </>
+        ) : (
+          <>
+            <WifiOff className="w-3 h-3 text-gray-400" />
+            <span>Connecting...</span>
+          </>
+        )}
+      </div>
+      </div>
     </div>
   );
 }
