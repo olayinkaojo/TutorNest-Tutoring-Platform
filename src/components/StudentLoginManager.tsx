@@ -34,6 +34,7 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
   const [generatedPassword, setGeneratedPassword] = useState('');
   const [resetPassword, setResetPassword] = useState('');
   const [copied, setCopied] = useState(false);
+  const [showResetPanel, setShowResetPanel] = useState(false);
 
   const handleEnableLogin = async () => {
     setLoading(true);
@@ -66,11 +67,7 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
 
       setSuccess('Student login enabled successfully!');
       setGeneratedPassword(data.temporaryPassword);
-      
-      setTimeout(() => {
-        setDialogOpen(false);
-        onUpdate();
-      }, 3000);
+      onUpdate(); // update parent state without closing — let user copy the password
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -150,6 +147,7 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
 
       setSuccess('Temporary password generated successfully. Share it securely with your child.');
       setResetPassword(temporaryPassword);
+      setShowResetPanel(true);
     } catch (err: any) {
       setError(err.message);
     } finally {
@@ -220,30 +218,37 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
             )}
 
             {success && generatedPassword && (
-              <Alert>
-                <Check className="size-4" />
-                <AlertDescription>
-                  <div className="space-y-2">
-                    <p className="font-medium">{success}</p>
-                    <div className="space-y-1">
-                      <p className="text-sm">Email: <span className="font-mono">{studentEmail || 'Auto-generated'}</span></p>
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm">Password: <span className="font-mono font-bold">{generatedPassword}</span></p>
-                        <Button
-                          size="sm"
-                          variant="ghost"
-                          onClick={() => copyToClipboard(generatedPassword)}
-                        >
-                          {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
-                        </Button>
+              <>
+                <Alert>
+                  <Check className="size-4" />
+                  <AlertDescription>
+                    <div className="space-y-2">
+                      <p className="font-medium">{success}</p>
+                      <div className="space-y-1">
+                        <p className="text-sm">Email: <span className="font-mono">{studentEmail || 'Auto-generated'}</span></p>
+                        <div className="flex items-center gap-2">
+                          <p className="text-sm">Password: <span className="font-mono font-bold">{generatedPassword}</span></p>
+                          <Button
+                            size="sm"
+                            variant="ghost"
+                            onClick={() => copyToClipboard(generatedPassword)}
+                          >
+                            {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                          </Button>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-2">
+                          ⚠️ Save these credentials! Share them with {child.firstName} to access their student dashboard.
+                        </p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-2">
-                        ⚠️ Save these credentials! Share them with {child.firstName} to access their student dashboard.
-                      </p>
                     </div>
-                  </div>
-                </AlertDescription>
-              </Alert>
+                  </AlertDescription>
+                </Alert>
+                <DialogFooter>
+                  <Button onClick={() => { setDialogOpen(false); }}>
+                    Done — copied the password
+                  </Button>
+                </DialogFooter>
+              </>
             )}
 
             {!success && (
@@ -317,6 +322,28 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
             )}
           </DialogContent>
         </Dialog>
+      )}
+
+      {/* Reset password result panel — stays visible until dismissed */}
+      {showResetPanel && resetPassword && (
+        <Alert className="mt-2 border-green-300 bg-green-50">
+          <Check className="size-4 text-green-600" />
+          <AlertDescription>
+            <div className="space-y-1">
+              <p className="font-medium text-green-800">New temporary password generated</p>
+              <div className="flex items-center gap-2">
+                <span className="font-mono font-bold text-green-900">{resetPassword}</span>
+                <Button size="sm" variant="ghost" className="h-6 px-1" onClick={() => copyToClipboard(resetPassword)}>
+                  {copied ? <Check className="size-3 text-green-600" /> : <Copy className="size-3" />}
+                </Button>
+              </div>
+              <p className="text-xs text-green-700">Share this with {child.firstName}. This message will disappear when you dismiss it.</p>
+              <Button size="sm" variant="outline" className="mt-1 h-6 text-xs" onClick={() => { setShowResetPanel(false); setResetPassword(''); setSuccess(''); }}>
+                Dismiss
+              </Button>
+            </div>
+          </AlertDescription>
+        </Alert>
       )}
 
       {error && !dialogOpen && (

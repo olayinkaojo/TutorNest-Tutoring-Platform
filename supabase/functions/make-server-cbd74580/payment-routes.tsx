@@ -829,7 +829,7 @@ async function createMeetEvent(
 // Called by both the client-side confirm-plan route AND the Flutterwave webhook.
 // Returns the number of sessions created, or throws on failure.
 // Fully idempotent — safe to call multiple times for the same reference.
-async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated: number; bookingIds: string[] }> {
+async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated: number; bookingIds: string[]; paymentId: string }> {
   if (!FLUTTERWAVE_SECRET_KEY) throw new Error('Payment not configured yet');
 
   // Verify the transaction with Flutterwave
@@ -849,7 +849,7 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
 
   // Idempotency — already processed
   if (payment.status === 'successful') {
-    return { sessionsCreated: (payment.bookingIds ?? []).length, bookingIds: payment.bookingIds ?? [] };
+    return { sessionsCreated: (payment.bookingIds ?? []).length, bookingIds: payment.bookingIds ?? [], paymentId: payment.id };
   }
 
   const plan = PAYMENT_PLANS[payment.planType];
@@ -941,9 +941,9 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
       db.getProfile(payment.studentId),
     ]);
 
-    const parentName  = parentProfile?.fullName  || parentProfile?.name  || 'Parent';
-    const tutorName   = tutorProfile?.fullName   || tutorProfile?.name   || 'Tutor';
-    const studentName = studentProfile?.fullName || studentProfile?.name || 'Student';
+    const parentName  = parentProfile?.fullName  || parentProfile?.full_name  || parentProfile?.name  || 'Parent';
+    const tutorName   = tutorProfile?.fullName   || tutorProfile?.full_name   || tutorProfile?.name   || 'Tutor';
+    const studentName = studentProfile?.fullName || studentProfile?.full_name || studentProfile?.name || 'Student';
     const parentEmail = parentProfile?.email;
     const tutorEmail  = tutorProfile?.email;
 
@@ -1005,7 +1005,7 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
     console.error('Post-booking email error (non-fatal):', emailErr.message);
   }
 
-  return { sessionsCreated: bookingIds.length, bookingIds };
+  return { sessionsCreated: bookingIds.length, bookingIds, paymentId: payment.id };
 }
 
 // ─── Plan-based payment: confirm (client-side call) ───────────────────────────
@@ -1027,6 +1027,7 @@ app.post('/payments/confirm-plan/:reference', async (c: any) => {
       success: true,
       sessionsCreated: result.sessionsCreated,
       bookingIds: result.bookingIds,
+      paymentId: result.paymentId,
       message: `Payment confirmed. ${result.sessionsCreated} sessions scheduled successfully.`,
     });
   } catch (err: any) {

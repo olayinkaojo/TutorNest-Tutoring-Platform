@@ -72,7 +72,9 @@ export function BookSessionWithPayment({
 }: BookSessionWithPaymentProps) {
   const [processing, setProcessing] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<{ sessions: number; planName: string } | null>(null);
+  const [success, setSuccess] = useState<{ sessions: number; planName: string; paymentId?: string } | null>(null);
+  const [invoice, setInvoice] = useState<any>(null);
+  const [invoiceLoading, setInvoiceLoading] = useState(false);
   const [showPlans, setShowPlans] = useState(false);
 
   useEffect(() => {
@@ -101,7 +103,19 @@ export function BookSessionWithPayment({
       throw new Error(confirmData.error || 'Sessions could not be created after payment');
     }
 
-    setSuccess({ sessions: confirmData.sessionsCreated, planName });
+    setSuccess({ sessions: confirmData.sessionsCreated, planName, paymentId: confirmData.paymentId });
+    // Fetch invoice in background
+    if (confirmData.paymentId) {
+      setInvoiceLoading(true);
+      fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/${confirmData.paymentId}/invoice`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      )
+        .then(r => r.json())
+        .then(d => { if (d.invoice) setInvoice(d.invoice); })
+        .catch(() => {})
+        .finally(() => setInvoiceLoading(false));
+    }
   };
 
   const handleSelectPlan = async (plan: typeof PLANS[number]) => {
@@ -161,7 +175,7 @@ export function BookSessionWithPayment({
 
       await new Promise<void>((resolve) => {
         // @ts-ignore — FlutterwaveCheckout loaded via <script> in index.html
-        window.FlutterwaveCheckout({
+        const modal = window.FlutterwaveCheckout({
           public_key: publicKey,
           tx_ref: reference,
           amount: plan.price,
@@ -176,12 +190,16 @@ export function BookSessionWithPayment({
             description: `${plan.name}${subject ? ' — ' + subject : ''}`,
             logo: 'https://tutornest.org/logo.png',
           },
-          // Synchronous callback — store tx_ref, resolve immediately so modal closes
           callback: (response: { status: string; tx_ref: string; transaction_id: number }) => {
             if (response.status === 'successful' || response.status === 'completed') {
               successTxRef = response.tx_ref;
             }
-            resolve(); // close the modal right away regardless
+            // Close the Flutterwave modal immediately — don't leave user on "Thanks for your payment!" screen
+            try { modal?.close?.(); } catch (_) {}
+            // Also remove the iframe directly as a fallback
+            const frame = document.querySelector('#flwpugpaidiv') as HTMLElement | null;
+            if (frame) frame.style.display = 'none';
+            resolve();
           },
           onclose: () => {
             if (!successTxRef) paymentCancelled = true;
@@ -208,8 +226,8 @@ export function BookSessionWithPayment({
   // ─── Success screen ──────────────────────────────────────────────────────
   if (success) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-4" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
-        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md text-center p-8 space-y-4">
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-4 overflow-y-auto" style={{ backgroundColor: 'rgba(0,0,0,0.5)' }}>
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md text-center p-8 space-y-4 my-auto">
           <div className="w-16 h-16 rounded-full flex items-center justify-center mx-auto" style={{ backgroundColor: '#f0f4ff' }}>
             <CheckCircle className="w-9 h-9" style={{ color: '#625d9c' }} />
           </div>
@@ -224,15 +242,48 @@ export function BookSessionWithPayment({
           <Alert className="bg-blue-50 border-blue-200 text-left">
             <AlertCircle className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800 text-sm">
-              Calendar invites will be sent to both you and your tutor.
+              A confirmation email with your virtual classroom link has been sent to you and your tutor.
             </AlertDescription>
           </Alert>
+
+          {/* Invoice section */}
+          {invoiceLoading && (
+            <div className="border rounded-xl p-4 text-sm text-gray-500 flex items-center gap-2">
+              <Loader2 className="w-4 h-4 animate-spin" /> Generating invoice...
+            </div>
+          )}
+          {invoice && !invoiceLoading && (
+            <div className="border rounded-xl p-4 text-left space-y-2 bg-gray-50">
+              <div className="flex items-center justify-between">
+                <p className="font-semibold text-sm text-gray-800">Invoice {invoice.id}</p>
+                <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Paid</span>
+              </div>
+              <div className="text-xs text-gray-600 space-y-1">
+                <p>Reference: <span className="font-mono">{invoice.reference}</span></p>
+                <p>Date: {invoice.paidDate ? new Date(invoice.paidDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                <p>Billed to: <span className="font-medium">{invoice.to?.name}</span></p>
+              </div>
+              <div className="border-t pt-2 mt-2">
+                {(invoice.items || []).map((item: any, i: number) => (
+                  <div key={i} className="flex justify-between text-xs text-gray-700">
+                    <span>{item.description}{item.tutor ? ` — ${item.tutor}` : ''}</span>
+                    <span className="font-semibold">₦{Number(item.amount).toLocaleString()}</span>
+                  </div>
+                ))}
+                <div className="flex justify-between text-sm font-bold mt-2 pt-2 border-t">
+                  <span>Total Paid</span>
+                  <span>₦{Number(invoice.total).toLocaleString()}</span>
+                </div>
+              </div>
+            </div>
+          )}
+
           <Button
             className="w-full text-white"
             style={{ backgroundColor: '#625d9c' }}
             onClick={() => onSuccess?.(success.sessions)}
           >
-            View My Bookings
+            Go to My Bookings
           </Button>
         </div>
       </div>

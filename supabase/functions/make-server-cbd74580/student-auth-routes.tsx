@@ -748,7 +748,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       }
 
       const body = await c.req.json();
-      const { childId, newPassword } = body;
+      const { childId } = body;
 
       // Get child profile
       const child = await kv.get(`child:${childId}`) as any;
@@ -765,6 +765,12 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         return c.json({ error: 'Student login not enabled' }, 400);
       }
 
+      // Generate a secure temporary password
+      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
+      const temporaryPassword = Array.from({ length: 12 }, () =>
+        chars[Math.floor(Math.random() * chars.length)]
+      ).join('');
+
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
         Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -773,7 +779,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       // Update password
       const { error: updateError } = await supabase.auth.admin.updateUserById(
         child.studentUserId,
-        { password: newPassword }
+        { password: temporaryPassword }
       );
 
       if (updateError) {
@@ -792,8 +798,9 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         timestamp: new Date().toISOString()
       });
 
-      return c.json({ 
+      return c.json({
         success: true,
+        temporaryPassword,
         message: 'Student password reset successfully'
       });
     } catch (error: any) {
