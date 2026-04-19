@@ -151,8 +151,15 @@ export function BookSessionWithPayment({
         import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ||
         'FLWPUBK_TEST-faf29eb495805d5a046cac66366b2eae-X';
 
-      // 2. Open Flutterwave inline checkout — callback fires when payment completes
-      await new Promise<void>((resolve, reject) => {
+      // 2. Open Flutterwave inline checkout.
+      //    The callback must return synchronously so Flutterwave can close its
+      //    modal immediately. We capture the tx_ref and run confirmPayment AFTER
+      //    the modal is gone — otherwise the app is stuck behind Flutterwave's
+      //    "Thanks for your payment!" screen while we await the backend call.
+      let successTxRef: string | null = null;
+      let paymentCancelled = false;
+
+      await new Promise<void>((resolve) => {
         // @ts-ignore — FlutterwaveCheckout loaded via <script> in index.html
         window.FlutterwaveCheckout({
           public_key: publicKey,
@@ -169,25 +176,27 @@ export function BookSessionWithPayment({
             description: `${plan.name}${subject ? ' — ' + subject : ''}`,
             logo: 'https://tutornest.org/logo.png',
           },
-          callback: async (response: { status: string; tx_ref: string; transaction_id: number }) => {
+          // Synchronous callback — store tx_ref, resolve immediately so modal closes
+          callback: (response: { status: string; tx_ref: string; transaction_id: number }) => {
             if (response.status === 'successful' || response.status === 'completed') {
-              try {
-                await confirmPayment(response.tx_ref, plan.name);
-                resolve();
-              } catch (err: any) {
-                reject(err);
-              }
-            } else {
-              reject(new Error('Payment was not completed. Please try again.'));
+              successTxRef = response.tx_ref;
             }
+            resolve(); // close the modal right away regardless
           },
           onclose: () => {
-            // User closed modal without paying — not an error
-            setProcessing(null);
+            if (!successTxRef) paymentCancelled = true;
             resolve();
           },
         });
       });
+
+      // 3. Modal is now closed — confirm payment if successful
+      if (paymentCancelled || !successTxRef) {
+        setProcessing(null);
+        return;
+      }
+
+      await confirmPayment(successTxRef, plan.name);
     } catch (err: any) {
       console.error('Payment error:', err);
       setError(err.message || 'Payment failed. Please try again.');
