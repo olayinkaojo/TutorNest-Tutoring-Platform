@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { AdminUserManagement } from './AdminUserManagement';
-import { AdminVerificationDashboard } from './AdminVerificationDashboard';
+import { EnhancedAdminVerificationDashboard } from './EnhancedAdminVerificationDashboard';
 import { AdminAnalytics } from './AdminAnalytics';
 import { AdminActivityFeed } from './AdminActivityFeed';
 import { AdminDisputeHandler } from './AdminDisputeHandler';
@@ -420,7 +420,7 @@ export function AdminDashboard({
 
           <TabsContent value="verification">
             {session && (
-              <AdminVerificationDashboard session={session} />
+              <EnhancedAdminVerificationDashboard session={session} />
             )}
           </TabsContent>
 
