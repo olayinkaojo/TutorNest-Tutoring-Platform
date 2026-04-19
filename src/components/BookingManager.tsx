@@ -8,6 +8,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { PostSessionReport } from './PostSessionReport';
 import { ViewSessionReport } from './ViewSessionReport';
+import { parentAPI } from '../utils/api-client';
 import {
   Calendar,
   Clock,
@@ -92,35 +93,18 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
       const data = await response.json();
       setBookings(data.bookings || []);
 
-      // Fetch reports for each booking
-      const reportsPromises = (data.bookings || []).map(async (booking: Booking) => {
+      // Fetch reports for all bookings at once (batch instead of individual)
+      const bookingIds = (data.bookings || []).map((b: Booking) => b.id);
+      
+      if (bookingIds.length > 0) {
         try {
-          const reportResponse = await fetch(
-            `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings/${booking.id}/report`,
-            {
-              headers: {
-                Authorization: `Bearer ${session.access_token}`,
-              },
-            }
-          );
-          if (reportResponse.ok) {
-            const reportData = await reportResponse.json();
-            return { bookingId: booking.id, report: reportData.report };
-          }
+          const reportsData = await parentAPI.getBookingReports(session.access_token, bookingIds);
+          setBookingReports(reportsData);
         } catch (err) {
-          console.error('Error fetching report for booking:', booking.id, err);
+          console.error('Error fetching reports:', err);
+          // Don't fail completely if reports can't load - bookings are still visible
         }
-        return null;
-      });
-
-      const reportsResults = await Promise.all(reportsPromises);
-      const reports: Record<string, any> = {};
-      reportsResults.forEach((result) => {
-        if (result && result.report) {
-          reports[result.bookingId] = result.report;
-        }
-      });
-      setBookingReports(reports);
+      }
     } catch (err: any) {
       console.error('Error fetching bookings:', err);
       setError(err.message);

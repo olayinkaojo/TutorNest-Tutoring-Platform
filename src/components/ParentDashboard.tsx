@@ -2,6 +2,7 @@ import { Users, Calendar, BookOpen, LogOut, Plus, TrendingUp, Search, Pencil, Tr
 import { ParentStatsSection } from './parent/ParentStatsSection';
 import { ParentQuickActions } from './parent/ParentQuickActions';
 import { ParentOverviewTab } from './parent/ParentOverviewTab';
+import ErrorBoundary from './ErrorBoundary';
 import TutorNestLogo from './TutorNestLogo';
 import { TutorSearch } from './TutorSearch';
 import { NairaIcon } from './icons/NairaIcon';
@@ -707,73 +708,78 @@ export function ParentDashboard({
 
           {/* Overview Tab */}
           <TabsContent value="overview">
-            <ParentOverviewTab
-              children={children}
-              loadingChildren={loadingChildren}
-              session={session}
-              activeChildId={activeChildId}
-              setShowAddChildDialog={setShowAddChildDialog}
-              handleEditChild={handleEditChild}
-              loadChildren={loadChildren}
-              onViewBookings={() => setActiveTab('bookings')}
-            />
+            <ErrorBoundary tabName="Overview">
+              <ParentOverviewTab
+                children={children}
+                loadingChildren={loadingChildren}
+                session={session}
+                activeChildId={activeChildId}
+                setShowAddChildDialog={setShowAddChildDialog}
+                handleEditChild={handleEditChild}
+                loadChildren={loadChildren}
+                onViewBookings={() => setActiveTab('bookings')}
+              />
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Tutors Tab */}
           <TabsContent value="find-tutors">
-            {!loadingChildren && children.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-gray-500">
-                  <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p className="mb-4">Add a child profile before searching for tutors</p>
-                  <Button 
-                    className="text-white"
-                    style={{ backgroundColor: '#625d9c' }}
-                    onClick={() => {
-                      setActiveTab('overview');
-                      setShowAddChildDialog(true);
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Your First Child
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : session && activeChildId ? (
-              <div className="space-y-4">
-                {activeChild && (
-                  <Card className="bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
-                    <CardContent className="pt-6">
-                      <div className="flex items-center gap-3">
-                        <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white">
-                          {activeChild.firstName?.[0]}{activeChild.lastName?.[0]}
+            <ErrorBoundary tabName="Find Tutors">
+              {!loadingChildren && children.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-gray-500">
+                    <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="mb-4">Add a child profile before searching for tutors</p>
+                    <Button 
+                      className="text-white"
+                      style={{ backgroundColor: '#625d9c' }}
+                      onClick={() => {
+                        setActiveTab('overview');
+                        setShowAddChildDialog(true);
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Your First Child
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : session && activeChildId ? (
+                <div className="space-y-4">
+                  {activeChild && (
+                    <Card className="bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200">
+                      <CardContent className="pt-6">
+                        <div className="flex items-center gap-3">
+                          <div className="w-12 h-12 bg-purple-600 rounded-full flex items-center justify-center text-white">
+                            {activeChild.firstName?.[0]}{activeChild.lastName?.[0]}
+                          </div>
+                          <div>
+                            <p className="text-sm text-gray-600">Searching tutors for:</p>
+                            <p className="font-medium">{activeChild.firstName} {activeChild.lastName}</p>
+                            <p className="text-xs text-gray-500">
+                              {formatGradeLevel(activeChild.gradeLevel)} • 
+                              {activeChild.subjects?.length > 0 ? ` ${activeChild.subjects.join(', ')}` : ' No subjects yet'}
+                            </p>
+                          </div>
                         </div>
-                        <div>
-                          <p className="text-sm text-gray-600">Searching tutors for:</p>
-                          <p className="font-medium">{activeChild.firstName} {activeChild.lastName}</p>
-                          <p className="text-xs text-gray-500">
-                            {formatGradeLevel(activeChild.gradeLevel)} • 
-                            {activeChild.subjects?.length > 0 ? ` ${activeChild.subjects.join(', ')}` : ' No subjects yet'}
-                          </p>
-                        </div>
-                      </div>
-                    </CardContent>
-                  </Card>
-                )}
-                <TutorSearch session={session} activeChildId={activeChildId} />
-              </div>
-            ) : (
-              <Card>
-                <CardContent className="py-12 text-center text-gray-500">
-                  <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>Loading...</p>
-                </CardContent>
-              </Card>
-            )}
+                      </CardContent>
+                    </Card>
+                  )}
+                  <TutorSearch session={session} activeChildId={activeChildId} />
+                </div>
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center text-gray-500">
+                    <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p>Loading...</p>
+                  </CardContent>
+                </Card>
+              )}
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Bookings Tab */}
           <TabsContent value="bookings">
+            <ErrorBoundary tabName="Bookings">
             {!loadingChildren && children.length === 0 ? (
               <Card>
                 <CardContent className="py-12 text-center text-gray-500">
@@ -826,116 +832,123 @@ export function ParentDashboard({
                 </CardContent>
               </Card>
             )}
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Progress Tab */}
           <TabsContent value="progress">
-            {session && children.length > 0 && activeChild ? (
-              <ProgressDashboard 
-                session={session} 
-                studentId={activeChild.id}
-                studentName={`${activeChild.firstName} ${activeChild.lastName}`}
-              />
-            ) : session && children.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-gray-500">
-                  <TrendingUp className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p className="mb-4">Add a child profile to view progress</p>
-                  <Button 
-                    className="text-white"
-                    style={{ backgroundColor: '#625d9c' }}
-                    onClick={() => {
-                      setActiveTab('overview');
-                      setShowAddChildDialog(true);
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Your First Child
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="py-12 text-center text-gray-500">
-                  <TrendingUp className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>Loading...</p>
-                </CardContent>
-              </Card>
-            )}
+            <ErrorBoundary tabName="Progress">
+              {session && children.length > 0 && activeChild ? (
+                <ProgressDashboard 
+                  session={session} 
+                  studentId={activeChild.id}
+                  studentName={`${activeChild.firstName} ${activeChild.lastName}`}
+                />
+              ) : session && children.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-gray-500">
+                    <TrendingUp className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="mb-4">Add a child profile to view progress</p>
+                    <Button 
+                      className="text-white"
+                      style={{ backgroundColor: '#625d9c' }}
+                      onClick={() => {
+                        setActiveTab('overview');
+                        setShowAddChildDialog(true);
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Your First Child
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center text-gray-500">
+                    <TrendingUp className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p>Loading...</p>
+                  </CardContent>
+                </Card>
+              )}
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Session Reports Tab */}
           <TabsContent value="session-reports">
-            {session && children.length > 0 ? (
-              <SessionReportsViewer 
-                userId={profile.id || profile.userId}
-                accessToken={session.access_token}
-                viewType="parent"
-                studentId={activeChildId || undefined}
-                children={children}
-              />
-            ) : session && children.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-gray-500">
-                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p className="mb-4">Add a child profile to view session reports</p>
-                  <Button 
-                    className="text-white"
-                    style={{ backgroundColor: '#625d9c' }}
-                    onClick={() => {
-                      setActiveTab('overview');
-                      setShowAddChildDialog(true);
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Your First Child
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="py-12 text-center text-gray-500">
-                  <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>Loading...</p>
-                </CardContent>
-              </Card>
-            )}
+            <ErrorBoundary tabName="Session Reports">
+              {session && children.length > 0 ? (
+                <SessionReportsViewer 
+                  userId={profile.id || profile.userId}
+                  accessToken={session.access_token}
+                  viewType="parent"
+                  studentId={activeChildId || undefined}
+                  children={children}
+                />
+              ) : session && children.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-gray-500">
+                    <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="mb-4">Add a child profile to view session reports</p>
+                    <Button 
+                      className="text-white"
+                      style={{ backgroundColor: '#625d9c' }}
+                      onClick={() => {
+                        setActiveTab('overview');
+                        setShowAddChildDialog(true);
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Your First Child
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                <Card>
+                  <CardContent className="py-12 text-center text-gray-500">
+                    <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p>Loading...</p>
+                  </CardContent>
+                </Card>
+              )}
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Curriculum Tab */}
           <TabsContent value="curriculum">
-            {session && children.length > 0 && activeChild ? (
-              <CurriculumPDFViewer 
-                gradeLevel={activeChild.gradeLevel}
-                accessToken={session.access_token}
-                studentName={`${activeChild.firstName} ${activeChild.lastName}`}
-              />
-            ) : session && children.length === 0 ? (
-              <Card>
-                <CardContent className="py-12 text-center text-gray-500">
-                  <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p className="mb-4">Add a child profile to view curriculum</p>
-                  <Button 
-                    className="text-white"
-                    style={{ backgroundColor: '#625d9c' }}
-                    onClick={() => {
-                      setActiveTab('overview');
-                      setShowAddChildDialog(true);
-                    }}
-                  >
-                    <Plus className="w-4 h-4 mr-2" />
-                    Add Your First Child
-                  </Button>
-                </CardContent>
-              </Card>
-            ) : (
-              <Card>
-                <CardContent className="py-12 text-center text-gray-500">
-                  <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                  <p>Loading...</p>
-                </CardContent>
-              </Card>
-            )}
+            <ErrorBoundary tabName="Curriculum">
+              {session && children.length > 0 && activeChild ? (
+                <CurriculumPDFViewer 
+                  gradeLevel={activeChild.gradeLevel}
+                  accessToken={session.access_token}
+                  studentName={`${activeChild.firstName} ${activeChild.lastName}`}
+                />
+              ) : session && children.length === 0 ? (
+                <Card>
+                  <CardContent className="py-12 text-center text-gray-500">
+                    <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p className="mb-4">Add a child profile to view curriculum</p>
+                    <Button 
+                      className="text-white"
+                      style={{ backgroundColor: '#625d9c' }}
+                      onClick={() => {
+                        setActiveTab('overview');
+                        setShowAddChildDialog(true);
+                      }}
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Your First Child
+                    </Button>
+                  </CardContent>
+                </Card>
+              ) : (
+                    <Card>
+                      <CardContent className="py-12 text-center text-gray-500">
+                        <BookOpen className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                        <p>Loading...</p>
+                      </CardContent>
+                    </Card>
+                  )}
+            </ErrorBoundary>
           </TabsContent>
 
           {/* Messages Tab */}

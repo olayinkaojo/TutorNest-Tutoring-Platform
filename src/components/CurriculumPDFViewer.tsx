@@ -8,10 +8,12 @@ import {
   ExternalLink, 
   FileText, 
   Loader2,
-  AlertCircle 
+  AlertCircle,
+  RefreshCw
 } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
-import { projectId } from '../utils/supabase/info';
+import { parentAPI } from '../utils/api-client';
+import type { Curriculum } from '../types/dashboard';
 
 interface CurriculumPDFViewerProps {
   gradeLevel: string;
@@ -20,37 +22,24 @@ interface CurriculumPDFViewerProps {
 }
 
 export function CurriculumPDFViewer({ gradeLevel, accessToken, studentName }: CurriculumPDFViewerProps) {
-  const [curricula, setCurricula] = useState<any[]>([]);
+  const [curricula, setCurricula] = useState<Curriculum[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [viewingCurriculum, setViewingCurriculum] = useState<any | null>(null);
+  const [viewingCurriculum, setViewingCurriculum] = useState<Curriculum | null>(null);
   const [pdfUrl, setPdfUrl] = useState<string | null>(null);
   const [loadingPdf, setLoadingPdf] = useState(false);
 
   useEffect(() => {
     fetchCurricula();
-  }, [gradeLevel]);
+  }, [gradeLevel, accessToken]);
 
   const fetchCurricula = async () => {
     setLoading(true);
     setError(null);
     
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/curriculum/grade/${gradeLevel}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch curricula');
-      }
-
-      const data = await response.json();
-      setCurricula(data.curricula || []);
+      const curricuaList = await parentAPI.getCurricula(accessToken, gradeLevel);
+      setCurricula(curricuaList);
     } catch (err: any) {
       console.error('Error fetching curricula:', err);
       setError(err.message || 'Failed to load curricula');
@@ -59,29 +48,20 @@ export function CurriculumPDFViewer({ gradeLevel, accessToken, studentName }: Cu
     }
   };
 
-  const handleViewPDF = async (curriculum: any) => {
+  const handleViewPDF = async (curriculum: Curriculum) => {
     setLoadingPdf(true);
     setViewingCurriculum(curriculum);
+    setPdfUrl(null); // Clear old URL
+    setError(null);
     
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/curriculum/${curriculum.id}/view`,
-        {
-          headers: {
-            'Authorization': `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to get PDF URL');
-      }
-
-      const data = await response.json();
-      setPdfUrl(data.signedUrl);
+      // Always request fresh URL (don't cache, signed URLs expire)
+      const urlData = await parentAPI.getCurriculumPDFUrl(accessToken, curriculum.id);
+      setPdfUrl(urlData.signedUrl);
     } catch (err: any) {
       console.error('Error loading PDF:', err);
       setError(err.message || 'Failed to load PDF');
+      setViewingCurriculum(null);
     } finally {
       setLoadingPdf(false);
     }
@@ -233,20 +213,38 @@ export function CurriculumPDFViewer({ gradeLevel, accessToken, studentName }: Cu
             </div>
 
             {/* PDF Viewer */}
-            <div className="flex-1 overflow-hidden">
+            <div className="flex-1 overflow-hidden flex flex-col">
               {loadingPdf ? (
                 <div className="h-full flex items-center justify-center">
                   <Loader2 className="w-12 h-12 text-gray-300 animate-spin" />
+                </div>
+              ) : error ? (
+                <div className="h-full flex flex-col items-center justify-center gap-4 p-8">
+                  <AlertCircle className="w-12 h-12 text-red-500" />
+                  <div className="text-center">
+                    <p className="text-gray-900 font-medium mb-2">Failed to Load PDF</p>
+                    <p className="text-sm text-gray-600 mb-4">{error}</p>
+                  </div>
+                  <Button 
+                    onClick={() => handleViewPDF(viewingCurriculum!)}
+                    className="flex items-center gap-2"
+                    style={{ backgroundColor: '#625d9c' }}
+                  >
+                    <RefreshCw className="w-4 h-4" />
+                    Try Again
+                  </Button>
                 </div>
               ) : pdfUrl ? (
                 <iframe
                   src={pdfUrl}
                   className="w-full h-full border-0"
                   title={viewingCurriculum.title}
+                  sandbox="allow-scripts"
+                  onError={() => setError('PDF failed to load. This might be a temporary issue.')}
                 />
               ) : (
                 <div className="h-full flex items-center justify-center">
-                  <p className="text-gray-500">Failed to load PDF</p>
+                  <p className="text-gray-500">No PDF URL available</p>
                 </div>
               )}
             </div>
