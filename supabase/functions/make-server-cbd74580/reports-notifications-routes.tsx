@@ -22,7 +22,13 @@ app.post('/bookings/:bookingId/report', async (c) => {
     }
 
     const bookingId = c.req.param('bookingId');
-    const reportData = await c.req.json();
+    const reportData = await c.req.json() as Record<string, unknown>;
+
+    // Validate report data
+    const validationError = validateReportSubmission(reportData);
+    if (validationError) {
+      return c.json({ error: validationError }, 400);
+    }
 
     // Get the booking
     const booking = await kv.get(`booking:${bookingId}`) as any;
@@ -30,11 +36,21 @@ app.post('/bookings/:bookingId/report', async (c) => {
       return c.json({ error: 'Booking not found' }, 404);
     }
 
+    // Sanitize text fields to prevent XSS
+    const sanitizedData = {
+      ...reportData,
+      summary: sanitizeReportText(reportData.summary as string),
+      topicsCovered: reportData.topicsCovered ? sanitizeReportText(reportData.topicsCovered as string) : undefined,
+      areasForImprovement: reportData.areasForImprovement ? sanitizeReportText(reportData.areasForImprovement as string) : undefined,
+      homework: reportData.homework ? sanitizeReportText(reportData.homework as string) : undefined,
+      nextSessionPlan: reportData.nextSessionPlan ? sanitizeReportText(reportData.nextSessionPlan as string) : undefined,
+    };
+
     // Create report
     const report = {
       id: `report:${bookingId}`,
       bookingId,
-      ...reportData,
+      ...sanitizedData,
       submittedAt: new Date().toISOString(),
     };
 
@@ -51,6 +67,16 @@ app.post('/bookings/:bookingId/report', async (c) => {
       title: 'New Session Report',
       message: `${booking.tutorName} has submitted a report for ${booking.studentName}'s session.`,
       actionUrl: `#bookings-report-${bookingId}`,
+      metadata: { bookingId, reportId: report.id }
+    });
+
+    // Create notification for student
+    await createNotification({
+      userId: booking.studentId,
+      type: 'report',
+      title: 'Session Report Submitted',
+      message: `${booking.tutorName} has submitted a report for your session.`,
+      actionUrl: `#report-${bookingId}`,
       metadata: { bookingId, reportId: report.id }
     });
 
@@ -100,15 +126,21 @@ app.post('/bookings/:bookingId/rate-session', async (c) => {
     }
 
     const bookingId = c.req.param('bookingId');
-    const { rating, feedback } = await c.req.json();
+    const body = await c.req.json() as Record<string, unknown>;
+
+    // Validate rating data
+    const validationError = validateSessionRating(body);
+    if (validationError) {
+      return c.json({ error: validationError }, 400);
+    }
 
     const report = await kv.get(`report:${bookingId}`) as any;
     if (!report) {
       return c.json({ error: 'Report not found' }, 404);
     }
 
-    report.parentRating = rating;
-    report.parentFeedback = feedback;
+    report.parentRating = Number(body.rating);
+    report.parentFeedback = body.feedback ? sanitizeReportText(body.feedback as string) : undefined;
     report.ratedAt = new Date().toISOString();
 
     await kv.set(`report:${bookingId}`, report);
@@ -116,7 +148,37 @@ app.post('/bookings/:bookingId/rate-session', async (c) => {
     // Update tutor's average rating
     const booking = await kv.get(`booking:${bookingId}`) as any;
     if (booking) {
-      await updateTutorRating(booking.tutorId, rating);
+      await updateTutorRating(booking.tutorId, Number(body.rating));
+
+      // Create notification for tutor about parent rating
+      await createNotification({
+        userId: booking.tutorId,
+        type: 'rating',
+        title: 'Session Rated',
+        message: `${booking.parentName} rated your session with ${booking.studentName} ${body.rating} stars.`,
+        actionUrl: `#feedback-${bookingId}`,
+        metadata: { 
+          bookingId, 
+          rating: body.rating, 
+          feedback: body.feedback,
+          studentName: booking.studentName,
+          parentName: booking.parentName
+        }
+      });
+
+      // Create notification for student about parent rating (optional)
+      await createNotification({
+        userId: booking.studentId,
+        type: 'session-rated',
+        title: 'Your Session Was Rated',
+        message: `Your parent rated your session with ${booking.tutorName} ${rating} stars.`,
+        actionUrl: `#session-feedback-${bookingId}`,
+        metadata: { 
+          bookingId, 
+          rating, 
+          tutorName: booking.tutorName
+        }
+      });
     }
 
     return c.json({ success: true, message: 'Rating submitted successfully' });
@@ -397,9 +459,83 @@ app.get('/students/:studentId/progress', async (c) => {
     });
   } catch (error: any) {
     console.error('Error fetching progress data:', error);
-    return c.json({ error: error.message || 'Failed to fetch progress' }, 500);
+      return c.json({ error: error.message || 'Failed to fetch progress' }, 500);
   }
 });
+
+// Validation functions
+function validateReportSubmission(body: Record<string, unknown>): string | null {
+  // Required fields
+  if (!body.summary || typeof body.summary !== 'string') return 'summary is required and must be a string';
+  if (!body.tutorName || typeof body.tutorName !== 'string') return 'tutorName is required';
+  if (!body.studentName || typeof body.studentName !== 'string') return 'studentName is required';
+  
+  // Validate text lengths
+  const summary = body.summary as string;
+  if (summary.length < 10) return 'summary must be at least 10 characters';
+  if (summary.length > 2000) return 'summary cannot exceed 2000 characters';
+  
+  // Optional fields with length limits
+  if (body.topicsCovered && typeof body.topicsCovered === 'string' && body.topicsCovered.length > 1000) {
+    return 'topicsCovered cannot exceed 1000 characters';
+  }
+  
+  if (body.areasForImprovement && typeof body.areasForImprovement === 'string' && body.areasForImprovement.length > 1000) {
+    return 'areasForImprovement cannot exceed 1000 characters';
+  }
+  
+  if (body.homework && typeof body.homework === 'string' && body.homework.length > 1000) {
+    return 'homework cannot exceed 1000 characters';
+  }
+  
+  if (body.nextSessionPlan && typeof body.nextSessionPlan === 'string' && body.nextSessionPlan.length > 1000) {
+    return 'nextSessionPlan cannot exceed 1000 characters';
+  }
+  
+  // Validate numeric fields if present
+  if (body.studentEngagement !== undefined) {
+    const engagement = Number(body.studentEngagement);
+    if (!Number.isFinite(engagement) || engagement < 1 || engagement > 5) {
+      return 'studentEngagement must be a number between 1 and 5';
+    }
+  }
+  
+  if (body.studentComprehension !== undefined) {
+    const comprehension = Number(body.studentComprehension);
+    if (!Number.isFinite(comprehension) || comprehension < 1 || comprehension > 5) {
+      return 'studentComprehension must be a number between 1 and 5';
+    }
+  }
+  
+  return null;
+}
+
+function validateSessionRating(body: Record<string, unknown>): string | null {
+  // Rating is required and must be 1-5
+  if (body.rating === undefined || body.rating === null) return 'rating is required';
+  const rating = Number(body.rating);
+  if (!Number.isFinite(rating) || rating < 1 || rating > 5) {
+    return 'rating must be a number between 1 and 5';
+  }
+  
+  // Feedback is optional but if provided, must be reasonable length
+  if (body.feedback && typeof body.feedback === 'string') {
+    if (body.feedback.length > 1500) {
+      return 'feedback cannot exceed 1500 characters';
+    }
+  }
+  
+  return null;
+}
+
+function sanitizeReportText(text: string): string {
+  // Remove potential XSS
+  return text
+    .replace(/<script[^>]*>.*?<\/script>/gi, '')
+    .replace(/<iframe[^>]*>.*?<\/iframe>/gi, '')
+    .replace(/on\w+\s*=/gi, '')
+    .trim();
+}
 
 // Helper functions
 async function createNotification(data: any) {
