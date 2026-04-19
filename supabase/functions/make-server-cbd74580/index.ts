@@ -1,6 +1,6 @@
-import { Hono } from 'npm:hono';
-import { cors } from 'npm:hono/cors';
-import { logger } from 'npm:hono/logger';
+import { Hono } from 'npm:hono@4';
+import { cors } from 'npm:hono@4/cors';
+import { logger } from 'npm:hono@4/logger';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
@@ -379,7 +379,7 @@ app.route('/make-server-cbd74580', bookingRoutes);
 app.route('/make-server-cbd74580', smartMatchingRoutes);
 
 // Register reports and notifications routes
-app.route('/make-server-cbd74580', reportsNotificationsRoutes);
+reportsNotificationsRoutes(app, getUserId);
 
 // Register trust & safety routes
 app.route('/make-server-cbd74580/moderation', contentModerationRoutes);

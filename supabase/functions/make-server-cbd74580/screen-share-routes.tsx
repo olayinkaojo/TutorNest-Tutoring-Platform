@@ -1,4 +1,4 @@
-import { Router } from 'npm:hono';
+import { Router } from 'npm:hono@4';
 import {
   startScreenShare,
   stopScreenShare,

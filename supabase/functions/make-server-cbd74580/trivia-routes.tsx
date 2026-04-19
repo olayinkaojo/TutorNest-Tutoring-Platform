@@ -1,4 +1,4 @@
-import { Hono } from 'npm:hono';
+import { Hono } from 'npm:hono@4';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import { COMPREHENSIVE_TRIVIA } from './comprehensive-trivia-data.tsx';

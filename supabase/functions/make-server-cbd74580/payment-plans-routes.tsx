@@ -4,7 +4,7 @@
 // Complete payment system with Flutterwave integration
 // Handles: initialization, verification, webhooks, and booking generation
 
-import { Hono } from 'npm:hono';
+import { Hono } from 'npm:hono@4';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 
 const app = new Hono();

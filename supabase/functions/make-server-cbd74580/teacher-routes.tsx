@@ -1,4 +1,4 @@
-import { Hono, Router } from 'npm:hono';
+import { Hono, Router } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import {
   createTeacherProfile,
