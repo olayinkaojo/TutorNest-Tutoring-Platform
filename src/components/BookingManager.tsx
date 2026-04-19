@@ -239,13 +239,14 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
       <CardContent className="pt-6">
         <div className="flex items-start justify-between mb-4">
           <div className="flex-1 min-w-0">
-            <div className="flex items-center flex-wrap gap-2 mb-2">
-              <h3 className="text-lg font-semibold">
+            {/* Primary: name + status */}
+            <div className="flex items-center flex-wrap gap-2 mb-1">
+              <h3 className="text-lg font-bold text-gray-900">
                 {userRole === 'parent' ? booking.tutorName : booking.studentName}
               </h3>
               {getStatusBadge(booking.status)}
             </div>
-            {/* Subject — prominent */}
+            {/* Subject — immediately below the name */}
             {booking.subject && (
               <div className="mb-3">
                 <span

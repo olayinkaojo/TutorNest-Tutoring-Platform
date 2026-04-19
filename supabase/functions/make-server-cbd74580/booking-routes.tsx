@@ -57,11 +57,18 @@ app.get('/bookings', async (c) => {
       const tutor   = profileMap[b.tutorId]   ?? {};
       const student = profileMap[b.studentId] ?? {};
       const parent  = profileMap[b.userId]    ?? {};
+      // Profiles can store the name under several keys depending on how the
+      // account was created (camelCase KV vs snake_case DB column vs raw_data).
+      const resolveName = (p: any, fallback: string) =>
+        p.fullName || p.full_name || p.name ||
+        (p.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
+        fallback;
+
       return {
         ...b,
-        tutorName:      tutor.fullName   || tutor.name   || 'Tutor',
-        studentName:    student.fullName || student.name || 'Student',
-        parentName:     parent.fullName  || parent.name  || '',
+        tutorName:      resolveName(tutor,   'Tutor'),
+        studentName:    resolveName(student, 'Student'),
+        parentName:     resolveName(parent,  ''),
         parentId:       b.userId,
         googleMeetLink: b.meetLink ?? null,
         price:          String(20000),   // platform fixed rate per session
