@@ -147,11 +147,9 @@ export function BookSessionWithPayment({
       }
 
       const { reference } = initData;
-      const publicKey = import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY;
-
-      if (!publicKey) {
-        throw new Error('Flutterwave public key not configured (VITE_FLUTTERWAVE_PUBLIC_KEY).');
-      }
+      const publicKey =
+        import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ||
+        'FLWPUBK_TEST-faf29eb495805d5a046cac66366b2eae-X';
 
       // 2. Open Flutterwave inline checkout — callback fires when payment completes
       await new Promise<void>((resolve, reject) => {
