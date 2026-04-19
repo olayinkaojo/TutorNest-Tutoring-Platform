@@ -43,6 +43,7 @@ import paymentRoutes from './payment-routes.tsx';
 import { upsertProfile, getProfile } from './db.tsx';
 import liveSessionRoutes from './live-session-routes.tsx';
 import payoutRoutes from './payout-routes.tsx';
+import payoutsComplete from './payouts-complete.tsx';
 import { videoRoutes } from './video-routes.tsx';
 import { screenShareRoutes } from './screen-share-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
@@ -439,6 +440,7 @@ app.route('/make-server-cbd74580', liveSessionRoutes);
 
 // Register payout routes
 app.route('/make-server-cbd74580/payouts', payoutRoutes);
+app.route('/make-server-cbd74580/tutor/payouts', payoutsComplete);
 
 // Register invoice routes
 app.route('/make-server-cbd74580/invoices', invoiceRoutes);

@@ -313,6 +313,122 @@ const tutorAPI = {
 
     return response.reports || [];
   },
+
+  /**
+   * Get payout dashboard data (earnings, history, stats)
+   */
+  async getPayoutDashboard(accessToken: string) {
+    const response = await makeRequest<any>(
+      '/tutor/payouts/dashboard',
+      accessToken,
+      { skipCache: false }
+    );
+
+    return {
+      earnings: response.earnings || [],
+      payouts: response.payouts || [],
+      stats: response.stats || {},
+      settings: response.settings || {},
+    };
+  },
+
+  /**
+   * Get tutor's bank account
+   */
+  async getBankAccount(accessToken: string) {
+    const response = await makeRequest<any>(
+      '/tutor/payouts/bank-account',
+      accessToken
+    );
+    return response.account || null;
+  },
+
+  /**
+   * Update tutor's bank account
+   */
+  async updateBankAccount(
+    accessToken: string,
+    bankName: string,
+    accountNumber: string,
+    accountHolder: string,
+    bankCode: string
+  ) {
+    if (!bankName || !accountNumber || !accountHolder || !bankCode) {
+      throw new TutorAPIError('INVALID_INPUT', 'All bank details are required', 400);
+    }
+
+    const response = await makeRequest<any>(
+      '/tutor/payouts/bank-account',
+      accessToken,
+      {
+        method: 'POST',
+        body: { bankName, accountNumber, accountHolder, bankCode },
+      }
+    );
+
+    return response;
+  },
+
+  /**
+   * Request a payout
+   */
+  async requestPayout(accessToken: string, amount: string) {
+    if (!amount || parseFloat(amount) <= 0) {
+      throw new TutorAPIError('INVALID_INPUT', 'Amount must be greater than 0', 400);
+    }
+
+    const response = await makeRequest<any>(
+      '/tutor/payouts/request',
+      accessToken,
+      {
+        method: 'POST',
+        body: { amount },
+        skipCache: true,
+      }
+    );
+
+    return response;
+  },
+
+  /**
+   * Get tutor's payout requests
+   */
+  async getPayoutRequests(accessToken: string) {
+    const response = await makeRequest<any>(
+      '/tutor/payouts/requests',
+      accessToken
+    );
+
+    return response.requests || [];
+  },
+
+  /**
+   * Get payout notifications
+   */
+  async getPayoutNotifications(accessToken: string) {
+    const response = await makeRequest<any>(
+      '/tutor/payouts/notifications',
+      accessToken
+    );
+
+    return response.notifications || [];
+  },
+
+  /**
+   * Get tax report for a year
+   */
+  async getTaxReport(accessToken: string, year: number) {
+    if (year < 2000 || year > 2100) {
+      throw new TutorAPIError('INVALID_INPUT', 'Invalid year', 400);
+    }
+
+    const response = await makeRequest<any>(
+      `/tutor/payouts/tax-report/${year}`,
+      accessToken
+    );
+
+    return response;
+  },
 };
 
 export default tutorAPI;

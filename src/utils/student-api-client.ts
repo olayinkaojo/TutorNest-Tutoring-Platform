@@ -428,7 +428,7 @@ export const studentAPI = {
 
   /**
    * Get student achievements/badges
-   */
+*/
   async getStudentAchievements(
     accessToken: string,
     studentId: string
@@ -445,50 +445,6 @@ export const studentAPI = {
 
     return response.achievements || [];
   },
-
-  /**
-   * Notify tutors of significant student progress improvement
-   * Only notifies if improvement >= 5%
-   */
-  async notifyProgressImprovement(
-    accessToken: string,
-    studentId: string,
-    previousScore: number,
-    currentScore: number,
-    subject: string,
-    tutorId?: string
-  ) {
-    if (!studentId || !subject) {
-      throw new StudentAPIError('INVALID_INPUT', 'Student ID and subject required', 400);
-    }
-
-    if (typeof previousScore !== 'number' || typeof currentScore !== 'number') {
-      throw new StudentAPIError('INVALID_INPUT', 'Scores must be numbers', 400);
-    }
-
-    const improvementPercentage = previousScore > 0 
-      ? ((currentScore - previousScore) / previousScore) * 100 
-      : 0;
-
-    const response = await makeRequest<any>(
-      `/students/${studentId}/notify-progress`,
-      accessToken,
-      {
-        method: 'POST',
-        body: {
-          previousScore,
-          currentScore,
-          subject,
-          improvementPercentage,
-          tutorId,
-        },
-        skipCache: true,
-      }
-    );
-
-    return response;
-  },
 };
 
 export default studentAPI;
-
