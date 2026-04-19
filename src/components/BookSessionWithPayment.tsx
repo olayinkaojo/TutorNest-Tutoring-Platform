@@ -72,9 +72,7 @@ export function BookSessionWithPayment({
 }: BookSessionWithPaymentProps) {
   const [processing, setProcessing] = useState<string | null>(null);
   const [error, setError] = useState('');
-  const [success, setSuccess] = useState<{ sessions: number; planName: string; paymentId?: string } | null>(null);
-  const [invoice, setInvoice] = useState<any>(null);
-  const [invoiceLoading, setInvoiceLoading] = useState(false);
+  const [success, setSuccess] = useState<{ sessions: number; planName: string } | null>(null);
   const [showPlans, setShowPlans] = useState(false);
 
   useEffect(() => {
@@ -103,19 +101,7 @@ export function BookSessionWithPayment({
       throw new Error(confirmData.error || 'Sessions could not be created after payment');
     }
 
-    setSuccess({ sessions: confirmData.sessionsCreated, planName, paymentId: confirmData.paymentId });
-    // Fetch invoice in background
-    if (confirmData.paymentId) {
-      setInvoiceLoading(true);
-      fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/${confirmData.paymentId}/invoice`,
-        { headers: { Authorization: `Bearer ${session.access_token}` } }
-      )
-        .then(r => r.json())
-        .then(d => { if (d.invoice) setInvoice(d.invoice); })
-        .catch(() => {})
-        .finally(() => setInvoiceLoading(false));
-    }
+    setSuccess({ sessions: confirmData.sessionsCreated, planName });
   };
 
   const handleSelectPlan = async (plan: typeof PLANS[number]) => {
@@ -246,37 +232,7 @@ export function BookSessionWithPayment({
             </AlertDescription>
           </Alert>
 
-          {/* Invoice section */}
-          {invoiceLoading && (
-            <div className="border rounded-xl p-4 text-sm text-gray-500 flex items-center gap-2">
-              <Loader2 className="w-4 h-4 animate-spin" /> Generating invoice...
-            </div>
-          )}
-          {invoice && !invoiceLoading && (
-            <div className="border rounded-xl p-4 text-left space-y-2 bg-gray-50">
-              <div className="flex items-center justify-between">
-                <p className="font-semibold text-sm text-gray-800">Invoice {invoice.id}</p>
-                <span className="text-xs px-2 py-0.5 rounded-full bg-green-100 text-green-700 font-medium">Paid</span>
-              </div>
-              <div className="text-xs text-gray-600 space-y-1">
-                <p>Reference: <span className="font-mono">{invoice.reference}</span></p>
-                <p>Date: {invoice.paidDate ? new Date(invoice.paidDate).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' }) : new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                <p>Billed to: <span className="font-medium">{invoice.to?.name}</span></p>
-              </div>
-              <div className="border-t pt-2 mt-2">
-                {(invoice.items || []).map((item: any, i: number) => (
-                  <div key={i} className="flex justify-between text-xs text-gray-700">
-                    <span>{item.description}{item.tutor ? ` — ${item.tutor}` : ''}</span>
-                    <span className="font-semibold">₦{Number(item.amount).toLocaleString()}</span>
-                  </div>
-                ))}
-                <div className="flex justify-between text-sm font-bold mt-2 pt-2 border-t">
-                  <span>Total Paid</span>
-                  <span>₦{Number(invoice.total).toLocaleString()}</span>
-                </div>
-              </div>
-            </div>
-          )}
+          <p className="text-sm text-gray-500">Your invoice is available in the <strong>Invoices</strong> tab of your dashboard.</p>
 
           <Button
             className="w-full text-white"
