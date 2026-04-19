@@ -22,19 +22,8 @@ import {
   Video,
   X
 } from 'lucide-react';
-import { projectId } from '../utils/supabase/info';
 import { getSupabaseClient } from '../utils/supabase/client';
-
-interface Notification {
-  id: string;
-  type: 'booking' | 'reminder' | 'message' | 'report' | 'payment' | 'system';
-  title: string;
-  message: string;
-  read: boolean;
-  createdAt: string;
-  actionUrl?: string;
-  metadata?: any;
-}
+import { notificationAPI, Notification } from '../utils/notification-api-client';
 
 interface NotificationCenterProps {
   session: any;
@@ -54,56 +43,22 @@ export function NotificationCenter({ session, userId }: NotificationCenterProps)
     }
 
     try {
-      const url = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/notifications/${userId}`;
-      
-      const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${session.access_token}`,
-        },
-        signal: AbortSignal.timeout(10000), // 10 second timeout
-      });
-
-      if (!response.ok) {
-        // If 401, token might be expired - try to refresh session
-        if (response.status === 401) {
-          console.log('Token expired, attempting to refresh session...');
-          const supabase = getSupabaseClient();
-          const { data: { session: newSession }, error } = await supabase.auth.refreshSession();
-          
-          if (newSession && !error) {
-            console.log('Session refreshed successfully');
-            // The session will be updated via auth state change listener
-            // and this function will be called again
-            return;
-          } else {
-            console.log('Could not refresh session - user may need to log in again');
-          }
-        }
+      const notifications = await notificationAPI.getNotifications(session.access_token, userId);
+      setNotifications(notifications);
+    } catch (err: any) {
+      console.error('Error fetching notifications:', err?.message || err);
+      // Keep existing notifications on error for better UX
+      if (err?.status === 401) {
+        console.log('Token expired, attempting to refresh session...');
+        const supabase = getSupabaseClient();
+        const { data: { session: newSession }, error } = await supabase.auth.refreshSession();
         
-        // If 404, the notifications endpoint doesn't exist yet
-        if (response.status === 404) {
-          console.log('Notifications endpoint not available');
-          setNotifications([]);
+        if (newSession && !error) {
+          console.log('Session refreshed successfully');
+          // The session will be updated via auth state change listener and this function will be called again
           return;
         }
-        
-        // For other errors, just keep existing notifications
-        console.log(`Notifications fetch returned ${response.status}, keeping existing data`);
-        return;
       }
-
-      const data = await response.json();
-      setNotifications(data.notifications || []);
-    } catch (err: any) {
-      // Silent handling of common errors
-      if (err.name === 'TimeoutError' || err.name === 'AbortError') {
-        console.log('Notification fetch timed out - server may be cold starting');
-      } else if (err.message === 'Failed to fetch') {
-        console.log('Network issue fetching notifications');
-      } else {
-        console.log('Error fetching notifications:', err.message);
-      }
-      // Keep existing notifications on error for better UX
     } finally {
       setLoading(false);
     }
@@ -123,16 +78,7 @@ export function NotificationCenter({ session, userId }: NotificationCenterProps)
 
   const markAsRead = async (notificationId: string) => {
     try {
-      await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/notifications/${notificationId}/read`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
+      await notificationAPI.markAsRead(session.access_token, notificationId);
       setNotifications(prev =>
         prev.map(n => n.id === notificationId ? { ...n, read: true } : n)
       );
@@ -143,16 +89,7 @@ export function NotificationCenter({ session, userId }: NotificationCenterProps)
 
   const markAllAsRead = async () => {
     try {
-      await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/notifications/${userId}/read-all`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
+      await notificationAPI.markAllAsRead(session.access_token, userId);
       setNotifications(prev => prev.map(n => ({ ...n, read: true })));
     } catch (err) {
       console.error('Error marking all as read:', err);
@@ -161,16 +98,7 @@ export function NotificationCenter({ session, userId }: NotificationCenterProps)
 
   const deleteNotification = async (notificationId: string) => {
     try {
-      await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/notifications/${notificationId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
+      await notificationAPI.deleteNotification(session.access_token, notificationId);
       setNotifications(prev => prev.filter(n => n.id !== notificationId));
     } catch (err) {
       console.error('Error deleting notification:', err);
