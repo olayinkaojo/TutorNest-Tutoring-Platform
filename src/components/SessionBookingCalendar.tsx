@@ -25,6 +25,13 @@ import {
   ChevronUp,
   Filter,
   GraduationCap,
+  Award,
+  Globe,
+  X,
+  Layers,
+  Users,
+  Laptop,
+  Brain,
 } from 'lucide-react';
 
 interface SessionBookingCalendarProps {
@@ -41,18 +48,32 @@ interface Tutor {
   subjects: string[];
   hourlyRate: number;
   availability?: any;
-  // Bio / profile fields
-  bio?: string;
-  about?: string;
+  // Identity
+  headline?: string;
+  location?: string;
+  // Credentials
+  educationLevel?: string;
+  institution?: string;
   experienceYears?: number;
   qualifications?: string;
-  location?: string;
+  // About
+  bio?: string;
+  about?: string;
+  teachingStyle?: string;
+  // Teaching scope
+  ageGroups?: string[];
+  classes?: string[];
   teachingFormat?: string;
+  groupSize?: string;
+  // Specialisms
+  examBoards?: string[];
+  learningDifficulties?: string[];
+  methodologies?: string[];
+  languages?: string[];
+  // Safeguarding
   dbsChecked?: boolean;
   hasInsurance?: boolean;
-  languages?: string[];
-  methodologies?: string[];
-  ageGroups?: string[];
+  // Engagement
   rating?: number;
 }
 
@@ -87,8 +108,9 @@ export function SessionBookingCalendar({
   const [dbsOnly, setDbsOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
-  // Tutor bio expansion
+  // Tutor bio expansion + full-profile modal
   const [expandedTutorId, setExpandedTutorId] = useState<string>('');
+  const [profileModalTutor, setProfileModalTutor] = useState<Tutor | null>(null);
 
   useEffect(() => {
     fetchTutors();
@@ -115,28 +137,46 @@ export function SessionBookingCalendar({
         if (!id) return null;
 
         const name =
-          tutor.name ||
-          tutor.fullName ||
+          tutor.name || tutor.fullName || tutor.full_name ||
           `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim() ||
           'Unknown Tutor';
 
         return {
           id,
           name,
-          subjects: tutor.subjects || [],
+          // Identity
+          headline:     tutor.headline    || '',
+          location:     tutor.location    || tutor.city || '',
+          // Credentials
+          educationLevel: tutor.educationLevel || tutor.education_level || '',
+          institution:    tutor.institution    || '',
+          experienceYears: tutor.experienceYears != null ? Number(tutor.experienceYears)
+                          : tutor.experience_years != null ? Number(tutor.experience_years)
+                          : undefined,
+          qualifications: tutor.qualifications || tutor.qualification || '',
+          // About
+          bio:           tutor.bio || tutor.about || tutor.profileBio || '',
+          teachingStyle: tutor.teachingStyle || tutor.teaching_style || '',
+          // Teaching scope
+          subjects:      tutor.subjects   || [],
+          ageGroups:     tutor.ageGroups  || tutor.age_groups || [],
+          classes:       tutor.classes    || [],
+          teachingFormat: tutor.teachingFormat || tutor.teaching_format || '',
+          groupSize:     tutor.groupSize  || tutor.group_size || '',
+          // Specialisms
+          examBoards:           tutor.examBoards           || tutor.exam_boards           || [],
+          learningDifficulties: tutor.learningDifficulties || tutor.learning_difficulties || [],
+          methodologies:        tutor.methodologies        || [],
+          languages:            tutor.languages            || [],
+          // Safeguarding
+          dbsChecked:   tutor.dbsChecked   === true || tutor.dbs_checked   === true || tutor.dbs === true,
+          hasInsurance: tutor.hasInsurance === true || tutor.has_insurance  === true,
+          // Engagement
           hourlyRate: 20000,
           availability: tutor.availability,
-          bio: tutor.bio || tutor.about || tutor.profileBio || '',
-          experienceYears: tutor.experienceYears || tutor.experience || undefined,
-          qualifications: tutor.qualifications || tutor.qualification || '',
-          location: tutor.location || tutor.city || '',
-          teachingFormat: tutor.teachingFormat || '',
-          dbsChecked: tutor.dbsChecked === true || tutor.dbs === true,
-          hasInsurance: tutor.hasInsurance === true || tutor.insurance === true,
-          languages: tutor.languages || [],
-          methodologies: tutor.methodologies || [],
-          ageGroups: tutor.ageGroups || [],
-          rating: tutor.rating != null ? Number(tutor.rating) : tutor.averageRating != null ? Number(tutor.averageRating) : undefined,
+          rating: tutor.rating != null ? Number(tutor.rating)
+                : tutor.averageRating != null ? Number(tutor.averageRating)
+                : undefined,
         } as Tutor;
       })
       .filter(Boolean) as Tutor[];
@@ -254,14 +294,254 @@ export function SessionBookingCalendar({
 
   const selectedTutorData = tutors.find(t => t.id === selectedTutor);
 
-  // ── Tutor card ───────────────────────────────────────────────────────────────
+  // ── Helper: pill list ────────────────────────────────────────────────────────
+  const PillList = ({ items, colour = 'gray' }: { items: string[]; colour?: 'gray' | 'purple' | 'green' | 'blue' }) => {
+    const map: Record<string, string> = {
+      gray:   'bg-gray-100 text-gray-700',
+      purple: 'bg-purple-100 text-purple-700',
+      green:  'bg-green-100 text-green-700',
+      blue:   'bg-blue-100 text-blue-700',
+    };
+    if (!items || items.length === 0) return null;
+    return (
+      <div className="flex flex-wrap gap-1">
+        {items.map(item => (
+          <span key={item} className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${map[colour]}`}>
+            {item}
+          </span>
+        ))}
+      </div>
+    );
+  };
+
+  // ── Full-profile modal ───────────────────────────────────────────────────────
+  const TutorProfileModal = ({ tutor, onClose, onSelect }: { tutor: Tutor; onClose: () => void; onSelect: () => void }) => {
+    const initials = tutor.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
+    const bioText = tutor.bio || tutor.about || '';
+
+    return (
+      <div
+        className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto py-8 px-4"
+        style={{ backgroundColor: 'rgba(0,0,0,0.55)' }}
+        onClick={(e) => { if (e.target === e.currentTarget) onClose(); }}
+      >
+        <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl relative">
+          {/* Close */}
+          <button
+            onClick={onClose}
+            className="absolute top-4 right-4 p-1.5 rounded-full bg-gray-100 hover:bg-gray-200 transition z-10"
+          >
+            <X className="w-4 h-4 text-gray-600" />
+          </button>
+
+          {/* ── Header ── */}
+          <div className="p-6 border-b bg-gradient-to-r from-purple-50 to-indigo-50 rounded-t-2xl">
+            <div className="flex items-start gap-4">
+              <div
+                className="w-16 h-16 rounded-full flex items-center justify-center text-white text-xl font-bold flex-shrink-0"
+                style={{ backgroundColor: '#625d9c' }}
+              >
+                {initials}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h2 className="text-xl font-bold text-gray-900">{tutor.name}</h2>
+                {tutor.headline && (
+                  <p className="text-sm text-purple-700 italic mt-0.5">{tutor.headline}</p>
+                )}
+                <div className="flex flex-wrap gap-2 mt-2">
+                  {tutor.dbsChecked && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-green-100 text-green-800 text-xs font-semibold">
+                      <ShieldCheck className="w-3 h-3" /> DBS Checked
+                    </span>
+                  )}
+                  {tutor.hasInsurance && (
+                    <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-blue-100 text-blue-800 text-xs font-semibold">
+                      <Award className="w-3 h-3" /> Has Insurance
+                    </span>
+                  )}
+                </div>
+                {/* Key stats */}
+                <div className="flex flex-wrap gap-x-4 gap-y-1 mt-3 text-xs text-gray-600">
+                  {tutor.rating != null && !isNaN(Number(tutor.rating)) && (
+                    <span className="flex items-center gap-1">
+                      <Star className="w-3.5 h-3.5 text-amber-500 fill-amber-500" />
+                      <strong>{Number(tutor.rating).toFixed(1)}</strong> rating
+                    </span>
+                  )}
+                  {tutor.experienceYears != null && (
+                    <span className="flex items-center gap-1">
+                      <GraduationCap className="w-3.5 h-3.5 text-purple-500" />
+                      <strong>{tutor.experienceYears}</strong> yr{tutor.experienceYears !== 1 ? 's' : ''} experience
+                    </span>
+                  )}
+                  {tutor.location && (
+                    <span className="flex items-center gap-1">
+                      <MapPin className="w-3.5 h-3.5 text-gray-400" />{tutor.location}
+                    </span>
+                  )}
+                  {tutor.teachingFormat && (
+                    <span className="flex items-center gap-1">
+                      <Laptop className="w-3.5 h-3.5 text-gray-400" />{tutor.teachingFormat}
+                    </span>
+                  )}
+                  {tutor.groupSize && (
+                    <span className="flex items-center gap-1">
+                      <Users className="w-3.5 h-3.5 text-gray-400" />{tutor.groupSize}
+                    </span>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* ── Scrollable body ── */}
+          <div className="p-6 space-y-6 max-h-[60vh] overflow-y-auto">
+
+            {/* About */}
+            {(bioText || tutor.teachingStyle) && (
+              <section>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">About</h3>
+                {bioText && <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{bioText}</p>}
+                {tutor.teachingStyle && (
+                  <div className="mt-3 p-3 bg-purple-50 rounded-lg border border-purple-100">
+                    <p className="text-xs font-semibold text-purple-700 mb-1">Teaching Style</p>
+                    <p className="text-sm text-gray-700 leading-relaxed">{tutor.teachingStyle}</p>
+                  </div>
+                )}
+              </section>
+            )}
+
+            {/* Qualifications */}
+            {(tutor.educationLevel || tutor.institution || tutor.qualifications) && (
+              <section>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Qualifications</h3>
+                <div className="space-y-2">
+                  {(tutor.educationLevel || tutor.institution) && (
+                    <div className="flex items-start gap-2">
+                      <GraduationCap className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" />
+                      <div>
+                        {tutor.educationLevel && <p className="text-sm font-medium text-gray-800">{tutor.educationLevel}</p>}
+                        {tutor.institution && <p className="text-xs text-gray-500">{tutor.institution}</p>}
+                      </div>
+                    </div>
+                  )}
+                  {tutor.qualifications && (
+                    <div className="mt-2 p-3 bg-gray-50 rounded-lg text-sm text-gray-700 leading-relaxed whitespace-pre-line border border-gray-100">
+                      {tutor.qualifications}
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Subjects & Teaching Scope */}
+            <section>
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Subjects & Teaching Scope</h3>
+              <div className="space-y-2">
+                <div>
+                  <p className="text-xs text-gray-500 mb-1">Subjects</p>
+                  <div className="flex flex-wrap gap-1">
+                    {tutor.subjects.map(s => (
+                      <span
+                        key={s}
+                        className={`inline-block px-2 py-0.5 rounded-full text-xs font-medium ${
+                          childSubjects.some(cs => cs.toLowerCase() === s.toLowerCase())
+                            ? 'bg-purple-100 text-purple-700 ring-1 ring-purple-300'
+                            : 'bg-gray-100 text-gray-700'
+                        }`}
+                      >
+                        {childSubjects.some(cs => cs.toLowerCase() === s.toLowerCase()) && '★ '}{s}
+                      </span>
+                    ))}
+                  </div>
+                </div>
+                {tutor.ageGroups && tutor.ageGroups.length > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Age Groups</p>
+                    <PillList items={tutor.ageGroups} colour="green" />
+                  </div>
+                )}
+                {tutor.classes && tutor.classes.length > 0 && (
+                  <div>
+                    <p className="text-xs text-gray-500 mb-1">Year Groups / Classes</p>
+                    <PillList items={tutor.classes} colour="blue" />
+                  </div>
+                )}
+              </div>
+            </section>
+
+            {/* Specialisms */}
+            {((tutor.examBoards?.length ?? 0) > 0 || (tutor.methodologies?.length ?? 0) > 0 || (tutor.learningDifficulties?.length ?? 0) > 0) && (
+              <section>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">Specialisms</h3>
+                <div className="space-y-2">
+                  {tutor.examBoards && tutor.examBoards.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                        <Layers className="w-3 h-3" /> Exam Boards
+                      </p>
+                      <PillList items={tutor.examBoards} colour="purple" />
+                    </div>
+                  )}
+                  {tutor.methodologies && tutor.methodologies.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1 flex items-center gap-1">
+                        <Brain className="w-3 h-3" /> Teaching Methodologies
+                      </p>
+                      <PillList items={tutor.methodologies} colour="blue" />
+                    </div>
+                  )}
+                  {tutor.learningDifficulties && tutor.learningDifficulties.length > 0 && (
+                    <div>
+                      <p className="text-xs text-gray-500 mb-1">Learning Difficulties Support</p>
+                      <PillList items={tutor.learningDifficulties} colour="green" />
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* Languages */}
+            {tutor.languages && tutor.languages.length > 0 && (
+              <section>
+                <h3 className="text-xs font-bold text-gray-500 uppercase tracking-widest mb-2">
+                  <span className="flex items-center gap-1"><Globe className="w-3.5 h-3.5" />Languages Spoken</span>
+                </h3>
+                <PillList items={tutor.languages} colour="gray" />
+              </section>
+            )}
+          </div>
+
+          {/* ── Footer CTA ── */}
+          <div className="p-5 border-t bg-gray-50 rounded-b-2xl flex gap-3">
+            <button
+              onClick={onClose}
+              className="flex-1 py-2.5 rounded-lg border border-gray-300 text-sm font-medium text-gray-700 hover:bg-gray-100 transition"
+            >
+              Close
+            </button>
+            <button
+              onClick={() => { onSelect(); onClose(); }}
+              className="flex-1 py-2.5 rounded-lg text-sm font-semibold text-white transition"
+              style={{ backgroundColor: '#625d9c' }}
+            >
+              <CheckCircle className="w-4 h-4 inline mr-1.5" />
+              Select {tutor.name.split(' ')[0]}
+            </button>
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  // ── Tutor card (compact list view) ──────────────────────────────────────────
   const TutorCard = ({ tutor }: { tutor: Tutor }) => {
     const isSelected = selectedTutor === tutor.id;
     const isExpanded = expandedTutorId === tutor.id;
     const bioText = tutor.bio || tutor.about || '';
-    const shortBio = bioText.length > 120 ? bioText.slice(0, 120).trimEnd() + '…' : bioText;
+    const shortBio = bioText.length > 140 ? bioText.slice(0, 140).trimEnd() + '…' : bioText;
     const hasBio = bioText.length > 0;
-    const hasMore = bioText.length > 120;
+    const hasMoreBio = bioText.length > 140;
 
     return (
       <div
@@ -269,122 +549,131 @@ export function SessionBookingCalendar({
           isSelected ? 'border-purple-500 bg-purple-50' : 'border-gray-200 hover:border-purple-300 bg-white'
         }`}
       >
-        {/* Clickable header row */}
+        {/* ── Clickable header (selects tutor) ── */}
         <button
-          onClick={() => {
-            setSelectedTutor(tutor.id);
-            setSelectedSlot('');
-          }}
+          onClick={() => { setSelectedTutor(tutor.id); setSelectedSlot(''); }}
           className="w-full p-4 text-left"
         >
-          <div className="flex items-start justify-between gap-2">
+          <div className="flex items-start gap-3">
             {/* Avatar */}
             <div
-              className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
+              className="w-11 h-11 rounded-full flex items-center justify-center text-white text-sm font-bold flex-shrink-0"
               style={{ backgroundColor: '#625d9c' }}
             >
-              {tutor.name.split(' ').map(n => n[0]).join('').slice(0, 2)}
+              {tutor.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
             </div>
 
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <h4 className="font-semibold text-gray-900 text-sm">{tutor.name}</h4>
+              {/* Name + safeguarding badges */}
+              <div className="flex items-center gap-1.5 flex-wrap">
+                <h4 className="font-bold text-gray-900 text-sm leading-tight">{tutor.name}</h4>
                 {tutor.dbsChecked && (
-                  <Badge variant="outline" className="text-xs border-green-300 text-green-700 bg-green-50 py-0">
-                    <ShieldCheck className="w-3 h-3 mr-1" />DBS
-                  </Badge>
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-green-100 text-green-800 text-[10px] font-semibold">
+                    <ShieldCheck className="w-2.5 h-2.5" />DBS
+                  </span>
                 )}
+                {tutor.hasInsurance && (
+                  <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded-full bg-blue-100 text-blue-800 text-[10px] font-semibold">
+                    <Award className="w-2.5 h-2.5" />Insured
+                  </span>
+                )}
+                {isSelected && <CheckCircle className="w-4 h-4 text-purple-600 ml-auto flex-shrink-0" />}
               </div>
 
-              {/* Key stats row */}
-              <div className="flex items-center gap-3 mt-1 text-xs text-gray-500 flex-wrap">
-                <span className="font-medium text-green-700">{formatNaira(tutor.hourlyRate)}/hr</span>
-                {tutor.experienceYears !== undefined && (
-                  <span className="flex items-center gap-1">
+              {/* Headline */}
+              {tutor.headline && (
+                <p className="text-xs text-purple-700 italic mt-0.5 leading-snug line-clamp-1">{tutor.headline}</p>
+              )}
+
+              {/* Key stats */}
+              <div className="flex items-center gap-3 mt-1.5 text-xs text-gray-500 flex-wrap">
+                {tutor.rating != null && !isNaN(Number(tutor.rating)) && (
+                  <span className="flex items-center gap-0.5">
+                    <Star className="w-3 h-3 text-amber-500 fill-amber-500" />{Number(tutor.rating).toFixed(1)}
+                  </span>
+                )}
+                {tutor.experienceYears != null && (
+                  <span className="flex items-center gap-0.5">
                     <GraduationCap className="w-3 h-3" />{tutor.experienceYears}yr{tutor.experienceYears !== 1 ? 's' : ''}
                   </span>
                 )}
                 {tutor.location && (
-                  <span className="flex items-center gap-1">
-                    <MapPin className="w-3 h-3" />{tutor.location}
+                  <span className="flex items-center gap-0.5 truncate">
+                    <MapPin className="w-3 h-3 flex-shrink-0" />{tutor.location}
                   </span>
                 )}
-                {tutor.rating !== undefined && !isNaN(Number(tutor.rating)) && (
-                  <span className="flex items-center gap-1">
-                    <Star className="w-3 h-3 text-amber-500 fill-amber-500" />{Number(tutor.rating).toFixed(1)}
+                {tutor.teachingFormat && (
+                  <span className="flex items-center gap-0.5">
+                    <Laptop className="w-3 h-3 flex-shrink-0" />
+                    {tutor.teachingFormat === 'Both Online & In-Person' ? 'Online & In-Person'
+                     : tutor.teachingFormat === 'Online Only' ? 'Online only'
+                     : 'In-Person only'}
                   </span>
                 )}
               </div>
 
+              {/* Education level */}
+              {(tutor.educationLevel || tutor.institution) && (
+                <p className="text-[11px] text-gray-500 mt-1 flex items-center gap-1">
+                  <GraduationCap className="w-3 h-3 flex-shrink-0" />
+                  {[tutor.educationLevel, tutor.institution].filter(Boolean).join(' · ')}
+                </p>
+              )}
+
               {/* Subject badges */}
               <div className="flex flex-wrap gap-1 mt-2">
                 {tutor.subjects.slice(0, 4).map(s => (
-                  <Badge
+                  <span
                     key={s}
-                    variant="secondary"
-                    className={`text-xs py-0 ${
+                    className={`inline-block px-2 py-0.5 rounded-full text-[11px] font-medium ${
                       childSubjects.some(cs => cs.toLowerCase() === s.toLowerCase())
                         ? 'bg-purple-100 text-purple-700'
                         : 'bg-gray-100 text-gray-600'
                     }`}
                   >
                     {s}
-                  </Badge>
+                  </span>
                 ))}
                 {tutor.subjects.length > 4 && (
-                  <Badge variant="secondary" className="text-xs py-0 bg-gray-100 text-gray-500">
+                  <span className="inline-block px-2 py-0.5 rounded-full text-[11px] bg-gray-100 text-gray-500">
                     +{tutor.subjects.length - 4} more
-                  </Badge>
+                  </span>
                 )}
               </div>
             </div>
-
-            {isSelected && <CheckCircle className="w-5 h-5 text-purple-600 flex-shrink-0" />}
           </div>
         </button>
 
-        {/* Bio section */}
+        {/* ── Bio strip ── */}
         {hasBio && (
-          <div className="px-4 pb-4 -mt-1">
+          <div className="px-4 pb-3 -mt-1">
             <p className="text-xs text-gray-600 leading-relaxed">
               {isExpanded ? bioText : shortBio}
             </p>
-            {hasMore && (
+            {hasMoreBio && (
               <button
                 onClick={() => setExpandedTutorId(isExpanded ? '' : tutor.id)}
-                className="mt-1 text-xs font-medium flex items-center gap-1"
+                className="mt-0.5 text-xs font-medium flex items-center gap-0.5"
                 style={{ color: '#625d9c' }}
               >
-                {isExpanded ? (
-                  <><ChevronUp className="w-3 h-3" />Show less</>
-                ) : (
-                  <><ChevronDown className="w-3 h-3" />Read more</>
-                )}
+                {isExpanded
+                  ? <><ChevronUp className="w-3 h-3" />Show less</>
+                  : <><ChevronDown className="w-3 h-3" />Read more</>}
               </button>
             )}
           </div>
         )}
 
-        {/* Expanded extra info */}
-        {isExpanded && (tutor.qualifications || tutor.teachingFormat || (tutor.languages && tutor.languages.length > 0)) && (
-          <div className="px-4 pb-4 space-y-2 border-t border-gray-100 pt-3">
-            {tutor.qualifications && (
-              <div className="text-xs text-gray-600">
-                <span className="font-medium text-gray-700">Qualifications: </span>{tutor.qualifications}
-              </div>
-            )}
-            {tutor.teachingFormat && (
-              <div className="text-xs text-gray-600">
-                <span className="font-medium text-gray-700">Format: </span>{tutor.teachingFormat}
-              </div>
-            )}
-            {tutor.languages && tutor.languages.length > 0 && (
-              <div className="text-xs text-gray-600">
-                <span className="font-medium text-gray-700">Languages: </span>{tutor.languages.join(', ')}
-              </div>
-            )}
-          </div>
-        )}
+        {/* ── View Full Profile button ── */}
+        <div className="px-4 pb-4">
+          <button
+            onClick={(e) => { e.stopPropagation(); setProfileModalTutor(tutor); }}
+            className="w-full py-1.5 rounded-lg border border-purple-200 text-xs font-semibold hover:bg-purple-50 transition flex items-center justify-center gap-1"
+            style={{ color: '#625d9c' }}
+          >
+            View Full Profile →
+          </button>
+        </div>
       </div>
     );
   };
@@ -755,6 +1044,18 @@ export function SessionBookingCalendar({
             onBookingSuccess?.();
           }}
           onCancel={() => setShowPaymentPlans(false)}
+        />
+      )}
+
+      {profileModalTutor && (
+        <TutorProfileModal
+          tutor={profileModalTutor}
+          onClose={() => setProfileModalTutor(null)}
+          onSelect={() => {
+            setSelectedTutor(profileModalTutor.id);
+            setSelectedSlot('');
+            setProfileModalTutor(null);
+          }}
         />
       )}
     </div>

@@ -128,18 +128,62 @@ app.get('/tutors/:tutorId/availability', async (c) => {
   }
 });
 
-// Get all tutors
+// Get all tutors — returns full public profile (no contact info)
 app.get('/tutors', async (c) => {
   try {
     const allTutors = await db.getProfilesByRole('tutor');
+
+    // Resolve name regardless of which key the signup stored it under
+    const resolveName = (t: any) =>
+      t.fullName || t.full_name || t.name ||
+      (t.firstName ? `${t.firstName} ${t.lastName ?? ''}`.trim() : null) ||
+      'Unknown Tutor';
+
     const tutors = allTutors
-      .filter((u: any) => u.verificationStatus === 'verified' || u.verificationStatus === 'approved')
+      .filter((u: any) => {
+        const status = String(u.verificationStatus || u.verification_status || '').toLowerCase();
+        return status === 'verified' || status === 'approved';
+      })
       .map((tutor: any) => ({
-        id: tutor.id,
-        name: tutor.fullName || tutor.name || 'Unknown Tutor',
-        subjects: tutor.subjects || [],
-        hourlyRate: tutor.hourlyRate || 25,
-        availability: tutor.availability || {},
+        // ── Identity ─────────────────────────────────────────────────────────
+        id:               tutor.id,
+        name:             resolveName(tutor),
+        headline:         tutor.headline         || '',
+        location:         tutor.location         || '',
+
+        // ── Credentials ──────────────────────────────────────────────────────
+        educationLevel:   tutor.education_level  || tutor.educationLevel  || '',
+        institution:      tutor.institution      || '',
+        experienceYears:  tutor.experience_years ?? tutor.experienceYears ?? null,
+        qualifications:   tutor.qualifications   || '',
+
+        // ── About ────────────────────────────────────────────────────────────
+        bio:              tutor.bio   || tutor.about || '',
+        teachingStyle:    tutor.teaching_style   || tutor.teachingStyle   || '',
+
+        // ── Subjects & teaching scope ────────────────────────────────────────
+        subjects:         tutor.subjects         || [],
+        ageGroups:        tutor.age_groups       || tutor.ageGroups       || [],
+        classes:          tutor.classes          || [],
+
+        // ── Format ───────────────────────────────────────────────────────────
+        teachingFormat:   tutor.teaching_format  || tutor.teachingFormat  || '',
+        groupSize:        tutor.group_size       || tutor.groupSize       || '',
+
+        // ── Specialisms ──────────────────────────────────────────────────────
+        examBoards:          tutor.exam_boards          || tutor.examBoards          || [],
+        learningDifficulties: tutor.learning_difficulties || tutor.learningDifficulties || [],
+        methodologies:       tutor.methodologies         || [],
+        languages:           tutor.languages             || [],
+
+        // ── Safeguarding ─────────────────────────────────────────────────────
+        dbsChecked:    tutor.dbs_checked  === true || tutor.dbsChecked  === true,
+        hasInsurance:  tutor.has_insurance === true || tutor.hasInsurance === true,
+
+        // ── Engagement ───────────────────────────────────────────────────────
+        rating:        tutor.rating ?? tutor.averageRating ?? null,
+        hourlyRate:    20000,   // platform-fixed
+        availability:  tutor.availability || {},
       }));
 
     return c.json({ tutors });

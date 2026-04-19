@@ -116,7 +116,20 @@ const TEACHING_METHODOLOGIES = [
 const LANGUAGES_SPOKEN = [
   'English', 'Spanish', 'French', 'German', 'Mandarin',
   'Arabic', 'Polish', 'Urdu', 'Bengali', 'Portuguese', 'Italian', 'Hindi',
+  'Yoruba', 'Igbo', 'Hausa', 'Pidgin English',
   'Others',
+];
+
+const EDUCATION_LEVELS = [
+  "Secondary School Certificate (SSCE/WAEC/NECO)",
+  "Ordinary National Diploma (OND)",
+  "Higher National Diploma (HND)",
+  "Bachelor's Degree (BSc / BA / BEd / BEng)",
+  "Postgraduate Certificate in Education (PGCE)",
+  "Postgraduate Diploma (PGDip)",
+  "Master's Degree (MSc / MA / MEd / MBA)",
+  "Doctorate (PhD / EdD)",
+  "Professional Certification (ICAN, ACCA, etc.)",
 ];
 
 interface TutorSignupProps {
@@ -192,6 +205,11 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   const [otherMethodology, setOtherMethodology] = useState('');
   const [selectedLanguages, setSelectedLanguages] = useState<string[]>([]);
   const [otherLanguage, setOtherLanguage] = useState('');
+
+  // Step 2: Education credentials
+  const [headline, setHeadline] = useState('');
+  const [educationLevel, setEducationLevel] = useState('');
+  const [institution, setInstitution] = useState('');
 
   // Step 5: Verification
   const [dbsChecked, setDbsChecked] = useState(false);
@@ -375,6 +393,9 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
           email,
           phone,
           location,
+          headline,
+          education_level: educationLevel,
+          institution,
           bio,
           hourly_rate: parseFloat(hourlyRate),
           experience_years: experienceYears ? parseInt(experienceYears) : null,
@@ -461,6 +482,9 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         email,
         phone,
         location,
+        headline,
+        education_level: educationLevel,
+        institution,
         bio,
         hourly_rate: parseFloat(hourlyRate),
         experience_years: experienceYears ? parseInt(experienceYears) : null,
@@ -783,12 +807,26 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
               </CardHeader>
               <CardContent className="space-y-4">
                 <div>
+                  <Label htmlFor="headline">Professional Headline</Label>
+                  <Input
+                    id="headline"
+                    value={headline}
+                    onChange={(e) => setHeadline(e.target.value)}
+                    placeholder="e.g. Experienced Maths Tutor | GCSE & A-Level | 8 years | University of Lagos graduate"
+                    maxLength={120}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    A short tagline parents see first when browsing tutors (max 120 characters)
+                  </p>
+                </div>
+
+                <div>
                   <Label htmlFor="bio">About Me / Bio *</Label>
                   <Textarea
                     id="bio"
                     value={bio}
                     onChange={(e) => setBio(e.target.value)}
-                    placeholder="Tell students about yourself, your teaching philosophy, and what makes you a great tutor..."
+                    placeholder="Tell parents and students about yourself, your teaching philosophy, your track record, and what makes you a great tutor..."
                     rows={5}
                     required
                   />
@@ -809,17 +847,40 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                   <div>
-                    <Label htmlFor="experienceYears">Years of Experience *</Label>
+                    <Label htmlFor="experienceYears">Years of Teaching Experience *</Label>
                     <Input
                       id="experienceYears"
                       type="number"
                       min="0"
+                      max="50"
                       value={experienceYears}
                       onChange={(e) => setExperienceYears(e.target.value)}
                       placeholder="5"
                       required
+                    />
+                  </div>
+                  <div>
+                    <Label>Highest Education Level</Label>
+                    <Select value={educationLevel} onValueChange={setEducationLevel}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Select level" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {EDUCATION_LEVELS.map(level => (
+                          <SelectItem key={level} value={level}>{level}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <Label htmlFor="institution">University / Institution</Label>
+                    <Input
+                      id="institution"
+                      value={institution}
+                      onChange={(e) => setInstitution(e.target.value)}
+                      placeholder="e.g. University of Lagos"
                     />
                   </div>
                 </div>
