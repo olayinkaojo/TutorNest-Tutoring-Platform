@@ -6,27 +6,28 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { VirtualClassroom } from './VirtualClassroom';
 import { PostSessionReport } from './PostSessionReport';
 import { ViewSessionReport } from './ViewSessionReport';
-import { 
-  Calendar, 
-  Clock, 
-  User, 
-  DollarSign, 
+import {
+  Calendar,
+  Clock,
+  User,
+  DollarSign,
   Video,
   AlertCircle,
   CheckCircle,
   XCircle,
   RotateCcw,
   Ban,
-  FileText
+  FileText,
+  BookOpen,
 } from 'lucide-react';
 
 interface BookingManagerProps {
   session: any;
   userRole: 'parent' | 'tutor';
   userId: string;
+  studentId?: string; // filter bookings to a specific child
 }
 
 interface Booking {
@@ -41,6 +42,7 @@ interface Booking {
   status: 'confirmed' | 'cancelled' | 'completed' | 'rescheduled';
   tutorName: string;
   studentName: string;
+  subject?: string;
   createdAt: string;
   cancelledAt?: string;
   cancellationReason?: string;
@@ -48,7 +50,7 @@ interface Booking {
   googleMeetLink?: string;
 }
 
-export function BookingManager({ session, userRole, userId }: BookingManagerProps) {
+export function BookingManager({ session, userRole, userId, studentId }: BookingManagerProps) {
   const [bookings, setBookings] = useState<Booking[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -56,26 +58,26 @@ export function BookingManager({ session, userRole, userId }: BookingManagerProp
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
   const [cancelling, setCancelling] = useState(false);
-  const [showClassroom, setShowClassroom] = useState<Booking | null>(null);
   const [showPostReport, setShowPostReport] = useState<Booking | null>(null);
   const [showViewReport, setShowViewReport] = useState<Booking | null>(null);
   const [bookingReports, setBookingReports] = useState<Record<string, any>>({});
 
   useEffect(() => {
     fetchBookings();
-    
+
     // Poll for booking updates every 30 seconds
     const interval = setInterval(fetchBookings, 30000);
     return () => clearInterval(interval);
-  }, []);
+  }, [studentId]);
 
   const fetchBookings = async () => {
     setLoading(true);
     setError('');
 
     try {
+      const params = studentId ? `?studentId=${studentId}` : '';
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings${params}`,
         {
           headers: {
             Authorization: `Bearer ${session.access_token}`,
@@ -236,13 +238,25 @@ export function BookingManager({ session, userRole, userId }: BookingManagerProp
     <Card>
       <CardContent className="pt-6">
         <div className="flex items-start justify-between mb-4">
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <h3 className="text-lg">
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center flex-wrap gap-2 mb-2">
+              <h3 className="text-lg font-semibold">
                 {userRole === 'parent' ? booking.tutorName : booking.studentName}
               </h3>
               {getStatusBadge(booking.status)}
             </div>
+            {/* Subject — prominent */}
+            {booking.subject && (
+              <div className="mb-3">
+                <span
+                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold"
+                  style={{ backgroundColor: '#f0edfb', color: '#625d9c' }}
+                >
+                  <BookOpen className="w-3.5 h-3.5" />
+                  {booking.subject}
+                </span>
+              </div>
+            )}
             <div className="space-y-1 text-sm text-gray-600">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
@@ -254,7 +268,7 @@ export function BookingManager({ session, userRole, userId }: BookingManagerProp
               </div>
               <div className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4" />
-                {formatNaira(parseFloat(booking.price))}
+                {formatNaira(parseFloat(booking.price || '20000'))}
               </div>
             </div>
           </div>
@@ -262,11 +276,11 @@ export function BookingManager({ session, userRole, userId }: BookingManagerProp
 
         {booking.status === 'confirmed' && (
           <div className="space-y-2 mt-4">
-            {/* Enter Classroom Button - Always visible for confirmed bookings */}
-            {booking.googleMeetLink && (
-              <a 
-                href={booking.googleMeetLink} 
-                target="_blank" 
+            {/* Enter Classroom — links to the stored meet/Jitsi URL */}
+            {booking.googleMeetLink ? (
+              <a
+                href={booking.googleMeetLink}
+                target="_blank"
                 rel="noopener noreferrer"
                 className="block"
               >
@@ -278,17 +292,12 @@ export function BookingManager({ session, userRole, userId }: BookingManagerProp
                   Enter Classroom
                 </Button>
               </a>
+            ) : (
+              <Button className="w-full" variant="outline" disabled>
+                <Video className="w-4 h-4 mr-2" />
+                Classroom link not yet available
+              </Button>
             )}
-            
-            {/* Alternative Virtual Classroom Button */}
-            <Button
-              onClick={() => setShowClassroom(booking)}
-              variant="outline"
-              className="w-full"
-            >
-              <Video className="w-4 h-4 mr-2" />
-              Open Virtual Classroom
-            </Button>
 
             <div className="flex gap-2">
               {canReschedule(booking) && (
@@ -329,17 +338,14 @@ export function BookingManager({ session, userRole, userId }: BookingManagerProp
               )}
             </div>
 
-            {/* Display Google Meet link info */}
+            {/* Virtual classroom link info */}
             {booking.googleMeetLink && (
-              <div className="mt-3 p-3 bg-green-50 border border-green-200 rounded-lg">
+              <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
                 <div className="flex items-start gap-2">
-                  <Video className="w-4 h-4 text-green-600 mt-0.5" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium text-green-900">Google Meet Ready</p>
-                    <p className="text-xs text-green-700 mt-1">
-                      Click "Enter Classroom" to join the video session
-                    </p>
-                    <p className="text-xs text-green-600 mt-1 font-mono break-all">
+                  <Video className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-medium text-blue-900">Virtual Classroom Ready</p>
+                    <p className="text-xs text-blue-600 mt-1 font-mono break-all">
                       {booking.googleMeetLink}
                     </p>
                   </div>
@@ -458,32 +464,6 @@ export function BookingManager({ session, userRole, userId }: BookingManagerProp
           </div>
         </CardContent>
       </Card>
-    );
-  }
-
-  if (showClassroom) {
-    const startDateTime = `${showClassroom.date}T${showClassroom.startTime}`;
-    const endDateTime = `${showClassroom.date}T${showClassroom.endTime}`;
-
-    return (
-      <div>
-        <Button
-          variant="outline"
-          onClick={() => setShowClassroom(null)}
-          className="mb-4"
-        >
-          ← Back to Bookings
-        </Button>
-        <VirtualClassroom
-          session={session}
-          bookingId={showClassroom.id}
-          userRole={userRole}
-          studentName={showClassroom.studentName}
-          tutorName={showClassroom.tutorName}
-          startTime={startDateTime}
-          endTime={endDateTime}
-        />
-      </div>
     );
   }
 

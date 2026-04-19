@@ -32,6 +32,7 @@ interface SessionBookingCalendarProps {
   activeChildId: string;
   childName?: string;
   childSubjects?: string[];
+  onBookingSuccess?: () => void;
 }
 
 interface Tutor {
@@ -66,6 +67,7 @@ export function SessionBookingCalendar({
   activeChildId,
   childName,
   childSubjects = [],
+  onBookingSuccess,
 }: SessionBookingCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
   const [selectedTutor, setSelectedTutor] = useState<string>('');
@@ -740,6 +742,7 @@ export function SessionBookingCalendar({
           tutorName={selectedTutorData?.name ?? ''}
           studentId={activeChildId}
           studentName={childName ?? ''}
+          subject={activeSubject || undefined}
           startDate={selectedDate.toISOString().split('T')[0]}
           startTime={selectedSlot}
           onSuccess={(sessionsCreated) => {
@@ -749,6 +752,7 @@ export function SessionBookingCalendar({
             );
             setSelectedSlot('');
             fetchAvailableSlots();
+            onBookingSuccess?.();
           }}
           onCancel={() => setShowPaymentPlans(false)}
         />

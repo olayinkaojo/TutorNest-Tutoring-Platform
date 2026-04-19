@@ -70,6 +70,7 @@ export function ParentDashboard({
   onTabChange,
 }: ParentDashboardProps) {
   const [activeTab, setActiveTab] = useState('overview');
+  const [bookingsSubTab, setBookingsSubTab] = useState('book-session');
   const hasMountedTabSync = useRef(false);
   const supabase = getSupabaseClient();
   const [session, setSession] = useState<any>(null);
@@ -304,6 +305,7 @@ export function ParentDashboard({
 
   const handleSwitchChild = (childId: string) => {
     setActiveChildId(childId);
+    setBookingsSubTab('book-session'); // reset to booking view when switching child
   };
 
   const handleAddChild = () => {
@@ -790,7 +792,7 @@ export function ParentDashboard({
                 </CardContent>
               </Card>
             ) : session && activeChildId ? (
-              <Tabs defaultValue="book-session">
+              <Tabs value={bookingsSubTab} onValueChange={setBookingsSubTab}>
                 <TabsList className="mb-4">
                   <TabsTrigger value="book-session">Book New Session</TabsTrigger>
                   <TabsTrigger value="my-bookings">My Bookings</TabsTrigger>
@@ -802,11 +804,17 @@ export function ParentDashboard({
                     activeChildId={activeChildId}
                     childName={activeChild ? `${activeChild.firstName} ${activeChild.lastName}` : undefined}
                     childSubjects={activeChild?.subjects ?? []}
+                    onBookingSuccess={() => setBookingsSubTab('my-bookings')}
                   />
                 </TabsContent>
 
                 <TabsContent value="my-bookings">
-                  <BookingManager session={session} userRole="parent" userId={profile.id || profile.userId} />
+                  <BookingManager
+                    session={session}
+                    userRole="parent"
+                    userId={profile.id || profile.userId}
+                    studentId={activeChildId ?? undefined}
+                  />
                 </TabsContent>
               </Tabs>
             ) : (
