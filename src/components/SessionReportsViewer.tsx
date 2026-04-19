@@ -38,6 +38,8 @@ import {
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
 import { useRealtimeReports, WebSocketEvents } from '../hooks/useWebSocket';
+import { studentAPI } from '../utils/student-api-client';
+import { useRealtimeStudentReports } from '../hooks/useRealtimeNotifications';
 
 interface SessionReport {
   id: string;
@@ -98,6 +100,36 @@ export function SessionReportsViewer({
   };
 
   const { isConnected } = useRealtimeReports(userId, accessToken, handleRealtimeUpdate);
+
+  // Real-time notifications for student reports (if viewing as student)
+  const { notifications: realtimeNotifications } = useRealtimeStudentReports(
+    viewType === 'student' ? userId : '',
+    accessToken,
+    viewType === 'student',
+    (reportId, title) => {
+      console.log(`📬 New report notification: ${title}`);
+      // Refresh reports to show new one
+      fetchReports();
+    }
+  );
+
+  // Mark report as viewed by student
+  const markReportAsViewed = async (reportId: string) => {
+    try {
+      // Call API to mark as viewed
+      await studentAPI.markReportViewed(accessToken, reportId);
+      console.log(`✅ Report ${reportId} marked as viewed`);
+      
+      // Update local state
+      setReports(prev =>
+        prev.map(r =>
+          r.id === reportId ? { ...r, viewed: true, viewedAt: new Date().toISOString() } : r
+        )
+      );
+    } catch (error) {
+      console.error('Error marking report as viewed:', error);
+    }
+  };
 
   useEffect(() => {
     fetchReports();
@@ -432,7 +464,13 @@ export function SessionReportsViewer({
                     <Button
                       variant="outline"
                       size="sm"
-                      onClick={() => setViewingReport(report)}
+                      onClick={() => {
+                        setViewingReport(report);
+                        // Mark as viewed if student is viewing (for student dashboard)
+                        if (viewType === 'student') {
+                          markReportAsViewed(report.id);
+                        }
+                      }}
                     >
                       <Eye className="w-4 h-4 mr-1" />
                       View Details

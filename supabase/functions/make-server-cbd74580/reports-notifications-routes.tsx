@@ -130,6 +130,70 @@ app.get('/bookings/:bookingId/report', async (c) => {
   }
 });
 
+// Mark report as viewed by student
+app.post('/reports/:reportId/mark-viewed', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const currentUserId = await getUserId(accessToken);
+    if (!currentUserId) {
+      return c.json({ error: 'Invalid or expired token' }, 401);
+    }
+
+    const reportId = c.req.param('reportId');
+    const report = await kv.get(`report:${reportId}`) as any;
+
+    if (!report) {
+      return c.json({ error: 'Report not found' }, 404);
+    }
+
+    // Security: Verify user is the student or parent of the student
+    if (report.studentId !== currentUserId && report.parentId !== currentUserId) {
+      return c.json({ error: 'Only the student or parent can mark reports as viewed' }, 403);
+    }
+
+    // Track view
+    const viewTracking = report.viewedBy || [];
+    if (!viewTracking.includes(currentUserId)) {
+      viewTracking.push(currentUserId);
+    }
+
+    report.viewedBy = viewTracking;
+    report.lastViewedAt = new Date().toISOString();
+    report.viewedByStudent = report.studentId === currentUserId;
+    report.viewedByParent = report.parentId === currentUserId;
+
+    await kv.set(`report:${reportId}`, report);
+
+    // Notify tutor that report was viewed
+    await createNotification({
+      userId: report.tutorId,
+      type: 'system',
+      title: 'Report Viewed',
+      message: `${report.viewedByStudent ? 'Student' : 'Parent'} has viewed your report for ${report.studentName}`,
+      actionUrl: `#report-${reportId}`,
+      metadata: {
+        reportId,
+        viewedBy: currentUserId,
+        studentId: report.studentId,
+        timestamp: new Date().toISOString(),
+      },
+    });
+
+    return c.json({
+      success: true,
+      message: 'Report marked as viewed',
+      report,
+    });
+  } catch (error: any) {
+    console.error('Error marking report as viewed:', error);
+    return c.json({ error: error.message || 'Failed to mark report as viewed' }, 500);
+  }
+});
+
 // Rate a session (parent feedback)
 app.post('/bookings/:bookingId/rate-session', async (c) => {
   try {
