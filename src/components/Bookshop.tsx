@@ -42,15 +42,13 @@ export function Bookshop({ session, subscriptionTier }: BookshopProps) {
   const categories = ['All', 'Mathematics', 'Science', 'English', 'History', 'Languages', 'Art', 'Music', 'Bible Study'];
   const ageRanges = ['All Ages', '3-5 years', '5-7 years', '7-9 years', '9-11 years', '11-14 years', '14-16 years', '16-18 years'];
   const gradeLevels = [
-    'All Grades', 
-    'Reception (Nursery 1)', 
-    'Year 1-2 (Nursery 2-3)', 
-    'Year 3-4 (Primary 1-2)', 
-    'Year 5-6 (Primary 3-4)', 
-    'Year 7-8 (Primary 5-6)', 
-    'Year 9-11 (JSS 1-3)', 
-    'Year 12-13 (SS 1-2)', 
-    'A-Level (SS 3 & Post-Secondary)'
+    'All Grades',
+    'Nursery / Pre-Primary',
+    'Primary 1-3 (P1-P3) – Year 1-3',
+    'Primary 4-6 (P4-P6) – Year 4-6',
+    'JSS 1-3 – Year 7-9',
+    'SS 1-2 – Year 10-11',
+    'SS 3 – Year 12 / College',
   ];
 
   useEffect(() => {

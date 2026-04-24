@@ -31,52 +31,39 @@ const AVAILABLE_SUBJECTS = [
 
 const AGE_GROUPS = [
   'Early Years (3-5)',
-  'Primary Lower (6-8)',
-  'Primary Upper (9-11)',
-  'Junior Secondary (12-14)',
-  'Senior Secondary (15-17)',
+  'Primary Lower (5-8)',
+  'Primary Upper (8-11)',
+  'Junior Secondary (11-14)',
+  'Senior Secondary (14-17)',
 ];
 
-// Class mapping for each age group
+// Class mapping for each age group (Nigeria 6-3-3-4 system / UK England system)
 const CLASS_OPTIONS: { [key: string]: string[] } = {
   'Early Years (3-5)': [
     'Nursery 1',
     'Nursery 2',
+    'Nursery 3 / Reception',
     'Kindergarten/Pre-Primary',
-    'Reception',
   ],
-  'Primary Lower (6-8)': [
-    'Primary 1',
-    'Primary 2',
-    'Primary 3',
-    'Year 1 (KS1)',
-    'Year 2 (KS1)',
-    'Year 3 (KS2)',
+  'Primary Lower (5-8)': [
+    'Primary 1 (P1) / Year 1',
+    'Primary 2 (P2) / Year 2',
+    'Primary 3 (P3) / Year 3',
   ],
-  'Primary Upper (9-11)': [
-    'Primary 4',
-    'Primary 5',
-    'Primary 6',
-    'Year 4 (KS2)',
-    'Year 5 (KS2)',
-    'Year 6 (KS2)',
+  'Primary Upper (8-11)': [
+    'Primary 4 (P4) / Year 4',
+    'Primary 5 (P5) / Year 5',
+    'Primary 6 (P6) / Year 6',
   ],
-  'Junior Secondary (12-14)': [
-    'JSS 1',
-    'JSS 2',
-    'JSS 3',
-    'Year 7 (KS3)',
-    'Year 8 (KS3)',
-    'Year 9 (KS3)',
+  'Junior Secondary (11-14)': [
+    'JSS 1 / Year 7',
+    'JSS 2 / Year 8',
+    'JSS 3 / Year 9',
   ],
-  'Senior Secondary (15-17)': [
-    'SSS 1',
-    'SSS 2',
-    'SSS 3',
-    'Year 10 (GCSE)',
-    'Year 11 (GCSE)',
-    'Year 12 (A-Level)',
-    'Year 13 (A-Level)',
+  'Senior Secondary (14-17)': [
+    'SS 1 / Year 10',
+    'SS 2 / Year 11',
+    'SS 3 / Year 12',
   ],
 };
 

@@ -182,21 +182,21 @@ export const PRICING_TIERS = {
   }
 };
 
-// Grade levels
+// Grade levels (Nigeria 6-3-3-4 system / UK England system)
 export const GRADE_LEVELS = [
-  { value: 'year_1', label: 'Year 1', ageRange: '5-6' },
-  { value: 'year_2', label: 'Year 2', ageRange: '6-7' },
-  { value: 'year_3', label: 'Year 3', ageRange: '7-8' },
-  { value: 'year_4', label: 'Year 4', ageRange: '8-9' },
-  { value: 'year_5', label: 'Year 5', ageRange: '9-10' },
-  { value: 'year_6', label: 'Year 6', ageRange: '10-11' },
-  { value: 'year_7', label: 'Year 7', ageRange: '11-12' },
-  { value: 'year_8', label: 'Year 8', ageRange: '12-13' },
-  { value: 'year_9', label: 'Year 9', ageRange: '13-14' },
-  { value: 'year_10', label: 'Year 10 (GCSE)', ageRange: '14-15' },
-  { value: 'year_11', label: 'Year 11 (GCSE)', ageRange: '15-16' },
-  { value: 'year_12', label: 'Year 12 (A-Level)', ageRange: '16-17' },
-  { value: 'year_13', label: 'Year 13 (A-Level)', ageRange: '17-18' },
+  { value: 'year_1', label: 'Year 1 / Primary 1 (P1)', ageRange: '5-6' },
+  { value: 'year_2', label: 'Year 2 / Primary 2 (P2)', ageRange: '6-7' },
+  { value: 'year_3', label: 'Year 3 / Primary 3 (P3)', ageRange: '7-8' },
+  { value: 'year_4', label: 'Year 4 / Primary 4 (P4)', ageRange: '8-9' },
+  { value: 'year_5', label: 'Year 5 / Primary 5 (P5)', ageRange: '9-10' },
+  { value: 'year_6', label: 'Year 6 / Primary 6 (P6)', ageRange: '10-11' },
+  { value: 'year_7', label: 'Year 7 / JSS 1', ageRange: '11-12' },
+  { value: 'year_8', label: 'Year 8 / JSS 2', ageRange: '12-13' },
+  { value: 'year_9', label: 'Year 9 / JSS 3', ageRange: '13-14' },
+  { value: 'year_10', label: 'Year 10 / SS 1', ageRange: '14-15' },
+  { value: 'year_11', label: 'Year 11 / SS 2', ageRange: '15-16' },
+  { value: 'year_12', label: 'Year 12 / SS 3', ageRange: '16-17' },
+  { value: 'year_13', label: 'Year 13 / Post-Secondary', ageRange: '17-18' },
 ];
 
 export default SUBJECTS;

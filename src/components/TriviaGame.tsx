@@ -64,46 +64,30 @@ export function TriviaGame({ userId, grade, onXPEarned }: TriviaGameProps) {
       return gradeValue;
     }
     
-    // Convert nursery_X to year_X (nursery_1 -> reception, nursery_2 -> year_1, nursery_3 -> year_2)
+    // Nursery maps to Year 1 questions (pre-primary, age 3-5)
     if (gradeValue.startsWith('nursery_')) {
-      const yearNum = parseInt(gradeValue.replace('nursery_', ''));
-      
-      // Map nursery to year levels
-      if (yearNum === 1) return 'year_1'; // Reception -> use year_1 questions
-      if (yearNum === 2) return 'year_1'; // Year 1 (Nursery 2) -> year_1 questions
-      if (yearNum === 3) return 'year_2'; // Year 2 (Nursery 3) -> year_2 questions
-      
-      return 'year_1'; // Default for nursery
+      return 'year_1';
     }
-    
-    // Convert primary_X to year_X (primary_1 -> year_3, primary_2 -> year_4, etc.)
+
+    // Nigeria primary maps directly: Primary 1 (P1) = Year 1, Primary 2 (P2) = Year 2, etc.
     if (gradeValue.startsWith('primary_')) {
-      const yearNum = parseInt(gradeValue.replace('primary_', ''));
-      
-      // Map to available year levels
-      // primary_1 = Year 3, primary_2 = Year 4, primary_3 = Year 5, primary_4 = Year 6, primary_5 = Year 7, primary_6 = Year 8
-      if (yearNum >= 1 && yearNum <= 4) return 'year_5'; // Primary 1-4 (Years 3-6) use year_5 questions
-      if (yearNum >= 5 && yearNum <= 6) return 'year_8'; // Primary 5-6 (Years 7-8) use year_8 questions
-      
-      return 'year_5'; // Default for primary
+      const num = parseInt(gradeValue.replace('primary_', ''));
+      return `year_${num}`; // primary_1 -> year_1, primary_6 -> year_6
     }
-    
-    // Convert secondary_X to year_X (secondary_7 -> year_9, etc.)
+
+    // Nigeria secondary maps directly: JSS 1 = Year 7, JSS 2 = Year 8, JSS 3 = Year 9,
+    // SS 1 = Year 10, SS 2 = Year 11
     if (gradeValue.startsWith('secondary_')) {
-      const yearNum = parseInt(gradeValue.replace('secondary_', ''));
-      
-      // Map to available year levels
-      // secondary_7 = JSS1 (Year 9), secondary_8 = JSS2 (Year 10), secondary_9 = JSS3 (Year 11)
-      // secondary_10 = SS1 (Year 12), secondary_11 = SS2 (Year 13), secondary_12 = SS3 (Year 14)
-      if (yearNum >= 7 && yearNum <= 9) return 'year_8'; // JSS (Years 9-11) use year_8 questions
-      if (yearNum >= 10 && yearNum <= 11) return 'year_10'; // SS1-2 (Years 12-13) use year_10 (GCSE level)
-      if (yearNum >= 12 && yearNum <= 13) return 'year_12'; // SS3+ use year_12 (A-Level)
-      
-      return 'year_8'; // Default for secondary
+      const num = parseInt(gradeValue.replace('secondary_', ''));
+      return `year_${num}`; // secondary_7 -> year_7, secondary_11 -> year_11
     }
-    
+
+    // SS 3 = Year 12
+    if (gradeValue === 'sixth_form_12') return 'year_12';
+    if (gradeValue === 'sixth_form_13') return 'year_12'; // Post-secondary uses year_12 max
+
     // Default fallback
-    return 'year_1'; // Changed from year_5 to year_1
+    return 'year_1';
   };
 
   const normalizedGrade = convertGradeFormat(grade);

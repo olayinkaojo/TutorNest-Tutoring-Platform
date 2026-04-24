@@ -82,29 +82,23 @@ export function TriviaLeaderboard({ userId, grade }: TriviaLeaderboardProps) {
   const convertGradeFormat = (gradeValue: string): string => {
     if (gradeValue.startsWith('year_')) return gradeValue;
     
-    if (gradeValue.startsWith('nursery_')) {
-      const yearNum = parseInt(gradeValue.replace('nursery_', ''));
-      if (yearNum === 1) return 'year_1';
-      if (yearNum === 2) return 'year_1';
-      if (yearNum === 3) return 'year_2';
-      return 'year_1';
-    }
-    
+    if (gradeValue.startsWith('nursery_')) return 'year_1';
+
+    // Primary 1 (P1) = Year 1, Primary 2 (P2) = Year 2, ..., Primary 6 (P6) = Year 6
     if (gradeValue.startsWith('primary_')) {
-      const yearNum = parseInt(gradeValue.replace('primary_', ''));
-      if (yearNum >= 1 && yearNum <= 4) return 'year_5';
-      if (yearNum >= 5 && yearNum <= 6) return 'year_8';
-      return 'year_5';
+      const num = parseInt(gradeValue.replace('primary_', ''));
+      return `year_${num}`;
     }
-    
+
+    // JSS 1 = Year 7, JSS 2 = Year 8, JSS 3 = Year 9, SS 1 = Year 10, SS 2 = Year 11
     if (gradeValue.startsWith('secondary_')) {
-      const yearNum = parseInt(gradeValue.replace('secondary_', ''));
-      if (yearNum >= 7 && yearNum <= 9) return 'year_8';
-      if (yearNum >= 10 && yearNum <= 11) return 'year_10';
-      if (yearNum >= 12 && yearNum <= 13) return 'year_12';
-      return 'year_8';
+      const num = parseInt(gradeValue.replace('secondary_', ''));
+      return `year_${num}`;
     }
-    
+
+    if (gradeValue === 'sixth_form_12') return 'year_12';
+    if (gradeValue === 'sixth_form_13') return 'year_12';
+
     return 'year_1';
   };
 

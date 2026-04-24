@@ -370,22 +370,22 @@ export function ParentDashboard({
     
     // Map grade level codes to UK + Nigerian names
     const gradeMap: Record<string, string> = {
-      'nursery_1': 'Reception (Nursery 1)',
-      'nursery_2': 'Year 1 (Nursery 2)',
-      'nursery_3': 'Year 2 (Nursery 3)',
-      'primary_1': 'Year 3 (Primary 1)',
-      'primary_2': 'Year 4 (Primary 2)',
-      'primary_3': 'Year 5 (Primary 3)',
-      'primary_4': 'Year 6 (Primary 4)',
-      'primary_5': 'Year 7 (Primary 5)',
-      'primary_6': 'Year 8 (Primary 6)',
-      'secondary_7': 'Year 9 (JSS 1)',
-      'secondary_8': 'Year 10 (JSS 2)',
-      'secondary_9': 'Year 11 (JSS 3)',
-      'secondary_10': 'Year 12 (SS 1)',
-      'secondary_11': 'Year 13 (SS 2)',
-      'sixth_form_12': 'A-Level Year 1 (SS 3)',
-      'sixth_form_13': 'A-Level Year 2 (Post-Secondary)',
+      'nursery_1': 'Nursery 1 (Pre-Primary)',
+      'nursery_2': 'Nursery 2 (Pre-Primary)',
+      'nursery_3': 'Nursery 3 / Reception',
+      'primary_1': 'Primary 1 (P1) – Year 1',
+      'primary_2': 'Primary 2 (P2) – Year 2',
+      'primary_3': 'Primary 3 (P3) – Year 3',
+      'primary_4': 'Primary 4 (P4) – Year 4',
+      'primary_5': 'Primary 5 (P5) – Year 5',
+      'primary_6': 'Primary 6 (P6) – Year 6',
+      'secondary_7': 'JSS 1 (Junior Secondary 1) – Year 7',
+      'secondary_8': 'JSS 2 – Year 8',
+      'secondary_9': 'JSS 3 – Year 9',
+      'secondary_10': 'SS 1 (Senior Secondary 1) – Year 10',
+      'secondary_11': 'SS 2 – Year 11',
+      'sixth_form_12': 'SS 3 – Year 12 / College',
+      'sixth_form_13': 'Post-Secondary',
     };
     
     return gradeMap[gradeLevel] || gradeLevel.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());

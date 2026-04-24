@@ -272,18 +272,21 @@ export function EnhancedAddChildDialog({
                   <SelectValue placeholder="Select year group" />
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="primary_1">Primary 1</SelectItem>
-                  <SelectItem value="primary_2">Primary 2</SelectItem>
-                  <SelectItem value="primary_3">Primary 3</SelectItem>
-                  <SelectItem value="primary_4">Primary 4</SelectItem>
-                  <SelectItem value="primary_5">Primary 5</SelectItem>
-                  <SelectItem value="primary_6">Primary 6</SelectItem>
-                  <SelectItem value="secondary_7">JSS 1 (Junior Secondary 1)</SelectItem>
-                  <SelectItem value="secondary_8">JSS 2 (Junior Secondary 2)</SelectItem>
-                  <SelectItem value="secondary_9">JSS 3 (Junior Secondary 3)</SelectItem>
-                  <SelectItem value="secondary_10">SS 1 (Senior Secondary 1)</SelectItem>
-                  <SelectItem value="secondary_11">SS 2 (Senior Secondary 2)</SelectItem>
-                  <SelectItem value="sixth_form_12">SS 3 (Senior Secondary 3)</SelectItem>
+                  <SelectItem value="nursery_1">Nursery 1 (Pre-Primary)</SelectItem>
+                  <SelectItem value="nursery_2">Nursery 2 (Pre-Primary)</SelectItem>
+                  <SelectItem value="nursery_3">Nursery 3 / Reception</SelectItem>
+                  <SelectItem value="primary_1">Primary 1 (P1) – Year 1</SelectItem>
+                  <SelectItem value="primary_2">Primary 2 (P2) – Year 2</SelectItem>
+                  <SelectItem value="primary_3">Primary 3 (P3) – Year 3</SelectItem>
+                  <SelectItem value="primary_4">Primary 4 (P4) – Year 4</SelectItem>
+                  <SelectItem value="primary_5">Primary 5 (P5) – Year 5</SelectItem>
+                  <SelectItem value="primary_6">Primary 6 (P6) – Year 6</SelectItem>
+                  <SelectItem value="secondary_7">JSS 1 (Junior Secondary 1) – Year 7</SelectItem>
+                  <SelectItem value="secondary_8">JSS 2 – Year 8</SelectItem>
+                  <SelectItem value="secondary_9">JSS 3 – Year 9</SelectItem>
+                  <SelectItem value="secondary_10">SS 1 (Senior Secondary 1) – Year 10</SelectItem>
+                  <SelectItem value="secondary_11">SS 2 – Year 11</SelectItem>
+                  <SelectItem value="sixth_form_12">SS 3 – Year 12 / College</SelectItem>
                   <SelectItem value="sixth_form_13">Post-Secondary</SelectItem>
                 </SelectContent>
               </Select>

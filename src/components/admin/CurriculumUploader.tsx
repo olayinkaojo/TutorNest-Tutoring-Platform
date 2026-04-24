@@ -30,19 +30,19 @@ interface CurriculumUploaderProps {
 }
 
 const GRADE_LEVELS = [
-  { value: 'year_1', label: 'Year 1' },
-  { value: 'year_2', label: 'Year 2' },
-  { value: 'year_3', label: 'Year 3' },
-  { value: 'year_4', label: 'Year 4' },
-  { value: 'year_5', label: 'Year 5' },
-  { value: 'year_6', label: 'Year 6' },
-  { value: 'year_7', label: 'Year 7' },
-  { value: 'year_8', label: 'Year 8' },
-  { value: 'year_9', label: 'Year 9' },
-  { value: 'year_10', label: 'Year 10' },
-  { value: 'year_11', label: 'Year 11' },
-  { value: 'year_12', label: 'Year 12' },
-  { value: 'year_13', label: 'Year 13' },
+  { value: 'year_1', label: 'Year 1 / Primary 1 (P1)' },
+  { value: 'year_2', label: 'Year 2 / Primary 2 (P2)' },
+  { value: 'year_3', label: 'Year 3 / Primary 3 (P3)' },
+  { value: 'year_4', label: 'Year 4 / Primary 4 (P4)' },
+  { value: 'year_5', label: 'Year 5 / Primary 5 (P5)' },
+  { value: 'year_6', label: 'Year 6 / Primary 6 (P6)' },
+  { value: 'year_7', label: 'Year 7 / JSS 1' },
+  { value: 'year_8', label: 'Year 8 / JSS 2' },
+  { value: 'year_9', label: 'Year 9 / JSS 3' },
+  { value: 'year_10', label: 'Year 10 / SS 1' },
+  { value: 'year_11', label: 'Year 11 / SS 2' },
+  { value: 'year_12', label: 'Year 12 / SS 3' },
+  { value: 'year_13', label: 'Year 13 / Post-Secondary' },
 ];
 
 const SUBJECTS = [
