@@ -3018,7 +3018,7 @@ app.post('/make-server-cbd74580/bookings/:bookingId/reschedule', async (c) => {
     const bookingId = c.req.param('bookingId');
     const { newDate, newStartTime, newEndTime } = await c.req.json();
 
-    const booking = await kv.get(bookingId) as any;
+    const booking = await kv.get(`booking:${bookingId}`) as any;
 
     if (!booking) {
       return c.json({ error: 'Booking not found' }, 404);
@@ -3074,7 +3074,7 @@ app.post('/make-server-cbd74580/bookings/:bookingId/reschedule', async (c) => {
       changeHistory: [...(booking.changeHistory || []), changeLog],
     };
 
-    await kv.set(bookingId, updatedBooking);
+    await kv.set(`booking:${bookingId}`, updatedBooking);
 
     // TODO: Send rescheduling notification emails
 
