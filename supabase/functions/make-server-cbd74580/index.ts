@@ -43,6 +43,7 @@ import paymentRoutes from './payment-routes.tsx';
 import { upsertProfile, getProfile } from './db.tsx';
 import liveSessionRoutes from './live-session-routes.tsx';
 import payoutRoutes from './payout-routes.tsx';
+import { tutorProfileRoutes } from './tutor-profile-routes.tsx';
 // import { videoRoutes } // disabled: uses non-existent Hono Router from './video-routes.tsx';
 // import { screenShareRoutes } // disabled: uses non-existent Hono Router from './screen-share-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
@@ -259,6 +260,9 @@ messagingRoutes(app, getUserId);
 
 // Register conversations routes (for non-deletable chatrooms)
 conversationsRoutes(app, getUserId);
+
+// Register tutor profile routes (reviews, stats)
+tutorProfileRoutes(app, getUserId);
 
 // Register documents routes (for file upload/download)
 const supabase = getSupabaseClient();

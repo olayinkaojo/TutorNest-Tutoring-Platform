@@ -9,6 +9,7 @@ import { Slider } from './ui/slider';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Avatar, AvatarFallback } from './ui/avatar';
+import { TutorProfileModal } from './TutorProfileModal';
 import { 
   Search, 
   Filter, 
@@ -19,18 +20,23 @@ import {
   Sparkles,
   UserPlus,
   CheckCircle,
-  AlertCircle
+  AlertCircle,
+  MessageSquare,
+  Eye,
+  ArrowUpDown
 } from 'lucide-react';
 
 interface TutorSearchProps {
   session: any;
   studentProfile?: any;
   onInviteTutor?: (tutorId: string) => void;
-  activeChildId?: string | null; // Add this to accept active child ID from parent dashboard
+  activeChildId?: string | null;
+  onStartConversation?: (tutorId: string, tutorName: string) => void;
 }
 
-export function TutorSearch({ session, studentProfile, onInviteTutor, activeChildId }: TutorSearchProps) {
+export function TutorSearch({ session, studentProfile, onInviteTutor, activeChildId, onStartConversation }: TutorSearchProps) {
   const [keyword, setKeyword] = useState('');
+  const [sortBy, setSortBy] = useState('rating');
   const [filters, setFilters] = useState({
     subject: '',
     level: '',
@@ -48,6 +54,8 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
   const [invitedTutors, setInvitedTutors] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedTutor, setSelectedTutor] = useState<any | null>(null);
+  const [showProfileModal, setShowProfileModal] = useState(false);
 
   const subjects = [
     'All Subjects',
@@ -219,90 +227,123 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
     const isInvited = invitedTutors.has(tutorUserId);
     
     return (
-      <Card className={isRecommendation ? 'border-purple-200 bg-purple-50' : ''}>
+      <Card className={isRecommendation ? 'border-purple-200 bg-purple-50' : 'hover:shadow-lg transition-shadow'}>
         <CardContent className="pt-6">
           <div className="flex items-start gap-4">
-            <Avatar className="w-16 h-16">
+            <Avatar className="w-16 h-16 flex-shrink-0">
               <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
                 {tutor.firstName?.[0]}{tutor.lastName?.[0]}
               </AvatarFallback>
             </Avatar>
 
-            <div className="flex-1">
-              <div className="flex items-start justify-between mb-2">
-                <div>
-                  <h3 className="mb-1">
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2 mb-2">
+                <div className="min-w-0">
+                  <h3 className="font-semibold truncate">
                     {tutor.firstName} {tutor.lastName}
                   </h3>
                   <div className="flex items-center gap-2 flex-wrap">
                     <Badge variant="secondary">
-                      <Star className="w-3 h-3 mr-1" />
+                      <Star className="w-3 h-3 mr-1 fill-current" />
                       {tutor.rating || '5.0'}
                     </Badge>
                     {tutor.dbsStatus === 'verified' && (
-                      <Badge variant="default" style={{ backgroundColor: '#5d9827' }}>
+                      <Badge style={{ backgroundColor: '#5d9827' }}>
                         <Shield className="w-3 h-3 mr-1" />
-                        DBS Verified
+                        DBS
                       </Badge>
                     )}
-                    <Badge variant="outline">
-                      {tutor.responseRate || '95'}% response rate
-                    </Badge>
+                    {tutor.isTopRated && (
+                      <Badge style={{ backgroundColor: '#ea580c' }} className="text-white">
+                        Top Rated
+                      </Badge>
+                    )}
                   </div>
                 </div>
               </div>
 
               <p className="text-sm text-gray-700 mb-3 line-clamp-2">
-                {tutor.bio}
+                {tutor.bio || 'Experienced tutor'}
               </p>
 
-              <div className="flex flex-wrap gap-2 mb-3">
-                {tutor.subjects?.slice(0, 4).map((subject: string) => (
-                  <Badge key={subject} variant="outline">
+              <div className="flex flex-wrap gap-1 mb-3">
+                {tutor.subjects?.slice(0, 3).map((subject: string) => (
+                  <Badge key={subject} variant="outline" className="text-xs">
                     {subject}
                   </Badge>
                 ))}
-                {tutor.subjects?.length > 4 && (
-                  <Badge variant="outline">+{tutor.subjects.length - 4} more</Badge>
+                {tutor.subjects?.length > 3 && (
+                  <Badge variant="outline" className="text-xs">+{tutor.subjects.length - 3}</Badge>
                 )}
               </div>
 
-              <div className="flex items-center gap-3 text-sm text-gray-600 mb-3">
-                <span className="flex items-center">
-                  <Clock className="w-4 h-4 mr-1" />
-                  {tutor.availability}
+              <div className="flex items-center gap-3 text-xs text-gray-600 mb-4">
+                <span className="flex items-center flex-shrink-0">
+                  <Clock className="w-3 h-3 mr-1" />
+                  {tutor.availability || 'Flexible'}
                 </span>
                 <span>•</span>
-                <span>{tutor.totalLessons || 0} lessons taught</span>
+                <span className="flex-shrink-0">₦{tutor.hourlyRate || '0'}/hr</span>
+                <span>•</span>
+                <span className="flex-shrink-0">{tutor.totalLessons || 0} lessons</span>
               </div>
 
               {isRecommendation && tutor.matchReasons && (
-                <Alert className="mb-3 bg-white border-purple-200">
-                  <Sparkles className="h-4 w-4" style={{ color: '#625d9c' }} />
-                  <AlertDescription className="text-sm">
-                    <strong>Why this match:</strong> {tutor.matchReasons}
+                <Alert className="mb-3 bg-white border-purple-200 py-2">
+                  <Sparkles className="h-4 w-4 text-purple-600 flex-shrink-0" />
+                  <AlertDescription className="text-xs ml-2">
+                    <strong>Match:</strong> {tutor.matchReasons}
                   </AlertDescription>
                 </Alert>
               )}
 
-              <Button
-                onClick={() => handleInviteTutor(tutorUserId)}
-                disabled={isInvited}
-                className="w-full text-white"
-                style={{ backgroundColor: isInvited ? '#9ca3af' : '#625d9c' }}
-              >
-                {isInvited ? (
-                  <>
-                    <CheckCircle className="w-4 h-4 mr-2" />
-                    Invited
-                  </>
-                ) : (
-                  <>
-                    <UserPlus className="w-4 h-4 mr-2" />
-                    Send Invitation
-                  </>
-                )}
-              </Button>
+              {/* Action Buttons */}
+              <div className="flex gap-2">
+                <Button
+                  onClick={() => {
+                    setSelectedTutor(tutor);
+                    setShowProfileModal(true);
+                  }}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 text-xs h-8"
+                >
+                  <Eye className="w-3 h-3 mr-1" />
+                  View Profile
+                </Button>
+                <Button
+                  onClick={() => {
+                    if (onStartConversation) {
+                      onStartConversation(tutorUserId, `${tutor.firstName} ${tutor.lastName}`);
+                    }
+                  }}
+                  size="sm"
+                  variant="outline"
+                  className="flex-1 text-xs h-8"
+                >
+                  <MessageSquare className="w-3 h-3 mr-1" />
+                  Message
+                </Button>
+                <Button
+                  onClick={() => handleInviteTutor(tutorUserId)}
+                  disabled={isInvited}
+                  size="sm"
+                  className="flex-1 text-xs h-8 text-white"
+                  style={{ backgroundColor: isInvited ? '#9ca3af' : '#625d9c' }}
+                >
+                  {isInvited ? (
+                    <>
+                      <CheckCircle className="w-3 h-3 mr-1" />
+                      Invited
+                    </>
+                  ) : (
+                    <>
+                      <UserPlus className="w-3 h-3 mr-1" />
+                      Invite
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
           </div>
         </CardContent>
@@ -332,7 +373,7 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
         <div>
           <div className="flex items-center gap-2 mb-4">
             <Sparkles className="w-5 h-5" style={{ color: '#625d9c' }} />
-            <h2 style={{ color: '#625d9c' }}>Recommended for You</h2>
+            <h2 className="font-bold text-lg" style={{ color: '#625d9c' }}>Recommended for You</h2>
           </div>
           <div className="grid gap-4 mb-6">
             {recommendations.map((tutor) => (
@@ -342,17 +383,17 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
         </div>
       )}
 
-      {/* Search Bar */}
+      {/* Search Bar & Filters */}
       <Card>
         <CardContent className="pt-6">
-          <div className="flex gap-2">
+          <div className="flex gap-2 flex-col sm:flex-row">
             <div className="flex-1 relative">
               <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
               <Input
                 value={keyword}
                 onChange={(e) => setKeyword(e.target.value)}
                 onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="Search for tutors by name, subject, or expertise..."
+                placeholder="Search by name, subject, or bio..."
                 className="pl-10 h-12"
               />
             </div>
@@ -377,7 +418,7 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
           {/* Filters */}
           {showFilters && (
             <div className="mt-6 pt-6 border-t space-y-4">
-              <div className="grid md:grid-cols-2 gap-4">
+              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
                 <div>
                   <Label>Subject</Label>
                   <Select
@@ -388,11 +429,17 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
                       <SelectValue placeholder="Select subject" />
                     </SelectTrigger>
                     <SelectContent>
-                      {subjects.map((subject) => (
-                        <SelectItem key={subject} value={subject}>
-                          {subject}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="">All Subjects</SelectItem>
+                      <SelectItem value="Mathematics">Mathematics</SelectItem>
+                      <SelectItem value="English">English</SelectItem>
+                      <SelectItem value="Science">Science</SelectItem>
+                      <SelectItem value="Physics">Physics</SelectItem>
+                      <SelectItem value="Chemistry">Chemistry</SelectItem>
+                      <SelectItem value="Biology">Biology</SelectItem>
+                      <SelectItem value="History">History</SelectItem>
+                      <SelectItem value="Geography">Geography</SelectItem>
+                      <SelectItem value="Computer Science">Computer Science</SelectItem>
+                      <SelectItem value="Languages">Languages</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -407,11 +454,12 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
                       <SelectValue placeholder="Select level" />
                     </SelectTrigger>
                     <SelectContent>
-                      {levels.map((level) => (
-                        <SelectItem key={level} value={level}>
-                          {level}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="">All Levels</SelectItem>
+                      <SelectItem value="Primary (Year 1-6)">Primary (Year 1-6)</SelectItem>
+                      <SelectItem value="KS3 (Year 7-9)">KS3 (Year 7-9)</SelectItem>
+                      <SelectItem value="GCSE (Year 10-11)">GCSE (Year 10-11)</SelectItem>
+                      <SelectItem value="A-Level (Year 12-13)">A-Level (Year 12-13)</SelectItem>
+                      <SelectItem value="University Level">University Level</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -426,11 +474,11 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
                       <SelectValue placeholder="Select availability" />
                     </SelectTrigger>
                     <SelectContent>
-                      {availabilities.map((avail) => (
-                        <SelectItem key={avail} value={avail}>
-                          {avail}
-                        </SelectItem>
-                      ))}
+                      <SelectItem value="">Any Time</SelectItem>
+                      <SelectItem value="weekdays-daytime">Weekdays (Daytime)</SelectItem>
+                      <SelectItem value="weekdays-evenings">Weekdays (Evenings)</SelectItem>
+                      <SelectItem value="weekends">Weekends</SelectItem>
+                      <SelectItem value="flexible">Flexible</SelectItem>
                     </SelectContent>
                   </Select>
                 </div>
@@ -452,6 +500,21 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
                     </SelectContent>
                   </Select>
                 </div>
+
+                <div>
+                  <Label>Max Price per Hour</Label>
+                  <div className="flex items-center gap-4 mt-2">
+                    <Slider
+                      value={[filters.maxPrice]}
+                      onValueChange={(val) => setFilters({ ...filters, maxPrice: val[0] })}
+                      min={10}
+                      max={200}
+                      step={10}
+                      className="flex-1"
+                    />
+                    <span className="text-sm font-medium min-w-fit">₦{filters.maxPrice}</span>
+                  </div>
+                </div>
               </div>
 
               <div className="flex items-center gap-2">
@@ -463,7 +526,7 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
                   className="w-4 h-4 rounded"
                 />
                 <label htmlFor="dbsRequired" className="text-sm cursor-pointer">
-                  Show only DBS verified tutors
+                  DBS Verified tutors only
                 </label>
               </div>
             </div>
@@ -471,28 +534,37 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
         </CardContent>
       </Card>
 
-      {/* Search Results */}
+      {/* Search Results with Sorting */}
       {searchPerformed && (
         <div>
-          <h2 className="mb-4">
-            {tutors.length === 0 ? 'No Results Found' : `${tutors.length} Tutor${tutors.length !== 1 ? 's' : ''} Found`}
-          </h2>
+          <div className="flex justify-between items-center mb-4">
+            <h2 className="font-semibold text-lg">
+              {tutors.length === 0 ? 'No Results Found' : `${tutors.length} Tutor${tutors.length !== 1 ? 's' : ''} Found`}
+            </h2>
+            {tutors.length > 0 && (
+              <Select value={sortBy} onValueChange={setSortBy}>
+                <SelectTrigger className="w-48">
+                  <ArrowUpDown className="w-4 h-4 mr-2" />
+                  <SelectValue placeholder="Sort by" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="rating">Highest Rated</SelectItem>
+                  <SelectItem value="lessons">Most Experienced</SelectItem>
+                  <SelectItem value="price-low">Price: Low to High</SelectItem>
+                  <SelectItem value="price-high">Price: High to Low</SelectItem>
+                </SelectContent>
+              </Select>
+            )}
+          </div>
 
           {tutors.length === 0 ? (
             <Card>
               <CardContent className="py-12 text-center">
                 <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-gray-600 mb-4">
-                  No tutors match your current search criteria
+                <p className="text-gray-600 mb-4 font-medium">
+                  No tutors match your criteria
                 </p>
-                <div className="space-y-2 text-sm text-gray-600">
-                  <p>Try:</p>
-                  <ul className="list-disc list-inside">
-                    <li>Broadening your subject or level selection</li>
-                    <li>Changing availability preferences</li>
-                    <li>Removing the DBS requirement filter</li>
-                  </ul>
-                </div>
+                <p className="text-sm text-gray-500 mb-4">Try adjusting your filters or search terms</p>
                 <Button
                   onClick={() => {
                     setFilters({
@@ -505,11 +577,11 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
                       dbsRequired: false,
                     });
                     setKeyword('');
+                    setSearchPerformed(false);
                   }}
-                  className="mt-6"
                   variant="outline"
                 >
-                  Clear All Filters
+                  Reset Filters
                 </Button>
               </CardContent>
             </Card>
@@ -521,6 +593,29 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
             </div>
           )}
         </div>
+      )}
+
+      {/* Tutor Profile Modal */}
+      {selectedTutor && (
+        <TutorProfileModal
+          tutor={selectedTutor}
+          isOpen={showProfileModal}
+          onClose={() => {
+            setShowProfileModal(false);
+            setSelectedTutor(null);
+          }}
+          session={session}
+          activeChildId={activeChildId}
+          onInvite={async (tutorId) => {
+            await handleInviteTutor(tutorId);
+          }}
+          onMessage={(tutorId, tutorName) => {
+            if (onStartConversation) {
+              onStartConversation(tutorId, tutorName);
+              setShowProfileModal(false);
+            }
+          }}
+        />
       )}
     </div>
   );

@@ -759,7 +759,15 @@ export function ParentDashboard({
                       </CardContent>
                     </Card>
                   )}
-                  <TutorSearch session={session} activeChildId={activeChildId} />
+                  <TutorSearch 
+                    session={session} 
+                    activeChildId={activeChildId}
+                    onStartConversation={(tutorId, tutorName) => {
+                      // Switch to messages tab and start conversation with tutor
+                      setActiveTab('messages');
+                      // Note: The Chatroom component will handle starting a new conversation
+                    }}
+                  />
                 </div>
               ) : (
                 <Card>
