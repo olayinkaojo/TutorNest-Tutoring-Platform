@@ -111,15 +111,16 @@ export async function createBooking(booking: BookingRow): Promise<void> {
 }
 
 /** Returns all bookings for a tutor on a specific date (for availability checks). */
-export async function getBookingsByTutorAndDate(tutorId: string, date: string): Promise<Pick<BookingRow, 'startTime' | 'endTime' | 'status'>[]> {
+export async function getBookingsByTutorAndDate(tutorId: string, date: string): Promise<Pick<BookingRow, 'id' | 'startTime' | 'endTime' | 'status'>[]> {
   const { data, error } = await db()
     .from('bookings')
-    .select('start_time, end_time, status')
+    .select('id, start_time, end_time, status')
     .eq('tutor_id', tutorId)
     .eq('date', date)
     .in('status', ['scheduled', 'confirmed']);
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => ({
+    id: row.id,
     startTime: row.start_time,
     endTime: row.end_time,
     status: row.status,
@@ -168,6 +169,38 @@ export async function getBookingsByUserId(userId: string): Promise<BookingRow[]>
     paymentStatus: row.payment_status,
     meetLink: row.meet_link ?? undefined,
   }));
+}
+
+/** Get a single booking by ID from the database. */
+export async function getBooking(bookingId: string): Promise<BookingRow | null> {
+  const { data, error } = await db()
+    .from('bookings')
+    .select('*')
+    .eq('id', bookingId)
+    .single();
+  if (error) {
+    if (error.code === 'PGRST116') return null; // Not found
+    throw new Error(error.message);
+  }
+  if (!data) return null;
+  return {
+    id: data.id,
+    paymentId: data.payment_id,
+    planType: data.plan_type,
+    sessionNumber: data.session_number,
+    totalSessions: data.total_sessions,
+    tutorId: data.tutor_id,
+    studentId: data.student_id,
+    userId: data.user_id,
+    date: data.date,
+    startTime: data.start_time,
+    endTime: data.end_time,
+    duration: data.duration,
+    subject: data.subject,
+    status: data.status,
+    paymentStatus: data.payment_status,
+    meetLink: data.meet_link ?? undefined,
+  };
 }
 
 // ─── Payments ─────────────────────────────────────────────────────────────────

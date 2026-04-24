@@ -461,8 +461,9 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
     const bookingId = c.req.param('bookingId');
-    const booking = await kv.get(`booking:${bookingId}`) as any;
-
+    
+    // Get booking from DATABASE (not KV store) - bookings come from db.getBookingsByUserId()
+    const booking = await db.getBooking(bookingId);
     if (!booking) return c.json({ error: 'Booking not found' }, 404);
     if (booking.status !== 'confirmed') return c.json({ error: 'Only confirmed bookings can be rescheduled' }, 400);
 
@@ -473,10 +474,8 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
       return c.json({ error: 'Bookings can only be rescheduled more than 24 hours in advance' }, 400);
     }
 
-    // Authorisation: must be the parent who booked or the tutor
-    const student = await kv.get(`child:${booking.studentId}`) as any;
-    const parentId = student?.parentId ?? booking.parentId ?? booking.userId;
-    if (user.id !== parentId && user.id !== booking.tutorId) {
+    // Authorization: must be the parent who booked or the tutor
+    if (user.id !== booking.userId && user.id !== booking.tutorId) {
       return c.json({ error: 'Forbidden' }, 403);
     }
 
@@ -492,12 +491,10 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
       return c.json({ error: 'New session time must be more than 24 hours in the future' }, 400);
     }
 
-    // Conflict check for new slot
-    const allBookings = await kv.getByPrefix('booking:');
-    const conflict = allBookings.find((b: any) =>
+    // Conflict check for new slot - check database for conflicts
+    const conflictingBookings = await db.getBookingsByTutorAndDate(booking.tutorId, newDate);
+    const conflict = conflictingBookings.find((b: any) =>
       b.id !== bookingId &&
-      (b.tutorId === booking.tutorId || b.studentId === booking.studentId) &&
-      b.date === newDate &&
       b.status === 'confirmed' &&
       (
         (newStartTime >= b.startTime && newStartTime < b.endTime) ||
@@ -507,19 +504,33 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
     );
     if (conflict) return c.json({ error: 'The selected time slot is not available' }, 409);
 
-    // Persist the rescheduled booking
-    const updated = {
-      ...booking,
-      date: newDate,
-      startTime: newStartTime,
-      endTime: newEndTime,
-      status: 'confirmed',
-      rescheduledAt: new Date().toISOString(),
-      previousDate: booking.date,
-      previousStartTime: booking.startTime,
-      previousEndTime: booking.endTime,
-    };
-    await kv.set(`booking:${bookingId}`, updated);
+    // Update the booking in the DATABASE
+    const { error: updateError } = await supabase
+      .from('bookings')
+      .update({
+        date: newDate,
+        start_time: newStartTime,
+        end_time: newEndTime,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', bookingId);
+
+    if (updateError) {
+      throw new Error(`Failed to update booking: ${updateError.message}`);
+    }
+
+    // Also update KV cache if it exists (for backwards compatibility)
+    const kvBooking = await kv.get(`booking:${bookingId}`) as any;
+    if (kvBooking) {
+      kvBooking.date = newDate;
+      kvBooking.startTime = newStartTime;
+      kvBooking.endTime = newEndTime;
+      kvBooking.rescheduledAt = new Date().toISOString();
+      await kv.set(`booking:${bookingId}`, kvBooking);
+    }
+
+    // Fetch updated booking
+    const updated = await db.getBooking(bookingId);
 
     return c.json({ success: true, booking: updated, message: 'Booking rescheduled successfully' });
   } catch (error: any) {
