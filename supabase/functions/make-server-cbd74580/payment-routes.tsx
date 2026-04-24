@@ -1208,4 +1208,131 @@ app.post('/payments/webhook', async (c: any) => {
   }
 });
 
+// Get user's saved payment methods
+app.get('/payments/methods', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const userId = await getUserIdFromToken(accessToken);
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const paymentData = await kv.get(`payment_methods:${userId}`) as any;
+    const methods = paymentData?.methods || [];
+
+    return c.json({ methods });
+  } catch (error: any) {
+    console.error('Error fetching payment methods:', error);
+    return c.json({ error: error.message || 'Failed to fetch payment methods' }, 500);
+  }
+});
+
+// Request refund for a payment
+app.post('/payments/:paymentId/refund', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const userId = await getUserIdFromToken(accessToken);
+    if (!userId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const paymentId = c.req.param('paymentId');
+    const { reason } = await c.req.json() as { reason?: string };
+
+    // Get the payment
+    const payment = await kv.get(`payment:${paymentId}`) as any;
+    if (!payment) {
+      return c.json({ error: 'Payment not found' }, 404);
+    }
+
+    // Only the payer can request a refund
+    if (payment.userId !== userId) {
+      return c.json({ error: 'Unauthorized to refund this payment' }, 403);
+    }
+
+    // Can only refund successful or pending payments
+    if (!['successful', 'pending'].includes(payment.status)) {
+      return c.json({ error: `Cannot refund ${payment.status} payments` }, 400);
+    }
+
+    // Calculate refund amount based on time until session
+    const bookingId = payment.bookingId;
+    const booking = await kv.get(`booking:${bookingId}`) as any;
+    
+    let refundPercentage = 0;
+    if (booking) {
+      const sessionDateTime = new Date(`${booking.date}T${booking.startTime}+01:00`);
+      const hoursUntilSession = (sessionDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
+      
+      if (hoursUntilSession > 24) {
+        refundPercentage = 100; // Full refund if >24 hours
+      } else if (hoursUntilSession > 0) {
+        refundPercentage = 50; // 50% refund if <24 hours but not started
+      } else {
+        refundPercentage = 0; // No refund if session already started
+      }
+    } else {
+      refundPercentage = 100; // Full refund if no booking found
+    }
+
+    const refundAmount = (payment.amount * refundPercentage) / 100;
+
+    if (refundAmount === 0) {
+      return c.json({ error: 'Session has already started - no refund available' }, 400);
+    }
+
+    // Create refund request
+    const refundId = `${Date.now()}_${paymentId}`;
+    const refund = {
+      id: refundId,
+      paymentId,
+      userId,
+      amount: refundAmount,
+      refundPercentage,
+      reason: reason || 'Customer requested refund',
+      status: 'pending', // Can be: pending, approved, processed, rejected
+      reference: payment.reference,
+      createdAt: new Date().toISOString(),
+      requestedAt: new Date().toISOString(),
+    };
+
+    await kv.set(`refund:${refundId}`, refund);
+
+    // Update payment with refund status
+    const updatedPayment = {
+      ...payment,
+      refundId,
+      refundStatus: 'requested',
+      refundAmount,
+      refundPercentage,
+      refundRequestedAt: new Date().toISOString(),
+    };
+    await kv.set(`payment:${paymentId}`, updatedPayment);
+
+    // TODO: Send email notification to user about refund request
+
+    return c.json({
+      success: true,
+      refund,
+      message: `Refund request submitted. You will receive ${refundPercentage}% of your payment (${formatNaira(refundAmount)}).`,
+    });
+  } catch (error: any) {
+    console.error('Error processing refund request:', error);
+    return c.json({ error: error.message || 'Failed to process refund request' }, 500);
+  }
+});
+
+// Helper to format amount in Naira (assuming it's in minor units)
+function formatNaira(amount: number): string {
+  return `₦${(amount / 100).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
+
 export default app;
