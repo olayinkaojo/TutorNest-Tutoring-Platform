@@ -1797,7 +1797,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       if (action === 'approve' && tutor.email) {
         const emailData = emailTemplates.tutorVerificationApproved(
           tutor.fullName || tutor.name || 'Tutor',
-          `${typeof window !== 'undefined' ? window.location.origin : 'https://tutornest.org'}/tutor-dashboard`
+          `https://tutornest.org/tutor-dashboard`
         );
         await sendEmail({
           to: tutor.email,
@@ -1810,7 +1810,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         const emailData = emailTemplates.tutorVerificationRejected(
           tutor.fullName || tutor.name || 'Tutor',
           rejectionReason,
-          `${typeof window !== 'undefined' ? window.location.origin : 'https://tutornest.org'}/tutor-dashboard`
+          `https://tutornest.org/tutor-dashboard`
         );
         await sendEmail({
           to: tutor.email,
