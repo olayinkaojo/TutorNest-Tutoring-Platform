@@ -55,6 +55,7 @@ import { TutorStatsSection } from './tutor/TutorStatsSection';
 import { TutorOverviewTab } from './tutor/TutorOverviewTab';
 import { StudentProgressWidget } from './StudentProgressWidget';
 import tutorAPI from '../utils/tutor-api-client';
+import { parseWAT, bookingDateLabel, formatRawTimeWAT, WAT_TIMEZONE } from '../utils/timezone';
 
 interface UserProfile {
   id: string;
@@ -389,8 +390,8 @@ export function TutorDashboard({
                   ...data.profile,
                   id: studentId,
                   totalLessons: studentBookings.filter((b: any) => b.status === 'completed').length,
-                  upcomingLessons: studentBookings.filter((b: any) => 
-                    b.status === 'confirmed' && new Date(b.date) > new Date()
+                  upcomingLessons: studentBookings.filter((b: any) =>
+                    b.status === 'confirmed' && parseWAT(b.date, b.startTime) > new Date()
                   ).length
                 };
               }
@@ -408,8 +409,8 @@ export function TutorDashboard({
         const pastStudentIds = allStudentIds.filter(studentId => {
           const studentBookings = bookings.filter((b: any) => b.studentId === studentId);
           const hasCompleted = studentBookings.some((b: any) => b.status === 'completed');
-          const hasUpcoming = studentBookings.some((b: any) => 
-            b.status === 'confirmed' && new Date(b.date) > new Date()
+          const hasUpcoming = studentBookings.some((b: any) =>
+            b.status === 'confirmed' && parseWAT(b.date, b.startTime) > new Date()
           );
           return hasCompleted && !hasUpcoming;
         });
@@ -1114,8 +1115,8 @@ export function TutorDashboard({
                                 Student: {lesson.studentName || `ID: ${lesson.studentId || 'N/A'}`}
                               </p>
                               <p className="text-xs text-gray-500">
-                                Date: {new Date(lesson.date).toLocaleDateString('en-US', { weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
-                                {lesson.startTime && ` at ${lesson.startTime}`}
+                                Date: {new Date(`${lesson.date}T12:00:00+01:00`).toLocaleDateString('en-GB', { timeZone: WAT_TIMEZONE, weekday: 'short', year: 'numeric', month: 'short', day: 'numeric' })}
+                                {lesson.startTime && ` at ${formatRawTimeWAT(lesson.startTime)}`}
                               </p>
                             </div>
                             <div className="text-right flex flex-col items-end gap-2">

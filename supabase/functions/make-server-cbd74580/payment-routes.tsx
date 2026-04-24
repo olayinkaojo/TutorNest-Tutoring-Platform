@@ -856,7 +856,8 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
   if (!plan) throw new Error('Invalid plan type on payment record: ' + payment.planType);
 
   // Generate all session dates and create booking rows
-  const startDate = new Date(payment.startDate);
+  // Parse startDate as noon WAT (+01:00) to avoid UTC date shifting
+  const startDate = new Date(payment.startDate + 'T12:00:00+01:00');
   const bookingDates = generateBookingDates(startDate, plan.sessions, plan.sessionsPerWeek);
   const endTime = addMinutesToTime(payment.startTime, 60);
 

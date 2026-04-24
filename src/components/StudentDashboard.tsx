@@ -1,3 +1,4 @@
+import { parseWAT } from '../utils/timezone';
 import { Bookshop } from './Bookshop';
 import { ParentContentLibrary } from './ParentContentLibrary';
 import { Chatroom } from './Chatroom';
@@ -286,8 +287,8 @@ export function StudentDashboard({
       const allBookings = await studentAPI.getStudentBookings(session.access_token, studentId);
       
       const now = new Date();
-      const upcoming = allBookings.filter((b: any) => 
-        new Date(b.date) >= now && (b.status === 'confirmed' || b.status === 'pending')
+      const upcoming = allBookings.filter((b: any) =>
+        parseWAT(b.date, b.startTime) >= now && (b.status === 'confirmed' || b.status === 'pending')
       );
       const completed = allBookings.filter((b: any) => b.status === 'completed');
 

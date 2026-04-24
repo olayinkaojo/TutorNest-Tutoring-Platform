@@ -177,7 +177,7 @@ export function PostSessionReport({
               </div>
               <div>
                 <span className="text-gray-600">Date:</span>
-                <p className="font-medium">{new Date(booking.date).toLocaleDateString('en-GB')}</p>
+                <p className="font-medium">{new Date(booking.date + 'T12:00:00+01:00').toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos' })}</p>
               </div>
               <div>
                 <span className="text-gray-600">Time:</span>

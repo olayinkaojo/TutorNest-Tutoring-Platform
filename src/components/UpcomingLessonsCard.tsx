@@ -12,6 +12,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
+import { parseWAT, bookingDateLabel, timeUntilWAT, formatRawTimeWAT } from '../utils/timezone';
 
 interface UpcomingLesson {
   id: string;
@@ -66,10 +67,10 @@ export function UpcomingLessonsCard({
         const data = await response.json();
         const allBookings = data.bookings || [];
         
-        // Filter for upcoming lessons
+        // Filter for upcoming lessons (WAT-aware)
         const now = new Date();
         let upcoming = allBookings.filter((booking: UpcomingLesson) => {
-          const bookingDateTime = new Date(`${booking.date}T${booking.startTime}`);
+          const bookingDateTime = parseWAT(booking.date, booking.startTime);
           return bookingDateTime > now && booking.status === 'confirmed';
         });
 
@@ -82,9 +83,7 @@ export function UpcomingLessonsCard({
 
         // Sort by date/time (earliest first)
         upcoming.sort((a: UpcomingLesson, b: UpcomingLesson) => {
-          const dateA = new Date(`${a.date}T${a.startTime}`);
-          const dateB = new Date(`${b.date}T${b.startTime}`);
-          return dateA.getTime() - dateB.getTime();
+          return parseWAT(a.date, a.startTime).getTime() - parseWAT(b.date, b.startTime).getTime();
         });
 
         // Take first 5
@@ -97,45 +96,7 @@ export function UpcomingLessonsCard({
     }
   };
 
-  const getTimeUntil = (date: string, startTime: string): string => {
-    const bookingDateTime = new Date(`${date}T${startTime}`);
-    const now = new Date();
-    const hoursUntil = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    if (hoursUntil < 1) {
-      const minutesUntil = Math.floor(hoursUntil * 60);
-      return `in ${minutesUntil} minute${minutesUntil !== 1 ? 's' : ''}`;
-    } else if (hoursUntil < 24) {
-      return `in ${Math.floor(hoursUntil)} hour${Math.floor(hoursUntil) !== 1 ? 's' : ''}`;
-    } else {
-      const daysUntil = Math.floor(hoursUntil / 24);
-      return `in ${daysUntil} day${daysUntil !== 1 ? 's' : ''}`;
-    }
-  };
-
-  const isToday = (date: string): boolean => {
-    const bookingDate = new Date(date);
-    const today = new Date();
-    return bookingDate.toDateString() === today.toDateString();
-  };
-
-  const formatDate = (date: string): string => {
-    if (isToday(date)) {
-      return 'Today';
-    }
-    
-    const tomorrow = new Date();
-    tomorrow.setDate(tomorrow.getDate() + 1);
-    if (new Date(date).toDateString() === tomorrow.toDateString()) {
-      return 'Tomorrow';
-    }
-
-    return new Date(date).toLocaleDateString('en-GB', { 
-      weekday: 'short', 
-      day: 'numeric', 
-      month: 'short' 
-    });
-  };
+  const getTimeUntil = (date: string, startTime: string): string => timeUntilWAT(date, startTime);
 
   if (loading) {
     return (
@@ -181,8 +142,7 @@ export function UpcomingLessonsCard({
           <div className="space-y-3">
             {lessons.map((lesson) => {
               const isUpcomingSoon = (() => {
-                const bookingDateTime = new Date(`${lesson.date}T${lesson.startTime}`);
-                const hoursUntil = (bookingDateTime.getTime() - new Date().getTime()) / (1000 * 60 * 60);
+                const hoursUntil = (parseWAT(lesson.date, lesson.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
                 return hoursUntil <= 2;
               })();
 
@@ -199,7 +159,7 @@ export function UpcomingLessonsCard({
                         <Badge 
                           className={isUpcomingSoon ? 'bg-[#5d9827] text-white' : 'bg-[#625d9c] text-white'}
                         >
-                          {formatDate(lesson.date)}
+                          {bookingDateLabel(lesson.date)}
                         </Badge>
                         {isUpcomingSoon && (
                           <Badge variant="outline" className="text-red-600 border-red-600">
@@ -213,7 +173,7 @@ export function UpcomingLessonsCard({
                         <div className="flex items-center gap-2">
                           <Clock className="w-4 h-4 text-gray-500" />
                           <span className="font-medium">
-                            {lesson.startTime} - {lesson.endTime}
+                            {formatRawTimeWAT(lesson.startTime)} – {lesson.endTime}
                           </span>
                           <span className="text-gray-500">
                             ({getTimeUntil(lesson.date, lesson.startTime)})

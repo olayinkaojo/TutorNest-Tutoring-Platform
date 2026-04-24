@@ -7,6 +7,7 @@ import { Calendar } from './ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Label } from './ui/label';
 import { projectId } from '../utils/supabase/info';
+import { todayStringWAT } from '../utils/timezone';
 import { formatNaira } from '../utils/currency';
 import { BookSessionWithPayment } from './BookSessionWithPayment';
 import {
@@ -898,7 +899,7 @@ export function SessionBookingCalendar({
                 mode="single"
                 selected={selectedDate}
                 onSelect={setSelectedDate}
-                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                disabled={(date) => date.toISOString().split('T')[0] < todayStringWAT()}
                 className="rounded-md border"
               />
             </CardContent>

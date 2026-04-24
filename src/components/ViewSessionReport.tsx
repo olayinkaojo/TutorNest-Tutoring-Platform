@@ -139,7 +139,7 @@ export function ViewSessionReport({
                     <Calendar className="w-4 h-4" />
                     <span>Date</span>
                   </div>
-                  <p className="font-medium">{new Date(booking.date).toLocaleDateString('en-GB', { weekday: 'short', month: 'short', day: 'numeric' })}</p>
+                  <p className="font-medium">{new Date(booking.date + 'T12:00:00+01:00').toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'short', month: 'short', day: 'numeric' })}</p>
                 </div>
                 <div>
                   <div className="flex items-center gap-1 text-gray-600 mb-1">

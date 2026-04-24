@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { projectId } from '../utils/supabase/info';
+import { parseWAT, bookingDateLabel, formatRawTimeWAT, WAT_TIMEZONE } from '../utils/timezone';
 import { formatNaira } from '../utils/currency';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
@@ -135,9 +136,7 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
   };
 
   const canCancel = (booking: Booking) => {
-    const bookingDateTime = new Date(`${booking.date}T${booking.startTime}`);
-    const now = new Date();
-    const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
+    const hoursUntilBooking = (parseWAT(booking.date, booking.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
     return hoursUntilBooking > 24 && booking.status === 'confirmed';
   };
 
@@ -201,21 +200,15 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
     }
   };
 
-  const formatTime = (time: string) => {
-    const [hours, minutes] = time.split(':');
-    const hour = parseInt(hours);
-    const ampm = hour >= 12 ? 'PM' : 'AM';
-    const displayHour = hour % 12 || 12;
-    return `${displayHour}:${minutes} ${ampm}`;
-  };
+  const formatTime = (time: string) => formatRawTimeWAT(time);
 
   const formatDate = (dateString: string) => {
-    const date = new Date(dateString);
-    return date.toLocaleDateString('en-GB', { 
-      weekday: 'long', 
-      year: 'numeric', 
-      month: 'long', 
-      day: 'numeric' 
+    return new Date(`${dateString}T12:00:00+01:00`).toLocaleDateString('en-GB', {
+      timeZone: WAT_TIMEZONE,
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
     });
   };
 
@@ -235,13 +228,13 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
   };
 
   const upcomingBookings = bookings.filter(
-    (b) => b.status === 'confirmed' && new Date(`${b.date}T${b.startTime}`) > new Date()
+    (b) => b.status === 'confirmed' && parseWAT(b.date, b.startTime) > new Date()
   );
 
   const pastBookings = bookings.filter(
-    (b) => b.status === 'completed' || 
-           b.status === 'cancelled' || 
-           new Date(`${b.date}T${b.startTime}`) < new Date()
+    (b) => b.status === 'completed' ||
+           b.status === 'cancelled' ||
+           parseWAT(b.date, b.startTime) < new Date()
   );
 
   const BookingCard = ({ booking }: { booking: Booking }) => (
@@ -271,11 +264,11 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
             <div className="space-y-1 text-sm text-gray-600">
               <div className="flex items-center gap-2">
                 <Calendar className="w-4 h-4" />
-                {formatDate(booking.date)}
+                {bookingDateLabel(booking.date)} · {formatDate(booking.date)}
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-4 h-4" />
-                {formatTime(booking.startTime)} - {formatTime(booking.endTime)}
+                {formatTime(booking.startTime)} – {booking.endTime}
               </div>
               <div className="flex items-center gap-2">
                 <DollarSign className="w-4 h-4" />
@@ -376,7 +369,7 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
         )}
 
         {/* POST-SESSION REPORTS - Show for past sessions */}
-        {new Date(`${booking.date}T${booking.endTime}`) < new Date() && (
+        {parseWAT(booking.date, booking.endTime) < new Date() && (
           <div className="space-y-2 mt-4">
             {/* For Tutors: Submit Report button (only for past sessions) */}
             {userRole === 'tutor' && (

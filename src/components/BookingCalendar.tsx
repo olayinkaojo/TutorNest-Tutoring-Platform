@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { projectId } from '../utils/supabase/info';
+import { todayStringWAT } from '../utils/timezone';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
@@ -230,7 +231,7 @@ export function BookingCalendar({
                 mode="single"
                 selected={selectedDate}
                 onSelect={setSelectedDate}
-                disabled={(date) => date < new Date(new Date().setHours(0, 0, 0, 0))}
+                disabled={(date) => date.toISOString().split('T')[0] < todayStringWAT()}
                 className="rounded-md border"
               />
             </CardContent>
