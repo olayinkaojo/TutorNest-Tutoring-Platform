@@ -39,30 +39,60 @@ interface Document {
   updatedAt: string;
 }
 
+interface Recipient {
+  id: string;
+  name: string;
+  type: 'child' | 'tutor' | 'self';
+}
+
 interface DocumentManagerProps {
   session: any;
   userId: string;
   userRole: string;
+  children?: { id: string; name?: string; full_name?: string; firstName?: string; lastName?: string }[];
 }
 
-export function DocumentManager({ session, userId, userRole }: DocumentManagerProps) {
+export function DocumentManager({ session, userId, userRole, children = [] }: DocumentManagerProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
   const [showUploadDialog, setShowUploadDialog] = useState(false);
   const [filterType, setFilterType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
-  
+  const [bookedTutors, setBookedTutors] = useState<Recipient[]>([]);
+
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadDocType, setUploadDocType] = useState<'assignment' | 'review' | 'resource' | 'other'>('assignment');
+  const [uploadRecipientId, setUploadRecipientId] = useState<string>('self');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadDocuments();
+    if (userRole === 'parent') loadBookedTutors();
   }, [filterType]);
+
+  const loadBookedTutors = async () => {
+    try {
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`,
+        { headers: { 'Authorization': `Bearer ${session.access_token}` } }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const seen = new Set<string>();
+      const tutors: Recipient[] = [];
+      for (const b of (data.bookings || [])) {
+        if (b.tutorId && !seen.has(b.tutorId)) {
+          seen.add(b.tutorId);
+          tutors.push({ id: b.tutorId, name: b.tutorName || 'Tutor', type: 'tutor' });
+        }
+      }
+      setBookedTutors(tutors);
+    } catch (_) {}
+  };
 
   const loadDocuments = async () => {
     setLoading(true);
@@ -130,6 +160,8 @@ export function DocumentManager({ session, userId, userRole }: DocumentManagerPr
       formData.append('uploadedByRole', userRole);
       formData.append('relatedToId', userId);
       formData.append('relatedToType', userRole);
+      // Recipient: empty string means "myself only"
+      formData.append('sharedWithId', uploadRecipientId === 'self' ? '' : uploadRecipientId);
 
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/documents/upload`,
@@ -219,9 +251,8 @@ export function DocumentManager({ session, userId, userRole }: DocumentManagerPr
     setUploadTitle('');
     setUploadDescription('');
     setUploadDocType('assignment');
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    setUploadRecipientId('self');
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -364,9 +395,21 @@ export function DocumentManager({ session, userId, userRole }: DocumentManagerPr
                         <span>•</span>
                         <span>{formatFileSize(doc.fileSize)}</span>
                         <span>•</span>
-                        <span>{new Date(doc.createdAt).toLocaleDateString()}</span>
-                        <span>•</span>
-                        <span className="capitalize">{doc.uploadedByRole}</span>
+                        <span>{new Date(doc.createdAt + 'T12:00:00+01:00').toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        {(doc as any).sharedWithId && (doc as any).sharedWithId !== '' && (
+                          <>
+                            <span>•</span>
+                            <span className="text-purple-600 font-medium">
+                              Shared
+                            </span>
+                          </>
+                        )}
+                        {doc.uploadedBy !== userId && (
+                          <>
+                            <span>•</span>
+                            <span className="text-blue-600">Received</span>
+                          </>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -459,6 +502,46 @@ export function DocumentManager({ session, userId, userRole }: DocumentManagerPr
                 </SelectContent>
               </Select>
             </div>
+
+            {/* Recipient selector — only shown when there are people to share with */}
+            {(children.length > 0 || bookedTutors.length > 0) && (
+              <div>
+                <Label htmlFor="recipient">Share With</Label>
+                <Select value={uploadRecipientId} onValueChange={setUploadRecipientId}>
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select recipient" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="self">Myself only (private)</SelectItem>
+                    {children.length > 0 && (
+                      <>
+                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">Children</div>
+                        {children.map(child => (
+                          <SelectItem key={child.id} value={child.id}>
+                            {child.name || child.full_name || (child.firstName ? `${child.firstName} ${child.lastName || ''}`.trim() : 'Child')}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {bookedTutors.length > 0 && (
+                      <>
+                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">Tutors</div>
+                        {bookedTutors.map(tutor => (
+                          <SelectItem key={tutor.id} value={tutor.id}>
+                            {tutor.name}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                  </SelectContent>
+                </Select>
+                <p className="text-xs text-gray-500 mt-1">
+                  {uploadRecipientId === 'self'
+                    ? 'Only you can see this document.'
+                    : 'The selected person will be able to view and download this document. All sharing is monitored by admins.'}
+                </p>
+              </div>
+            )}
           </div>
 
           <DialogFooter>

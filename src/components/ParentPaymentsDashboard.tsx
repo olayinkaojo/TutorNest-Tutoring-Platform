@@ -106,7 +106,7 @@ export function ParentPaymentsDashboard({ accessToken }: { accessToken: string }
   const loadAllData = async () => {
     setLoading(true);
     try {
-      await Promise.all([fetchPayments(), fetchPaymentMethods(), calculateStats()]);
+      await Promise.all([fetchPayments(), fetchPaymentMethods()]);
     } catch (error) {
       console.error('Error loading payment data:', error);
       toast.error('Failed to load payment data');
@@ -117,22 +117,32 @@ export function ParentPaymentsDashboard({ accessToken }: { accessToken: string }
 
   const fetchPayments = async () => {
     try {
-      const { data: session } = await supabase.auth.getSession();
-      if (!session?.session) throw new Error('No active session');
-
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/payments/history`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
+        { headers: { Authorization: `Bearer ${accessToken}` } }
       );
 
       if (!response.ok) throw new Error('Failed to fetch payments');
 
       const data = await response.json();
-      setPayments(data.payments || []);
+      const fetched: Payment[] = data.payments || [];
+      setPayments(fetched);
+
+      // Compute stats immediately from fetched data (not stale state)
+      const now = new Date();
+      let totalSpent = 0, thisMonth = 0, pendingAmount = 0;
+      fetched.forEach((p) => {
+        if (p.status === 'successful') {
+          totalSpent += p.amount;
+          const pd = new Date(p.createdAt);
+          if (pd.getMonth() === now.getMonth() && pd.getFullYear() === now.getFullYear()) {
+            thisMonth += p.amount;
+          }
+        } else if (p.status === 'pending') {
+          pendingAmount += p.amount;
+        }
+      });
+      setStats({ totalSpent, thisMonth, pendingAmount, transactionCount: fetched.length });
     } catch (error: any) {
       console.error('Error fetching payments:', error);
       toast.error(error.message || 'Failed to load payment history');
@@ -156,41 +166,6 @@ export function ParentPaymentsDashboard({ accessToken }: { accessToken: string }
       }
     } catch (error) {
       console.error('Error fetching payment methods:', error);
-    }
-  };
-
-  const calculateStats = async () => {
-    try {
-      const now = new Date();
-      const currentMonth = now.getMonth();
-      const currentYear = now.getFullYear();
-
-      let totalSpent = 0;
-      let thisMonth = 0;
-      let pendingAmount = 0;
-
-      payments.forEach((payment) => {
-        if (payment.status === 'successful' || payment.status === 'refunded') {
-          totalSpent += payment.amount;
-
-          // Check if payment is this month
-          const paymentDate = new Date(payment.createdAt);
-          if (paymentDate.getMonth() === currentMonth && paymentDate.getFullYear() === currentYear) {
-            thisMonth += payment.amount;
-          }
-        } else if (payment.status === 'pending') {
-          pendingAmount += payment.amount;
-        }
-      });
-
-      setStats({
-        totalSpent,
-        thisMonth,
-        pendingAmount,
-        transactionCount: payments.length,
-      });
-    } catch (error) {
-      console.error('Error calculating stats:', error);
     }
   };
 
@@ -569,7 +544,11 @@ export function ParentPaymentsDashboard({ accessToken }: { accessToken: string }
 
         {/* Receipts Tab */}
         <TabsContent value="receipts">
-          <ReceiptsPanel payments={payments.filter((p) => p.status === 'successful')} accessToken={accessToken} />
+          <ReceiptsPanel
+            payments={payments.filter((p) => p.status === 'successful')}
+            accessToken={accessToken}
+            onDownload={downloadInvoice}
+          />
         </TabsContent>
       </Tabs>
     </div>
@@ -679,9 +658,7 @@ function PaymentMethodsPanel({ accessToken, methods, onRefresh }: any) {
   );
 }
 
-function ReceiptsPanel({ payments, accessToken }: any) {
-  const [selectedPayment, setSelectedPayment] = useState<string | null>(null);
-
+function ReceiptsPanel({ payments, onDownload }: { payments: Payment[]; accessToken: string; onDownload: (p: Payment) => void }) {
   return (
     <div className="space-y-4">
       <Card>
@@ -697,23 +674,34 @@ function ReceiptsPanel({ payments, accessToken }: any) {
             <div className="text-center py-12">
               <FileText className="h-12 w-12 mx-auto text-muted-foreground mb-4" />
               <p className="text-muted-foreground">No receipts available yet</p>
+              <p className="text-sm text-muted-foreground mt-1">Completed payments will appear here</p>
             </div>
           ) : (
             <div className="space-y-3">
               {payments.map((payment: Payment) => (
-                <Card key={payment.id} className="border-slate-200">
-                  <CardContent className="pt-6">
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="font-semibold">{payment.subject}</p>
-                        <p className="text-sm text-muted-foreground">
-                          {new Date(payment.createdAt).toLocaleDateString('en-NG')} • {formatNaira(payment.amount)}
-                        </p>
+                <Card key={payment.id} className="border-slate-200 hover:shadow-sm transition-shadow">
+                  <CardContent className="pt-5 pb-5">
+                    <div className="flex items-center justify-between gap-4">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                          <Receipt className="h-5 w-5 text-green-700" />
+                        </div>
+                        <div>
+                          <p className="font-semibold">{payment.subject || 'Tutoring Session'}</p>
+                          <p className="text-sm text-muted-foreground">
+                            {payment.metadata?.tutorName && `${payment.metadata.tutorName} · `}
+                            {new Date(payment.createdAt).toLocaleDateString('en-NG', { day: 'numeric', month: 'short', year: 'numeric' })}
+                          </p>
+                          <p className="text-xs text-muted-foreground font-mono mt-0.5">{payment.reference}</p>
+                        </div>
                       </div>
-                      <Button variant="outline" size="sm">
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </Button>
+                      <div className="flex items-center gap-3 flex-shrink-0">
+                        <p className="font-bold text-lg">{formatNaira(payment.amount)}</p>
+                        <Button variant="outline" size="sm" onClick={() => onDownload(payment)}>
+                          <Download className="h-4 w-4 mr-2" />
+                          Invoice
+                        </Button>
+                      </div>
                     </div>
                   </CardContent>
                 </Card>

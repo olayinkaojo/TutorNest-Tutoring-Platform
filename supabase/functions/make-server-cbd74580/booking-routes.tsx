@@ -397,6 +397,88 @@ app.post('/bookings/:bookingId/cancel', async (c) => {
   }
 });
 
+// Reschedule a booking
+app.post('/bookings/:bookingId/reschedule', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) return c.json({ error: 'Unauthorized' }, 401);
+
+    const { createClient } = await import('jsr:@supabase/supabase-js@2');
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+    const { data: { user } } = await supabase.auth.getUser(accessToken);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const bookingId = c.req.param('bookingId');
+    const booking = await kv.get(`booking:${bookingId}`) as any;
+
+    if (!booking) return c.json({ error: 'Booking not found' }, 404);
+    if (booking.status !== 'confirmed') return c.json({ error: 'Only confirmed bookings can be rescheduled' }, 400);
+
+    // Must be >24 h before the original session
+    const originalDT = new Date(`${booking.date}T${booking.startTime}+01:00`);
+    const hoursUntil = (originalDT.getTime() - Date.now()) / (1000 * 60 * 60);
+    if (hoursUntil <= 24) {
+      return c.json({ error: 'Bookings can only be rescheduled more than 24 hours in advance' }, 400);
+    }
+
+    // Authorisation: must be the parent who booked or the tutor
+    const student = await kv.get(`child:${booking.studentId}`) as any;
+    const parentId = student?.parentId ?? booking.parentId ?? booking.userId;
+    if (user.id !== parentId && user.id !== booking.tutorId) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
+
+    const { newDate, newStartTime, newEndTime } = await c.req.json();
+    if (!newDate || !newStartTime || !newEndTime) {
+      return c.json({ error: 'newDate, newStartTime and newEndTime are required' }, 400);
+    }
+
+    // New slot must also be >24 h in the future
+    const newDT = new Date(`${newDate}T${newStartTime}+01:00`);
+    const hoursUntilNew = (newDT.getTime() - Date.now()) / (1000 * 60 * 60);
+    if (hoursUntilNew <= 24) {
+      return c.json({ error: 'New session time must be more than 24 hours in the future' }, 400);
+    }
+
+    // Conflict check for new slot
+    const allBookings = await kv.getByPrefix('booking:');
+    const conflict = allBookings.find((b: any) =>
+      b.id !== bookingId &&
+      (b.tutorId === booking.tutorId || b.studentId === booking.studentId) &&
+      b.date === newDate &&
+      b.status === 'confirmed' &&
+      (
+        (newStartTime >= b.startTime && newStartTime < b.endTime) ||
+        (newEndTime > b.startTime && newEndTime <= b.endTime) ||
+        (newStartTime <= b.startTime && newEndTime >= b.endTime)
+      )
+    );
+    if (conflict) return c.json({ error: 'The selected time slot is not available' }, 409);
+
+    // Persist the rescheduled booking
+    const updated = {
+      ...booking,
+      date: newDate,
+      startTime: newStartTime,
+      endTime: newEndTime,
+      status: 'confirmed',
+      rescheduledAt: new Date().toISOString(),
+      previousDate: booking.date,
+      previousStartTime: booking.startTime,
+      previousEndTime: booking.endTime,
+    };
+    await kv.set(`booking:${bookingId}`, updated);
+
+    return c.json({ success: true, booking: updated, message: 'Booking rescheduled successfully' });
+  } catch (error: any) {
+    console.error('Error rescheduling booking:', error);
+    return c.json({ error: error.message || 'Failed to reschedule booking' }, 500);
+  }
+});
+
 // Get session reports for multiple bookings (batch endpoint)
 app.get('/bookings/:ids/reports', async (c) => {
   try {

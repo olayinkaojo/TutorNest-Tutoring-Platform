@@ -15,12 +15,14 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
 
       const formData = await c.req.formData();
       const file = formData.get('file') as File;
-      const documentType = formData.get('documentType') as string; // 'assignment', 'review', 'resource', 'other'
-      const relatedToId = formData.get('relatedToId') as string; // booking ID, student ID, etc.
-      const relatedToType = formData.get('relatedToType') as string; // 'booking', 'student', 'tutor'
+      const documentType = formData.get('documentType') as string;
+      const relatedToId = formData.get('relatedToId') as string;
+      const relatedToType = formData.get('relatedToType') as string;
       const title = formData.get('title') as string;
       const description = formData.get('description') as string;
       const uploadedByRole = formData.get('uploadedByRole') as string;
+      // Recipient: the user (or child) this document is shared with
+      const sharedWithId = formData.get('sharedWithId') as string || '';
 
       if (!file) {
         return c.json({ error: 'No file provided' }, 400);
@@ -92,6 +94,7 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         documentType,
         relatedToId,
         relatedToType,
+        sharedWithId,   // explicit recipient (child id, tutor id, etc.)
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -133,15 +136,9 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
 
       // Filter documents accessible by this user
       let userDocuments = allDocuments.filter((doc: any) => {
-        // User can see documents they uploaded
-        if (doc.uploadedBy === userId) return true;
-        
-        // User can see documents related to them
-        if (doc.relatedToId === userId) return true;
-        
-        // TODO: Add more access control logic based on relationships
-        // (e.g., tutor can see student's documents if they have sessions together)
-        
+        if (doc.uploadedBy === userId) return true;      // own documents
+        if (doc.relatedToId === userId) return true;     // related to user
+        if (doc.sharedWithId === userId) return true;    // explicitly shared with user
         return false;
       });
 
@@ -184,10 +181,10 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       }
 
       // Check if user has access to this document
-      const hasAccess = 
-        document.uploadedBy === userId || 
-        document.relatedToId === userId;
-        // TODO: Add more access control logic
+      const hasAccess =
+        document.uploadedBy === userId ||
+        document.relatedToId === userId ||
+        document.sharedWithId === userId;
 
       if (!hasAccess) {
         return c.json({ error: 'Unauthorized to access this document' }, 403);

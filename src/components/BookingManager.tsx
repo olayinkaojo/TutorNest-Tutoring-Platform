@@ -1,12 +1,15 @@
 import { useState, useEffect } from 'react';
 import { projectId } from '../utils/supabase/info';
-import { parseWAT, bookingDateLabel, formatRawTimeWAT, WAT_TIMEZONE } from '../utils/timezone';
+import { parseWAT, bookingDateLabel, formatRawTimeWAT, WAT_TIMEZONE, todayStringWAT } from '../utils/timezone';
 import { formatNaira } from '../utils/currency';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from './ui/dialog';
+import { Label } from './ui/label';
+import { Input } from './ui/input';
 import { PostSessionReport } from './PostSessionReport';
 import { ViewSessionReport } from './ViewSessionReport';
 import { parentAPI } from '../utils/api-client';
@@ -26,6 +29,7 @@ import {
   BookOpen,
   Wifi,
   WifiOff,
+  Loader2,
 } from 'lucide-react';
 
 interface BookingManagerProps {
@@ -66,6 +70,13 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
   const [showPostReport, setShowPostReport] = useState<Booking | null>(null);
   const [showViewReport, setShowViewReport] = useState<Booking | null>(null);
   const [bookingReports, setBookingReports] = useState<Record<string, any>>({});
+  // Reschedule state
+  const [rescheduleBooking, setRescheduleBooking] = useState<Booking | null>(null);
+  const [rescheduleDate, setRescheduleDate] = useState('');
+  const [rescheduleSlots, setRescheduleSlots] = useState<{ time: string; available: boolean }[]>([]);
+  const [rescheduleTime, setRescheduleTime] = useState('');
+  const [loadingSlots, setLoadingSlots] = useState(false);
+  const [rescheduling, setRescheduling] = useState(false);
 
   // Real-time updates via WebSocket
   const handleRealtimeUpdate = (type: string, data: unknown) => {
@@ -142,6 +153,62 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
 
   const canReschedule = (booking: Booking) => {
     return canCancel(booking);
+  };
+
+  const openReschedule = (booking: Booking) => {
+    setRescheduleBooking(booking);
+    setRescheduleDate('');
+    setRescheduleTime('');
+    setRescheduleSlots([]);
+  };
+
+  const loadAvailableSlots = async (date: string) => {
+    if (!rescheduleBooking) return;
+    setLoadingSlots(true);
+    setRescheduleTime('');
+    try {
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutors/${rescheduleBooking.tutorId}/availability?date=${date}&studentId=${rescheduleBooking.studentId}`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setRescheduleSlots(data.slots || []);
+      }
+    } catch (e) {
+      console.error('Error loading slots', e);
+    } finally {
+      setLoadingSlots(false);
+    }
+  };
+
+  const handleReschedule = async () => {
+    if (!rescheduleBooking || !rescheduleDate || !rescheduleTime) return;
+    const [hh, mm] = rescheduleTime.split(':');
+    const newEndTime = `${String(parseInt(hh) + 1).padStart(2, '0')}:${mm}`;
+    setRescheduling(true);
+    try {
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings/${rescheduleBooking.id}/reschedule`,
+        {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newDate: rescheduleDate, newStartTime: rescheduleTime, newEndTime }),
+        }
+      );
+      const data = await res.json();
+      if (res.ok) {
+        setSuccess('Booking rescheduled successfully');
+        setRescheduleBooking(null);
+        fetchBookings();
+      } else {
+        setError(data.error || 'Failed to reschedule booking');
+      }
+    } catch (e) {
+      setError('Failed to reschedule booking');
+    } finally {
+      setRescheduling(false);
+    }
   };
 
   const calculateRefund = async (booking: Booking): Promise<{ amount: string; percentage: number } | null> => {
@@ -309,10 +376,7 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
                   variant="outline"
                   size="sm"
                   className="flex-1"
-                  onClick={() => {
-                    setSuccess('Rescheduling feature coming soon!');
-                    setTimeout(() => setSuccess(''), 3000);
-                  }}
+                  onClick={() => openReschedule(booking)}
                 >
                   <RotateCcw className="w-4 h-4 mr-2" />
                   Reschedule
@@ -528,6 +592,95 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
 
   return (
     <div className="space-y-6">
+      {/* Reschedule Dialog */}
+      <Dialog open={!!rescheduleBooking} onOpenChange={(open) => { if (!open) setRescheduleBooking(null); }}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <RotateCcw className="w-5 h-5" style={{ color: '#625d9c' }} />
+              Reschedule Booking
+            </DialogTitle>
+            <DialogDescription>
+              Select a new date and time for your session with{' '}
+              <strong>{rescheduleBooking?.tutorName}</strong>.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4 pt-2">
+            {rescheduleBooking && (
+              <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
+                Current: <strong>{bookingDateLabel(rescheduleBooking.date)}</strong> at{' '}
+                <strong>{formatRawTimeWAT(rescheduleBooking.startTime)}</strong>
+              </div>
+            )}
+            <div>
+              <Label htmlFor="reschedule-date">New Date</Label>
+              <Input
+                id="reschedule-date"
+                type="date"
+                min={(() => {
+                  const d = new Date(); d.setDate(d.getDate() + 2);
+                  return d.toLocaleDateString('en-CA', { timeZone: WAT_TIMEZONE });
+                })()}
+                value={rescheduleDate}
+                onChange={(e) => {
+                  setRescheduleDate(e.target.value);
+                  if (e.target.value) loadAvailableSlots(e.target.value);
+                }}
+                className="mt-1"
+              />
+            </div>
+            {loadingSlots && (
+              <div className="flex items-center gap-2 text-sm text-gray-500">
+                <Loader2 className="w-4 h-4 animate-spin" />
+                Checking availability...
+              </div>
+            )}
+            {rescheduleSlots.length > 0 && (
+              <div>
+                <Label>Available Time Slots (WAT)</Label>
+                <div className="grid grid-cols-3 gap-2 mt-2 max-h-48 overflow-y-auto">
+                  {rescheduleSlots.filter(s => s.available).map(slot => (
+                    <button
+                      key={slot.time}
+                      onClick={() => setRescheduleTime(slot.time)}
+                      className={`px-3 py-2 text-sm rounded-lg border transition-colors ${
+                        rescheduleTime === slot.time
+                          ? 'text-white border-transparent'
+                          : 'border-gray-200 hover:border-gray-400'
+                      }`}
+                      style={rescheduleTime === slot.time ? { backgroundColor: '#625d9c' } : {}}
+                    >
+                      {slot.time}
+                    </button>
+                  ))}
+                  {rescheduleSlots.filter(s => s.available).length === 0 && (
+                    <p className="col-span-3 text-sm text-gray-500 text-center py-4">
+                      No available slots on this date
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+            {rescheduleDate && !loadingSlots && rescheduleSlots.length === 0 && (
+              <p className="text-sm text-gray-500">No availability data for this date.</p>
+            )}
+            <div className="flex gap-3 pt-2">
+              <Button variant="outline" className="flex-1" onClick={() => setRescheduleBooking(null)}>
+                Cancel
+              </Button>
+              <Button
+                className="flex-1 text-white"
+                style={{ backgroundColor: '#625d9c' }}
+                disabled={!rescheduleDate || !rescheduleTime || rescheduling}
+                onClick={handleReschedule}
+              >
+                {rescheduling ? <><Loader2 className="w-4 h-4 mr-2 animate-spin" />Rescheduling...</> : 'Confirm Reschedule'}
+              </Button>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       {success && (
         <Alert className="bg-green-50 border-green-200">
           <CheckCircle className="h-4 w-4 text-green-600" />

@@ -213,9 +213,36 @@ export function SessionReportsViewer({
   const uniqueTutors = Array.from(new Set(reports.map(r => ({ id: r.tutorId, name: r.tutorName || 'Unknown Tutor' }))));
 
   const exportToPDF = () => {
-    // TODO: Implement PDF export
-    console.log('Exporting to PDF...');
-    alert('PDF export coming soon!');
+    const win = window.open('', '_blank');
+    if (!win) return;
+    const rows = filteredReports.map(r => `
+      <div style="page-break-inside:avoid;border:1px solid #e2e8f0;border-radius:8px;padding:20px;margin-bottom:16px;">
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+          <div>
+            <h3 style="margin:0;font-size:16px;color:#1a202c;">${r.subject || 'Session'} — ${r.studentName}</h3>
+            <p style="margin:4px 0 0;font-size:13px;color:#718096;">${r.tutorName || ''} · ${new Date(r.date + 'T12:00:00+01:00').toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' })}</p>
+          </div>
+          <span style="padding:4px 10px;border-radius:99px;font-size:12px;font-weight:600;background:${r.progressStatus === 'excellent' ? '#c6f6d5' : r.progressStatus === 'good' ? '#bee3f8' : r.progressStatus === 'satisfactory' ? '#fef3c7' : '#fed7d7'};color:${r.progressStatus === 'excellent' ? '#276749' : r.progressStatus === 'good' ? '#2c5282' : r.progressStatus === 'satisfactory' ? '#92400e' : '#9b2c2c'};">${r.progressStatus?.replace('-', ' ').toUpperCase()}</span>
+        </div>
+        <table style="width:100%;font-size:13px;border-collapse:collapse;">
+          ${r.topicsCovered ? `<tr><td style="padding:6px 0;color:#718096;width:180px;">Topics Covered</td><td style="padding:6px 0;">${r.topicsCovered}</td></tr>` : ''}
+          ${r.studentPerformance ? `<tr><td style="padding:6px 0;color:#718096;">Performance</td><td style="padding:6px 0;">${r.studentPerformance}</td></tr>` : ''}
+          ${r.strengths ? `<tr><td style="padding:6px 0;color:#718096;">Strengths</td><td style="padding:6px 0;">${r.strengths}</td></tr>` : ''}
+          ${r.areasForImprovement ? `<tr><td style="padding:6px 0;color:#718096;">Areas for Improvement</td><td style="padding:6px 0;">${r.areasForImprovement}</td></tr>` : ''}
+          ${r.homeworkAssigned ? `<tr><td style="padding:6px 0;color:#718096;">Homework</td><td style="padding:6px 0;">${r.homeworkAssigned}</td></tr>` : ''}
+          ${r.nextSessionPlan ? `<tr><td style="padding:6px 0;color:#718096;">Next Session Plan</td><td style="padding:6px 0;">${r.nextSessionPlan}</td></tr>` : ''}
+          <tr><td style="padding:6px 0;color:#718096;">Overall Rating</td><td style="padding:6px 0;">${'★'.repeat(r.overallRating)}${'☆'.repeat(5 - r.overallRating)} (${r.overallRating}/5)</td></tr>
+          <tr><td style="padding:6px 0;color:#718096;">Attendance</td><td style="padding:6px 0;">${r.attendance}</td></tr>
+        </table>
+      </div>`).join('');
+    win.document.write(`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Session Reports</title>
+      <style>body{font-family:'Segoe UI',sans-serif;padding:32px;color:#1a202c;max-width:800px;margin:0 auto;}
+        h1{font-size:22px;margin-bottom:4px;}p.sub{font-size:13px;color:#718096;margin-bottom:24px;}
+        @media print{@page{margin:20mm;}}</style></head>
+      <body><h1>Session Reports</h1>
+      <p class="sub">Exported ${new Date().toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric', month: 'long', year: 'numeric' })} · ${filteredReports.length} report(s)</p>
+      ${rows}<script>window.onload=()=>window.print();</script></body></html>`);
+    win.document.close();
   };
 
   return (

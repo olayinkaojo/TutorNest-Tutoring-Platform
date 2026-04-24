@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -14,6 +14,9 @@ import {
   Search,
   Shield,
   Plus,
+  Check,
+  CheckCheck,
+  Loader2,
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
@@ -76,24 +79,22 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
 
-  // Load conversations on mount
+  // Load conversations on mount; poll faster (2s) when a conversation is open
   useEffect(() => {
     loadConversations();
-    
-    // Poll for new messages every 5 seconds
+
+    const interval = selectedConversation ? 2000 : 8000;
     pollingIntervalRef.current = setInterval(() => {
       if (selectedConversation) {
-        loadMessages(selectedConversation.id, true); // Silent reload
+        loadMessages(selectedConversation.id, true);
       }
-      loadConversations(); // Update conversation list
-    }, 5000);
+      loadConversations();
+    }, interval);
 
     return () => {
-      if (pollingIntervalRef.current) {
-        clearInterval(pollingIntervalRef.current);
-      }
+      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
     };
-  }, [selectedConversation]);
+  }, [selectedConversation?.id]);
 
   const loadConversations = async () => {
     try {
@@ -119,24 +120,27 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
     }
   };
 
+  const markConversationRead = async (conversationId: string) => {
+    try {
+      await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/conversations/${conversationId}/read`,
+        { method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}` } }
+      );
+      // Zero out unread locally immediately
+      setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, unreadCount: 0 } : c));
+    } catch (_) {}
+  };
+
   const loadMessages = async (conversationId: string, silent = false) => {
     if (!silent) setLoading(true);
-    
     try {
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/conversations/${conversationId}/messages`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
+        { headers: { 'Authorization': `Bearer ${session.access_token}` } }
       );
-
       if (response.ok) {
         const data = await response.json();
         setMessages(data.messages || []);
-      } else {
-        console.error('Failed to load messages');
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -147,37 +151,50 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation || sending) return;
+    const content = newMessage.trim();
+    setNewMessage('');
 
+    // Optimistic update
+    const optimisticId = `optimistic-${Date.now()}`;
+    const optimistic: Message = {
+      id: optimisticId,
+      conversationId: selectedConversation.id,
+      senderId: userId,
+      senderName: userName,
+      receiverId: selectedConversation.participants.find(p => p !== userId) || '',
+      content,
+      type: 'text',
+      read: false,
+      createdAt: new Date().toISOString(),
+      deletable: false,
+    };
+    setMessages(prev => [...prev, optimistic]);
     setSending(true);
-    
     try {
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/conversations/${selectedConversation.id}/messages`,
         {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            content: newMessage,
-            senderName: userName,
-          }),
+          headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content, senderName: userName }),
         }
       );
-
       if (response.ok) {
         const data = await response.json();
-        setMessages([...messages, data.message]);
-        setNewMessage('');
-        loadConversations(); // Refresh conversation list
+        // Replace optimistic message with real one
+        setMessages(prev => prev.map(m => m.id === optimisticId ? data.message : m));
+        loadConversations();
       } else {
+        // Roll back optimistic
+        setMessages(prev => prev.filter(m => m.id !== optimisticId));
         const error = await response.json();
         toast.error(error.error || 'Failed to send message');
+        setNewMessage(content); // restore draft
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      setMessages(prev => prev.filter(m => m.id !== optimisticId));
       toast.error('Failed to send message');
+      setNewMessage(content);
     } finally {
       setSending(false);
     }
@@ -427,32 +444,40 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
                       onClick={() => {
                         setSelectedConversation(conv);
                         loadMessages(conv.id);
+                        if (conv.unreadCount > 0) markConversationRead(conv.id);
                       }}
                       className={`w-full p-4 text-left hover:bg-gray-50 transition-colors ${
-                        selectedConversation?.id === conv.id ? 'bg-purple-50' : ''
+                        selectedConversation?.id === conv.id ? 'bg-purple-50 border-l-2' : ''
                       }`}
+                      style={selectedConversation?.id === conv.id ? { borderLeftColor: '#625d9c' } : {}}
                     >
                       <div className="flex items-start gap-3">
-                        <Avatar>
-                          <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
-                            {otherParticipantName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
-                          </AvatarFallback>
-                        </Avatar>
+                        <div className="relative">
+                          <Avatar>
+                            <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
+                              {otherParticipantName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                            </AvatarFallback>
+                          </Avatar>
+                          {conv.unreadCount > 0 && (
+                            <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full text-white text-[10px] flex items-center justify-center" style={{ backgroundColor: '#625d9c' }}>
+                              {conv.unreadCount > 9 ? '9+' : conv.unreadCount}
+                            </span>
+                          )}
+                        </div>
                         <div className="flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <h4 className="text-sm truncate">{otherParticipantName}</h4>
-                            {conv.unreadCount > 0 && (
-                              <Badge 
-                                className="text-white ml-2" 
-                                style={{ backgroundColor: '#625d9c' }}
-                              >
-                                {conv.unreadCount}
-                              </Badge>
+                          <div className="flex items-center justify-between mb-0.5">
+                            <h4 className={`text-sm truncate ${conv.unreadCount > 0 ? 'font-semibold' : ''}`}>{otherParticipantName}</h4>
+                            {conv.updatedAt && (
+                              <span className="text-[10px] text-gray-400 ml-2 flex-shrink-0">
+                                {new Date(conv.updatedAt).toLocaleDateString() === new Date().toLocaleDateString()
+                                  ? new Date(conv.updatedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+                                  : new Date(conv.updatedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' })}
+                              </span>
                             )}
                           </div>
                           <p className="text-xs text-gray-500 capitalize mb-1">{otherParticipantRole}</p>
                           {conv.lastMessage && (
-                            <p className="text-xs text-gray-600 truncate">
+                            <p className={`text-xs truncate ${conv.unreadCount > 0 ? 'text-gray-900 font-medium' : 'text-gray-500'}`}>
                               {conv.lastMessage.senderId === userId ? 'You: ' : ''}
                               {conv.lastMessage.content}
                             </p>
@@ -517,42 +542,58 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
                     </div>
                   </div>
                 ) : (
-                  <div className="space-y-4">
-                    {messages.map((message) => {
+                  <div className="space-y-1 py-2">
+                    {messages.map((message, idx) => {
                       const isOwn = message.senderId === userId;
-                      
+                      const isOptimistic = message.id.startsWith('optimistic-');
+                      const msgDate = new Date(message.createdAt);
+                      const prevDate = idx > 0 ? new Date(messages[idx - 1].createdAt) : null;
+                      const showDateSep = !prevDate || msgDate.toDateString() !== prevDate.toDateString();
                       return (
-                        <div
-                          key={message.id}
-                          className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={`max-w-[70%] rounded-lg p-3 ${
-                              isOwn
-                                ? 'text-white'
-                                : 'bg-gray-100 text-gray-900'
-                            }`}
-                            style={isOwn ? { backgroundColor: '#625d9c' } : {}}
-                          >
-                            {!isOwn && (
-                              <p className="text-xs mb-1 opacity-75">{message.senderName}</p>
-                            )}
-                            <p className="text-sm whitespace-pre-wrap break-words">{message.content}</p>
-                            <div className="flex items-center justify-between mt-2 gap-2">
-                              <p className={`text-xs ${isOwn ? 'text-purple-200' : 'text-gray-500'}`}>
-                                {new Date(message.createdAt).toLocaleTimeString([], { 
-                                  hour: '2-digit', 
-                                  minute: '2-digit' 
-                                })}
-                              </p>
+                        <div key={message.id}>
+                          {showDateSep && (
+                            <div className="flex items-center gap-2 my-3">
+                              <div className="flex-1 h-px bg-gray-200" />
+                              <span className="text-xs text-gray-400 px-2">
+                                {msgDate.toDateString() === new Date().toDateString() ? 'Today' :
+                                  msgDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' })}
+                              </span>
+                              <div className="flex-1 h-px bg-gray-200" />
+                            </div>
+                          )}
+                          <div className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                            <div
+                              className={`max-w-[72%] rounded-2xl px-4 py-2.5 ${
+                                isOwn ? 'text-white rounded-br-sm' : 'bg-gray-100 text-gray-900 rounded-bl-sm'
+                              } ${isOptimistic ? 'opacity-70' : ''}`}
+                              style={isOwn ? { backgroundColor: '#625d9c' } : {}}
+                            >
                               {!isOwn && (
-                                <button
-                                  onClick={() => reportMessage(message.id)}
-                                  className="text-xs text-red-600 hover:text-red-800 underline"
-                                >
-                                  Report
-                                </button>
+                                <p className="text-xs mb-1 font-semibold opacity-75">{message.senderName}</p>
                               )}
+                              <p className="text-sm whitespace-pre-wrap break-words leading-relaxed">{message.content}</p>
+                              <div className={`flex items-center gap-1 mt-1 ${isOwn ? 'justify-end' : 'justify-between'}`}>
+                                <p className={`text-[10px] ${isOwn ? 'text-purple-200' : 'text-gray-400'}`}>
+                                  {msgDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                </p>
+                                {isOwn && (
+                                  <span className="text-purple-200">
+                                    {isOptimistic
+                                      ? <Loader2 className="w-3 h-3 animate-spin inline" />
+                                      : message.read
+                                        ? <CheckCheck className="w-3 h-3 inline" />
+                                        : <Check className="w-3 h-3 inline" />}
+                                  </span>
+                                )}
+                                {!isOwn && !isOptimistic && (
+                                  <button
+                                    onClick={() => reportMessage(message.id)}
+                                    className="text-[10px] text-red-500 hover:text-red-700"
+                                  >
+                                    Report
+                                  </button>
+                                )}
+                              </div>
                             </div>
                           </div>
                         </div>

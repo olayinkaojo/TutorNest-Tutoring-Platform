@@ -968,10 +968,11 @@ export function ParentDashboard({
           {/* Documents Tab */}
           <TabsContent value="documents">
             {session ? (
-              <DocumentManager 
+              <DocumentManager
                 session={session}
                 userId={profile.id || profile.userId}
                 userRole="parent"
+                children={children}
               />
             ) : (
               <Card>
