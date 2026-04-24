@@ -41,6 +41,7 @@ import { ContentLibrary } from './ContentLibrary';
 import { SubscriptionsPage } from './SubscriptionsPage';
 import { PaymentMethodManager } from './PaymentMethodManager';
 import { ParentPaymentsDashboard } from './ParentPaymentsDashboard';
+import { ParentAnalyticsDashboard } from './ParentAnalyticsDashboard';
 
 interface UserProfile {
   id: string;
@@ -103,6 +104,7 @@ export function ParentDashboard({
     'bookshop',
     'resources',
     'payments',
+    'analytics',
     'reviews',
   ]);
 
@@ -721,6 +723,7 @@ export function ParentDashboard({
             <TabsTrigger value="messages">Messages</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
+            <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
           </TabsList>
 
@@ -1049,6 +1052,13 @@ export function ParentDashboard({
           <TabsContent value="payments">
             {session && (
               <ParentPaymentsDashboard accessToken={session.access_token} />
+            )}
+          </TabsContent>
+
+          {/* Analytics Tab */}
+          <TabsContent value="analytics">
+            {session && (
+              <ParentAnalyticsDashboard accessToken={session.access_token} />
             )}
           </TabsContent>
 
