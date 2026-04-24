@@ -50,6 +50,9 @@ interface ChatroomProps {
   userId: string;
   userName: string;
   userRole: string;
+  initialContactId?: string;
+  initialContactName?: string;
+  initialContactRole?: string;
 }
 
 interface Contact {
@@ -58,7 +61,7 @@ interface Contact {
   role: string;
 }
 
-export function Chatroom({ session, userId, userName, userRole }: ChatroomProps) {
+export function Chatroom({ session, userId, userName, userRole, initialContactId, initialContactName, initialContactRole }: ChatroomProps) {
   const [conversations, setConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
@@ -73,11 +76,34 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
   const [startingConv, setStartingConv] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollingIntervalRef = useRef<NodeJS.Timeout>();
+  const hasInitiatedRef = useRef(false);
 
   // Scroll to bottom when messages change
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages]);
+
+  // Auto-start conversation with initial contact if provided
+  useEffect(() => {
+    if (initialContactId && !hasInitiatedRef.current && conversations.length > 0) {
+      hasInitiatedRef.current = true;
+      // Find existing conversation with this contact or create new one
+      const existingConv = conversations.find(conv => 
+        conv.participants.includes(initialContactId)
+      );
+      if (existingConv) {
+        setSelectedConversation(existingConv);
+        loadMessages(existingConv.id);
+      } else if (initialContactName && initialContactRole) {
+        // Start new conversation
+        startConversation({
+          id: initialContactId,
+          name: initialContactName,
+          role: initialContactRole,
+        });
+      }
+    }
+  }, [initialContactId, conversations]);
 
   // Load conversations on mount; poll faster (2s) when a conversation is open
   useEffect(() => {
@@ -236,10 +262,19 @@ export function Chatroom({ session, userId, userName, userRole }: ChatroomProps)
   };
 
   const filteredConversations = conversations.filter(conv => {
-    if (!searchQuery) return true;
+    if (!searchQuery.trim()) return true;
+    
+    // Get the other participant's name
     const otherParticipantId = conv.participants.find(p => p !== userId);
-    const otherParticipantName = otherParticipantId ? conv.participantNames[otherParticipantId] : '';
-    return otherParticipantName?.toLowerCase().includes(searchQuery.toLowerCase());
+    if (!otherParticipantId) return false;
+    
+    // Try multiple sources for the name
+    const otherParticipantName = 
+      conv.participantNames?.[otherParticipantId] || 
+      conv.lastMessage?.senderName || 
+      'Unknown';
+    
+    return otherParticipantName.toLowerCase().includes(searchQuery.toLowerCase());
   });
 
   const loadContacts = async () => {

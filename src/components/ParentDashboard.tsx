@@ -123,6 +123,12 @@ export function ParentDashboard({
     totalSpent: 0
   });
 
+  // Track tutor to message with
+  const [initialMessageTutor, setInitialMessageTutor] = useState<{
+    id: string;
+    name: string;
+  } | null>(null);
+
   // Check if user can become a tutor (doesn't already have tutor role)
   const canBecomeTutor = !availableRoles.includes('tutor');
 
@@ -763,9 +769,10 @@ export function ParentDashboard({
                     session={session} 
                     activeChildId={activeChildId}
                     onStartConversation={(tutorId, tutorName) => {
-                      // Switch to messages tab and start conversation with tutor
+                      // Set the initial tutor to message with
+                      setInitialMessageTutor({ id: tutorId, name: tutorName });
+                      // Switch to messages tab (which will auto-start the conversation)
                       setActiveTab('messages');
-                      // Note: The Chatroom component will handle starting a new conversation
                     }}
                   />
                 </div>
@@ -962,6 +969,9 @@ export function ParentDashboard({
                 userId={profile.id || profile.userId}
                 userName={profile.full_name || profile.name || 'Parent'}
                 userRole="parent"
+                initialContactId={initialMessageTutor?.id}
+                initialContactName={initialMessageTutor?.name}
+                initialContactRole="tutor"
               />
             ) : (
               <Card>
