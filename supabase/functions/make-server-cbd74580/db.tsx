@@ -179,7 +179,8 @@ export async function getBooking(bookingId: string): Promise<BookingRow | null> 
     .eq('id', bookingId)
     .single();
   if (error) {
-    if (error.code === 'PGRST116') return null; // Not found
+    // PGRST116: No rows found. 22P02: Invalid input (usually non-UUID string in UUID column)
+    if (error.code === 'PGRST116' || error.code === '22P02') return null;
     throw new Error(error.message);
   }
   if (!data) return null;

@@ -462,8 +462,15 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
 
     const bookingId = c.req.param('bookingId');
     
-    // Get booking from DATABASE (not KV store) - bookings come from db.getBookingsByUserId()
-    const booking = await db.getBooking(bookingId);
+    // Try Database first, fallback to KV Store for single-session bookings
+    let booking = await db.getBooking(bookingId);
+    let isKvBooking = false;
+
+    if (!booking) {
+      booking = await kv.get(`booking:${bookingId}`) as any;
+      if (booking) isKvBooking = true;
+    }
+
     if (!booking) return c.json({ error: 'Booking not found' }, 404);
     if (booking.status !== 'confirmed') return c.json({ error: 'Only confirmed bookings can be rescheduled' }, 400);
 
@@ -475,7 +482,9 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
     }
 
     // Authorization: must be the parent who booked or the tutor
-    if (user.id !== booking.userId && user.id !== booking.tutorId) {
+    // Database uses .userId, KV uses .parentId
+    const ownerId = isKvBooking ? (booking as any).parentId : (booking as any).userId;
+    if (user.id !== ownerId && user.id !== booking.tutorId) {
       return c.json({ error: 'Forbidden' }, 403);
     }
 
@@ -493,7 +502,7 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
 
     // Conflict check for new slot - check database for conflicts
     const conflictingBookings = await db.getBookingsByTutorAndDate(booking.tutorId, newDate);
-    const conflict = conflictingBookings.find((b: any) =>
+    let conflict = conflictingBookings.find((b: any) =>
       b.id !== bookingId &&
       b.status === 'confirmed' &&
       (
@@ -502,35 +511,53 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
         (newStartTime <= b.startTime && newEndTime >= b.endTime)
       )
     );
+
+    // Also check KV for conflicts
+    if (!conflict) {
+      const allKv = await kv.getByPrefix('booking:');
+      conflict = allKv.find((b: any) => 
+        b.id !== bookingId &&
+        b.tutorId === booking.tutorId &&
+        b.date === newDate &&
+        b.status === 'confirmed' &&
+        (
+          (newStartTime >= b.startTime && newStartTime < b.endTime) ||
+          (newEndTime > b.startTime && newEndTime <= b.endTime) ||
+          (newStartTime <= b.startTime && newEndTime >= b.endTime)
+        )
+      );
+    }
+
     if (conflict) return c.json({ error: 'The selected time slot is not available' }, 409);
 
-    // Update the booking in the DATABASE
-    const { error: updateError } = await supabase
-      .from('bookings')
-      .update({
+    let updated;
+    if (isKvBooking) {
+      // Update KV Store
+      updated = {
+        ...booking,
         date: newDate,
-        start_time: newStartTime,
-        end_time: newEndTime,
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', bookingId);
+        startTime: newStartTime,
+        endTime: newEndTime,
+        rescheduledAt: new Date().toISOString(),
+      };
+      await kv.set(`booking:${bookingId}`, updated);
+    } else {
+      // Update the booking in the DATABASE
+      const { error: updateError } = await supabase
+        .from('bookings')
+        .update({
+          date: newDate,
+          start_time: newStartTime,
+          end_time: newEndTime,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', bookingId);
 
-    if (updateError) {
-      throw new Error(`Failed to update booking: ${updateError.message}`);
+      if (updateError) {
+        throw new Error(`Failed to update booking: ${updateError.message}`);
+      }
+      updated = await db.getBooking(bookingId);
     }
-
-    // Also update KV cache if it exists (for backwards compatibility)
-    const kvBooking = await kv.get(`booking:${bookingId}`) as any;
-    if (kvBooking) {
-      kvBooking.date = newDate;
-      kvBooking.startTime = newStartTime;
-      kvBooking.endTime = newEndTime;
-      kvBooking.rescheduledAt = new Date().toISOString();
-      await kv.set(`booking:${bookingId}`, kvBooking);
-    }
-
-    // Fetch updated booking
-    const updated = await db.getBooking(bookingId);
 
     return c.json({ success: true, booking: updated, message: 'Booking rescheduled successfully' });
   } catch (error: any) {
