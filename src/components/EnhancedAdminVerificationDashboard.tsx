@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import { projectId } from '../utils/supabase/info';
 import { Button } from './ui/button';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
 import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -9,27 +9,20 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Input } from './ui/input';
-import { 
-  CheckCircle, 
-  XCircle, 
-  Clock, 
-  Eye, 
-  FileText, 
+import {
+  CheckCircle,
+  XCircle,
+  Clock,
+  Eye,
+  FileText,
   AlertTriangle,
   User,
   Shield,
-  Calendar,
-  TrendingUp,
-  Filter,
-  Search,
-  ChevronDown,
   Download,
   Flag,
-  CheckSquare,
-  Square,
-  BarChart3,
   RefreshCw,
-  AlertCircle
+  AlertCircle,
+  History,
 } from 'lucide-react';
 
 interface AdminVerificationDashboardProps {
@@ -48,19 +41,55 @@ interface VerificationMetrics {
 interface VerificationRecord {
   userId: string;
   profile: any;
+  documents: { dbs: string | null; qualifications: any[]; insurance: string | null };
   submittedAt: string;
   status?: string;
   reviewer?: string;
   reviewedAt?: string;
   rejectionReason?: string;
-  riskFlags?: string[];
-  documentStatus?: Record<string, string>;
+  kycStatus?: string;
+  dbsStatus?: string;
+}
+
+const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
+
+function resolveName(profile: any) {
+  return (
+    profile?.fullName ||
+    profile?.full_name ||
+    profile?.name ||
+    (profile?.firstName ? `${profile.firstName} ${profile.lastName ?? ''}`.trim() : null) ||
+    'Unknown'
+  );
+}
+
+function daysSince(dateStr: string) {
+  return Math.floor((Date.now() - new Date(dateStr).getTime()) / (1000 * 60 * 60 * 24));
+}
+
+function getDataIssues(profile: any): string[] {
+  const issues: string[] = [];
+  if (!profile?.qualifications) issues.push('No qualifications listed');
+  if (!profile?.subjects?.length) issues.push('No subjects specified');
+  if (!profile?.bio || profile.bio.length < 20) issues.push('Bio too short or missing');
+  if (!profile?.phone) issues.push('Phone number missing');
+  return issues;
+}
+
+function getRiskFlags(profile: any): string[] {
+  const flags: string[] = [];
+  const expYears = profile?.experience_years ?? profile?.experienceYears;
+  if (expYears && expYears > 50) flags.push('Implausible experience years');
+  if (!profile?.bio || profile.bio.length < 20) flags.push('Incomplete bio');
+  if (!profile?.photoUrl && !profile?.photo_url) flags.push('No profile photo');
+  return flags;
 }
 
 export function EnhancedAdminVerificationDashboard({ session }: AdminVerificationDashboardProps) {
   const [verifications, setVerifications] = useState<VerificationRecord[]>([]);
-  const [selectedVerification, setSelectedVerification] = useState<VerificationRecord | null>(null);
+  const [selected, setSelected] = useState<VerificationRecord | null>(null);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [reviewing, setReviewing] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -73,11 +102,8 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
     document_issues: 0,
   });
 
-  // Filter and search states
   const [searchQuery, setSearchQuery] = useState('');
-  const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [sortBy, setSortBy] = useState<string>('newest');
-  const [selectedForBulk, setSelectedForBulk] = useState<Set<string>>(new Set());
+  const [sortBy, setSortBy] = useState('newest');
   const [showHistory, setShowHistory] = useState(false);
 
   const [reviewData, setReviewData] = useState({
@@ -87,150 +113,77 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
     dbsStatus: 'verified',
   });
 
-  // Fetch verifications with metrics
-  const fetchVerifications = useCallback(async () => {
-    try {
-      setLoading(true);
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/verifications${
-          showHistory ? '/history' : '/pending'
-        }`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to fetch verifications');
-      }
-
-      const data = await response.json();
-      setVerifications(data.verifications || []);
-
-      // Fetch metrics
-      const metricsResponse = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/verifications/metrics`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (metricsResponse.ok) {
-        const metricsData = await metricsResponse.json();
-        setMetrics(metricsData.metrics);
-      }
-
-      setError('');
-    } catch (err: any) {
-      console.error('Error fetching verifications:', err);
-      setError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  }, [session.access_token, showHistory]);
+  // Auto-clear success / error banners
+  useEffect(() => {
+    if (!success) return;
+    const t = setTimeout(() => setSuccess(''), 6000);
+    return () => clearTimeout(t);
+  }, [success]);
 
   useEffect(() => {
-    fetchVerifications();
-    const interval = setInterval(fetchVerifications, 30000);
+    if (!error) return;
+    const t = setTimeout(() => setError(''), 8000);
+    return () => clearTimeout(t);
+  }, [error]);
+
+  const fetchAll = useCallback(
+    async (quiet = false) => {
+      try {
+        if (!quiet) setLoading(true);
+        else setRefreshing(true);
+
+        const headers = { Authorization: `Bearer ${session.access_token}` };
+
+        const [listRes, metricsRes] = await Promise.all([
+          fetch(`${BASE}/admin/verifications/${showHistory ? 'history' : 'pending'}`, { headers }),
+          fetch(`${BASE}/admin/verifications/metrics`, { headers }),
+        ]);
+
+        if (!listRes.ok) throw new Error('Failed to fetch verifications');
+        const listData = await listRes.json();
+        setVerifications(listData.verifications || []);
+
+        if (metricsRes.ok) {
+          const m = await metricsRes.json();
+          setMetrics(m.metrics);
+        }
+
+        setError('');
+      } catch (err: any) {
+        setError(err.message || 'Failed to load verifications');
+      } finally {
+        setLoading(false);
+        setRefreshing(false);
+      }
+    },
+    [session.access_token, showHistory]
+  );
+
+  useEffect(() => {
+    fetchAll();
+    const interval = setInterval(() => fetchAll(true), 30000);
     return () => clearInterval(interval);
-  }, [fetchVerifications]);
+  }, [fetchAll]);
 
-  // Filter and search logic
-  const filteredVerifications = verifications.filter((v) => {
-    const matchesSearch =
-      !searchQuery ||
-      v.profile?.fullName?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.profile?.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      v.profile?.email?.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesStatus =
-      filterStatus === 'all' || 
-      (filterStatus === 'with_issues' && v.riskFlags && v.riskFlags.length > 0) ||
-      (filterStatus === 'doc_issues' && v.documentStatus && 
-        Object.values(v.documentStatus).some(s => s !== 'verified'));
-
-    return matchesSearch && matchesStatus;
-  });
-
-  const sortedVerifications = [...filteredVerifications].sort((a, b) => {
-    const getDate = (v: VerificationRecord) => new Date(v.reviewedAt || v.submittedAt).getTime();
-    
-    if (sortBy === 'newest') {
-      return getDate(b) - getDate(a);
-    } else if (sortBy === 'oldest') {
-      return getDate(a) - getDate(b);
-    } else if (sortBy === 'name') {
-      const nameA = a.profile?.fullName || a.profile?.full_name || '';
-      const nameB = b.profile?.fullName || b.profile?.full_name || '';
-      return nameA.localeCompare(nameB);
-    }
-    return 0;
-  });
-
-  // Data validation check
-  const validateTutorData = (profile: any): string[] => {
-    const issues: string[] = [];
-
-    if (!profile?.fullName && !profile?.full_name) issues.push('Missing full name');
-    if (!profile?.email) issues.push('Missing email');
-    if (!profile?.phone) issues.push('Missing phone');
-    if (!profile?.qualifications) issues.push('Missing qualifications');
-    if (!profile?.subjects || profile.subjects.length === 0) issues.push('No subjects specified');
-    if (!profile?.teaching_format && !profile?.teachingFormat) issues.push('Teaching format not specified');
-    if (!profile?.hourly_rate && !profile?.hourlyRate) issues.push('Rate not specified');
-
-    // Document verification issues
-    if (!profile?.documents?.photo) issues.push('Profile photo missing');
-    if (!profile?.documents?.idDocument) issues.push('ID document missing');
-    if (profile?.hasDbsCheck && !profile?.documents?.dbsDocument) issues.push('DBS certificate missing');
-
-    // DBS expiry check
-    if (profile?.dbsExpiryDate) {
-      const expiryDate = new Date(profile.dbsExpiryDate);
-      const today = new Date();
-      const daysUntilExpiry = Math.floor((expiryDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-      if (daysUntilExpiry < 30) issues.push(`DBS expires in ${daysUntilExpiry} days`);
-    }
-
-    return issues;
-  };
-
-  // Risk flag detection
-  const detectRiskFlags = (profile: any): string[] => {
-    const flags: string[] = [];
-
-    // Check for inconsistencies
-    if (profile?.hourly_rate && profile.hourly_rate > 50000) {
-      flags.push('Unusually high rate');
-    }
-    if (profile?.experience_years > 50) {
-      flags.push('Implausible experience');
-    }
-
-    // Check for missing documents
-    const hasKyc = profile?.documents?.idDocument;
-    const hasPhoto = profile?.documents?.photo;
-    if (!hasKyc || !hasPhoto) {
-      flags.push('Essential documents missing');
-    }
-
-    // Check profile completeness
-    if (!profile?.bio || profile.bio.length < 20) {
-      flags.push('Incomplete bio');
-    }
-
-    return flags;
-  };
+  const displayed = [...verifications]
+    .filter((v) => {
+      if (!searchQuery) return true;
+      const q = searchQuery.toLowerCase();
+      const name = resolveName(v.profile).toLowerCase();
+      return name.includes(q) || (v.profile?.email || '').toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      if (sortBy === 'oldest')
+        return new Date(a.submittedAt).getTime() - new Date(b.submittedAt).getTime();
+      if (sortBy === 'name')
+        return resolveName(a.profile).localeCompare(resolveName(b.profile));
+      return new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime();
+    });
 
   const handleReview = async () => {
-    if (!selectedVerification) return;
-
+    if (!selected) return;
     if (reviewData.action === 'reject' && !reviewData.rejectionReason.trim()) {
-      setError('Please provide a rejection reason');
+      setError('Please provide a rejection reason before submitting.');
       return;
     }
 
@@ -238,43 +191,29 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
       setReviewing(true);
       setError('');
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/verifications/${selectedVerification.userId}/review`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({
-            ...reviewData,
-            reviewer_id: session.user?.id,
-            reviewed_at: new Date().toISOString(),
-          }),
-        }
-      );
+      const res = await fetch(`${BASE}/admin/verifications/${selected.userId}/review`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${session.access_token}`,
+        },
+        body: JSON.stringify(reviewData),
+      });
 
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to review verification');
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || 'Review failed');
       }
 
       setSuccess(
         reviewData.action === 'approve'
-          ? '✅ Tutor verified successfully! Congratulatory email has been sent.'
-          : '❌ Application rejected. Rejection notification has been sent to the tutor.'
+          ? '✅ Tutor approved — a congratulatory email has been sent.'
+          : '❌ Application rejected — the tutor has been notified by email.'
       );
-
-      await fetchVerifications();
-      setSelectedVerification(null);
-      setReviewData({
-        action: 'approve',
-        rejectionReason: '',
-        kycStatus: 'verified',
-        dbsStatus: 'verified',
-      });
+      setSelected(null);
+      setReviewData({ action: 'approve', rejectionReason: '', kycStatus: 'verified', dbsStatus: 'verified' });
+      await fetchAll(true);
     } catch (err: any) {
-      console.error('Error reviewing:', err);
       setError(err.message);
     } finally {
       setReviewing(false);
@@ -283,602 +222,464 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
 
   const viewDocument = async (userId: string, docType: string) => {
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutors/${userId}/documents/${docType}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error('Failed to retrieve document');
-      }
-
-      const data = await response.json();
+      const res = await fetch(`${BASE}/tutors/${userId}/documents/${docType}`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) throw new Error('Could not retrieve document');
+      const data = await res.json();
       window.open(data.url, '_blank');
     } catch (err: any) {
-      console.error('Error viewing document:', err);
       setError(err.message);
     }
   };
 
-  const toggleBulkSelect = (userId: string) => {
-    const newSelected = new Set(selectedForBulk);
-    if (newSelected.has(userId)) {
-      newSelected.delete(userId);
-    } else {
-      newSelected.add(userId);
-    }
-    setSelectedForBulk(newSelected);
-  };
-
-  const toggleAllSelect = () => {
-    if (selectedForBulk.size === sortedVerifications.length) {
-      setSelectedForBulk(new Set());
-    } else {
-      setSelectedForBulk(new Set(sortedVerifications.map(v => v.userId)));
-    }
-  };
-
-  const exportData = () => {
-    const csv = [
-      ['Name', 'Email', 'Phone', 'Subjects', 'Rate', 'Status', 'Submitted Date', 'Risk Flags'],
-      ...sortedVerifications.map(v => [
-        v.profile?.fullName || v.profile?.full_name || '',
+  const exportCSV = () => {
+    const rows = [
+      ['Name', 'Email', 'Phone', 'Subjects', 'Status', 'Submitted', 'Risk Flags'],
+      ...displayed.map((v) => [
+        resolveName(v.profile),
         v.profile?.email || '',
         v.profile?.phone || '',
         (v.profile?.subjects || []).join('; '),
-        v.profile?.hourly_rate || '',
         v.status || 'pending',
         new Date(v.submittedAt).toLocaleDateString(),
-        (v.riskFlags || []).join('; '),
+        getRiskFlags(v.profile).join('; '),
       ]),
     ]
-      .map(row => row.map(cell => `"${cell}"`).join(','))
+      .map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(','))
       .join('\n');
 
-    const blob = new Blob([csv], { type: 'text/csv' });
-    const url = window.URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `verifications-${new Date().toISOString().split('T')[0]}.csv`;
+    const url = URL.createObjectURL(new Blob([rows], { type: 'text/csv' }));
+    const a = Object.assign(document.createElement('a'), {
+      href: url,
+      download: `verifications-${new Date().toISOString().split('T')[0]}.csv`,
+    });
     document.body.appendChild(a);
     a.click();
-    window.URL.revokeObjectURL(url);
-    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+    a.remove();
   };
 
+  // ─── Derived values for the selected record ───────────────────────────────
+  const p = selected?.profile;
+  const dataIssues = p ? getDataIssues(p) : [];
+  const riskFlags = p ? getRiskFlags(p) : [];
+  const hasPhoto = !!(p?.photoUrl || p?.photo_url);
+  const hasDbs = !!selected?.documents?.dbs;
+  const hasInsurance = !!selected?.documents?.insurance;
+
+  // ─── Loading skeleton ─────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 flex items-center justify-center">
+      <div className="min-h-[400px] flex items-center justify-center">
         <Clock className="w-8 h-8 animate-spin" style={{ color: '#625d9c' }} />
       </div>
     );
   }
 
-  const riskFlagsForSelected = selectedVerification ? detectRiskFlags(selectedVerification.profile) : [];
-  const validationIssues = selectedVerification ? validateTutorData(selectedVerification.profile) : [];
-
   return (
-    <div className="min-h-screen bg-gradient-to-br from-purple-50 via-white to-green-50 p-4 sm:p-6 md:p-8">
-      <div className="max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <h1 className="text-3xl font-bold" style={{ color: '#625d9c' }}>
-            Tutor Verification Management
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 className="text-2xl font-bold" style={{ color: '#625d9c' }}>
+            Tutor Verification
           </h1>
-          <p className="text-gray-600 mt-2">
-            Review and approve tutor applications with advanced filtering and batch operations
+          <p className="text-sm text-gray-500 mt-0.5">
+            {showHistory ? 'Showing reviewed applications' : `${metrics.total_pending} application${metrics.total_pending !== 1 ? 's' : ''} awaiting review`}
           </p>
         </div>
-
-        {/* Metrics Dashboard */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-6 gap-4 mb-8">
-          <Card className="bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Pending</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold" style={{ color: '#625d9c' }}>
-                {metrics.total_pending}
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Awaiting review</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Approved</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-green-600">
-                {metrics.total_approved}
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Total verified</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Rejected</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {metrics.total_rejected}
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Not approved</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Approval Rate</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-blue-600">
-                {metrics.approval_rate.toFixed(1)}%
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Approved of total</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Avg Review Time</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-orange-600">
-                {metrics.avg_review_time_hours.toFixed(1)}h
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Hours to review</p>
-            </CardContent>
-          </Card>
-
-          <Card className="bg-white">
-            <CardHeader className="pb-3">
-              <CardTitle className="text-sm font-medium text-gray-600">Doc Issues</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <div className="text-2xl font-bold text-red-600">
-                {metrics.document_issues}
-              </div>
-              <p className="text-xs text-gray-500 mt-1">Need attention</p>
-            </CardContent>
-          </Card>
+        <div className="flex gap-2 flex-wrap">
+          <Button
+            variant={showHistory ? 'default' : 'outline'}
+            size="sm"
+            onClick={() => { setShowHistory((h) => !h); setSelected(null); }}
+            className="gap-2"
+            style={showHistory ? { backgroundColor: '#625d9c' } : {}}
+          >
+            <History className="w-4 h-4" />
+            {showHistory ? 'View Pending' : 'View History'}
+          </Button>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => fetchAll(true)}
+            disabled={refreshing}
+            className="gap-2"
+          >
+            <RefreshCw className={`w-4 h-4 ${refreshing ? 'animate-spin' : ''}`} />
+            Refresh
+          </Button>
+          <Button variant="outline" size="sm" onClick={exportCSV} className="gap-2">
+            <Download className="w-4 h-4" />
+            Export CSV
+          </Button>
         </div>
+      </div>
 
-        {/* Alerts */}
-        {error && (
-          <Alert className="mb-6 bg-red-50 border-red-200">
-            <XCircle className="h-4 w-4 text-red-600" />
-            <AlertDescription className="text-red-800">{error}</AlertDescription>
-          </Alert>
-        )}
+      {/* Metrics */}
+      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+        {[
+          { label: 'Pending', value: metrics.total_pending, color: 'text-amber-600' },
+          { label: 'Approved', value: metrics.total_approved, color: 'text-green-600' },
+          { label: 'Rejected', value: metrics.total_rejected, color: 'text-red-600' },
+          { label: 'Approval Rate', value: `${metrics.approval_rate.toFixed(1)}%`, color: 'text-blue-600' },
+          { label: 'Avg Review', value: `${metrics.avg_review_time_hours.toFixed(1)}h`, color: 'text-purple-600' },
+          { label: 'Doc Issues', value: metrics.document_issues, color: 'text-orange-600' },
+        ].map(({ label, value, color }) => (
+          <Card key={label} className="bg-white">
+            <CardContent className="pt-4 pb-3 px-4">
+              <p className="text-xs text-gray-500 font-medium">{label}</p>
+              <p className={`text-2xl font-bold mt-1 ${color}`}>{value}</p>
+            </CardContent>
+          </Card>
+        ))}
+      </div>
 
-        {success && (
-          <Alert className="mb-6 bg-green-50 border-green-200">
-            <CheckCircle className="h-4 w-4 text-green-600" />
-            <AlertDescription className="text-green-800">{success}</AlertDescription>
-          </Alert>
-        )}
+      {/* Alerts */}
+      {error && (
+        <Alert className="bg-red-50 border-red-200">
+          <XCircle className="h-4 w-4 text-red-600" />
+          <AlertDescription className="text-red-800">{error}</AlertDescription>
+        </Alert>
+      )}
+      {success && (
+        <Alert className="bg-green-50 border-green-200">
+          <CheckCircle className="h-4 w-4 text-green-600" />
+          <AlertDescription className="text-green-800">{success}</AlertDescription>
+        </Alert>
+      )}
 
-        {/* Controls */}
-        <div className="bg-white rounded-lg border border-gray-200 p-4 mb-6 space-y-4">
-          <div className="flex flex-wrap gap-2">
-            <Button
-              onClick={() => setShowHistory(!showHistory)}
-              variant={showHistory ? 'default' : 'outline'}
-              className="gap-2"
-            >
-              <Clock className="w-4 h-4" />
-              {showHistory ? 'Hide History' : 'Show History'}
-            </Button>
-            <Button
-              onClick={fetchVerifications}
-              variant="outline"
-              className="gap-2"
-            >
-              <RefreshCw className="w-4 h-4" />
-              Refresh
-            </Button>
-            <Button
-              onClick={exportData}
-              variant="outline"
-              className="gap-2"
-            >
-              <Download className="w-4 h-4" />
-              Export CSV
-            </Button>
-          </div>
-
-          {/* Search and Filters */}
-          <div className="space-y-4">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-4 h-4 text-gray-400" />
-              <Input
-                placeholder="Search by name, email..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <Label className="text-sm mb-2 block">Filter By</Label>
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">All Records</SelectItem>
-                    <SelectItem value="with_issues">With Risk Flags</SelectItem>
-                    <SelectItem value="doc_issues">Document Issues</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
-                <Label className="text-sm mb-2 block">Sort By</Label>
-                <Select value={sortBy} onValueChange={setSortBy}>
-                  <SelectTrigger>
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="newest">Newest First</SelectItem>
-                    <SelectItem value="oldest">Oldest First</SelectItem>
-                    <SelectItem value="name">Name (A-Z)</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
-          </div>
+      {/* Search + Sort */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="relative flex-1">
+          <Eye className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            placeholder="Search by name or email…"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="pl-9"
+          />
         </div>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="w-44">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="newest">Newest first</SelectItem>
+            <SelectItem value="oldest">Oldest first</SelectItem>
+            <SelectItem value="name">Name A–Z</SelectItem>
+          </SelectContent>
+        </Select>
+      </div>
 
-        {/* Main Content */}
-        <div className="grid lg:grid-cols-3 gap-6">
-          {/* Verifications List */}
-          <div className="lg:col-span-1">
-            <Card className="p-6 max-h-[800px] overflow-hidden flex flex-col">
-              <div className="flex items-center justify-between mb-4">
-                <h2 style={{ color: '#625d9c' }} className="font-semibold">
-                  Verifications ({sortedVerifications.length})
-                </h2>
-                {sortedVerifications.length > 0 && (
+      {/* Main Panel */}
+      <div className="grid lg:grid-cols-5 gap-6">
+        {/* List */}
+        <Card className="lg:col-span-2 flex flex-col overflow-hidden" style={{ maxHeight: 720 }}>
+          <CardHeader className="pb-3 border-b">
+            <CardTitle className="text-base" style={{ color: '#625d9c' }}>
+              {showHistory ? 'Reviewed' : 'Pending'} ({displayed.length})
+            </CardTitle>
+          </CardHeader>
+          <div className="overflow-y-auto flex-1 p-3 space-y-2">
+            {displayed.length === 0 ? (
+              <div className="text-center py-12">
+                <FileText className="w-10 h-10 mx-auto text-gray-300 mb-3" />
+                <p className="text-sm text-gray-500">
+                  {showHistory ? 'No reviewed applications yet' : 'No pending applications'}
+                </p>
+              </div>
+            ) : (
+              displayed.map((v) => {
+                const flags = getRiskFlags(v.profile);
+                const isActive = selected?.userId === v.userId;
+                const days = daysSince(v.submittedAt);
+
+                return (
                   <button
-                    onClick={toggleAllSelect}
-                    className="p-1 hover:bg-gray-100 rounded"
-                    title={selectedForBulk.size === sortedVerifications.length ? 'Deselect all' : 'Select all'}
+                    key={v.userId}
+                    onClick={() => {
+                      setSelected(v);
+                      setReviewData({ action: 'approve', rejectionReason: '', kycStatus: 'verified', dbsStatus: 'verified' });
+                    }}
+                    className={`w-full text-left p-3 rounded-lg border-2 transition-all ${
+                      isActive
+                        ? 'border-purple-500 bg-purple-50'
+                        : 'border-gray-200 hover:border-gray-300 hover:bg-gray-50'
+                    }`}
                   >
-                    {selectedForBulk.size === sortedVerifications.length ? (
-                      <CheckSquare className="w-5 h-5 text-blue-600" />
-                    ) : (
-                      <Square className="w-5 h-5 text-gray-400" />
-                    )}
-                  </button>
-                )}
-              </div>
-
-              <div className="overflow-y-auto flex-1 space-y-2">
-                {sortedVerifications.length === 0 ? (
-                  <p className="text-gray-500 text-center py-8">
-                    No verifications found
-                  </p>
-                ) : (
-                  sortedVerifications.map((verification) => {
-                    const risks = detectRiskFlags(verification.profile);
-                    const isSelected = selectedForBulk.has(verification.userId);
-
-                    return (
-                      <div
-                        key={verification.userId}
-                        onClick={() => setSelectedVerification(verification)}
-                        className={`p-3 rounded-lg border-2 cursor-pointer transition-all flex gap-2 ${
-                          selectedVerification?.userId === verification.userId
-                            ? 'border-purple-500 bg-purple-50'
-                            : 'border-gray-200 hover:border-gray-300'
-                        }`}
-                      >
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            toggleBulkSelect(verification.userId);
-                          }}
-                          className="mt-1 flex-shrink-0"
-                        >
-                          {isSelected ? (
-                            <CheckSquare className="w-4 h-4 text-blue-600" />
-                          ) : (
-                            <Square className="w-4 h-4 text-gray-300" />
-                          )}
-                        </button>
-
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-1">
-                            <p className="font-medium text-sm truncate">
-                              {verification.profile?.fullName ||
-                                verification.profile?.full_name ||
-                                'Unknown'}
-                            </p>
-                            {risks.length > 0 && (
-                              <Flag className="w-4 h-4 text-red-500 flex-shrink-0" />
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-600 truncate">
-                            {verification.profile?.email}
-                          </p>
-                          <div className="flex gap-1 mt-1">
-                            {verification.profile?.subjects && verification.profile.subjects.length > 0 && (
-                              <Badge variant="outline" className="text-xs">
-                                {verification.profile.subjects[0]}
-                              </Badge>
-                            )}
-                            {verification.riskFlags && verification.riskFlags.length > 0 && (
-                              <Badge variant="destructive" className="text-xs">
-                                {verification.riskFlags.length} flags
-                              </Badge>
-                            )}
-                          </div>
-                        </div>
+                    <div className="flex items-start justify-between gap-2">
+                      <p className="font-medium text-sm truncate">{resolveName(v.profile)}</p>
+                      <div className="flex items-center gap-1 flex-shrink-0">
+                        {flags.length > 0 && <Flag className="w-3.5 h-3.5 text-red-500" />}
+                        {showHistory && v.status === 'verified' && (
+                          <Badge className="bg-green-600 text-white text-xs">Approved</Badge>
+                        )}
+                        {showHistory && v.status === 'rejected' && (
+                          <Badge variant="destructive" className="text-xs">Rejected</Badge>
+                        )}
                       </div>
-                    );
-                  })
-                )}
-              </div>
-            </Card>
+                    </div>
+                    <p className="text-xs text-gray-500 truncate mt-0.5">{v.profile?.email}</p>
+                    <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                      {v.profile?.subjects?.[0] && (
+                        <Badge variant="outline" className="text-xs">
+                          {v.profile.subjects[0]}
+                        </Badge>
+                      )}
+                      {!showHistory && (
+                        <span className="text-xs text-gray-400">
+                          {days === 0 ? 'Today' : `${days}d waiting`}
+                        </span>
+                      )}
+                      {showHistory && v.reviewedAt && (
+                        <span className="text-xs text-gray-400">
+                          Reviewed {new Date(v.reviewedAt).toLocaleDateString()}
+                        </span>
+                      )}
+                    </div>
+                  </button>
+                );
+              })
+            )}
           </div>
+        </Card>
 
-          {/* Details Panel */}
-          <div className="lg:col-span-2">
-            {selectedVerification ? (
-              <Card className="p-6 max-h-[800px] overflow-hidden flex flex-col">
-                <Tabs defaultValue="details" className="flex flex-col h-full">
+        {/* Detail Panel */}
+        <div className="lg:col-span-3">
+          {selected ? (
+            <Card className="overflow-hidden" style={{ maxHeight: 720 }}>
+              <Tabs defaultValue="details" className="flex flex-col h-full">
+                <div className="px-6 pt-4 border-b">
                   <TabsList className="grid w-full grid-cols-4">
                     <TabsTrigger value="details">Details</TabsTrigger>
                     <TabsTrigger value="documents">Documents</TabsTrigger>
                     <TabsTrigger value="review">Review</TabsTrigger>
-                    <TabsTrigger value="audit" className="text-xs">Audit</TabsTrigger>
+                    <TabsTrigger value="audit">Audit</TabsTrigger>
                   </TabsList>
+                </div>
 
-                  {/* Details Tab */}
-                  <TabsContent value="details" className="overflow-y-auto flex-1 space-y-4 mt-4">
-                    {/* Risk Flags */}
-                    {riskFlagsForSelected.length > 0 && (
-                      <Alert className="bg-orange-50 border-orange-200">
-                        <AlertTriangle className="h-4 w-4 text-orange-600" />
-                        <AlertDescription className="text-orange-800 text-sm">
-                          <strong>Risk Flags ({riskFlagsForSelected.length}):</strong><br />
-                          {riskFlagsForSelected.map((flag, i) => (
-                            <div key={i}>• {flag}</div>
-                          ))}
-                        </AlertDescription>
-                      </Alert>
+                {/* ── Details ─────────────────────────────────────────────── */}
+                <TabsContent value="details" className="overflow-y-auto flex-1 px-6 py-4 space-y-4 mt-0">
+                  {riskFlags.length > 0 && (
+                    <Alert className="bg-orange-50 border-orange-200">
+                      <AlertTriangle className="h-4 w-4 text-orange-600" />
+                      <AlertDescription className="text-orange-800 text-sm">
+                        <strong>Risk flags ({riskFlags.length}):</strong>
+                        {riskFlags.map((f, i) => <div key={i} className="ml-1">• {f}</div>)}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {dataIssues.length > 0 && (
+                    <Alert className="bg-yellow-50 border-yellow-200">
+                      <AlertCircle className="h-4 w-4 text-yellow-600" />
+                      <AlertDescription className="text-yellow-800 text-sm">
+                        <strong>Profile gaps ({dataIssues.length}):</strong>
+                        {dataIssues.map((iss, i) => <div key={i} className="ml-1">• {iss}</div>)}
+                      </AlertDescription>
+                    </Alert>
+                  )}
+
+                  {/* Identity */}
+                  <div className="flex items-start gap-4 pb-4 border-b">
+                    {hasPhoto ? (
+                      <img
+                        src={p?.photoUrl || p?.photo_url}
+                        alt="Profile"
+                        className="w-20 h-20 rounded-full object-cover border-2 border-purple-200 flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-20 h-20 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
+                        <User className="w-10 h-10 text-purple-400" />
+                      </div>
                     )}
-
-                    {/* Validation Issues */}
-                    {validationIssues.length > 0 && (
-                      <Alert className="bg-yellow-50 border-yellow-200">
-                        <AlertCircle className="h-4 w-4 text-yellow-600" />
-                        <AlertDescription className="text-yellow-800 text-sm">
-                          <strong>Data Issues ({validationIssues.length}):</strong><br />
-                          {validationIssues.map((issue, i) => (
-                            <div key={i}>• {issue}</div>
-                          ))}
-                        </AlertDescription>
-                      </Alert>
-                    )}
-
-                    {/* Tutor Profile */}
-                    <div className="flex items-start gap-4 border-b pb-4">
-                      {selectedVerification.profile?.photo_url || selectedVerification.profile?.photoUrl ? (
-                        <img
-                          src={selectedVerification.profile.photo_url || selectedVerification.profile.photoUrl}
-                          alt="Profile"
-                          className="w-20 h-20 rounded-full object-cover border-2 border-purple-200 flex-shrink-0"
-                        />
-                      ) : (
-                        <div className="w-20 h-20 rounded-full bg-purple-100 flex items-center justify-center flex-shrink-0">
-                          <User className="w-10 h-10 text-purple-400" />
-                        </div>
-                      )}
-                      <div className="flex-1 min-w-0">
-                        <h2 style={{ color: '#625d9c' }} className="font-semibold">
-                          {selectedVerification.profile?.fullName || selectedVerification.profile?.full_name}
-                        </h2>
-                        <p className="text-sm text-gray-600">{selectedVerification.profile?.email}</p>
-                        <p className="text-sm text-gray-600">{selectedVerification.profile?.phone}</p>
-                        <p className="text-xs text-gray-500 mt-1">
-                          Submitted: {new Date(selectedVerification.submittedAt).toLocaleDateString()}
-                        </p>
-                      </div>
-                    </div>
-
-                    {/* Professional Info */}
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-xs text-gray-600">Subjects</Label>
-                        <div className="flex flex-wrap gap-1 mt-1">
-                          {selectedVerification.profile?.subjects?.map((s: string) => (
-                            <Badge key={s} variant="secondary" className="text-xs">
-                              {s}
-                            </Badge>
-                          ))}
-                        </div>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-gray-600">Rate</Label>
-                        <p className="text-sm">
-                          ₦{Number(
-                            selectedVerification.profile?.hourly_rate ||
-                            selectedVerification.profile?.hourlyRate ||
-                            0
-                          ).toLocaleString()}/session
-                        </p>
-                      </div>
-                    </div>
-
-                    <div>
-                      <Label className="text-xs text-gray-600">Professional Bio</Label>
-                      <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap line-clamp-4">
-                        {selectedVerification.profile?.bio || 'Not provided'}
+                    <div className="flex-1 min-w-0">
+                      <h2 className="font-semibold text-lg" style={{ color: '#625d9c' }}>
+                        {resolveName(p)}
+                      </h2>
+                      <p className="text-sm text-gray-600">{p?.email}</p>
+                      {p?.phone && <p className="text-sm text-gray-600">{p.phone}</p>}
+                      {p?.location && <p className="text-sm text-gray-500">{p.location}</p>}
+                      <p className="text-xs text-gray-400 mt-1">
+                        Applied {new Date(selected.submittedAt).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })}
                       </p>
                     </div>
+                  </div>
 
-                    <div className="grid md:grid-cols-2 gap-4 pt-4 border-t">
-                      <div>
-                        <Label className="text-xs text-gray-600">Experience</Label>
-                        <p className="text-sm">
-                          {selectedVerification.profile?.experience_years ||
-                            selectedVerification.profile?.experienceYears ||
-                            0} years
-                        </p>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-gray-600">Location</Label>
-                        <p className="text-sm">
-                          {selectedVerification.profile?.location || 'Not specified'}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="grid md:grid-cols-2 gap-4">
-                      <div>
-                        <Label className="text-xs text-gray-600">DBS Checked</Label>
-                        <Badge
-                          variant={selectedVerification.profile?.dbsChecked || selectedVerification.profile?.dbs_checked ? 'default' : 'outline'}
-                          className={selectedVerification.profile?.dbsChecked || selectedVerification.profile?.dbs_checked ? 'bg-green-600' : ''}
-                        >
-                          {selectedVerification.profile?.dbsChecked || selectedVerification.profile?.dbs_checked ? 'Yes' : 'No'}
-                        </Badge>
-                      </div>
-                      <div>
-                        <Label className="text-xs text-gray-600">Insurance</Label>
-                        <Badge
-                          variant={selectedVerification.profile?.hasInsurance || selectedVerification.profile?.has_insurance ? 'default' : 'outline'}
-                          className={selectedVerification.profile?.hasInsurance || selectedVerification.profile?.has_insurance ? 'bg-green-600' : ''}
-                        >
-                          {selectedVerification.profile?.hasInsurance || selectedVerification.profile?.has_insurance ? 'Yes' : 'No'}
-                        </Badge>
-                      </div>
-                    </div>
-                  </TabsContent>
-
-                  {/* Documents Tab */}
-                  <TabsContent value="documents" className="overflow-y-auto flex-1 space-y-3 mt-4">
-                    <div className="space-y-2">
-                      {selectedVerification.profile?.documents?.photo && (
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start"
-                          onClick={() => viewDocument(selectedVerification.userId, 'photo')}
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          Profile Photo
-                          {selectedVerification.documentStatus?.photo === 'verified' && (
-                            <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
-                          )}
-                        </Button>
-                      )}
-
-                      {selectedVerification.profile?.documents?.idDocument && (
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start"
-                          onClick={() => viewDocument(selectedVerification.userId, 'id')}
-                        >
-                          <FileText className="w-4 h-4 mr-2" />
-                          ID Document (KYC)
-                          {selectedVerification.documentStatus?.id === 'verified' && (
-                            <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
-                          )}
-                        </Button>
-                      )}
-
-                      {selectedVerification.profile?.documents?.dbsDocument && (
-                        <Button
-                          variant="outline"
-                          className="w-full justify-start"
-                          onClick={() => viewDocument(selectedVerification.userId, 'dbs')}
-                        >
-                          <Shield className="w-4 h-4 mr-2" />
-                          DBS Certificate
-                          {selectedVerification.documentStatus?.dbs === 'verified' && (
-                            <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
-                          )}
-                        </Button>
-                      )}
-
-                      {!selectedVerification.profile?.documents?.photo &&
-                        !selectedVerification.profile?.documents?.idDocument &&
-                        !selectedVerification.profile?.documents?.dbsDocument && (
-                        <p className="text-sm text-gray-500 text-center py-4">
-                          No documents uploaded
-                        </p>
-                      )}
-                    </div>
-                  </TabsContent>
-
-                  {/* Review Tab */}
-                  <TabsContent value="review" className="overflow-y-auto flex-1 space-y-4 mt-4">
+                  {/* Subjects */}
+                  {p?.subjects?.length > 0 && (
                     <div>
-                      <Label>Decision</Label>
-                      <Select
-                        value={reviewData.action}
-                        onValueChange={(value) =>
-                          setReviewData({ ...reviewData, action: value })
-                        }
-                      >
-                        <SelectTrigger className="mt-2">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="approve">
-                            <span className="flex items-center">
-                              <CheckCircle className="w-4 h-4 mr-2 text-green-600" />
-                              Approve
-                            </span>
-                          </SelectItem>
-                          <SelectItem value="reject">
-                            <span className="flex items-center">
-                              <XCircle className="w-4 h-4 mr-2 text-red-600" />
-                              Reject
-                            </span>
-                          </SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <Label className="text-xs text-gray-500">Subjects</Label>
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {p.subjects.map((s: string) => (
+                          <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
+                        ))}
+                      </div>
                     </div>
+                  )}
 
-                    {reviewData.action === 'approve' && (
-                      <>
-                        <div>
-                          <Label>KYC Status</Label>
-                          <Select
-                            value={reviewData.kycStatus}
-                            onValueChange={(value) =>
-                              setReviewData({ ...reviewData, kycStatus: value })
-                            }
-                          >
-                            <SelectTrigger className="mt-2">
-                              <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                              <SelectItem value="verified">Verified</SelectItem>
-                              <SelectItem value="pending">Pending</SelectItem>
-                              <SelectItem value="rejected">Rejected</SelectItem>
-                            </SelectContent>
-                          </Select>
-                        </div>
+                  {/* Bio */}
+                  <div>
+                    <Label className="text-xs text-gray-500">Professional Bio</Label>
+                    <p className="text-sm text-gray-700 mt-1 whitespace-pre-wrap">
+                      {p?.bio || <span className="italic text-gray-400">Not provided</span>}
+                    </p>
+                  </div>
 
-                        {selectedVerification.profile?.hasDbsCheck && (
+                  {/* Qualifications */}
+                  {p?.qualifications && (
+                    <div>
+                      <Label className="text-xs text-gray-500">Qualifications</Label>
+                      <p className="text-sm text-gray-700 mt-1">{p.qualifications}</p>
+                    </div>
+                  )}
+
+                  {/* Stats row */}
+                  <div className="grid grid-cols-2 gap-3 pt-3 border-t">
+                    <div>
+                      <Label className="text-xs text-gray-500">Experience</Label>
+                      <p className="text-sm mt-0.5">
+                        {p?.experience_years ?? p?.experienceYears ?? '—'} yrs
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500">Teaching Format</Label>
+                      <p className="text-sm mt-0.5">
+                        {p?.teaching_format || p?.teachingFormat || '—'}
+                      </p>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500">DBS Checked</Label>
+                      <Badge
+                        className={`mt-0.5 ${p?.dbsChecked || p?.dbs_checked ? 'bg-green-600 text-white' : ''}`}
+                        variant={p?.dbsChecked || p?.dbs_checked ? 'default' : 'outline'}
+                      >
+                        {p?.dbsChecked || p?.dbs_checked ? 'Yes' : 'No'}
+                      </Badge>
+                    </div>
+                    <div>
+                      <Label className="text-xs text-gray-500">Insurance</Label>
+                      <Badge
+                        className={`mt-0.5 ${p?.hasInsurance || p?.has_insurance ? 'bg-green-600 text-white' : ''}`}
+                        variant={p?.hasInsurance || p?.has_insurance ? 'default' : 'outline'}
+                      >
+                        {p?.hasInsurance || p?.has_insurance ? 'Yes' : 'No'}
+                      </Badge>
+                    </div>
+                  </div>
+                </TabsContent>
+
+                {/* ── Documents ───────────────────────────────────────────── */}
+                <TabsContent value="documents" className="overflow-y-auto flex-1 px-6 py-4 space-y-3 mt-0">
+                  <p className="text-xs text-gray-500 mb-3">
+                    Click a document to open it in a new tab. Documents expire after 1 hour.
+                  </p>
+
+                  {hasPhoto && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-3"
+                      onClick={() => viewDocument(selected.userId, 'photo')}
+                    >
+                      <User className="w-4 h-4 text-purple-500" />
+                      Profile Photo
+                      <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
+                    </Button>
+                  )}
+
+                  {hasDbs && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-3"
+                      onClick={() => viewDocument(selected.userId, 'dbs')}
+                    >
+                      <Shield className="w-4 h-4 text-blue-500" />
+                      DBS Certificate
+                      <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
+                    </Button>
+                  )}
+
+                  {hasInsurance && (
+                    <Button
+                      variant="outline"
+                      className="w-full justify-start gap-3"
+                      onClick={() => viewDocument(selected.userId, 'insurance')}
+                    >
+                      <FileText className="w-4 h-4 text-green-500" />
+                      Insurance Document
+                      <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
+                    </Button>
+                  )}
+
+                  {selected.documents?.qualifications?.length > 0 && (
+                    <div className="rounded-lg border p-3 bg-gray-50">
+                      <p className="text-xs font-medium text-gray-600 mb-1">Qualification Certificates</p>
+                      {selected.documents.qualifications.map((url: string, i: number) => (
+                        <button
+                          key={i}
+                          onClick={() => window.open(url, '_blank')}
+                          className="text-sm text-blue-600 underline block"
+                        >
+                          Certificate {i + 1}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+
+                  {!hasPhoto && !hasDbs && !hasInsurance && !selected.documents?.qualifications?.length && (
+                    <div className="text-center py-10">
+                      <FileText className="w-10 h-10 mx-auto text-gray-300 mb-3" />
+                      <p className="text-sm text-gray-500">No documents uploaded by this tutor</p>
+                    </div>
+                  )}
+                </TabsContent>
+
+                {/* ── Review ──────────────────────────────────────────────── */}
+                <TabsContent value="review" className="overflow-y-auto flex-1 px-6 py-4 space-y-4 mt-0">
+                  {showHistory && selected.status !== 'pending' ? (
+                    <Alert className="bg-blue-50 border-blue-200">
+                      <AlertCircle className="h-4 w-4 text-blue-600" />
+                      <AlertDescription className="text-blue-800">
+                        This application has already been{' '}
+                        <strong>{selected.status === 'verified' ? 'approved' : 'rejected'}</strong>. Switch to
+                        Pending view to review new applications.
+                      </AlertDescription>
+                    </Alert>
+                  ) : (
+                    <>
+                      <div>
+                        <Label className="text-sm font-medium">Decision</Label>
+                        <Select
+                          value={reviewData.action}
+                          onValueChange={(v) => setReviewData((d) => ({ ...d, action: v }))}
+                        >
+                          <SelectTrigger className="mt-2">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="approve">
+                              <span className="flex items-center gap-2">
+                                <CheckCircle className="w-4 h-4 text-green-600" /> Approve
+                              </span>
+                            </SelectItem>
+                            <SelectItem value="reject">
+                              <span className="flex items-center gap-2">
+                                <XCircle className="w-4 h-4 text-red-600" /> Reject
+                              </span>
+                            </SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+
+                      {reviewData.action === 'approve' && (
+                        <div className="grid grid-cols-2 gap-3">
                           <div>
-                            <Label>DBS Status</Label>
+                            <Label className="text-sm font-medium">KYC Status</Label>
                             <Select
-                              value={reviewData.dbsStatus}
-                              onValueChange={(value) =>
-                                setReviewData({ ...reviewData, dbsStatus: value })
-                              }
+                              value={reviewData.kycStatus}
+                              onValueChange={(v) => setReviewData((d) => ({ ...d, kycStatus: v }))}
                             >
                               <SelectTrigger className="mt-2">
                                 <SelectValue />
@@ -886,111 +687,158 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
                               <SelectContent>
                                 <SelectItem value="verified">Verified</SelectItem>
                                 <SelectItem value="pending">Pending</SelectItem>
-                                <SelectItem value="rejected">Rejected</SelectItem>
                               </SelectContent>
                             </Select>
                           </div>
+                          {(p?.dbsChecked || p?.dbs_checked) && (
+                            <div>
+                              <Label className="text-sm font-medium">DBS Status</Label>
+                              <Select
+                                value={reviewData.dbsStatus}
+                                onValueChange={(v) => setReviewData((d) => ({ ...d, dbsStatus: v }))}
+                              >
+                                <SelectTrigger className="mt-2">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="verified">Verified</SelectItem>
+                                  <SelectItem value="pending">Pending</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {reviewData.action === 'reject' && (
+                        <div>
+                          <Label className="text-sm font-medium">Rejection Reason</Label>
+                          <Textarea
+                            value={reviewData.rejectionReason}
+                            onChange={(e) => setReviewData((d) => ({ ...d, rejectionReason: e.target.value }))}
+                            placeholder="Provide a clear, detailed reason. The tutor will receive this in an email and can use it to improve their application."
+                            className="mt-2"
+                            rows={5}
+                          />
+                        </div>
+                      )}
+
+                      <Alert className={reviewData.action === 'approve' ? 'bg-green-50 border-green-200' : 'bg-red-50 border-red-200'}>
+                        <AlertDescription className={`text-sm ${reviewData.action === 'approve' ? 'text-green-800' : 'text-red-800'}`}>
+                          {reviewData.action === 'approve'
+                            ? 'The tutor will be activated immediately and receive a congratulatory email.'
+                            : 'The tutor will receive a rejection email with the reason you provide above.'}
+                        </AlertDescription>
+                      </Alert>
+
+                      <Button
+                        onClick={handleReview}
+                        disabled={reviewing}
+                        className="w-full h-11 text-white font-semibold"
+                        style={{ backgroundColor: reviewData.action === 'approve' ? '#5d9827' : '#dc2626' }}
+                      >
+                        {reviewing
+                          ? 'Processing…'
+                          : reviewData.action === 'approve'
+                          ? '✓ Approve Tutor'
+                          : '✗ Reject Application'}
+                      </Button>
+                    </>
+                  )}
+                </TabsContent>
+
+                {/* ── Audit ───────────────────────────────────────────────── */}
+                <TabsContent value="audit" className="overflow-y-auto flex-1 px-6 py-4 space-y-3 mt-0">
+                  <div className="space-y-3">
+                    <div className="rounded-lg border p-3 bg-gray-50">
+                      <p className="text-xs text-gray-500 font-medium">Current Status</p>
+                      <div className="flex items-center gap-2 mt-1">
+                        {selected.status === 'verified' && (
+                          <Badge className="bg-green-600 text-white">Approved</Badge>
                         )}
-                      </>
-                    )}
-
-                    {reviewData.action === 'reject' && (
-                      <div>
-                        <Label>Rejection Reason</Label>
-                        <Textarea
-                          value={reviewData.rejectionReason}
-                          onChange={(e) =>
-                            setReviewData({
-                              ...reviewData,
-                              rejectionReason: e.target.value,
-                            })
-                          }
-                          placeholder="Provide detailed reason. Tutor will see this and can appeal."
-                          className="mt-2"
-                          rows={5}
-                        />
+                        {selected.status === 'rejected' && (
+                          <Badge variant="destructive">Rejected</Badge>
+                        )}
+                        {(!selected.status || selected.status === 'pending') && (
+                          <Badge variant="secondary">Pending Review</Badge>
+                        )}
                       </div>
-                    )}
+                    </div>
 
-                    <Alert className="bg-blue-50 border-blue-200">
-                      <AlertTriangle className="h-4 w-4 text-blue-600" />
-                      <AlertDescription className="text-blue-800 text-sm">
-                        {reviewData.action === 'approve'
-                          ? 'This tutor will be activated after approval.'
-                          : 'This tutor will receive the rejection reason.'}
-                      </AlertDescription>
-                    </Alert>
-
-                    <Button
-                      onClick={handleReview}
-                      disabled={reviewing}
-                      className="w-full h-11 text-white font-semibold"
-                      style={{
-                        backgroundColor:
-                          reviewData.action === 'approve' ? '#5d9827' : '#dc2626',
-                      }}
-                    >
-                      {reviewing
-                        ? 'Processing...'
-                        : reviewData.action === 'approve'
-                        ? 'Approve Tutor'
-                        : 'Reject Application'}
-                    </Button>
-                  </TabsContent>
-
-                  {/* Audit Tab */}
-                  <TabsContent value="audit" className="overflow-y-auto flex-1 space-y-3 mt-4">
-                    {selectedVerification.status && (
-                      <div className="border rounded p-3 bg-gray-50">
-                        <p className="text-sm font-medium">Current Status</p>
-                        <p className="text-lg font-semibold capitalize">
-                          {selectedVerification.status}
+                    {selected.reviewedAt && (
+                      <div className="rounded-lg border p-3 bg-gray-50">
+                        <p className="text-xs text-gray-500 font-medium">Reviewed At</p>
+                        <p className="text-sm mt-1">
+                          {new Date(selected.reviewedAt).toLocaleString('en-GB', {
+                            day: 'numeric', month: 'long', year: 'numeric',
+                            hour: '2-digit', minute: '2-digit',
+                          })}
                         </p>
                       </div>
                     )}
 
-                    {selectedVerification.reviewer && (
-                      <div className="border rounded p-3 bg-gray-50">
-                        <p className="text-sm font-medium">Reviewed By</p>
-                        <p className="text-sm">{selectedVerification.reviewer}</p>
+                    {selected.reviewer && (
+                      <div className="rounded-lg border p-3 bg-gray-50">
+                        <p className="text-xs text-gray-500 font-medium">Reviewed By</p>
+                        <p className="text-sm mt-1 font-mono text-gray-700">{selected.reviewer}</p>
                       </div>
                     )}
 
-                    {selectedVerification.reviewedAt && (
-                      <div className="border rounded p-3 bg-gray-50">
-                        <p className="text-sm font-medium">Review Date</p>
-                        <p className="text-sm">
-                          {new Date(selectedVerification.reviewedAt).toLocaleString()}
-                        </p>
+                    <div className="rounded-lg border p-3 bg-gray-50">
+                      <p className="text-xs text-gray-500 font-medium">Submitted At</p>
+                      <p className="text-sm mt-1">
+                        {new Date(selected.submittedAt).toLocaleString('en-GB', {
+                          day: 'numeric', month: 'long', year: 'numeric',
+                          hour: '2-digit', minute: '2-digit',
+                        })}
+                      </p>
+                    </div>
+
+                    {selected.kycStatus && (
+                      <div className="rounded-lg border p-3 bg-gray-50">
+                        <p className="text-xs text-gray-500 font-medium">KYC / DBS</p>
+                        <div className="flex gap-2 mt-1">
+                          <Badge variant={selected.kycStatus === 'verified' ? 'default' : 'secondary'}
+                            className={selected.kycStatus === 'verified' ? 'bg-green-600 text-white' : ''}>
+                            KYC: {selected.kycStatus}
+                          </Badge>
+                          {selected.dbsStatus && (
+                            <Badge variant={selected.dbsStatus === 'verified' ? 'default' : 'secondary'}
+                              className={selected.dbsStatus === 'verified' ? 'bg-green-600 text-white' : ''}>
+                              DBS: {selected.dbsStatus}
+                            </Badge>
+                          )}
+                        </div>
                       </div>
                     )}
 
-                    {selectedVerification.rejectionReason && (
-                      <div className="border rounded p-3 bg-red-50 border-red-200">
-                        <p className="text-sm font-medium text-red-800">Rejection Reason</p>
-                        <p className="text-sm text-red-700 mt-1 whitespace-pre-wrap">
-                          {selectedVerification.rejectionReason}
-                        </p>
+                    {selected.rejectionReason && (
+                      <div className="rounded-lg border border-red-200 p-3 bg-red-50">
+                        <p className="text-xs text-red-700 font-medium">Rejection Reason</p>
+                        <p className="text-sm text-red-800 mt-1 whitespace-pre-wrap">{selected.rejectionReason}</p>
                       </div>
                     )}
 
-                    {!selectedVerification.status && (
-                      <p className="text-sm text-gray-500 text-center py-4">
-                        No audit history yet
+                    {!selected.status && !selected.reviewedAt && (
+                      <p className="text-sm text-gray-400 text-center py-6">
+                        No audit history yet — this application is still pending.
                       </p>
                     )}
-                  </TabsContent>
-                </Tabs>
-              </Card>
-            ) : (
-              <Card className="p-12 text-center">
-                <FileText className="w-16 h-16 mx-auto text-gray-300 mb-4" />
-                <p className="text-gray-500">
-                  Select a verification from the list to review
+                  </div>
+                </TabsContent>
+              </Tabs>
+            </Card>
+          ) : (
+            <Card className="flex items-center justify-center" style={{ minHeight: 400 }}>
+              <div className="text-center p-12">
+                <FileText className="w-14 h-14 mx-auto text-gray-300 mb-4" />
+                <p className="text-gray-500 font-medium">Select an application to review</p>
+                <p className="text-sm text-gray-400 mt-1">
+                  Choose a tutor from the list on the left
                 </p>
-              </Card>
-            )}
-          </div>
+              </div>
+            </Card>
+          )}
         </div>
       </div>
     </div>

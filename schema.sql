@@ -42,7 +42,8 @@ CREATE TABLE IF NOT EXISTS bookings (
   payment_status TEXT NOT NULL DEFAULT 'paid',
   meet_link      TEXT,
   calendar_event_id TEXT,
-  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS bookings_tutor_date    ON bookings (tutor_id, date);

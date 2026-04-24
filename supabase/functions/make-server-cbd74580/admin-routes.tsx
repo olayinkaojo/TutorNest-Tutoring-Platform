@@ -1578,6 +1578,130 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
     }
   });
 
+  // Verification metrics
+  app.get('/make-server-cbd74580/admin/verifications/metrics', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+      const allUsers = await kv.getByPrefix('user:');
+      const tutors = allUsers.filter((u: any) => u.role === 'tutor');
+
+      const pending  = tutors.filter((u: any) => u.verificationStatus === 'pending').length;
+      const approved = tutors.filter((u: any) => u.verificationStatus === 'verified').length;
+      const rejected = tutors.filter((u: any) => u.verificationStatus === 'rejected').length;
+      const total    = approved + rejected;
+      const approvalRate = total > 0 ? (approved / total) * 100 : 0;
+
+      // Average hours from submission to review
+      const reviewedTutors = tutors.filter((u: any) =>
+        u.verificationStatus === 'verified' || u.verificationStatus === 'rejected'
+      );
+      let avgReviewTimeHours = 0;
+      if (reviewedTutors.length > 0) {
+        const times = await Promise.all(
+          reviewedTutors.map(async (tutor: any) => {
+            const v = await kv.get(`verification:${tutor.id || tutor.userId}`) as any;
+            if (!v?.reviewedAt || !tutor.createdAt) return null;
+            return (new Date(v.reviewedAt).getTime() - new Date(tutor.createdAt).getTime()) / (1000 * 60 * 60);
+          })
+        );
+        const valid = times.filter((t): t is number => t !== null && t > 0);
+        if (valid.length > 0) avgReviewTimeHours = valid.reduce((a, b) => a + b, 0) / valid.length;
+      }
+
+      // Pending tutors with no photo and no DBS cert
+      const pendingTutors = tutors.filter((u: any) => u.verificationStatus === 'pending');
+      const documentIssues = pendingTutors.filter((u: any) =>
+        !u.photo_url && !u.photoUrl && !u.dbsCertificateUrl
+      ).length;
+
+      return c.json({
+        metrics: {
+          total_pending: pending,
+          total_approved: approved,
+          total_rejected: rejected,
+          approval_rate: approvalRate,
+          avg_review_time_hours: avgReviewTimeHours,
+          document_issues: documentIssues,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching verification metrics:', error);
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
+  // Verification history (approved + rejected)
+  app.get('/make-server-cbd74580/admin/verifications/history', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+      const allUsers = await kv.getByPrefix('user:');
+      const reviewedTutors = allUsers.filter((u: any) =>
+        u.role === 'tutor' &&
+        (u.verificationStatus === 'verified' || u.verificationStatus === 'rejected')
+      );
+
+      const verifications = [];
+      for (const tutor of reviewedTutors) {
+        const tutorId = tutor.id || tutor.userId;
+        const verification = await kv.get(`verification:${tutorId}`) as any;
+        const resolvedName =
+          tutor.full_name || tutor.fullName || tutor.name ||
+          `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim() || 'Unknown Tutor';
+
+        verifications.push({
+          userId: tutorId,
+          submittedAt: tutor.createdAt,
+          status: tutor.verificationStatus,
+          reviewer: verification?.reviewedBy || tutor.verifiedBy || tutor.rejectedBy || null,
+          reviewedAt: verification?.reviewedAt || tutor.verifiedAt || tutor.rejectedAt || null,
+          rejectionReason: tutor.rejectionReason || null,
+          kycStatus: verification?.kycStatus || (tutor.verificationStatus === 'verified' ? 'verified' : 'rejected'),
+          dbsStatus: verification?.dbsStatus || (tutor.verificationStatus === 'verified' ? 'verified' : 'rejected'),
+          documents: {
+            dbs: tutor.dbsCertificateUrl || null,
+            qualifications: tutor.qualificationCertificates || [],
+            insurance: tutor.insuranceDocumentUrl || null,
+          },
+          profile: {
+            ...tutor,
+            fullName: resolvedName,
+            full_name: resolvedName,
+            email: tutor.email,
+            phone: tutor.phone || tutor.phone_number || '',
+            location: tutor.location || '',
+            bio: tutor.bio || '',
+            qualifications: tutor.qualifications || '',
+            subjects: tutor.subjects || [],
+            experience_years: tutor.experience_years ?? tutor.experienceYears ?? null,
+            experienceYears: tutor.experience_years ?? tutor.experienceYears ?? null,
+            dbs_checked: tutor.dbs_checked === true || tutor.dbsChecked === true,
+            dbsChecked: tutor.dbs_checked === true || tutor.dbsChecked === true,
+            has_insurance: tutor.has_insurance === true || tutor.hasInsurance === true,
+            hasInsurance: tutor.has_insurance === true || tutor.hasInsurance === true,
+            photo_url: tutor.photo_url || tutor.photoUrl || null,
+            photoUrl: tutor.photo_url || tutor.photoUrl || null,
+          },
+        });
+      }
+
+      verifications.sort((a, b) =>
+        new Date(b.reviewedAt || b.submittedAt).getTime() -
+        new Date(a.reviewedAt || a.submittedAt).getTime()
+      );
+
+      return c.json({ verifications });
+    } catch (error: any) {
+      console.error('Error fetching verification history:', error);
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
   // Review verification
   app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) => {
     try {
@@ -1611,6 +1735,22 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       await kv.set(`user:${tutorId}`, tutor);
+
+      // Keep the role-specific profile in sync so that switching roles doesn't
+      // revert the verification status back to 'pending'.
+      const tutorRoleProfile = await kv.get(`profile_tutor_${tutorId}`) as any;
+      if (tutorRoleProfile) {
+        if (action === 'approve') {
+          tutorRoleProfile.verificationStatus = 'verified';
+          tutorRoleProfile.verifiedAt = tutor.verifiedAt;
+          tutorRoleProfile.verifiedBy = adminId;
+        } else if (action === 'reject') {
+          tutorRoleProfile.verificationStatus = 'rejected';
+          tutorRoleProfile.rejectionReason = rejectionReason;
+          tutorRoleProfile.rejectedAt = tutor.rejectedAt;
+        }
+        await kv.set(`profile_tutor_${tutorId}`, tutorRoleProfile);
+      }
 
       // Update or create verification record
       const verificationId = `verification:${tutorId}`;

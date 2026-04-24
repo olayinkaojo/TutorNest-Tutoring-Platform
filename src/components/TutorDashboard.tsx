@@ -176,7 +176,7 @@ export function TutorDashboard({
     const hasSeenVerificationCongrats = localStorage.getItem(verificationCongratsKey);
 
     // Check if profile shows verification is complete
-    if (!hasSeenVerificationCongrats && profile.verificationStatus === 'approved') {
+    if (!hasSeenVerificationCongrats && (profile.verificationStatus === 'verified' || profile.verificationStatus === 'approved')) {
       setShowVerificationCongrats(true);
       localStorage.setItem(verificationCongratsKey, 'true');
     }
@@ -725,8 +725,8 @@ export function TutorDashboard({
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 py-4 lg:py-8 pb-20 lg:pb-8">
-        {/* Verification Status Alert */}
-        {verificationInfo && (
+        {/* Verification Status Alert - hidden once verified (congrats card handles that) */}
+        {verificationInfo && !isVerified && (
           <Alert className={`mb-4 lg:mb-6 ${verificationInfo.bgColor} ${verificationInfo.borderColor}`}>
             <verificationInfo.icon className={`h-4 w-4 ${verificationInfo.color}`} />
             <AlertDescription className="text-gray-800">
@@ -892,8 +892,8 @@ export function TutorDashboard({
           </Card>
         )}
 
-        {/* Verification Congratulations Card - Show when tutor is verified */}
-        {session && profile.verificationStatus === 'approved' && showVerificationCongrats && (
+        {/* Verification Congratulations Card - Show once when tutor is verified */}
+        {session && (profile.verificationStatus === 'verified' || profile.verificationStatus === 'approved') && showVerificationCongrats && (
           <Card className="mb-6 border-green-200 bg-green-50">
             <CardContent className="pt-6">
               <div className="flex flex-col md:flex-row items-start md:items-center gap-4">

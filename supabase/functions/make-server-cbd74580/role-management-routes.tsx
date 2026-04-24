@@ -150,15 +150,12 @@ app.post('/add-role', async (c) => {
         userProfile.fullName || userProfile.name || 'Tutor',
         `https://tutornest.org/tutor-dashboard`
       );
-      // Small delay to avoid overwhelming the email service
-      setTimeout(async () => {
-        await sendEmail({
-          to: userProfile.email,
-          subject: verificationEmailData.subject,
-          html: verificationEmailData.html,
-          replyTo: 'support@tutornest.org'
-        });
-      }, 1000);
+      await sendEmail({
+        to: userProfile.email,
+        subject: verificationEmailData.subject,
+        html: verificationEmailData.html,
+        replyTo: 'support@tutornest.org'
+      });
     }
 
     return c.json({
