@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
+import { sendEmail, emailTemplates } from './email-service.tsx';
 
 const app = new Hono();
 
@@ -279,10 +280,58 @@ app.post('/bookings', async (c) => {
 
     await kv.set(`booking:${bookingId}`, booking);
 
+    // Send confirmation emails to parent and tutor
+    const formattedDate = new Date(`${date}T12:00:00+01:00`).toLocaleDateString('en-GB', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      timeZone: 'Africa/Lagos',
+    });
+    const formattedTime = `${startTime} WAT`;
+    const subject = notes || 'Tutoring Session'; // Use notes as subject if provided
+
+    // Send email to parent
+    if (parentEmail) {
+      const parentEmailData = emailTemplates.bookingConfirmation(
+        parent?.fullName || parent?.name || 'Parent',
+        studentName,
+        tutorName,
+        formattedDate,
+        formattedTime,
+        subject,
+        meetLink || 'https://meet.google.com/new'
+      );
+      await sendEmail({
+        to: parentEmail,
+        subject: parentEmailData.subject,
+        html: parentEmailData.html,
+        replyTo: tutorEmail,
+      });
+    }
+
+    // Send email to tutor
+    if (tutorEmail) {
+      const tutorEmailData = emailTemplates.tutorBookingNotification(
+        tutorName,
+        parent?.fullName || parent?.name || 'Parent',
+        studentName,
+        formattedDate,
+        formattedTime,
+        subject,
+        `https://tutornest.org/dashboard?tab=bookings&bookingId=${bookingId}` // Dashboard link to confirm
+      );
+      await sendEmail({
+        to: tutorEmail,
+        subject: tutorEmailData.subject,
+        html: tutorEmailData.html,
+      });
+    }
+
     return c.json({
       success: true,
       booking,
-      message: 'Booking created successfully.'
+      message: 'Booking created successfully. Confirmation emails sent.'
     });
   } catch (error: any) {
     console.error('Error creating booking:', error);
