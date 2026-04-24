@@ -79,6 +79,38 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         return c.json({ error: 'Failed to upload file' }, 500);
       }
 
+      // Get uploader's name
+      let uploadedByName = 'User';
+      try {
+        const uploaderProfile = await kv.get(`user:${userId}`) as any;
+        if (uploaderProfile) {
+          if (uploaderProfile.full_name) uploadedByName = uploaderProfile.full_name;
+          else if (uploaderProfile.firstName && uploaderProfile.lastName) 
+            uploadedByName = `${uploaderProfile.firstName} ${uploaderProfile.lastName}`;
+          else if (uploaderProfile.firstName) uploadedByName = uploaderProfile.firstName;
+          else if (uploaderProfile.email) uploadedByName = uploaderProfile.email.split('@')[0];
+        }
+      } catch (e) {
+        console.error('Error fetching uploader profile:', e);
+      }
+
+      // Get shared with user's name if applicable
+      let sharedWithName = '';
+      if (sharedWithId && sharedWithId !== '') {
+        try {
+          const sharedWithProfile = await kv.get(`user:${sharedWithId}`) as any;
+          if (sharedWithProfile) {
+            if (sharedWithProfile.full_name) sharedWithName = sharedWithProfile.full_name;
+            else if (sharedWithProfile.firstName && sharedWithProfile.lastName)
+              sharedWithName = `${sharedWithProfile.firstName} ${sharedWithProfile.lastName}`;
+            else if (sharedWithProfile.firstName) sharedWithName = sharedWithProfile.firstName;
+            else if (sharedWithProfile.email) sharedWithName = sharedWithProfile.email.split('@')[0];
+          }
+        } catch (e) {
+          console.error('Error fetching shared with profile:', e);
+        }
+      }
+
       // Create document metadata
       const document = {
         id: `document:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -90,11 +122,14 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         filePath: uploadData.path,
         bucketName,
         uploadedBy: userId,
+        uploadedByName,
         uploadedByRole,
         documentType,
         relatedToId,
         relatedToType,
-        sharedWithId,   // explicit recipient (child id, tutor id, etc.)
+        sharedWithId,
+        sharedWithName,
+        sharedWithType: relatedToType,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -117,6 +152,23 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       return c.json({ error: error.message || 'Internal server error' }, 500);
     }
   });
+
+  // Helper function to get profile name
+  const getProfileName = async (userId: string): Promise<string> => {
+    try {
+      const profile = await kv.get(`user:${userId}`) as any;
+      if (profile) {
+        // Try different name formats
+        if (profile.full_name) return profile.full_name;
+        if (profile.firstName && profile.lastName) return `${profile.firstName} ${profile.lastName}`;
+        if (profile.firstName) return profile.firstName;
+        if (profile.email) return profile.email.split('@')[0]; // fallback to email prefix
+      }
+    } catch (e) {
+      console.error('Error getting profile name:', e);
+    }
+    return 'User'; // ultimate fallback
+  };
 
   // Get documents for a user
   app.get('/make-server-cbd74580/documents', async (c) => {
@@ -151,12 +203,30 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         userDocuments = userDocuments.filter((doc: any) => doc.relatedToId === relatedToId);
       }
 
+      // Enrich documents with profile names
+      const enrichedDocuments = await Promise.all(userDocuments.map(async (doc: any) => {
+        const enriched = { ...doc };
+        
+        // Add uploadedByName
+        if (doc.uploadedBy) {
+          enriched.uploadedByName = await getProfileName(doc.uploadedBy);
+        }
+        
+        // Add sharedWithName
+        if (doc.sharedWithId && doc.sharedWithId !== '') {
+          enriched.sharedWithName = await getProfileName(doc.sharedWithId);
+          enriched.sharedWithType = doc.relatedToType; // e.g., 'parent', 'tutor', 'student'
+        }
+        
+        return enriched;
+      }));
+
       // Sort by most recent
-      userDocuments.sort((a: any, b: any) => 
+      enrichedDocuments.sort((a: any, b: any) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
-      return c.json({ documents: userDocuments });
+      return c.json({ documents: enrichedDocuments });
     } catch (error: any) {
       console.error('Error fetching documents:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);

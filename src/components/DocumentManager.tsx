@@ -32,9 +32,13 @@ interface Document {
   bucketName: string;
   uploadedBy: string;
   uploadedByRole: string;
+  uploadedByName?: string;
   documentType: 'assignment' | 'review' | 'resource' | 'other';
   relatedToId: string;
   relatedToType: string;
+  sharedWithId?: string;
+  sharedWithName?: string;
+  sharedWithType?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -87,7 +91,10 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
       for (const b of (data.bookings || [])) {
         if (b.tutorId && !seen.has(b.tutorId)) {
           seen.add(b.tutorId);
-          tutors.push({ id: b.tutorId, name: b.tutorName || 'Tutor', type: 'tutor' });
+          // Use full name if available, fallback to firstName lastName, then generic label
+          const tutorName = b.tutorFullName || b.tutorName || 
+            (b.tutorFirstName ? `${b.tutorFirstName} ${b.tutorLastName || ''}`.trim() : 'Tutor');
+          tutors.push({ id: b.tutorId, name: tutorName, type: 'tutor' });
         }
       }
       setBookedTutors(tutors);
@@ -396,18 +403,18 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
                         <span>{formatFileSize(doc.fileSize)}</span>
                         <span>•</span>
                         <span>{new Date(doc.createdAt + 'T12:00:00+01:00').toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric', month: 'short', year: 'numeric' })}</span>
-                        {(doc as any).sharedWithId && (doc as any).sharedWithId !== '' && (
+                        {doc.sharedWithId && doc.sharedWithId !== '' && doc.sharedWithName && (
                           <>
                             <span>•</span>
                             <span className="text-purple-600 font-medium">
-                              Shared
+                              Shared with {doc.sharedWithName}
                             </span>
                           </>
                         )}
-                        {doc.uploadedBy !== userId && (
+                        {doc.uploadedBy !== userId && doc.uploadedByName && (
                           <>
                             <span>•</span>
-                            <span className="text-blue-600">Received</span>
+                            <span className="text-blue-600">Received from {doc.uploadedByName}</span>
                           </>
                         )}
                       </div>
