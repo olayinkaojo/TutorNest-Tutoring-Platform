@@ -171,6 +171,62 @@ export async function getBookingsByUserId(userId: string): Promise<BookingRow[]>
   }));
 }
 
+/** Returns only bookings where the user is the TUTOR (teaching sessions). */
+export async function getBookingsByTutorId(tutorId: string): Promise<BookingRow[]> {
+  const { data, error } = await db()
+    .from('bookings')
+    .select('*')
+    .eq('tutor_id', tutorId)
+    .order('date', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    paymentId: row.payment_id,
+    planType: row.plan_type,
+    sessionNumber: row.session_number,
+    totalSessions: row.total_sessions,
+    tutorId: row.tutor_id,
+    studentId: row.student_id,
+    userId: row.user_id,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    duration: row.duration,
+    subject: row.subject,
+    status: row.status,
+    paymentStatus: row.payment_status,
+    meetLink: row.meet_link ?? undefined,
+  }));
+}
+
+/** Returns only bookings where the user is the STUDENT (attending sessions). */
+export async function getBookingsByStudentId(studentId: string): Promise<BookingRow[]> {
+  const { data, error } = await db()
+    .from('bookings')
+    .select('*')
+    .eq('student_id', studentId)
+    .order('date', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    paymentId: row.payment_id,
+    planType: row.plan_type,
+    sessionNumber: row.session_number,
+    totalSessions: row.total_sessions,
+    tutorId: row.tutor_id,
+    studentId: row.student_id,
+    userId: row.user_id,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    duration: row.duration,
+    subject: row.subject,
+    status: row.status,
+    paymentStatus: row.payment_status,
+    meetLink: row.meet_link ?? undefined,
+  }));
+}
+
 /** Get a single booking by ID from the database. */
 export async function getBooking(bookingId: string): Promise<BookingRow | null> {
   const { data, error } = await db()

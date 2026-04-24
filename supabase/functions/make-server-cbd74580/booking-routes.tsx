@@ -15,8 +15,10 @@ async function getUserFromToken(accessToken: string | undefined) {
 }
 
 // Get bookings for a user.
-// Supports optional query params: ?studentId=, ?tutorId= (for parent viewing child's bookings)
-// Falls back to the authenticated user's own bookings if no param is provided.
+// Supports role-specific query params:
+//   ?tutorId=<id>   - Get only bookings where user is the TUTOR (teaching sessions)
+//   ?studentId=<id> - Get only bookings where user is the STUDENT (attending sessions)
+//   No params       - Get all bookings involving the authenticated user (all roles)
 app.get('/bookings', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
@@ -31,11 +33,18 @@ app.get('/bookings', async (c) => {
     const { data: { user } } = await supabase.auth.getUser(accessToken);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
-    // If a specific student/tutor ID is requested (e.g. parent viewing child's bookings),
-    // use that — otherwise default to the authenticated user's own ID.
-    const targetId = c.req.query('studentId') || c.req.query('tutorId') || user.id;
-
-    const rawBookings = await db.getBookingsByUserId(targetId);
+    // Fetch bookings based on role context (role-specific filtering)
+    let rawBookings;
+    if (c.req.query('tutorId')) {
+      // Get bookings where user is the TUTOR (teaching sessions)
+      rawBookings = await db.getBookingsByTutorId(c.req.query('tutorId')!);
+    } else if (c.req.query('studentId')) {
+      // Get bookings where user is the STUDENT (attending sessions)
+      rawBookings = await db.getBookingsByStudentId(c.req.query('studentId')!);
+    } else {
+      // Default: Get all bookings involving the authenticated user (all roles)
+      rawBookings = await db.getBookingsByUserId(user.id);
+    }
 
     // Enrich each booking with tutor/student display names and meet link.
     // Collect unique profile IDs, fetch in parallel, then map onto rows.
