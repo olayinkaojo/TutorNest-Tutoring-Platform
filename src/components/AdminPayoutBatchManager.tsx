@@ -32,6 +32,7 @@ import {
   Filter,
 } from 'lucide-react';
 import { formatNaira } from '../utils/currency';
+import { getSupabaseClient } from '../utils/supabase/client';
 import adminAPI from '../utils/admin-api-client';
 
 interface PayoutBatch {
@@ -72,6 +73,7 @@ export function AdminPayoutBatchManager() {
   const [showDetailsDialog, setShowDetailsDialog] = useState(false);
   const [approvalNotes, setApprovalNotes] = useState('');
   const [processing, setProcessing] = useState(false);
+  const supabase = getSupabaseClient();
 
   useEffect(() => {
     fetchPayoutBatches();
