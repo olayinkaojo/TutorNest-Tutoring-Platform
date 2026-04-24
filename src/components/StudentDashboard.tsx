@@ -766,27 +766,46 @@ export function StudentDashboard({
                 <CardContent>
                   {upcomingSessions.length > 0 ? (
                     <div className="space-y-4">
-                      {upcomingSessions.slice(0, 3).map(session => (
-                        <div key={session.id} className="flex items-start gap-4 p-4 border rounded-lg hover:bg-gray-50 transition-colors">
-                          <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#625d9c20' }}>
-                            <BookOpen className="w-5 h-5" style={{ color: '#625d9c' }} />
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <h4 className="mb-1">{session.subject || 'Session'}</h4>
-                            <p className="text-sm text-gray-600 mb-2">with {session.tutorName || 'Tutor'}</p>
-                            <div className="flex flex-wrap items-center gap-2">
-                              <Badge variant="outline" className="text-xs">
-                                <Calendar className="w-3 h-3 mr-1" />
-                                {new Date(session.date).toLocaleDateString()}
-                              </Badge>
-                              <Badge variant="outline" className="text-xs">
-                                <Clock className="w-3 h-3 mr-1" />
-                                {session.time}
-                              </Badge>
+                      {upcomingSessions.slice(0, 3).map(session => {
+                        const hoursUntil = (parseWAT(session.date, session.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
+                        const startingSoon = hoursUntil >= 0 && hoursUntil <= 2;
+                        return (
+                          <div
+                            key={session.id}
+                            className={`flex items-start gap-4 p-4 border rounded-lg transition-colors ${startingSoon ? 'border-green-500 bg-green-50' : 'hover:bg-gray-50'}`}
+                          >
+                            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#625d9c20' }}>
+                              <BookOpen className="w-5 h-5" style={{ color: '#625d9c' }} />
+                            </div>
+                            <div className="flex-1 min-w-0">
+                              <h4 className="mb-1">{session.subject || 'Session'}</h4>
+                              <p className="text-sm text-gray-600 mb-2">with {session.tutorName || 'Tutor'}</p>
+                              <div className="flex flex-wrap items-center gap-2">
+                                <Badge variant="outline" className="text-xs">
+                                  <Calendar className="w-3 h-3 mr-1" />
+                                  {new Date(session.date + 'T12:00:00+01:00').toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric', month: 'short', year: 'numeric' })}
+                                </Badge>
+                                <Badge variant="outline" className="text-xs">
+                                  <Clock className="w-3 h-3 mr-1" />
+                                  {session.startTime} WAT
+                                </Badge>
+                              </div>
+                              {session.googleMeetLink && (
+                                <a
+                                  href={session.googleMeetLink}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-colors"
+                                  style={{ backgroundColor: startingSoon ? '#5d9827' : '#625d9c' }}
+                                >
+                                  <Video className="w-3.5 h-3.5" />
+                                  {startingSoon ? 'Join Now' : 'Join Classroom'}
+                                </a>
+                              )}
                             </div>
                           </div>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                   ) : (
                     <div className="text-center py-12 text-gray-500">
@@ -869,29 +888,45 @@ export function StudentDashboard({
                       <div>
                         <h3 className="mb-4 text-sm uppercase tracking-wider text-gray-500">Upcoming</h3>
                         <div className="space-y-3">
-                          {upcomingSessions.map(session => (
-                            <div key={session.id} className="flex items-start justify-between p-4 border rounded-lg bg-blue-50">
-                              <div className="flex items-start gap-4">
-                                <Avatar>
-                                  <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
-                                    {session.tutorName?.split(' ').map((n: string) => n[0]).join('') || 'T'}
-                                  </AvatarFallback>
-                                </Avatar>
-                                <div>
-                                  <h4 className="mb-1">{session.subject || 'Session'}</h4>
-                                  <p className="text-sm text-gray-600 mb-2">with {session.tutorName || 'Tutor'}</p>
-                                  <div className="flex items-center gap-2">
-                                    <Badge variant="outline">
-                                      {new Date(session.date).toLocaleDateString()} at {session.time}
-                                    </Badge>
-                                    <Badge style={{ backgroundColor: '#3b82f6', color: 'white' }}>
-                                      Upcoming
-                                    </Badge>
+                          {upcomingSessions.map(session => {
+                            const hoursUntil = (parseWAT(session.date, session.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
+                            const startingSoon = hoursUntil >= 0 && hoursUntil <= 2;
+                            return (
+                              <div key={session.id} className={`flex items-start justify-between p-4 border rounded-lg ${startingSoon ? 'border-green-500 bg-green-50' : 'bg-blue-50'}`}>
+                                <div className="flex items-start gap-4 flex-1 min-w-0">
+                                  <Avatar>
+                                    <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
+                                      {session.tutorName?.split(' ').map((n: string) => n[0]).join('') || 'T'}
+                                    </AvatarFallback>
+                                  </Avatar>
+                                  <div className="flex-1 min-w-0">
+                                    <h4 className="mb-1">{session.subject || 'Session'}</h4>
+                                    <p className="text-sm text-gray-600 mb-2">with {session.tutorName || 'Tutor'}</p>
+                                    <div className="flex flex-wrap items-center gap-2 mb-2">
+                                      <Badge variant="outline">
+                                        {new Date(session.date + 'T12:00:00+01:00').toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric', month: 'short' })} at {session.startTime} WAT
+                                      </Badge>
+                                      <Badge style={{ backgroundColor: startingSoon ? '#5d9827' : '#3b82f6', color: 'white' }}>
+                                        {startingSoon ? 'Starting Soon' : 'Upcoming'}
+                                      </Badge>
+                                    </div>
+                                    {session.googleMeetLink && (
+                                      <a
+                                        href={session.googleMeetLink}
+                                        target="_blank"
+                                        rel="noopener noreferrer"
+                                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-colors"
+                                        style={{ backgroundColor: startingSoon ? '#5d9827' : '#625d9c' }}
+                                      >
+                                        <Video className="w-3.5 h-3.5" />
+                                        {startingSoon ? 'Join Now' : 'Join Classroom'}
+                                      </a>
+                                    )}
                                   </div>
                                 </div>
                               </div>
-                            </div>
-                          ))}
+                            );
+                          })}
                         </div>
                       </div>
                     )}

@@ -38,8 +38,6 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { Badge } from './ui/badge';
 import { Bookshop } from './Bookshop';
 import { ContentLibrary } from './ContentLibrary';
-import { CreditsManager } from './CreditsManager';
-import { InvoiceManager } from './InvoiceManager';
 import { SubscriptionsPage } from './SubscriptionsPage';
 import { PaymentMethodManager } from './PaymentMethodManager';
 import { ParentPaymentsDashboard } from './ParentPaymentsDashboard';
@@ -102,8 +100,6 @@ export function ParentDashboard({
     'resources',
     'payments',
     'reviews',
-    'credits',
-    'invoices',
   ]);
 
   useEffect(() => {
@@ -226,8 +222,9 @@ export function ParentDashboard({
         b.status === 'completed'
       ).length;
 
+      // Include confirmed (paid, upcoming) and completed (paid, done) — exclude cancelled refunds
       const totalSpent = filteredBookings
-        .filter((b: any) => b.status === 'completed')
+        .filter((b: any) => b.status === 'completed' || b.status === 'confirmed')
         .reduce((sum: number, b: any) => sum + (parseFloat(b.price) || 0), 0);
 
       setStats({
@@ -384,8 +381,6 @@ export function ParentDashboard({
       'bookshop': 'bookshop',
       'payments': 'payments',
       'reviews': 'reviews',
-      'credits': 'credits',
-      'invoices': 'invoices',
     };
     return mapping[tab] || 'home';
   };
@@ -400,8 +395,6 @@ export function ParentDashboard({
       'bookshop': 'bookshop',
       'payments': 'payments',
       'reviews': 'reviews',
-      'credits': 'credits',
-      'invoices': 'invoices',
     };
     const tabValue = reverseMapping[navId] || 'overview';
     setActiveTab(tabValue);
@@ -706,8 +699,6 @@ export function ParentDashboard({
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
-            <TabsTrigger value="credits">Credits</TabsTrigger>
-            <TabsTrigger value="invoices">Invoices</TabsTrigger>
           </TabsList>
 
           {/* Overview Tab */}
@@ -1035,15 +1026,6 @@ export function ParentDashboard({
             )}
           </TabsContent>
 
-          {/* Credits Tab */}
-          <TabsContent value="credits">
-            <CreditsManager userId={profile.id || profile.userId} />
-          </TabsContent>
-
-          {/* Invoices Tab */}
-          <TabsContent value="invoices">
-            <InvoiceManager userId={profile.id || profile.userId} session={session} />
-          </TabsContent>
         </Tabs>
       </main>
 
