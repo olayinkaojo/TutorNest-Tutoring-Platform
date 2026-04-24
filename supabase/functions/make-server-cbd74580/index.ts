@@ -42,7 +42,7 @@ import tutorSessionReportsRoutes from './tutor-session-reports-routes.tsx';
 import paymentRoutes from './payment-routes.tsx';
 import { upsertProfile, getProfile } from './db.tsx';
 import liveSessionRoutes from './live-session-routes.tsx';
-import payoutRoutes from './payout-routes.tsx';
+import payoutsComplete from './payouts-complete.tsx';
 import { tutorProfileRoutes } from './tutor-profile-routes.tsx';
 // import { videoRoutes } // disabled: uses non-existent Hono Router from './video-routes.tsx';
 // import { screenShareRoutes } // disabled: uses non-existent Hono Router from './screen-share-routes.tsx';
@@ -441,8 +441,8 @@ app.route('/make-server-cbd74580', paymentPlansRoutes);
 // Register live session routes
 app.route('/make-server-cbd74580', liveSessionRoutes);
 
-// Register payout routes
-app.route('/make-server-cbd74580/payouts', payoutRoutes);
+// Register payout routes (tutor payouts dashboard)
+app.route('/make-server-cbd74580/tutor/payouts', payoutsComplete);
 
 // Register invoice routes
 app.route('/make-server-cbd74580/invoices', invoiceRoutes);
