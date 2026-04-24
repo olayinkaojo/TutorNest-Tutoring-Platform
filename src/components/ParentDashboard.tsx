@@ -78,7 +78,11 @@ export function ParentDashboard({
   const [showEditChildDialog, setShowEditChildDialog] = useState(false);
   const [children, setChildren] = useState<any[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(true);
-  const [activeChildId, setActiveChildId] = useState<string | null>(null);
+  // Initialize from localStorage to persist across page refreshes
+  const [activeChildId, setActiveChildId] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    return localStorage.getItem(`tutornest_active_child_${profile.id || profile.userId}`);
+  });
   const [subscriptionTier, setSubscriptionTier] = useState('basic');
   const [isAddingTutorRole, setIsAddingTutorRole] = useState(false);
   const [tutorRoleError, setTutorRoleError] = useState<string | null>(null);
@@ -178,12 +182,23 @@ export function ParentDashboard({
     }
   }, [session]);
 
-  // Set active child when children load
+  // Set active child when children load, persist to localStorage
   useEffect(() => {
-    if (children.length > 0 && !activeChildId) {
-      setActiveChildId(children[0].id);
+    if (children.length > 0) {
+      // Check if current activeChildId still exists in children
+      const childExists = activeChildId && children.some(c => c.id === activeChildId);
+      
+      if (childExists) {
+        // Keep current selection and persist it
+        localStorage.setItem(`tutornest_active_child_${profile.id || profile.userId}`, activeChildId);
+      } else {
+        // Set to first child and persist
+        const firstChildId = children[0].id;
+        setActiveChildId(firstChildId);
+        localStorage.setItem(`tutornest_active_child_${profile.id || profile.userId}`, firstChildId);
+      }
     }
-  }, [children]);
+  }, [children, activeChildId, profile.id, profile.userId]);
 
   // Calculate stats when children data or filter changes
   useEffect(() => {
@@ -310,6 +325,8 @@ export function ParentDashboard({
 
   const handleSwitchChild = (childId: string) => {
     setActiveChildId(childId);
+    // Persist to localStorage
+    localStorage.setItem(`tutornest_active_child_${profile.id || profile.userId}`, childId);
     setBookingsSubTab('book-session'); // reset to booking view when switching child
   };
 

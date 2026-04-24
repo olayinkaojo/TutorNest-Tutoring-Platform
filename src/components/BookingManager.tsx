@@ -160,12 +160,14 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
     setRescheduleDate('');
     setRescheduleTime('');
     setRescheduleSlots([]);
+    setError('');
   };
 
   const loadAvailableSlots = async (date: string) => {
     if (!rescheduleBooking) return;
     setLoadingSlots(true);
     setRescheduleTime('');
+    setError('');
     try {
       const res = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutors/${rescheduleBooking.tutorId}/availability?date=${date}&studentId=${rescheduleBooking.studentId}`,
@@ -174,9 +176,15 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
       if (res.ok) {
         const data = await res.json();
         setRescheduleSlots(data.slots || []);
+      } else {
+        const data = await res.json();
+        setError(data.error || 'Failed to load available slots');
+        setRescheduleSlots([]);
       }
-    } catch (e) {
+    } catch (e: any) {
       console.error('Error loading slots', e);
+      setError('Failed to load available slots. Please try again.');
+      setRescheduleSlots([]);
     } finally {
       setLoadingSlots(false);
     }
@@ -606,6 +614,12 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 pt-2">
+            {error && (
+              <Alert className="bg-red-50 border-red-200">
+                <AlertCircle className="h-4 w-4 text-red-600" />
+                <AlertDescription className="text-red-800">{error}</AlertDescription>
+              </Alert>
+            )}
             {rescheduleBooking && (
               <div className="p-3 bg-gray-50 rounded-lg text-sm text-gray-600">
                 Current: <strong>{bookingDateLabel(rescheduleBooking.date)}</strong> at{' '}
