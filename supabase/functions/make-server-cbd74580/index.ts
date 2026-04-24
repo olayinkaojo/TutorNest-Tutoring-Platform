@@ -2668,7 +2668,35 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
       paymentStatus: 'paid', // In production, integrate with payment gateway
     };
 
+    // Save to KV store
     await kv.set(bookingId, booking);
+
+    // ALSO save to Postgres database for reschedule and other operations
+    const supabaseUrl = Deno.env.get('SUPABASE_URL') ?? '';
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '';
+    const supabase = createClient(supabaseUrl, serviceRoleKey);
+    
+    const { error: dbError } = await supabase
+      .from('bookings')
+      .insert({
+        id: bookingId,
+        user_id: parentId,
+        tutor_id: tutorId,
+        student_id: studentId,
+        date,
+        start_time: startTime,
+        end_time: endTime,
+        duration: 60, // default 1 hour
+        subject: tutorProfile?.subjects?.[0] || 'General',
+        status: 'confirmed',
+        payment_status: 'paid',
+        created_at: new Date().toISOString(),
+      });
+    
+    if (dbError) {
+      console.error('Warning: Failed to save booking to database:', dbError);
+      // Continue anyway - KV store has the booking
+    }
 
     // Create Google Calendar events for both parent and tutor if connected
     const calendarEventPromises = [];

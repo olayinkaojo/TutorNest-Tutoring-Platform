@@ -18,9 +18,13 @@ import {
   CheckCheck,
   Loader2,
 } from 'lucide-react';
-import { projectId } from '../utils/supabase/info';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
 import { Alert, AlertDescription } from './ui/alert';
+import { createClient } from '@supabase/supabase-js';
+
+// Initialize Supabase client for Realtime
+const supabase = createClient(`https://${projectId}.supabase.co`, publicAnonKey);
 
 interface Message {
   id: string;
@@ -75,7 +79,6 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
   const [contactsLoading, setContactsLoading] = useState(false);
   const [startingConv, setStartingConv] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const pollingIntervalRef = useRef<NodeJS.Timeout>();
   const hasInitiatedRef = useRef(false);
 
   // Scroll to bottom when messages change
@@ -105,20 +108,46 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
     }
   }, [initialContactId, conversations]);
 
-  // Load conversations on mount; poll faster (2s) when a conversation is open
+  // Real-time subscription logic
   useEffect(() => {
     loadConversations();
 
-    const interval = selectedConversation ? 2000 : 8000;
-    pollingIntervalRef.current = setInterval(() => {
-      if (selectedConversation) {
-        loadMessages(selectedConversation.id, true);
-      }
-      loadConversations();
-    }, interval);
+    if (!selectedConversation) return;
+
+    // Subscribe to new messages for the selected conversation
+    const messageChannel = supabase
+      .channel(`room:${selectedConversation.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversationId=eq.${selectedConversation.id}`,
+        },
+        (payload) => {
+          const newMessage = payload.new as Message;
+          setMessages((current) => {
+            // Avoid duplicates from optimistic updates
+            if (current.some((m) => m.id === newMessage.id)) return current;
+            return [...current, newMessage];
+          });
+          loadConversations(); // Refresh list to update last message preview
+        }
+      )
+      .subscribe();
+
+    // Subscribe to conversation updates (unread counts, etc.)
+    const convChannel = supabase
+      .channel('conversations_updates')
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => {
+        loadConversations();
+      })
+      .subscribe();
 
     return () => {
-      if (pollingIntervalRef.current) clearInterval(pollingIntervalRef.current);
+      supabase.removeChannel(messageChannel);
+      supabase.removeChannel(convChannel);
     };
   }, [selectedConversation?.id]);
 

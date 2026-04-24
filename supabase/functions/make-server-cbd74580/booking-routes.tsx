@@ -348,14 +348,19 @@ app.post('/bookings/:bookingId/calculate-refund', async (c) => {
     }
 
     const bookingId = c.req.param('bookingId');
-    const booking = await kv.get(`booking:${bookingId}`) as any;
+    
+    // Try Database first, fallback to KV Store
+    let booking = await db.getBooking(bookingId);
+    if (!booking) {
+      booking = await kv.get(`booking:${bookingId}`) as any;
+    }
 
     if (!booking) {
       return c.json({ error: 'Booking not found' }, 404);
     }
 
     if (booking.status !== 'confirmed') {
-      return c.json({ error: 'Booking cannot be cancelled' }, 400);
+      return c.json({ error: 'Only confirmed bookings can have refunds calculated' }, 400);
     }
 
     // Calculate refund based on cancellation policy
@@ -405,7 +410,11 @@ app.post('/bookings/:bookingId/cancel', async (c) => {
     }
 
     const bookingId = c.req.param('bookingId');
-    const booking = await kv.get(`booking:${bookingId}`) as any;
+    
+    let booking = await db.getBooking(bookingId);
+    if (!booking) {
+      booking = await kv.get(`booking:${bookingId}`) as any;
+    }
 
     if (!booking) {
       return c.json({ error: 'Booking not found' }, 404);
@@ -549,7 +558,6 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
           date: newDate,
           start_time: newStartTime,
           end_time: newEndTime,
-          updated_at: new Date().toISOString(),
         })
         .eq('id', bookingId);
 
