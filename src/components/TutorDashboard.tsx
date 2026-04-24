@@ -54,6 +54,7 @@ import { TutorSessionReports } from './TutorSessionReports';
 import { TutorStatsSection } from './tutor/TutorStatsSection';
 import { TutorOverviewTab } from './tutor/TutorOverviewTab';
 import { StudentProgressWidget } from './StudentProgressWidget';
+import { Chatroom } from './Chatroom';
 import tutorAPI from '../utils/tutor-api-client';
 import { parseWAT, bookingDateLabel, formatRawTimeWAT, WAT_TIMEZONE } from '../utils/timezone';
 
@@ -116,6 +117,7 @@ export function TutorDashboard({
   const validTabs = new Set([
     'overview',
     'profile',
+    'messages',
     'invitations',
     'availability',
     'bookings',
@@ -1015,6 +1017,7 @@ export function TutorDashboard({
           <TabsList className="mb-4 hidden lg:inline-flex overflow-x-auto">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
+            <TabsTrigger value="messages">Messages</TabsTrigger>
             <TabsTrigger value="invitations">Invitations</TabsTrigger>
             <TabsTrigger value="availability">Availability</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
@@ -1050,6 +1053,32 @@ export function TutorDashboard({
             )}
           </TabsContent>
 
+          <TabsContent value="messages">
+            {session && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Messages</CardTitle>
+                  <CardDescription>Communicate with parents and students</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Chatroom
+                    session={session}
+                    userId={profile.id || profile.userId || ''}
+                    userName={profile.full_name || profile.email || 'Tutor'}
+                    userRole="tutor"
+                  />
+                </CardContent>
+              </Card>
+            )}
+            {!session && (
+              <Card>
+                <CardContent className="py-12 text-center">
+                  <p className="text-gray-600">Loading messaging...</p>
+                </CardContent>
+              </Card>
+            )}
+          </TabsContent>
+
           <TabsContent value="invitations">
             <Card>
               <CardHeader>
@@ -1057,7 +1086,13 @@ export function TutorDashboard({
                 <CardDescription>Manage your invitations and accept or decline them</CardDescription>
               </CardHeader>
               <CardContent>
-                <TutorInvitations session={session} />
+                {session ? (
+                  <TutorInvitations session={session} />
+                ) : (
+                  <div className="text-center py-8 text-gray-600">
+                    <p>Loading invitations...</p>
+                  </div>
+                )}
               </CardContent>
             </Card>
           </TabsContent>
