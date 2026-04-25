@@ -23,6 +23,7 @@ import {
 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { getSupabaseClient } from '../utils/supabase/client';
+import { TriviaPaywall } from './TriviaPaywall';
 
 interface TriviaQuestion {
   id: string;
@@ -56,6 +57,15 @@ export function TriviaGame({ userId, grade, onXPEarned }: TriviaGameProps) {
   const [showResult, setShowResult] = useState(false);
   const [isAnswered, setIsAnswered] = useState(false);
   const [gameStartTime, setGameStartTime] = useState<number>(0);
+  
+  // Paywall state
+  const [showPaywall, setShowPaywall] = useState(false);
+  const [paywallData, setPaywallData] = useState<{
+    status: 'free' | 'free_trial' | 'trial_expired' | 'paid_active' | 'subscription_expired';
+    subject: string;
+    expiresAt?: string;
+    daysRemaining?: number;
+  } | null>(null);
 
   // Convert grade format from profile format to trivia format
   const convertGradeFormat = (gradeValue: string): string => {
@@ -167,6 +177,22 @@ export function TriviaGame({ userId, grade, onXPEarned }: TriviaGameProps) {
         setIsAnswered(false);
         setSelectedAnswer(null);
         setGameStartTime(Date.now());
+      } else if (response.status === 403) {
+        // Paywall error
+        const errorData = await response.json();
+        if (errorData.errorCode === 'TRIVIA_PAYWALL') {
+          setPaywallData({
+            status: errorData.status,
+            subject: subject,
+            expiresAt: errorData.expiresAt,
+            daysRemaining: errorData.daysRemaining,
+          });
+          setShowPaywall(true);
+          toast.info('This feature requires a subscription');
+        } else {
+          toast.error(errorData.message || 'Access denied');
+        }
+        setGameState('subject-select');
       } else {
         const errorData = await response.json();
         toast.error(errorData.message || 'Failed to load trivia questions');
@@ -322,6 +348,40 @@ export function TriviaGame({ userId, grade, onXPEarned }: TriviaGameProps) {
     if (timeLeft > 10) return 'text-yellow-600';
     return 'text-red-600';
   };
+
+  // Show paywall if needed
+  if (showPaywall && paywallData) {
+    return (
+      <div className="space-y-4">
+        <TriviaPaywall
+          subject={paywallData.subject}
+          grade={grade}
+          status={paywallData.status}
+          expiresAt={paywallData.expiresAt}
+          daysRemaining={paywallData.daysRemaining}
+          pricePerMonth={3000}
+          onSubscribe={(subject) => {
+            toast.info('Redirecting to payment...');
+            window.location.href = `/payment?product=trivia_${subject.toLowerCase().replace(/\s+/g, '_')}`;
+          }}
+          onDismiss={() => {
+            setShowPaywall(false);
+            setGameState('subject-select');
+          }}
+        />
+        <Button
+          onClick={() => {
+            setShowPaywall(false);
+            setGameState('subject-select');
+          }}
+          variant="outline"
+          className="w-full"
+        >
+          Back to Subject Selection
+        </Button>
+      </div>
+    );
+  }
 
   if (gameState === 'idle') {
     return (

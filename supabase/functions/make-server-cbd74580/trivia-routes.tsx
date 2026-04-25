@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
 import { COMPREHENSIVE_TRIVIA } from './comprehensive-trivia-data.tsx';
 
 const app = new Hono();
@@ -11,9 +12,58 @@ const TRIVIA_QUESTIONS = COMPREHENSIVE_TRIVIA;
 // Get random trivia questions
 app.get('/questions', async (c) => {
   try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    // Verify user
+    const supabase = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+    );
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    if (authError || !user) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
     const grade = c.req.query('grade') || 'year_5';
     const subject = c.req.query('subject') || 'Mathematics';
     const count = parseInt(c.req.query('count') || '5');
+
+    // Map subject to lowercase ID for trivia subscription check
+    const subjectId = subject.toLowerCase().replace(/\s+/g, '_');
+
+    // Check trivia access for this subject
+    try {
+      const accessCheck = await db.checkTriviaAccess(user.id, subjectId);
+      
+      if (!accessCheck.hasAccess) {
+        // Access denied - return paywall info
+        return c.json({
+          error: 'Access denied',
+          errorCode: 'TRIVIA_PAYWALL',
+          status: accessCheck.status,
+          reason: accessCheck.reason,
+          message: `${subject} trivia requires subscription. ${accessCheck.reason}`,
+          pricePerMonth: 3000,
+          currency: 'NGN',
+        }, 403);
+      }
+
+      // First time access - create subscription with free trial
+      if (accessCheck.status === 'free' && accessCheck.reason?.includes('First-time')) {
+        try {
+          await db.getOrCreateTriviaSubscription(user.id, subjectId, subject);
+        } catch (subError) {
+          console.warn('Could not create trivia subscription:', subError);
+          // Continue anyway - user gets access
+        }
+      }
+    } catch (accessError) {
+      // If access check fails, allow access (fail open)
+      console.warn('Trivia access check error:', accessError);
+    }
 
     // Get questions for the specified grade and subject
     const allQuestions = TRIVIA_QUESTIONS[grade as keyof typeof TRIVIA_QUESTIONS]?.[subject] || [];
@@ -30,7 +80,12 @@ app.get('/questions', async (c) => {
     const shuffled = [...allQuestions].sort(() => Math.random() - 0.5);
     const selectedQuestions = shuffled.slice(0, Math.min(count, shuffled.length));
 
-    return c.json({ questions: selectedQuestions });
+    return c.json({ 
+      questions: selectedQuestions,
+      accessStatus: accessCheck?.status || 'unknown',
+      expiresAt: accessCheck?.expiresAt,
+      daysRemaining: accessCheck?.daysRemaining,
+    });
   } catch (error) {
     console.error('Error fetching trivia questions:', error);
     return c.json({ error: 'Failed to fetch trivia questions' }, 500);
@@ -61,6 +116,23 @@ app.post('/submit', async (c) => {
     const { answers, grade, subject, timeSpent } = body;
 
     console.log('Trivia submit: User:', user.id, '| Grade:', grade, '| Subject:', subject, '| Answers:', answers?.length);
+
+    // Check trivia access before accepting submission
+    const subjectId = subject.toLowerCase().replace(/\s+/g, '_');
+    try {
+      const accessCheck = await db.checkTriviaAccess(user.id, subjectId);
+      if (!accessCheck.hasAccess) {
+        return c.json({
+          error: 'Access denied',
+          errorCode: 'TRIVIA_PAYWALL',
+          status: accessCheck.status,
+          reason: accessCheck.reason,
+        }, 403);
+      }
+    } catch (accessError) {
+      console.warn('Trivia access check error on submit:', accessError);
+      // Fail open - allow submission on error
+    }
 
     // Calculate score
     let correctAnswers = 0;

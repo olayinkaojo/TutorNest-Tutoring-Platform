@@ -579,3 +579,207 @@ export async function getAllProfilesForAdmin(): Promise<any[]> {
     createdAt: row.created_at,
   }));
 }
+
+// ─── Trivia Subscriptions ──────────────────────────────────────────────────────
+
+export interface TriviaSubscription {
+  id: string;
+  studentId: string;
+  subjectId: string;
+  subjectName: string;
+  status: 'free' | 'active' | 'expired';
+  freeTrialStartedAt?: string;
+  freeTrialExpiresAt?: string;
+  paidExpiresAt?: string;
+  paymentId?: string;
+  pricePerMonth: number;
+}
+
+/**
+ * Get or create trivia subscription for a student-subject combo.
+ * First access starts 30-day free trial. After trial: requires payment.
+ */
+export async function getOrCreateTriviaSubscription(
+  studentId: string,
+  subjectId: string,
+  subjectName: string
+): Promise<TriviaSubscription> {
+  const { data, error } = await db()
+    .from('trivia_subscriptions')
+    .select('*')
+    .eq('student_id', studentId)
+    .eq('subject_id', subjectId)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') throw new Error(error.message);
+
+  // Subscription exists
+  if (data) {
+    return {
+      id: data.id,
+      studentId: data.student_id,
+      subjectId: data.subject_id,
+      subjectName: data.subject_name,
+      status: data.status,
+      freeTrialStartedAt: data.free_trial_started_at,
+      freeTrialExpiresAt: data.free_trial_expires_at,
+      paidExpiresAt: data.paid_expires_at,
+      paymentId: data.payment_id,
+      pricePerMonth: data.price_per_month,
+    };
+  }
+
+  // Create new subscription with 30-day free trial
+  const now = new Date();
+  const trialExpiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+
+  const { data: newSub, error: createError } = await db()
+    .from('trivia_subscriptions')
+    .insert({
+      student_id: studentId,
+      subject_id: subjectId,
+      subject_name: subjectName,
+      status: 'free',
+      free_trial_started_at: now.toISOString(),
+      free_trial_expires_at: trialExpiresAt.toISOString(),
+      price_per_month: 3000,
+    })
+    .select()
+    .single();
+
+  if (createError) throw new Error(createError.message);
+
+  return {
+    id: newSub.id,
+    studentId: newSub.student_id,
+    subjectId: newSub.subject_id,
+    subjectName: newSub.subject_name,
+    status: newSub.status,
+    freeTrialStartedAt: newSub.free_trial_started_at,
+    freeTrialExpiresAt: newSub.free_trial_expires_at,
+    paidExpiresAt: newSub.paid_expires_at,
+    paymentId: newSub.payment_id,
+    pricePerMonth: newSub.price_per_month,
+  };
+}
+
+/**
+ * Check if student has access to trivia for a subject.
+ * Returns: { hasAccess, status, expiresAt, reason }
+ */
+export async function checkTriviaAccess(
+  studentId: string,
+  subjectId: string
+): Promise<{ hasAccess: boolean; status: string; expiresAt?: string; daysRemaining?: number; reason?: string }> {
+  const { data, error } = await db()
+    .from('trivia_subscriptions')
+    .select('*')
+    .eq('student_id', studentId)
+    .eq('subject_id', subjectId)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') throw new Error(error.message);
+
+  // No subscription = first-time access (will be created on trivia endpoint call)
+  if (!data) {
+    return {
+      hasAccess: true,
+      status: 'free',
+      reason: 'First-time access (free trial starting)',
+    };
+  }
+
+  const now = new Date();
+
+  // Check free trial
+  if (data.status === 'free' && data.free_trial_expires_at) {
+    const trialExpires = new Date(data.free_trial_expires_at);
+    const daysLeft = Math.ceil((trialExpires.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+
+    if (now < trialExpires) {
+      return {
+        hasAccess: true,
+        status: 'free_trial',
+        expiresAt: data.free_trial_expires_at,
+        daysRemaining: daysLeft,
+      };
+    }
+
+    // Trial expired, check paid subscription
+    if (data.paid_expires_at) {
+      const paidExpires = new Date(data.paid_expires_at);
+      const paidDaysLeft = Math.ceil((paidExpires.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+
+      if (now < paidExpires) {
+        return {
+          hasAccess: true,
+          status: 'paid_active',
+          expiresAt: data.paid_expires_at,
+          daysRemaining: paidDaysLeft,
+        };
+      }
+    }
+
+    // No paid subscription or paid subscription expired
+    return {
+      hasAccess: false,
+      status: 'trial_expired',
+      reason: 'Free trial expired. Subscribe to continue.',
+    };
+  }
+
+  // Check paid subscription
+  if (data.status === 'active' && data.paid_expires_at) {
+    const paidExpires = new Date(data.paid_expires_at);
+    const daysLeft = Math.ceil((paidExpires.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+
+    if (now < paidExpires) {
+      return {
+        hasAccess: true,
+        status: 'paid_active',
+        expiresAt: data.paid_expires_at,
+        daysRemaining: daysLeft,
+      };
+    }
+
+    // Paid subscription expired
+    return {
+      hasAccess: false,
+      status: 'subscription_expired',
+      reason: 'Subscription expired. Renew to continue.',
+    };
+  }
+
+  // Fallback
+  return {
+    hasAccess: false,
+    status: 'no_access',
+    reason: 'No active subscription.',
+  };
+}
+
+/**
+ * Update trivia subscription status after payment.
+ */
+export async function updateTriviaSubscription(
+  studentId: string,
+  subjectId: string,
+  updates: {
+    status?: string;
+    paidExpiresAt?: string;
+    paymentId?: string;
+  }
+): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (updates.status !== undefined) row.status = updates.status;
+  if (updates.paidExpiresAt !== undefined) row.paid_expires_at = updates.paidExpiresAt;
+  if (updates.paymentId !== undefined) row.payment_id = updates.paymentId;
+
+  const { error } = await db()
+    .from('trivia_subscriptions')
+    .update(row)
+    .eq('student_id', studentId)
+    .eq('subject_id', subjectId);
+
+  if (error) throw new Error(error.message);
+}
