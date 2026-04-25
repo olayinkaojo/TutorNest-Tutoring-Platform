@@ -253,20 +253,35 @@ app.post('/bookings', async (c) => {
       return c.json({ error: 'Time slot is no longer available' }, 409);
     }
 
-    // Get tutor and student details
-    const tutor = await kv.get(`user:${tutorId}`) as any;
-    const student = await kv.get(`child:${studentId}`) as any;
+    // Resolve a display name from any profile shape (KV camelCase, DB snake_case, child record)
+    const resolveName = (p: any, fallback: string): string =>
+      p?.fullName || p?.full_name || p?.name ||
+      (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
+      fallback;
+
+    // Tutor: KV first (most up-to-date for tutor-specific fields), then DB
+    let tutor: any = await kv.get(`user:${tutorId}`);
+    if (!tutor) tutor = await db.getProfile(tutorId);
+
+    // Student: child KV record first, then user KV (linked student accounts), then DB
+    let student: any = await kv.get(`child:${studentId}`);
+    if (!student) student = await kv.get(`user:${studentId}`);
+    if (!student) student = await db.getProfile(studentId);
 
     if (!tutor || !student) {
       return c.json({ error: 'Tutor or student not found' }, 404);
     }
 
-    // Look up parent to get their email for the calendar invite
-    const parent = student.parentId ? await kv.get(`user:${student.parentId}`) as any : null;
+    // Parent: from child's parentId or booking's userId, KV first then DB
+    const parentId = student.parentId || null;
+    let parent: any = parentId ? await kv.get(`user:${parentId}`) : null;
+    if (!parent && parentId) parent = await db.getProfile(parentId);
+
     const parentEmail = parent?.email || '';
-    const tutorEmail = tutor.email || '';
-    const tutorName = tutor.fullName || tutor.name || 'Tutor';
-    const studentName = `${student.firstName} ${student.lastName}`;
+    const tutorEmail  = tutor?.email  || '';
+    const tutorName   = resolveName(tutor,   'Your Tutor');
+    const studentName = resolveName(student, 'Your Student');
+    const parentName  = resolveName(parent,  'Parent');
 
     // Create a real Google Calendar event with Meet link using the tutor's connected calendar.
     // Falls back to a generic Meet URL if the tutor hasn't connected their calendar.
@@ -313,7 +328,7 @@ app.post('/bookings', async (c) => {
     // Send email to parent
     if (parentEmail) {
       const parentEmailData = emailTemplates.bookingConfirmation(
-        parent?.fullName || parent?.name || 'Parent',
+        parentName,
         studentName,
         tutorName,
         formattedDate,
@@ -333,12 +348,12 @@ app.post('/bookings', async (c) => {
     if (tutorEmail) {
       const tutorEmailData = emailTemplates.tutorBookingNotification(
         tutorName,
-        parent?.fullName || parent?.name || 'Parent',
+        parentName,
         studentName,
         formattedDate,
         formattedTime,
         subject,
-        `https://tutornest.org/dashboard?tab=bookings&bookingId=${bookingId}` // Dashboard link to confirm
+        `https://tutornest.org/dashboard?tab=bookings&bookingId=${bookingId}`
       );
       await sendEmail({
         to: tutorEmail,

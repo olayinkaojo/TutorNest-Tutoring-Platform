@@ -62,6 +62,17 @@ async function getUserIdFromToken(accessToken: string | undefined): Promise<stri
   }
 }
 
+// Returns the full KV/DB profile for the authenticated user (needed where role checks are required)
+async function getUserFromToken(accessToken: string | undefined): Promise<any | null> {
+  const userId = await getUserIdFromToken(accessToken);
+  if (!userId) return null;
+  const kvUser = await kv.get(`user:${userId}`) as any;
+  if (kvUser) return { ...kvUser, id: userId, userId };
+  const dbUser = await db.getProfile(userId);
+  if (dbUser) return { ...dbUser, id: userId, userId };
+  return null;
+}
+
 // Validate payment initialization body
 function validatePaymentInit(body: Record<string, unknown>): string | null {
   const { bookingId, tutorId, amount, email } = body;
@@ -941,15 +952,33 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
 
   // ── Send professional emails (non-fatal) ───────────────────────────────────
   try {
+    // Name resolution: DB → KV user: → KV child: (children are never in the DB)
+    const resolveProfile = async (id: string, isStudent = false): Promise<any> => {
+      const dbProfile = await db.getProfile(id).catch(() => null);
+      if (dbProfile) return dbProfile;
+      const kvUser = await kv.get(`user:${id}`) as any;
+      if (kvUser) return kvUser;
+      if (isStudent) {
+        const kvChild = await kv.get(`child:${id}`) as any;
+        if (kvChild) return kvChild;
+      }
+      return null;
+    };
+
+    const resolveName = (p: any, fallback: string): string =>
+      p?.fullName || p?.full_name || p?.name ||
+      (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
+      fallback;
+
     const [parentProfile, tutorProfile, studentProfile] = await Promise.all([
-      db.getProfile(payment.userId),
-      db.getProfile(payment.tutorId),
-      db.getProfile(payment.studentId),
+      resolveProfile(payment.userId),
+      resolveProfile(payment.tutorId),
+      resolveProfile(payment.studentId, true),
     ]);
 
-    const parentName  = parentProfile?.fullName  || parentProfile?.full_name  || parentProfile?.name  || 'Parent';
-    const tutorName   = tutorProfile?.fullName   || tutorProfile?.full_name   || tutorProfile?.name   || 'Tutor';
-    const studentName = studentProfile?.fullName || studentProfile?.full_name || studentProfile?.name || 'Student';
+    const parentName  = resolveName(parentProfile,  'Parent');
+    const tutorName   = resolveName(tutorProfile,   'Your Tutor');
+    const studentName = resolveName(studentProfile, 'Your Student');
     const parentEmail = parentProfile?.email;
     const tutorEmail  = tutorProfile?.email;
 
