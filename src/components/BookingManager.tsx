@@ -122,8 +122,21 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
     setError('');
 
     try {
-      // Use API client instead of hardcoded fetch
-      const bookingsList = await parentAPI.getBookings(session.access_token, studentId || '');
+      let bookingsList: any[];
+
+      if (userRole === 'tutor') {
+        // Tutor role: only fetch sessions where this user is the tutor
+        const response = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings?tutorId=${userId}`,
+          { headers: { Authorization: `Bearer ${session.access_token}` } }
+        );
+        const data = await response.json();
+        bookingsList = data.bookings || [];
+      } else {
+        // Parent role: fetch bookings for the specific child (or all children)
+        bookingsList = await parentAPI.getBookings(session.access_token, studentId || '');
+      }
+
       setBookings(bookingsList);
 
       // Fetch reports for all bookings at once (batch instead of individual)
