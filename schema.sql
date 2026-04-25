@@ -68,12 +68,14 @@ CREATE TABLE IF NOT EXISTS payments (
   subject      TEXT,
   booking_ids  UUID[] DEFAULT '{}',
   confirmed_at TIMESTAMPTZ,
+  payment_expires_at TIMESTAMPTZ,       -- Chat access expires when payment duration ends
   created_at   TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS payments_reference ON payments (reference);
 CREATE INDEX IF NOT EXISTS payments_user_id   ON payments (user_id);
 CREATE INDEX IF NOT EXISTS payments_tutor_id  ON payments (tutor_id);
+CREATE INDEX IF NOT EXISTS payments_expires_at ON payments (payment_expires_at);
 
 -- ─── Tutor Balance ─────────────────────────────────────────────────────────────
 -- One row per tutor, updated atomically on each payment confirmation.

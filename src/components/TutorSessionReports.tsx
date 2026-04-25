@@ -141,7 +141,7 @@ export function TutorSessionReports({ tutorId, accessToken }: TutorSessionReport
   const fetchStudents = async () => {
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutors/${tutorId}/students`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutor-session-reports/${tutorId}/students`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,
@@ -161,7 +161,7 @@ export function TutorSessionReports({ tutorId, accessToken }: TutorSessionReport
   const fetchSessions = async () => {
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutors/${tutorId}/completed-sessions`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutor-session-reports/${tutorId}/completed-sessions`,
         {
           headers: {
             Authorization: `Bearer ${accessToken}`,

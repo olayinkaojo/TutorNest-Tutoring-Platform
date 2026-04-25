@@ -1722,6 +1722,16 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         return c.json({ error: 'Tutor not found' }, 404);
       }
 
+      // Ensure we have an email — fall back to DB profile if KV entry lacks one
+      if (!tutor.email) {
+        try {
+          const dbProfile = await db.getProfile(tutorId);
+          if (dbProfile?.email) tutor.email = dbProfile.email;
+        } catch (emailLookupErr) {
+          console.error('Could not look up tutor email from DB:', emailLookupErr);
+        }
+      }
+
       // Update verification status
       if (action === 'approve') {
         tutor.verificationStatus = 'verified';
@@ -1793,31 +1803,40 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         metadata: { action, rejectionReason }
       });
 
-      // Send email notification
-      if (action === 'approve' && tutor.email) {
-        const emailData = emailTemplates.tutorVerificationApproved(
-          tutor.fullName || tutor.name || 'Tutor',
-          `https://tutornest.org/tutor-dashboard`
-        );
-        await sendEmail({
-          to: tutor.email,
-          subject: emailData.subject,
-          html: emailData.html,
-          replyTo: 'support@tutornest.org'
-        });
-      } else if (action === 'reject' && tutor.email) {
-        // Send rejection email as well
-        const emailData = emailTemplates.tutorVerificationRejected(
-          tutor.fullName || tutor.name || 'Tutor',
-          rejectionReason,
-          `https://tutornest.org/tutor-dashboard`
-        );
-        await sendEmail({
-          to: tutor.email,
-          subject: emailData.subject,
-          html: emailData.html,
-          replyTo: 'support@tutornest.org'
-        });
+      // Send email notification (non-blocking — don't fail the request on email errors)
+      try {
+        if (action === 'approve' && tutor.email) {
+          console.log(`Sending approval email to ${tutor.email}`);
+          const emailData = emailTemplates.tutorVerificationApproved(
+            tutor.fullName || tutor.full_name || tutor.name || 'Tutor',
+            `https://tutornest.org/tutor-dashboard`
+          );
+          await sendEmail({
+            to: tutor.email,
+            subject: emailData.subject,
+            html: emailData.html,
+            replyTo: 'support@tutornest.org'
+          });
+          console.log('Approval email sent successfully');
+        } else if (action === 'reject' && tutor.email) {
+          console.log(`Sending rejection email to ${tutor.email}`);
+          const emailData = emailTemplates.tutorVerificationRejected(
+            tutor.fullName || tutor.full_name || tutor.name || 'Tutor',
+            rejectionReason,
+            `https://tutornest.org/tutor-dashboard`
+          );
+          await sendEmail({
+            to: tutor.email,
+            subject: emailData.subject,
+            html: emailData.html,
+            replyTo: 'support@tutornest.org'
+          });
+          console.log('Rejection email sent successfully');
+        } else {
+          console.warn(`No email sent: tutor.email=${tutor.email}, action=${action}`);
+        }
+      } catch (emailErr) {
+        console.error('Failed to send verification email (non-fatal):', emailErr);
       }
 
       return c.json({ success: true });

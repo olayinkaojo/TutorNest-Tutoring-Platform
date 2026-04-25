@@ -184,23 +184,22 @@ export function ParentDashboard({
     }
   }, [session]);
 
-  // Set active child when children load, persist to localStorage
+  // Sync active child when children list loads or changes.
+  // Uses functional setState so activeChildId is NOT in the dep array —
+  // this prevents a re-run (and potential reset) every time the user
+  // switches the active child.
   useEffect(() => {
-    if (children.length > 0) {
-      // Check if current activeChildId still exists in children
-      const childExists = activeChildId && children.some(c => c.id === activeChildId);
-      
-      if (childExists) {
-        // Keep current selection and persist it
-        localStorage.setItem(`tutornest_active_child_${profile.id || profile.userId}`, activeChildId);
-      } else {
-        // Set to first child and persist
-        const firstChildId = children[0].id;
-        setActiveChildId(firstChildId);
-        localStorage.setItem(`tutornest_active_child_${profile.id || profile.userId}`, firstChildId);
-      }
-    }
-  }, [children, activeChildId, profile.id, profile.userId]);
+    if (children.length === 0) return;
+    const userId = profile.id || profile.userId;
+    setActiveChildId((prev: string | null) => {
+      const stillExists = prev != null && children.some((c: { id: string }) => c.id === prev);
+      if (stillExists) return prev; // keep the selection intact
+      // Default to first child on initial load or after deletion
+      const firstId = children[0].id;
+      if (userId) localStorage.setItem(`tutornest_active_child_${userId}`, firstId);
+      return firstId;
+    });
+  }, [children, profile.id, profile.userId]);
 
   // Calculate stats when children data or filter changes
   useEffect(() => {

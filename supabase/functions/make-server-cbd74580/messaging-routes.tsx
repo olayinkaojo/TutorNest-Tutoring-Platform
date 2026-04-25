@@ -1,5 +1,39 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
+
+// Check if a payment associated with a booking has expired
+async function isPaymentExpired(bookingId: string): Promise<{ expired: boolean; expiresAt?: string }> {
+  try {
+    // Get booking to find the payment ID
+    const booking = await db.getBooking(bookingId);
+    if (!booking || !booking.paymentId) {
+      // No payment means no expiration (legacy or free booking)
+      return { expired: false };
+    }
+
+    // Get payment to check expiration date
+    const payment = await db.getPaymentById(booking.paymentId);
+    if (!payment || !payment.paymentExpiresAt) {
+      // No expiration date set yet or payment not found
+      return { expired: false };
+    }
+
+    // Check if expiration date has passed
+    const now = new Date();
+    const expiresAt = new Date(payment.paymentExpiresAt);
+    const isExpired = now > expiresAt;
+
+    return {
+      expired: isExpired,
+      expiresAt: payment.paymentExpiresAt,
+    };
+  } catch (error: any) {
+    console.warn('Error checking payment expiration:', error.message);
+    // On error, allow access (fail open) to prevent blocking users
+    return { expired: false };
+  }
+}
 
 export const messagingRoutes = (app: Hono, getUserId: Function) => {
 
@@ -23,6 +57,17 @@ export const messagingRoutes = (app: Hono, getUserId: Function) => {
 
       if (booking.tutorId !== userId && booking.parentId !== userId) {
         return c.json({ error: 'Unauthorized to view these messages' }, 403);
+      }
+
+      // Check if payment has expired
+      const paymentExpiration = await isPaymentExpired(bookingId);
+      if (paymentExpiration.expired) {
+        return c.json({
+          error: 'Payment expired',
+          errorCode: 'PAYMENT_EXPIRED',
+          message: 'Chat access has ended because the payment duration has expired. Please renew your subscription to continue messaging.',
+          expiresAt: paymentExpiration.expiresAt,
+        }, 403);
       }
 
       // Get all messages for this booking
@@ -63,6 +108,17 @@ export const messagingRoutes = (app: Hono, getUserId: Function) => {
 
       if (booking.tutorId !== userId && booking.parentId !== userId) {
         return c.json({ error: 'Unauthorized to send messages for this booking' }, 403);
+      }
+
+      // Check if payment has expired
+      const paymentExpiration = await isPaymentExpired(bookingId);
+      if (paymentExpiration.expired) {
+        return c.json({
+          error: 'Payment expired',
+          errorCode: 'PAYMENT_EXPIRED',
+          message: 'Chat access has ended because the payment duration has expired. Please renew your subscription to continue messaging.',
+          expiresAt: paymentExpiration.expiresAt,
+        }, 403);
       }
 
       // Check for personal contact info (basic pattern matching)

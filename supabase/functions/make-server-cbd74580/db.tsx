@@ -276,6 +276,7 @@ export interface PaymentRow {
   status: string;
   bookingIds?: string[];
   confirmedAt?: string;
+  paymentExpiresAt?: string;  // Chat access expires when payment duration ends
 }
 
 export async function createPayment(payment: PaymentRow): Promise<void> {
@@ -319,6 +320,33 @@ export async function getPaymentByReference(reference: string): Promise<PaymentR
     status: data.status,
     bookingIds: data.booking_ids ?? [],
     confirmedAt: data.confirmed_at,
+    paymentExpiresAt: data.payment_expires_at,
+  };
+}
+
+export async function getPaymentById(paymentId: string): Promise<PaymentRow | null> {
+  const { data, error } = await db()
+    .from('payments')
+    .select('*')
+    .eq('id', paymentId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return {
+    id: data.id,
+    userId: data.user_id,
+    tutorId: data.tutor_id,
+    studentId: data.student_id,
+    planType: data.plan_type,
+    amount: data.amount,
+    reference: data.reference,
+    startDate: data.start_date,
+    startTime: data.start_time,
+    subject: data.subject,
+    status: data.status,
+    bookingIds: data.booking_ids ?? [],
+    confirmedAt: data.confirmed_at,
+    paymentExpiresAt: data.payment_expires_at,
   };
 }
 
@@ -326,11 +354,13 @@ export async function updatePayment(id: string, updates: {
   status?: string;
   bookingIds?: string[];
   confirmedAt?: string;
+  paymentExpiresAt?: string;
 }): Promise<void> {
   const row: Record<string, unknown> = {};
   if (updates.status !== undefined) row.status = updates.status;
   if (updates.bookingIds !== undefined) row.booking_ids = updates.bookingIds;
   if (updates.confirmedAt !== undefined) row.confirmed_at = updates.confirmedAt;
+  if (updates.paymentExpiresAt !== undefined) row.payment_expires_at = updates.paymentExpiresAt;
   const { error } = await db().from('payments').update(row).eq('id', id);
   if (error) throw new Error(error.message);
 }

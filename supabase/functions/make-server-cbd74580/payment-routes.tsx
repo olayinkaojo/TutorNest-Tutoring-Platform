@@ -884,11 +884,16 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
     bookingIds.push(bookingId);
   }
 
+  // Calculate payment expiration date (start_date + plan duration in weeks)
+  const paymentExpiresAt = new Date(payment.startDate + 'T23:59:59+01:00');
+  paymentExpiresAt.setDate(paymentExpiresAt.getDate() + (plan.weeks * 7));
+
   // Mark payment confirmed
   await db.updatePayment(payment.id, {
     status: 'successful',
     bookingIds,
     confirmedAt: new Date().toISOString(),
+    paymentExpiresAt: paymentExpiresAt.toISOString(),
   });
 
   // Credit tutor (80%)

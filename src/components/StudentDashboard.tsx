@@ -131,7 +131,6 @@ export function StudentDashboard({
 
   const validTabs = new Set([
     'performance',
-    'overview',
     'sessions',
     'reports',
     'curriculum',
@@ -421,8 +420,7 @@ export function StudentDashboard({
   // Tab mapping for mobile navigation
   const mapTabToNav = (tab: string) => {
     const mapping: Record<string, string> = {
-      'overview': 'home',
-      'sessions': 'sessions',
+      'sessions': 'home',
       'performance': 'reports',
       'curriculum': 'resources',
       'gamification': 'rewards',
@@ -432,13 +430,13 @@ export function StudentDashboard({
 
   const handleNavChange = (navId: string) => {
     const reverseMapping: Record<string, string> = {
-      'home': 'overview',
+      'home': 'sessions',
       'sessions': 'sessions',
       'reports': 'performance',
       'resources': 'curriculum',
       'rewards': 'gamification',
     };
-    const tabValue = reverseMapping[navId] || 'overview';
+    const tabValue = reverseMapping[navId] || 'sessions';
     setActiveTab(tabValue);
   };
 
@@ -577,7 +575,6 @@ export function StudentDashboard({
                 </Badge>
               )}
             </TabsTrigger>
-            <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="sessions">My Sessions</TabsTrigger>
             <TabsTrigger value="reports">
               Session Reports
@@ -750,128 +747,10 @@ export function StudentDashboard({
             </ErrorBoundary>
           </TabsContent>
 
-          {/* Overview Tab */}
-          <TabsContent value="overview">
-            <ErrorBoundary>
-              <div className="grid lg:grid-cols-2 gap-6">
-              {/* Upcoming Sessions */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Calendar className="w-5 h-5" style={{ color: '#625d9c' }} />
-                    Upcoming Sessions
-                  </CardTitle>
-                  <CardDescription>Your scheduled lessons</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {upcomingSessions.length > 0 ? (
-                    <div className="space-y-4">
-                      {upcomingSessions.slice(0, 3).map(session => {
-                        const hoursUntil = (parseWAT(session.date, session.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
-                        const startingSoon = hoursUntil >= 0 && hoursUntil <= 2;
-                        return (
-                          <div
-                            key={session.id}
-                            className={`flex items-start gap-4 p-4 border rounded-lg transition-colors ${startingSoon ? 'border-green-500 bg-green-50' : 'hover:bg-gray-50'}`}
-                          >
-                            <div className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0" style={{ backgroundColor: '#625d9c20' }}>
-                              <BookOpen className="w-5 h-5" style={{ color: '#625d9c' }} />
-                            </div>
-                            <div className="flex-1 min-w-0">
-                              <h4 className="mb-1">{session.subject || 'Session'}</h4>
-                              <p className="text-sm text-gray-600 mb-2">with {session.tutorName || 'Tutor'}</p>
-                              <div className="flex flex-wrap items-center gap-2">
-                                <Badge variant="outline" className="text-xs">
-                                  <Calendar className="w-3 h-3 mr-1" />
-                                  {new Date(session.date + 'T12:00:00+01:00').toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric', month: 'short', year: 'numeric' })}
-                                </Badge>
-                                <Badge variant="outline" className="text-xs">
-                                  <Clock className="w-3 h-3 mr-1" />
-                                  {session.startTime} WAT
-                                </Badge>
-                              </div>
-                              {session.googleMeetLink && (
-                                <a
-                                  href={session.googleMeetLink}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  className="inline-flex items-center gap-2 mt-3 px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-colors"
-                                  style={{ backgroundColor: startingSoon ? '#5d9827' : '#625d9c' }}
-                                >
-                                  <Video className="w-3.5 h-3.5" />
-                                  {startingSoon ? 'Join Now' : 'Join Classroom'}
-                                </a>
-                              )}
-                            </div>
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 text-gray-500">
-                      <Calendar className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                      <p>No upcoming sessions</p>
-                      <p className="text-sm text-gray-400 mt-1">Book a session to get started</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-
-              {/* Recent Performance */}
-              <Card>
-                <CardHeader>
-                  <CardTitle className="flex items-center gap-2">
-                    <Award className="w-5 h-5" style={{ color: '#5d9827' }} />
-                    Recent Performance
-                  </CardTitle>
-                  <CardDescription>Your latest assessment scores</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {assessments.length > 0 ? (
-                    <div className="space-y-4">
-                      {assessments.slice(0, 3).map(assessment => {
-                        const avgScore = Math.round((
-                          assessment.understanding + 
-                          assessment.participation + 
-                          assessment.homeworkCompletion + 
-                          assessment.attentiveness + 
-                          assessment.improvement
-                        ) / 5);
-                        
-                        return (
-                          <div key={assessment.id} className="p-4 border rounded-lg">
-                            <div className="flex items-center justify-between mb-2">
-                              <h4>{assessment.subject || 'Session'}</h4>
-                              <Badge style={{ backgroundColor: getScoreColor(avgScore), color: 'white' }}>
-                                {avgScore}%
-                              </Badge>
-                            </div>
-                            <p className="text-sm text-gray-600 mb-2">
-                              {new Date(assessment.createdAt).toLocaleDateString()}
-                            </p>
-                            {assessment.feedback && (
-                              <p className="text-sm text-gray-700 italic">"{assessment.feedback}"</p>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-                  ) : (
-                    <div className="text-center py-12 text-gray-500">
-                      <Award className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                      <p>No assessments yet</p>
-                      <p className="text-sm text-gray-400 mt-1">Complete sessions to receive feedback</p>
-                    </div>
-                  )}
-                </CardContent>
-              </Card>
-            </div>
-            </ErrorBoundary>
-          </TabsContent>
-
           {/* Sessions Tab */}
           <TabsContent value="sessions">
             <ErrorBoundary>
+              <div className="space-y-6">
               <Card>
               <CardHeader>
                 <CardTitle className="flex items-center gap-2">
@@ -972,6 +851,55 @@ export function StudentDashboard({
                 )}
               </CardContent>
             </Card>
+
+            {/* Recent Performance */}
+            <Card>
+              <CardHeader>
+                <CardTitle className="flex items-center gap-2">
+                  <Award className="w-5 h-5" style={{ color: '#5d9827' }} />
+                  Recent Performance
+                </CardTitle>
+                <CardDescription>Your latest assessment scores</CardDescription>
+              </CardHeader>
+              <CardContent>
+                {assessments.length > 0 ? (
+                  <div className="space-y-4">
+                    {assessments.slice(0, 3).map((assessment: any) => {
+                      const avgScore = Math.round((
+                        assessment.understanding +
+                        assessment.participation +
+                        assessment.homeworkCompletion +
+                        assessment.attentiveness +
+                        assessment.improvement
+                      ) / 5);
+                      return (
+                        <div key={assessment.id} className="p-4 border rounded-lg">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4>{assessment.subject || 'Session'}</h4>
+                            <Badge style={{ backgroundColor: getScoreColor(avgScore), color: 'white' }}>
+                              {avgScore}%
+                            </Badge>
+                          </div>
+                          <p className="text-sm text-gray-600 mb-2">
+                            {new Date(assessment.createdAt).toLocaleDateString()}
+                          </p>
+                          {assessment.feedback && (
+                            <p className="text-sm text-gray-700 italic">"{assessment.feedback}"</p>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="text-center py-12 text-gray-500">
+                    <Award className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                    <p>No assessments yet</p>
+                    <p className="text-sm text-gray-400 mt-1">Complete sessions to receive feedback</p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+            </div>
             </ErrorBoundary>
           </TabsContent>
 

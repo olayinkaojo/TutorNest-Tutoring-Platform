@@ -283,26 +283,88 @@ app.get('/:tutorId/completed-sessions', async (c) => {
 
     // Get all bookings for this tutor
     const allBookings = await kv.getByPrefix('booking_');
-    
+
     // Filter for completed bookings by this tutor
-    const completedSessions = (allBookings || [])
-      .filter((booking: any) => 
-        booking.tutorId === tutorId && 
+    const rawSessions = (allBookings || [])
+      .filter((booking: any) =>
+        booking.tutorId === tutorId &&
         booking.status === 'completed'
       )
       .sort((a: any, b: any) => {
         return new Date(b.date).getTime() - new Date(a.date).getTime();
       })
-      .slice(0, 50); // Limit to last 50 sessions
+      .slice(0, 50);
+
+    // Enrich with student names by looking up each unique student profile
+    const uniqueStudentIds = [...new Set(rawSessions.map((s: any) => s.studentId).filter(Boolean))];
+    const studentNameMap: Record<string, string> = {};
+    await Promise.all(uniqueStudentIds.map(async (sid: any) => {
+      try {
+        const profile = await kv.get(`user:${sid}`) as any;
+        if (profile) {
+          studentNameMap[sid] = profile.fullName || profile.full_name ||
+            [profile.firstName, profile.lastName].filter(Boolean).join(' ') || 'Unknown Student';
+        }
+      } catch (_) { /* ignore */ }
+    }));
+
+    const completedSessions = rawSessions.map((session: any) => ({
+      ...session,
+      studentName: studentNameMap[session.studentId] || session.studentName || 'Unknown Student',
+    }));
 
     console.log(`Retrieved ${completedSessions.length} completed sessions for tutor ${tutorId}`);
 
-    return c.json({ 
+    return c.json({
       success: true,
-      sessions: completedSessions 
+      sessions: completedSessions
     });
   } catch (error) {
     console.error('Error fetching completed sessions:', error);
+    return c.json({ error: 'Internal server error' }, 500);
+  }
+});
+
+// Get unique students linked to a tutor (from bookings)
+app.get('/:tutorId/students', async (c) => {
+  console.log('=== GET /tutors/:tutorId/students called ===');
+
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const userId = await getUserId(accessToken);
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+    const tutorId = c.req.param('tutorId');
+    if (userId !== tutorId) return c.json({ error: 'Forbidden' }, 403);
+
+    const allBookings = await kv.getByPrefix('booking_');
+    const tutorBookings = (allBookings || []).filter((b: any) =>
+      b.tutorId === tutorId && (b.status === 'confirmed' || b.status === 'completed')
+    );
+
+    const uniqueStudentIds = [...new Set(tutorBookings.map((b: any) => b.studentId).filter(Boolean))];
+
+    const students = (await Promise.all(uniqueStudentIds.map(async (sid: any) => {
+      try {
+        const profile = await kv.get(`user:${sid}`) as any;
+        if (!profile) return null;
+        const studentBookings = tutorBookings.filter((b: any) => b.studentId === sid);
+        const subjects = [...new Set(studentBookings.map((b: any) => b.subject).filter(Boolean))];
+        return {
+          id: sid,
+          name: profile.fullName || profile.full_name ||
+            [profile.firstName, profile.lastName].filter(Boolean).join(' ') || 'Unknown Student',
+          full_name: profile.fullName || profile.full_name ||
+            [profile.firstName, profile.lastName].filter(Boolean).join(' ') || 'Unknown Student',
+          subjects,
+          totalSessions: studentBookings.length,
+        };
+      } catch (_) { return null; }
+    }))).filter(Boolean);
+
+    return c.json({ success: true, students });
+  } catch (error) {
+    console.error('Error fetching tutor students:', error);
     return c.json({ error: 'Internal server error' }, 500);
   }
 });
