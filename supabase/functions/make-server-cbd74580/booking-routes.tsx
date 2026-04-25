@@ -47,7 +47,10 @@ app.get('/bookings', async (c) => {
     }
 
     // Enrich each booking with tutor/student display names and meet link.
-    // Collect unique profile IDs, fetch in parallel, then map onto rows.
+    // Resolution order per ID:
+    //   1. DB profiles table  — covers tutor/parent Supabase accounts
+    //   2. KV user:${id}      — covers tutor/parent profiles stored only in KV
+    //   3. KV child:${id}     — covers child profiles (never in the DB, added via AddChildDialog)
     const profileIds = [
       ...new Set(rawBookings.flatMap((b) => [b.tutorId, b.studentId, b.userId].filter(Boolean))),
     ];
@@ -56,23 +59,30 @@ app.get('/bookings', async (c) => {
       await Promise.all(
         profileIds.map(async (id) => {
           try {
-            const p = await db.getProfile(id);
-            if (p) profileMap[id] = p;
+            const dbProfile = await db.getProfile(id);
+            if (dbProfile) { profileMap[id] = dbProfile; return; }
+            const kvUser = await kv.get(`user:${id}`) as any;
+            if (kvUser) { profileMap[id] = kvUser; return; }
+            const kvChild = await kv.get(`child:${id}`) as any;
+            if (kvChild) profileMap[id] = kvChild;
           } catch (_) { /* non-fatal */ }
         }),
       );
     }
 
+    // Name fields differ by profile source: DB returns fullName, KV user profiles
+    // may use fullName/full_name/name, child profiles use firstName+lastName.
+    const resolveName = (p: any, fallback: string): string =>
+      p?.fullName ||
+      p?.full_name ||
+      p?.name ||
+      (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
+      fallback;
+
     const bookings = rawBookings.map((b) => {
       const tutor   = profileMap[b.tutorId]   ?? {};
       const student = profileMap[b.studentId] ?? {};
       const parent  = profileMap[b.userId]    ?? {};
-      // Profiles can store the name under several keys depending on how the
-      // account was created (camelCase KV vs snake_case DB column vs raw_data).
-      const resolveName = (p: any, fallback: string) =>
-        p.fullName || p.full_name || p.name ||
-        (p.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
-        fallback;
 
       return {
         ...b,
@@ -81,8 +91,8 @@ app.get('/bookings', async (c) => {
         parentName:     resolveName(parent,  ''),
         parentId:       b.userId,
         googleMeetLink: b.meetLink ?? null,
-        price:          String(20000),   // platform fixed rate per session
-        createdAt:      new Date().toISOString(), // best-effort; not stored on row
+        price:          String(20000),
+        createdAt:      new Date().toISOString(),
       };
     });
 

@@ -325,166 +325,203 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
            parseWAT(b.date, b.startTime) < new Date()
   );
 
-  const BookingCard = ({ booking }: { booking: Booking }) => (
-    <Card>
-      <CardContent className="pt-6">
-        <div className="flex items-start justify-between mb-4">
-          <div className="flex-1 min-w-0">
-            {/* Primary: name + status */}
-            <div className="flex items-center flex-wrap gap-2 mb-1">
-              <h3 className="text-lg font-bold text-gray-900">
-                {userRole === 'parent' ? booking.tutorName : booking.studentName}
+  const BookingCard = ({ booking }: { booking: Booking }) => {
+    const personName  = userRole === 'parent' ? booking.tutorName  : booking.studentName;
+    const personLabel = userRole === 'parent' ? 'Your Tutor'       : 'Your Student';
+    const initials    = personName
+      .split(' ')
+      .filter(Boolean)
+      .map((n: string) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
+
+    const isPast        = parseWAT(booking.date, booking.endTime  ) < new Date();
+    const isUpcoming    = booking.status === 'confirmed' && parseWAT(booking.date, booking.startTime) > new Date();
+    const hoursUntil    = (parseWAT(booking.date, booking.startTime).getTime() - Date.now()) / (1000 * 60 * 60);
+    const startingSoon  = isUpcoming && hoursUntil >= 0 && hoursUntil <= 2;
+    const accentColor   = startingSoon ? '#5d9827' : '#625d9c';
+
+    const statusStripe: Record<string, string> = {
+      confirmed:   accentColor,
+      completed:   '#6b7280',
+      cancelled:   '#ef4444',
+      rescheduled: '#f59e0b',
+    };
+
+    return (
+      <Card className={`overflow-hidden transition-all hover:shadow-md ${startingSoon ? 'ring-2 ring-green-500 shadow-green-100' : ''}`}>
+        {/* Status stripe */}
+        <div className="h-1.5" style={{ backgroundColor: statusStripe[booking.status] ?? accentColor }} />
+
+        <CardContent className="pt-5 pb-5">
+          {/* ── Person header ── */}
+          <div className="flex items-start gap-4 mb-5">
+            <div
+              className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-lg flex-shrink-0 shadow-sm"
+              style={{ backgroundColor: accentColor }}
+            >
+              {initials || <User className="w-6 h-6" />}
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-widest mb-0.5">
+                {personLabel}
+              </p>
+              <h3 className="text-xl font-bold text-gray-900 leading-tight truncate">
+                {personName}
               </h3>
-              {getStatusBadge(booking.status)}
+              {/* Contextual sub-line */}
+              {userRole === 'tutor' && booking.parentName && (
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Booked by <span className="font-medium text-gray-700">{booking.parentName}</span>
+                </p>
+              )}
+              {userRole === 'parent' && booking.studentName && booking.studentName !== booking.tutorName && (
+                <p className="text-sm text-gray-500 mt-0.5">
+                  Session for <span className="font-medium text-gray-700">{booking.studentName}</span>
+                </p>
+              )}
             </div>
-            {/* Subject — immediately below the name */}
-            {booking.subject && (
-              <div className="mb-3">
-                <span
-                  className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-semibold"
-                  style={{ backgroundColor: '#f0edfb', color: '#625d9c' }}
-                >
-                  <BookOpen className="w-3.5 h-3.5" />
-                  {booking.subject}
-                </span>
-              </div>
-            )}
-            <div className="space-y-1 text-sm text-gray-600">
-              <div className="flex items-center gap-2">
-                <Calendar className="w-4 h-4" />
-                {bookingDateLabel(booking.date)} · {formatDate(booking.date)}
-              </div>
-              <div className="flex items-center gap-2">
-                <Clock className="w-4 h-4" />
-                {formatTime(booking.startTime)} – {booking.endTime}
-              </div>
-              <div className="flex items-center gap-2">
-                <DollarSign className="w-4 h-4" />
+            <div className="flex-shrink-0 pt-0.5">{getStatusBadge(booking.status)}</div>
+          </div>
+
+          {/* ── Subject pill ── */}
+          {booking.subject && (
+            <div className="mb-4">
+              <span
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm font-semibold"
+                style={{ backgroundColor: '#f0edfb', color: '#625d9c' }}
+              >
+                <BookOpen className="w-3.5 h-3.5" />
+                {booking.subject}
+              </span>
+            </div>
+          )}
+
+          {/* ── Stats strip ── */}
+          <div className="grid grid-cols-3 gap-0 mb-4 rounded-xl overflow-hidden border border-gray-100 bg-gray-50">
+            <div className="py-3 px-2 text-center">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Date</p>
+              <p className="text-sm font-bold text-gray-800 leading-tight">{bookingDateLabel(booking.date)}</p>
+              <p className="text-xs text-gray-500 mt-0.5">{formatDate(booking.date)}</p>
+            </div>
+            <div className="py-3 px-2 text-center border-x border-gray-100">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Time (WAT)</p>
+              <p className="text-sm font-bold text-gray-800 leading-tight">{formatTime(booking.startTime)}</p>
+              <p className="text-xs text-gray-500 mt-0.5">– {booking.endTime}</p>
+            </div>
+            <div className="py-3 px-2 text-center">
+              <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Fee</p>
+              <p className="text-sm font-bold text-gray-800 leading-tight">
                 {formatNaira(parseFloat(booking.price || '20000'))}
-              </div>
+              </p>
             </div>
           </div>
-        </div>
 
-        {booking.status === 'confirmed' && (
-          <div className="space-y-2 mt-4">
-            {/* Enter Classroom — links to the stored meet/Jitsi URL */}
-            {booking.googleMeetLink ? (
-              <a
-                href={booking.googleMeetLink}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="block"
-              >
-                <Button
-                  className="w-full text-white"
-                  style={{ backgroundColor: '#5d9827' }}
-                >
+          {/* ── Starting-soon banner ── */}
+          {startingSoon && (
+            <div className="mb-4 px-4 py-3 rounded-xl bg-green-50 border border-green-200 flex items-center gap-3">
+              <span className="relative flex h-2.5 w-2.5 flex-shrink-0">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-green-400 opacity-75" />
+                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-green-500" />
+              </span>
+              <p className="text-sm font-semibold text-green-800">
+                Starting in {Math.max(1, Math.round(hoursUntil * 60))} minutes
+              </p>
+            </div>
+          )}
+
+          {/* ── Actions ── */}
+          {booking.status === 'confirmed' && (
+            <div className="space-y-2">
+              {booking.googleMeetLink ? (
+                <a href={booking.googleMeetLink} target="_blank" rel="noopener noreferrer" className="block">
+                  <Button
+                    className="w-full text-white font-semibold h-11"
+                    style={{ backgroundColor: accentColor }}
+                  >
+                    <Video className="w-4 h-4 mr-2" />
+                    {startingSoon ? 'Join Now — Session Starting!' : 'Enter Classroom'}
+                  </Button>
+                </a>
+              ) : (
+                <Button className="w-full h-11" variant="outline" disabled>
                   <Video className="w-4 h-4 mr-2" />
-                  Enter Classroom
+                  Classroom link not yet available
                 </Button>
-              </a>
-            ) : (
-              <Button className="w-full" variant="outline" disabled>
-                <Video className="w-4 h-4 mr-2" />
-                Classroom link not yet available
-              </Button>
-            )}
+              )}
 
-            <div className="flex gap-2">
-              {canReschedule(booking) && (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => openReschedule(booking)}
-                >
-                  <RotateCcw className="w-4 h-4 mr-2" />
-                  Reschedule
+              <div className="flex gap-2">
+                {canReschedule(booking) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => openReschedule(booking)}
+                  >
+                    <RotateCcw className="w-4 h-4 mr-1.5" />
+                    Reschedule
+                  </Button>
+                )}
+                {canCancel(booking) && (
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
+                    onClick={() => { setSelectedBooking(booking); setShowCancelConfirm(true); }}
+                  >
+                    <XCircle className="w-4 h-4 mr-1.5" />
+                    Cancel
+                  </Button>
+                )}
+                {!canCancel(booking) && !canReschedule(booking) && (
+                  <Alert className="bg-amber-50 border-amber-200 flex-1 py-2">
+                    <AlertCircle className="h-4 w-4 text-amber-600" />
+                    <AlertDescription className="text-amber-800 text-xs">
+                      Cannot cancel within 24 hours of lesson
+                    </AlertDescription>
+                  </Alert>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* ── Refund notice ── */}
+          {booking.status === 'cancelled' && booking.refundAmount && (
+            <Alert className="mt-3 bg-blue-50 border-blue-200">
+              <DollarSign className="h-4 w-4 text-blue-600" />
+              <AlertDescription className="text-blue-800 text-sm">
+                Refund: {formatNaira(parseFloat(booking.refundAmount!))}
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {/* ── Post-session reports ── */}
+          {isPast && (
+            <div className="space-y-2 mt-3 pt-3 border-t border-gray-100">
+              {userRole === 'tutor' && (
+                <Button onClick={() => setShowPostReport(booking)} variant="outline" className="w-full">
+                  <FileText className="w-4 h-4 mr-2" />
+                  {bookingReports[booking.id] ? 'Edit Session Report' : 'Submit Session Report'}
                 </Button>
               )}
-              {canCancel(booking) && (
+              {userRole === 'parent' && bookingReports[booking.id] && (
                 <Button
+                  onClick={() => setShowViewReport(booking)}
                   variant="outline"
-                  size="sm"
-                  className="flex-1 text-red-600 border-red-200 hover:bg-red-50"
-                  onClick={() => {
-                    setSelectedBooking(booking);
-                    setShowCancelConfirm(true);
-                  }}
+                  className="w-full"
+                  style={{ borderColor: '#625d9c', color: '#625d9c' }}
                 >
-                  <XCircle className="w-4 h-4 mr-2" />
-                  Cancel
+                  <FileText className="w-4 h-4 mr-2" />
+                  View Session Report
                 </Button>
-              )}
-              {!canCancel(booking) && !canReschedule(booking) && (
-                <Alert className="bg-amber-50 border-amber-200">
-                  <AlertCircle className="h-4 w-4 text-amber-600" />
-                  <AlertDescription className="text-amber-800 text-sm">
-                    Cannot cancel within 24 hours of lesson
-                  </AlertDescription>
-                </Alert>
               )}
             </div>
-
-            {/* Virtual classroom link info */}
-            {booking.googleMeetLink && (
-              <div className="mt-2 p-3 bg-blue-50 border border-blue-100 rounded-lg">
-                <div className="flex items-start gap-2">
-                  <Video className="w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-medium text-blue-900">Virtual Classroom Ready</p>
-                    <p className="text-xs text-blue-600 mt-1 font-mono break-all">
-                      {booking.googleMeetLink}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-
-        {booking.status === 'cancelled' && booking.refundAmount && (
-          <Alert className="mt-4 bg-blue-50 border-blue-200">
-            <DollarSign className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800 text-sm">
-              Refund: {formatNaira(parseFloat(booking.refundAmount!))}
-            </AlertDescription>
-          </Alert>
-        )}
-
-        {/* POST-SESSION REPORTS - Show for past sessions */}
-        {parseWAT(booking.date, booking.endTime) < new Date() && (
-          <div className="space-y-2 mt-4">
-            {/* For Tutors: Submit Report button (only for past sessions) */}
-            {userRole === 'tutor' && (
-              <Button
-                onClick={() => setShowPostReport(booking)}
-                variant="outline"
-                className="w-full"
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                {bookingReports[booking.id] ? 'Edit Session Report' : 'Submit Session Report'}
-              </Button>
-            )}
-
-            {/* For Parents: View Report button (only if report exists) */}
-            {userRole === 'parent' && bookingReports[booking.id] && (
-              <Button
-                onClick={() => setShowViewReport(booking)}
-                variant="outline"
-                className="w-full"
-                style={{ borderColor: '#625d9c', color: '#625d9c' }}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                View Session Report
-              </Button>
-            )}
-          </div>
-        )}
-      </CardContent>
-    </Card>
-  );
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
 
   if (loading) {
     return (
