@@ -54,19 +54,24 @@ export function UpcomingLessonsCard({
   const loadUpcomingLessons = async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
+      // Scope the query to the correct role so sessions from a different role
+      // never bleed through. Tutor view: only sessions where this user is the
+      // tutor. Parent view: all bookings (filtered client-side by child).
+      const tutorId = userRole === 'tutor' ? session.user?.id : null;
+      const url = tutorId
+        ? `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings?tutorId=${tutorId}`
+        : `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`;
+
+      const response = await fetch(url, {
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      });
 
       if (response.ok) {
         const data = await response.json();
         const allBookings = data.bookings || [];
-        
+
         // Filter for upcoming lessons (WAT-aware)
         const now = new Date();
         let upcoming = allBookings.filter((booking: UpcomingLesson) => {
@@ -74,9 +79,16 @@ export function UpcomingLessonsCard({
           return bookingDateTime > now && booking.status === 'confirmed';
         });
 
-        // If viewing from parent dashboard with active child, filter for that child
+        // Tutor: client-side guard — only sessions where this user is the tutor
+        if (userRole === 'tutor' && tutorId) {
+          upcoming = upcoming.filter((booking: UpcomingLesson) =>
+            booking.tutorId === tutorId
+          );
+        }
+
+        // Parent: filter for the selected child
         if (userRole === 'parent' && activeChildId) {
-          upcoming = upcoming.filter((booking: UpcomingLesson) => 
+          upcoming = upcoming.filter((booking: UpcomingLesson) =>
             booking.studentId === activeChildId
           );
         }
