@@ -78,6 +78,8 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
   const [contactSearch, setContactSearch] = useState('');
   const [contactsLoading, setContactsLoading] = useState(false);
   const [startingConv, setStartingConv] = useState(false);
+  const [paymentExpired, setPaymentExpired] = useState(false);
+  const [paymentExpiresAt, setPaymentExpiresAt] = useState<string | null>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const hasInitiatedRef = useRef(false);
 
@@ -196,6 +198,19 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
       if (response.ok) {
         const data = await response.json();
         setMessages(data.messages || []);
+        setPaymentExpired(false);
+        setPaymentExpiresAt(null);
+      } else if (response.status === 403) {
+        // Check if it's a payment expiration error
+        const error = await response.json();
+        if (error.errorCode === 'PAYMENT_EXPIRED') {
+          setPaymentExpired(true);
+          setPaymentExpiresAt(error.expiresAt || null);
+          setMessages([]);
+          toast.error('Chat access ended: Payment duration expired');
+        } else {
+          toast.error(error.error || 'Access denied');
+        }
       }
     } catch (error) {
       console.error('Error loading messages:', error);
@@ -206,6 +221,13 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
 
   const sendMessage = async () => {
     if (!newMessage.trim() || !selectedConversation || sending) return;
+    
+    // Check if payment has expired
+    if (paymentExpired) {
+      toast.error('Cannot send message: Payment duration has expired. Please renew your subscription.');
+      return;
+    }
+
     const content = newMessage.trim();
     setNewMessage('');
 
@@ -239,6 +261,19 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
         // Replace optimistic message with real one
         setMessages(prev => prev.map(m => m.id === optimisticId ? data.message : m));
         loadConversations();
+      } else if (response.status === 403) {
+        // Check if it's a payment expiration error
+        const error = await response.json();
+        if (error.errorCode === 'PAYMENT_EXPIRED') {
+          setPaymentExpired(true);
+          setPaymentExpiresAt(error.expiresAt || null);
+          setMessages(prev => prev.filter(m => m.id !== optimisticId));
+          toast.error('Cannot send message: Payment duration has expired.');
+        } else {
+          setMessages(prev => prev.filter(m => m.id !== optimisticId));
+          toast.error(error.error || 'Failed to send message');
+          setNewMessage(content); // restore draft
+        }
       } else {
         // Roll back optimistic
         setMessages(prev => prev.filter(m => m.id !== optimisticId));
@@ -595,6 +630,18 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
                 </div>
               </div>
 
+              {/* Payment Expired Alert */}
+              {paymentExpired && (
+                <Alert className="m-4 bg-red-50 border-red-200">
+                  <AlertCircle className="h-4 w-4 text-red-600" />
+                  <AlertDescription className="text-sm text-red-900">
+                    <strong>Chat Access Ended:</strong> The payment duration for this booking has expired. 
+                    {paymentExpiresAt && ` Expired on ${new Date(paymentExpiresAt).toLocaleDateString()}.`}
+                    Please purchase a new plan to continue messaging.
+                  </AlertDescription>
+                </Alert>
+              )}
+
               {/* Messages */}
               <ScrollArea className="flex-1 p-4">
                 {messages.length === 0 ? (
@@ -670,28 +717,44 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
 
               {/* Message Input */}
               <div className="p-4 border-t bg-gray-50">
-                <div className="flex gap-2">
-                  <Input
-                    placeholder="Type a message... (No personal contact info)"
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyPress={handleKeyPress}
-                    disabled={sending}
-                    className="flex-1"
-                  />
-                  <Button
-                    onClick={sendMessage}
-                    disabled={!newMessage.trim() || sending}
-                    className="text-white"
-                    style={{ backgroundColor: '#625d9c' }}
-                  >
-                    <Send className="w-4 h-4 mr-2" />
-                    Send
-                  </Button>
-                </div>
-                <p className="text-xs text-gray-500 mt-2">
-                  ⚠️ Messages are permanent and monitored. Do not share phone numbers, emails, or social media.
-                </p>
+                {paymentExpired ? (
+                  <div className="space-y-2">
+                    <div className="p-3 bg-red-100 border border-red-300 rounded-lg">
+                      <p className="text-sm text-red-900 font-medium">
+                        ❌ Chat access has ended
+                      </p>
+                      <p className="text-xs text-red-800 mt-1">
+                        The payment duration for this booking has expired. 
+                        You cannot send or receive messages until you purchase a new plan.
+                      </p>
+                    </div>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Type a message... (No personal contact info)"
+                        value={newMessage}
+                        onChange={(e) => setNewMessage(e.target.value)}
+                        onKeyPress={handleKeyPress}
+                        disabled={sending}
+                        className="flex-1"
+                      />
+                      <Button
+                        onClick={sendMessage}
+                        disabled={!newMessage.trim() || sending}
+                        className="text-white"
+                        style={{ backgroundColor: '#625d9c' }}
+                      >
+                        <Send className="w-4 h-4 mr-2" />
+                        Send
+                      </Button>
+                    </div>
+                    <p className="text-xs text-gray-500 mt-2">
+                      ⚠️ Messages are permanent and monitored. Do not share phone numbers, emails, or social media.
+                    </p>
+                  </div>
+                )}
               </div>
             </>
           ) : (
