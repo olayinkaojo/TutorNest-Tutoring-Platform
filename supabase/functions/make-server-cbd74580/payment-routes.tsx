@@ -301,29 +301,70 @@ app.post('/payments/verify/:reference', async (c) => {
 app.get('/payments/history', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    if (!accessToken) return c.json({ error: 'Unauthorized' }, 401);
 
     const user = await getUserFromToken(accessToken);
-    if (!user) {
-      return c.json({ error: 'User not found' }, 404);
-    }
+    if (!user) return c.json({ error: 'User not found' }, 404);
 
     const userId = user.userId || user.id;
-    const allPayments = await kv.getByPrefix('payment:');
-    
-    // Filter payments for this user (either as payer or recipient)
-    let userPayments = allPayments.filter((p: any) => 
-      p.userId === userId || p.tutorId === userId || p.studentId === userId
-    );
 
-    // Sort by date (newest first)
-    userPayments = userPayments.sort((a: any, b: any) => 
-      new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
-    );
+    // ── 1. KV payments (single-session Flutterwave bookings) ──────────────────
+    const allKv = await kv.getByPrefix('payment:');
+    const kvPayments = allKv
+      .filter((p: any) => p.userId === userId || p.tutorId === userId)
+      .map((p: any) => ({ ...p, source: 'kv' }));
 
-    return c.json({ payments: userPayments });
+    // ── 2. DB payments (plan bookings via initiate-plan) ──────────────────────
+    let dbPayments: any[] = [];
+    try {
+      dbPayments = await db.getPaymentsByUserId(userId);
+    } catch (dbErr: any) {
+      console.warn('DB payment history fetch failed (non-fatal):', dbErr.message);
+    }
+
+    // ── 3. Merge, deduplicate by id ───────────────────────────────────────────
+    const seen = new Set<string>();
+    const merged: any[] = [];
+    for (const p of [...kvPayments, ...dbPayments]) {
+      if (!seen.has(p.id)) { seen.add(p.id); merged.push(p); }
+    }
+
+    // ── 4. Enrich each payment with tutor + student display names ─────────────
+    const resolveName = (profile: any, fallback: string): string =>
+      profile?.fullName || profile?.full_name || profile?.name ||
+      (profile?.firstName ? `${profile.firstName} ${profile.lastName ?? ''}`.trim() : null) ||
+      fallback;
+
+    const enriched = await Promise.all(merged.map(async (p: any) => {
+      // Only look up if we don't already have a name
+      if (!p.metadata?.tutorName && p.tutorId) {
+        try {
+          const tutorDb = await db.getProfile(p.tutorId).catch(() => null);
+          const tutorKv = tutorDb ? null : await kv.get(`user:${p.tutorId}`) as any;
+          const tutorProfile = tutorDb ?? tutorKv;
+          const tutorName = resolveName(tutorProfile, 'Tutor');
+
+          let studentName = '';
+          if (p.studentId) {
+            const stuDb = await db.getProfile(p.studentId).catch(() => null);
+            const stuKvUser = stuDb ? null : await kv.get(`user:${p.studentId}`) as any;
+            const stuKvChild = (stuDb || stuKvUser) ? null : await kv.get(`child:${p.studentId}`) as any;
+            studentName = resolveName(stuDb ?? stuKvUser ?? stuKvChild, '');
+          }
+
+          return {
+            ...p,
+            metadata: { ...(p.metadata || {}), tutorName, studentName },
+          };
+        } catch (_) { /* non-fatal */ }
+      }
+      return p;
+    }));
+
+    // ── 5. Sort newest-first ──────────────────────────────────────────────────
+    enriched.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    return c.json({ payments: enriched });
   } catch (error: any) {
     console.error('Error fetching payment history:', error);
     return c.json({ error: error.message || 'Failed to fetch payment history' }, 500);
@@ -590,60 +631,81 @@ app.get('/admin/payouts', async (c) => {
 app.get('/payments/:paymentId/invoice', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
+    if (!accessToken) return c.json({ error: 'Unauthorized' }, 401);
 
     const paymentId = c.req.param('paymentId');
-    const payment = await kv.get(`payment:${paymentId}`) as any;
 
-    if (!payment) {
-      return c.json({ error: 'Payment not found' }, 404);
+    // 1. Check for pre-generated invoice (created by confirmPlanPayment)
+    const preGenInvoiceId = await kv.get(`payment_invoice:${paymentId}`) as string | null;
+    if (preGenInvoiceId) {
+      const preGenInvoice = await kv.get(`invoice:${preGenInvoiceId}`) as any;
+      if (preGenInvoice) return c.json({ invoice: preGenInvoice });
     }
 
-    // Get booking details
-    const booking = await kv.get(`booking:${payment.bookingId}`) as any;
-    
-    // Get tutor details
-    const tutorUsers = await kv.getByPrefix('user:');
-    const tutor = tutorUsers.find((u: any) => (u.userId || u.id) === payment.tutorId);
+    // 2. Try KV (single-session Flutterwave payments)
+    let payment: any = await kv.get(`payment:${paymentId}`);
 
-    // Get student/parent details
-    const payer = tutorUsers.find((u: any) => (u.userId || u.id) === payment.userId);
+    // 3. Fallback to DB (plan payments stored via initiate-plan)
+    if (!payment) {
+      payment = await db.getPaymentById(paymentId).catch(() => null);
+    }
+
+    if (!payment) return c.json({ error: 'Payment not found' }, 404);
+
+    // Resolve names
+    const resolveName = (p: any, fallback: string): string =>
+      p?.fullName || p?.full_name || p?.name ||
+      (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) || fallback;
+
+    const [tutorProfile, payerProfile] = await Promise.all([
+      payment.tutorId ? db.getProfile(payment.tutorId).catch(() => null) : null,
+      payment.userId  ? db.getProfile(payment.userId).catch(() => null)  : null,
+    ]);
+
+    const tutorKv = tutorProfile ? null : payment.tutorId ? await kv.get(`user:${payment.tutorId}`) as any : null;
+    const payerKv = payerProfile ? null : payment.userId  ? await kv.get(`user:${payment.userId}`) as any  : null;
+
+    const tutorName = resolveName(tutorProfile ?? tutorKv, 'Your Tutor');
+    const payerName = resolveName(payerProfile ?? payerKv, 'Customer');
+    const payerEmail = (payerProfile ?? payerKv)?.email || '';
+
+    // For single-session: get the KV booking; for plan: use startDate/startTime
+    const booking = payment.bookingId ? await kv.get(`booking:${payment.bookingId}`) as any : null;
+    const sessionDate = booking?.date || payment.startDate || '';
+    const sessionTime = booking?.startTime || payment.startTime || '';
+
+    // Determine line items (plan payments have sessions count)
+    const planSessions = payment.metadata?.sessions || payment.sessions || null;
+    const itemDescription = planSessions
+      ? `${payment.metadata?.planType || payment.planType || 'Plan'} — ${payment.subject || 'Tutoring'} with ${tutorName} (${planSessions} sessions)`
+      : `Tutoring Session — ${payment.subject || 'General'}`;
 
     const invoice = {
       id: `INV-${payment.id}`,
       paymentId: payment.id,
       reference: payment.reference,
-      date: payment.createdAt,
-      dueDate: payment.createdAt,
-      paidDate: payment.verifiedAt,
+      date: payment.createdAt || new Date().toISOString(),
+      dueDate: payment.createdAt || new Date().toISOString(),
+      paidDate: payment.verifiedAt || payment.confirmedAt || null,
       status: payment.status,
-      from: {
-        name: 'TutorNest',
-        address: 'Lagos, Nigeria',
-        email: 'billing@tutornest.org',
-      },
-      to: {
-        name: payer?.fullName || payer?.name || 'Customer',
-        email: payer?.email || '',
-      },
+      from: { name: 'TutorNest', address: 'Lagos, Nigeria', email: 'billing@tutornest.org' },
+      to: { name: payerName, email: payerEmail },
       items: [
         {
-          description: `Tutoring Session - ${payment.subject || 'General'}`,
-          tutor: tutor?.fullName || tutor?.name || 'Tutor',
-          date: booking?.date || '',
-          time: booking?.startTime || '',
-          duration: '1 hour',
-          quantity: 1,
-          rate: payment.amount,
+          description: itemDescription,
+          tutor: tutorName,
+          date: sessionDate,
+          time: sessionTime,
+          duration: planSessions ? `${planSessions} sessions` : '1 hour',
+          quantity: planSessions || 1,
+          rate: planSessions ? Math.round(payment.amount / planSessions) : payment.amount,
           amount: payment.amount,
         },
       ],
       subtotal: payment.amount,
       tax: 0,
       total: payment.amount,
-      notes: 'Thank you for using TutorNest!',
+      notes: 'Thank you for investing in quality education with TutorNest!',
     };
 
     return c.json({ invoice });
