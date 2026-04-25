@@ -597,7 +597,7 @@ export interface TriviaSubscription {
 
 /**
  * Get or create trivia subscription for a student-subject combo.
- * First access starts 30-day free trial. After trial: requires payment.
+ * First access starts 7-day free trial. After trial: requires payment.
  */
 export async function getOrCreateTriviaSubscription(
   studentId: string,
@@ -629,9 +629,9 @@ export async function getOrCreateTriviaSubscription(
     };
   }
 
-  // Create new subscription with 30-day free trial
+  // Create new subscription with 7-day free trial
   const now = new Date();
-  const trialExpiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000); // 30 days
+  const trialExpiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
   const { data: newSub, error: createError } = await db()
     .from('trivia_subscriptions')

@@ -9,11 +9,11 @@
 
 ## Overview
 
-This document details the comprehensive implementation of the **Trivia Paywall** feature, which monetizes the trivia game by offering a 30-day free trial followed by a ₦3,000/month subscription per subject. The implementation follows the same architectural pattern as the Chat Expiration feature, ensuring consistency across payment-gated features.
+This document details the comprehensive implementation of the **Trivia Paywall** feature, which monetizes the trivia game by offering a 7-day free trial followed by a ₦3,000/month subscription per subject. The implementation follows the same architectural pattern as the Chat Expiration feature, ensuring consistency across payment-gated features.
 
 ### Key Features
 
-- **30-Day Free Trial**: Automatic activation on first access, no payment required
+- **7-Day Free Trial**: Automatic activation on first access, no payment required
 - **Per-Subject Pricing**: ₦3,000 per month per subject (students choose which subjects to subscribe to)
 - **Smart Access Control**: Non-blocking database checks prevent service outages if DB unavailable
 - **Detailed Status Tracking**: Return comprehensive access status (trial active, trial expired, paid active, subscription expired)
@@ -24,7 +24,7 @@ This document details the comprehensive implementation of the **Trivia Paywall**
 
 | Status | Duration | Cost | Access |
 |--------|----------|------|--------|
-| Free Trial | 30 days | ₦0 | Full access to all questions |
+| Free Trial | 7 days | ₦0 | Full access to all questions |
 | Paid Active | 1 month | ₦3,000/subject | Full access, auto-renews |
 | Trial Expired | — | N/A | Paywall shown, can subscribe |
 | Subscription Expired | — | N/A | Paywall shown, can renew |
@@ -39,7 +39,7 @@ This document details the comprehensive implementation of the **Trivia Paywall**
 Student Starts Trivia
     ↓
 Is subscription record found?
-    ↓ [NO] → Create subscription with 30-day trial start
+    ↓ [NO] → Create subscription with 7-day trial start
     ↓ [YES]
 Check trial status
     ↓ [Trial Active] → Allow access, return {status: 'free_trial', daysRemaining: X}
@@ -68,7 +68,7 @@ Check trial status
 
 4. **Automatic Trial Creation**: First-time access auto-creates subscription record with:
    - `free_trial_started_at` = NOW()
-   - `free_trial_expires_at` = NOW() + 30 days
+   - `free_trial_expires_at` = NOW() + 7 days
    - `status` = 'free'
    - No payment record yet
 
@@ -126,7 +126,7 @@ Payment Made: ₦3,000 for Mathematics trivia
 ├─ Create/update payments record
 ├─ Update trivia_subscriptions:
 │  ├─ Set status = 'active'
-│  ├─ Set paid_expires_at = NOW() + 30 days
+│  ├─ Set paid_expires_at = NOW() + 30 days (30 days = 1 month subscription)
 │  └─ Link payment_id to payments record
 └─ trivia_subscriptions now shows:
    ├─ Free trial: Expired
@@ -161,7 +161,7 @@ export interface TriviaSubscription {
 
 #### 2. Function: `getOrCreateTriviaSubscription()`
 
-**Purpose**: Retrieve existing subscription or auto-create with 30-day trial
+**Purpose**: Retrieve existing subscription or auto-create with 7-day trial
 
 ```typescript
 export async function getOrCreateTriviaSubscription(
@@ -180,9 +180,9 @@ export async function getOrCreateTriviaSubscription(
 
     if (data) return data;
 
-    // 2. If not found, create new subscription with 30-day trial
+    // 2. If not found, create new subscription with 7-day trial
     const expiresAt = new Date();
-    expiresAt.setDate(expiresAt.getDate() + 30);
+    expiresAt.setDate(expiresAt.getDate() + 7);
 
     const { data: newSubscription } = await supabase
       .from('trivia_subscriptions')
@@ -472,7 +472,7 @@ interface TriviaPaywallProps {
 
 | Status | UI | Message | Actions |
 |--------|----|---------|---------| 
-| `free_trial` | Blue alert, ✨ icon | "30 days remaining" | View Details |
+| `free_trial` | Blue alert, ✨ icon | "7 days remaining" | View Details |
 | `trial_expired` | Orange alert, 🔒 icon | "Subscribe to continue" | Subscribe Now |
 | `paid_active` | Green alert, ✅ icon | "Renews on [date]" | View Details |
 | `subscription_expired` | Red alert, ❌ icon | "Renew to continue" | Subscribe Now |
@@ -599,7 +599,7 @@ describe('Trivia Paywall User Flow', () => {
   test('Free trial user can play trivia', async () => {
     // 1. User logs in and navigates to trivia
     // 2. Selects a subject (first time)
-    // 3. Should auto-create subscription with 30-day trial
+    // 3. Should auto-create subscription with 7-day trial
     // 4. Questions load successfully
     // 5. User can submit answers and see score
     
@@ -656,16 +656,16 @@ describe('Trivia Paywall User Flow', () => {
 
 ### Manual Testing Checklist
 
-- [ ] **Free Trial Creation**: New user starts trivia, subscription auto-created with 30-day expiration
-- [ ] **Trial Countdown**: Dashboard shows "14 days remaining" accurately
-- [ ] **Trial Expiration**: After 30 days, paywall displays instead of game
+- [ ] **Free Trial Creation**: New user starts trivia, subscription auto-created with 7-day expiration
+- [ ] **Trial Countdown**: Dashboard shows "3 days remaining" accurately
+- [ ] **Trial Expiration**: After 7 days, paywall displays instead of game
 - [ ] **Paywall Display**: Shows correct subject, pricing (₦3,000/month), benefits list
 - [ ] **Subscribe Button**: Redirects to payment page with correct product
 - [ ] **Payment Processing**: After payment, user regains access to trivia
 - [ ] **Per-Subject Isolation**: Paying for Math doesn't unlock English
 - [ ] **Backend Resilience**: If DB temporarily unavailable, trivia still loads (fail open)
 - [ ] **Status Transitions**: 
-  - free_trial → trial_expired (at +30 days)
+  - free_trial → trial_expired (at +7 days)
   - trial_expired + payment → paid_active
   - paid_active → subscription_expired (at payment +30 days)
 - [ ] **UI Responsiveness**: Paywall displays properly on mobile/tablet/desktop

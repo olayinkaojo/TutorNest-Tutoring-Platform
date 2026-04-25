@@ -139,15 +139,15 @@ CREATE INDEX IF NOT EXISTS earnings_tutor_id ON earnings (tutor_id);
 
 -- ─── Trivia Subscriptions ──────────────────────────────────────────────────────
 -- Tracks student access to trivia by subject (N3,000 per subject per month).
--- Free trial: 30 days from first access. After trial: requires active subscription.
+-- Free trial: 7 days from first access. After trial: requires active subscription.
 
 CREATE TABLE IF NOT EXISTS trivia_subscriptions (
   id           UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   student_id   UUID NOT NULL UNIQUE,           -- One record per student
   subject_id   TEXT NOT NULL,                  -- e.g., 'mathematics', 'english', 'science'
   status       TEXT NOT NULL DEFAULT 'free',   -- 'free' (in trial), 'active' (paid), 'expired'
-  free_trial_started_at TIMESTAMPTZ,          -- When free 30-day trial started
-  free_trial_expires_at TIMESTAMPTZ,          -- Trial expires (started_at + 30 days)
+  free_trial_started_at TIMESTAMPTZ,          -- When free 7-day trial started
+  free_trial_expires_at TIMESTAMPTZ,          -- Trial expires (started_at + 7 days)
   paid_expires_at TIMESTAMPTZ,                -- When paid subscription expires
   payment_id   UUID,                          -- Link to payments table
   subject_name TEXT,                          -- Display name (e.g., 'Mathematics')
