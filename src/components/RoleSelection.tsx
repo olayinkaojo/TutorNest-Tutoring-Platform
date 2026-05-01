@@ -75,18 +75,30 @@ export function RoleSelection({ session, currentProfile, onComplete, onTutorSele
             Authorization: `Bearer ${session.access_token}`,
           },
           body: JSON.stringify({ role: selectedRole }),
+          signal: AbortSignal.timeout(15000),
         }
       );
 
       if (!response.ok) {
-        const data = await response.json();
+        const data = await response.json().catch(() => ({}));
         throw new Error(data.error || 'Failed to set role');
       }
 
       // Show profile form
       setShowProfileForm(true);
     } catch (err: any) {
-      console.error('Error setting role:', err);
+      console.error('Error setting role via edge function:', err);
+      // Edge function unreachable or profile missing — update auth metadata directly
+      const isNetworkError = err.message === 'Failed to fetch' || err.name === 'TimeoutError' || err.name === 'AbortError' || err.message === 'Profile not found';
+      if (isNetworkError) {
+        try {
+          await supabase.auth.updateUser({ data: { role: selectedRole } });
+          setShowProfileForm(true);
+          return;
+        } catch (fallbackErr: any) {
+          console.error('Fallback role update failed:', fallbackErr);
+        }
+      }
       setError(err.message || 'An error occurred. Please try again.');
     } finally {
       setLoading(false);

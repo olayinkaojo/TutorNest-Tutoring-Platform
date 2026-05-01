@@ -116,7 +116,7 @@ export default function App() {
           headers: {
             Authorization: `Bearer ${accessToken}`,
           },
-          signal: AbortSignal.timeout(30000),
+          signal: AbortSignal.timeout(10000),
         }
       );
 

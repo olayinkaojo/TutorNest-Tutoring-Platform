@@ -1043,16 +1043,28 @@ app.post('/make-server-cbd74580/profile', async (c) => {
       return c.json({ error: 'Invalid role' }, 400);
     }
 
-    const profile = await kv.get(`user:${userId}`);
+    let profile = await kv.get(`user:${userId}`) as any;
 
     if (!profile) {
-      return c.json({ error: 'Profile not found' }, 404);
+      // Profile missing from KV — create it from auth metadata rather than failing
+      const adminSupa = getSupabaseClient();
+      const { data: { user: authUser } } = await adminSupa.auth.admin.getUserById(userId);
+      profile = {
+        userId,
+        id: userId,
+        email: authUser?.email || '',
+        full_name: authUser?.user_metadata?.name || '',
+        role: null,
+        profileData: {},
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString(),
+      };
     }
 
     // Create updated profile object
     const updatedProfile = {
       ...profile,
-      userId, // Explicitly set userId for consistency
+      userId,
       role,
       updatedAt: new Date().toISOString(),
     };
