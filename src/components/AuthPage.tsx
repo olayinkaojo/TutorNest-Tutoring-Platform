@@ -117,7 +117,7 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
           throw new Error('⚠️ Email Not Confirmed: Please check your email for a confirmation link, OR disable email confirmation in your Supabase Dashboard (Authentication → Email → Turn OFF "Confirm email"). See EMAIL_CONFIRMATION_FIX.md for detailed instructions.');
         }
         if (error.message.includes('Invalid login credentials')) {
-          throw new Error('Invalid email or password. Please check your credentials and try again. If you don\'t have an account yet, click "Sign Up" below to create one.');
+          throw new Error('Invalid email or password. Please double-check your credentials. If you just signed up, your account may need a moment — try again or use "Forgot Password" to reset it.');
         }
         throw error;
       }

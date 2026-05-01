@@ -664,21 +664,22 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         {emailConfirmationSent ? (
           <div className="bg-white rounded-3xl shadow-xl p-8 text-center">
             <div className="flex justify-center mb-4">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center">
-                <CheckCircle className="w-8 h-8 text-purple-600" />
+              <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center">
+                <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Check your email</h2>
-            <p className="text-gray-600 mb-4">
-              We sent a confirmation link to <strong>{email}</strong>.
-              Click the link in the email to activate your account.
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Application Submitted!</h2>
+            <p className="text-gray-600 mb-6">
+              Your tutor application for <strong>{email}</strong> has been received.
+              You can sign in now — your account will be reviewed within 24–48 hours.
             </p>
-            <p className="text-sm text-gray-500">
-              Already confirmed?{' '}
-              <button onClick={onBackToSignIn} className="text-purple-600 hover:underline font-medium">
-                Sign in
-              </button>
-            </p>
+            <button
+              onClick={onBackToSignIn}
+              className="w-full py-3 px-6 rounded-xl text-white font-semibold"
+              style={{ backgroundColor: '#625d9c' }}
+            >
+              Sign In Now
+            </button>
           </div>
         ) : (
 

@@ -669,12 +669,13 @@ app.post('/make-server-cbd74580/signup', async (c) => {
 
     const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Step 1: Create user (email confirmation required) via admin client
+    // Step 1: Create user via admin client — auto-confirm so they can sign in immediately
+    const userRole = role || profileData?.role || null;
     const { data, error } = await adminSupabase.auth.admin.createUser({
       email,
       password,
-      user_metadata: { name },
-      email_confirm: false,
+      user_metadata: { name, role: userRole },
+      email_confirm: true,
     });
 
     if (error) {
@@ -883,7 +884,7 @@ app.post('/make-server-cbd74580/signup', async (c) => {
     console.log('Signup successful for:', email);
     return c.json({
       success: true,
-      requiresEmailConfirmation: true,
+      requiresEmailConfirmation: false,
       userId: data.user.id,
       isAdmin,
       session: null,
@@ -946,18 +947,30 @@ app.get('/make-server-cbd74580/profile', async (c) => {
 
     // Try to get profile from KV store with a quick fallback
     let profile = await kv.get(`user:${userId}`) as any;
-    
+
     if (profile) {
       console.log('✅ Profile found in KV store');
       console.log('Profile role:', profile.role);
-      console.log('Profile summary:', {
-        userId: profile.userId,
-        email: profile.email,
-        role: profile.role,
-        fullName: profile.fullName || profile.full_name
-      });
+
+      // If profile has no role, try to recover it from auth user_metadata
+      if (!profile.role) {
+        console.log('⚠️ KV profile has no role — checking user_metadata for recovery');
+        try {
+          const supabaseForMeta = getSupabaseClient();
+          const { data: { user: metaUser } } = await supabaseForMeta.auth.admin.getUserById(userId);
+          if (metaUser?.user_metadata?.role) {
+            profile.role = metaUser.user_metadata.role;
+            profile.onboardingComplete = true;
+            // Persist the recovered role back to KV
+            kv.set(`user:${userId}`, profile).catch(() => {});
+            console.log('✅ Role recovered from user_metadata:', profile.role);
+          }
+        } catch (metaErr: any) {
+          console.warn('⚠️ Could not recover role from user_metadata:', metaErr.message);
+        }
+      }
+
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
-      // Quick return for existing profiles
       return c.json({ profile });
     }
 
