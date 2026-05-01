@@ -23,7 +23,7 @@ import { BookingManager } from './BookingManager';
 import { Chatroom } from './Chatroom';
 import { DocumentManager } from './DocumentManager';
 import { ResourcesHub } from './ResourcesHub';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -204,14 +204,9 @@ export function ParentDashboard({
     });
   }, [children, profile.id, profile.userId]);
 
-  // Calculate stats when children data, filter, or active child changes
-  useEffect(() => {
-    if (session?.access_token) {
-      calculateStats();
-    }
-  }, [children, selectedYears, selectedMonths, session, activeChildId]);
-
-  const calculateStats = async () => {
+  // Define calculateStats wrapped in useCallback to fix temporal dead zone error
+  // This must be defined BEFORE the effect that calls it
+  const calculateStats = useCallback(async () => {
     if (!session?.access_token || children.length === 0) return;
 
     try {
@@ -274,7 +269,14 @@ export function ParentDashboard({
     } catch (error) {
       console.error('Error calculating stats:', error);
     }
-  };
+  }, [children, session, activeChildId, selectedYears, selectedMonths]);
+
+  // Calculate stats when children data, filter, or active child changes
+  useEffect(() => {
+    if (session?.access_token) {
+      calculateStats();
+    }
+  }, [calculateStats, session?.access_token]);
 
   const loadChildren = async () => {
     if (!session?.access_token) return;
@@ -356,22 +358,7 @@ export function ParentDashboard({
     setShowEditChildDialog(true);
   };
 
-  // Transform children data for ChildProfileSwitcher component
-  const childProfilesForSwitcher = children.map(child => {
-    const counts = childSessionCounts[child.id];
-    return {
-      id: child.id,
-      firstName: child.firstName,
-      lastName: child.lastName,
-      age: child.age || calculateAge(child.dateOfBirth),
-      yearGroup: formatGradeLevel(child.gradeLevel || ''),
-      upcomingSessions: counts?.upcoming ?? 0,
-      completedSessions: counts?.completed ?? 0,
-      currentProgress: child.progress || 0,
-    };
-  });
-
-  // Helper function to calculate age
+  // Helper function to calculate age (MUST be defined before childProfilesForSwitcher)
   const calculateAge = (dateOfBirth: string): number => {
     if (!dateOfBirth) return 0;
     const today = new Date();
@@ -384,7 +371,7 @@ export function ParentDashboard({
     return age;
   };
 
-  // Helper function to format grade level to UK + Nigerian system
+  // Helper function to format grade level to UK + Nigerian system (MUST be defined before childProfilesForSwitcher)
   const formatGradeLevel = (gradeLevel: string): string => {
     if (!gradeLevel) return '';
     
@@ -410,6 +397,21 @@ export function ParentDashboard({
     
     return gradeMap[gradeLevel] || gradeLevel.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
   };
+
+  // Transform children data for ChildProfileSwitcher component
+  const childProfilesForSwitcher = children.map(child => {
+    const counts = childSessionCounts[child.id];
+    return {
+      id: child.id,
+      firstName: child.firstName,
+      lastName: child.lastName,
+      age: child.age || calculateAge(child.dateOfBirth),
+      yearGroup: formatGradeLevel(child.gradeLevel || ''),
+      upcomingSessions: counts?.upcoming ?? 0,
+      completedSessions: counts?.completed ?? 0,
+      currentProgress: child.progress || 0,
+    };
+  });
 
   const activeChild = children.find(c => c.id === activeChildId);
 

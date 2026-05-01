@@ -64,6 +64,7 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
   const [filterType, setFilterType] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [bookedTutors, setBookedTutors] = useState<Recipient[]>([]);
+  const [bookedStudents, setBookedStudents] = useState<Recipient[]>([]);
 
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -71,13 +72,37 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadDocType, setUploadDocType] = useState<'assignment' | 'review' | 'resource' | 'other'>('assignment');
   const [uploadRecipientId, setUploadRecipientId] = useState<string>('self');
+  const [selectedRecipientName, setSelectedRecipientName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     loadDocuments();
-    // Parents and students both need the booked-tutors list for the recipient selector
+    // Parents and students need booked tutors; Tutors need booked students
     if (userRole === 'parent' || userRole === 'student') loadBookedTutors();
+    else if (userRole === 'tutor') loadBookedStudents();
   }, [filterType]);
+
+  useEffect(() => {
+    // Update selected recipient name when uploading or recipient changes
+    if (uploadRecipientId === 'self') {
+      setSelectedRecipientName('');
+    } else if (children && children.length > 0) {
+      const child = children.find(c => c.id === uploadRecipientId);
+      if (child) {
+        setSelectedRecipientName(child.name || child.full_name || (child.firstName ? `${child.firstName} ${child.lastName || ''}`.trim() : 'Child'));
+      }
+    } else if (bookedTutors && bookedTutors.length > 0) {
+      const recipient = bookedTutors.find(t => t.id === uploadRecipientId);
+      if (recipient) {
+        setSelectedRecipientName(recipient.name);
+      }
+    } else if (bookedStudents && bookedStudents.length > 0) {
+      const recipient = bookedStudents.find(t => t.id === uploadRecipientId);
+      if (recipient) {
+        setSelectedRecipientName(recipient.name);
+      }
+    }
+  }, [uploadRecipientId, children, bookedTutors, bookedStudents]);
 
   const loadBookedTutors = async () => {
     try {
@@ -102,14 +127,44 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
     } catch (_) {}
   };
 
+  // Load booked students for tutors
+  const loadBookedStudents = async () => {
+    try {
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`,
+        { headers: { 'Authorization': `Bearer ${session.access_token}` } }
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const seen = new Set<string>();
+      const students: Recipient[] = [];
+      for (const b of (data.bookings || [])) {
+        if (b.studentId && !seen.has(b.studentId)) {
+          seen.add(b.studentId);
+          // Use full name if available
+          const studentName = b.studentFullName || b.studentName || 
+            (b.studentFirstName ? `${b.studentFirstName} ${b.studentLastName || ''}`.trim() : 'Student');
+          students.push({ id: b.studentId, name: studentName, type: 'child' });
+        }
+      }
+      setBookedStudents(students);
+    } catch (_) {}
+  };
+
   const loadDocuments = async () => {
     setLoading(true);
     
     try {
       let url = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/documents`;
       
+      const params = new URLSearchParams();
       if (filterType !== 'all') {
-        url += `?documentType=${filterType}`;
+        params.append('documentType', filterType);
+      }
+      params.append('userRole', userRole);
+      
+      if (params.toString()) {
+        url += `?${params.toString()}`;
       }
 
       const response = await fetch(url, {
@@ -141,6 +196,30 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
         toast.error('File size must be less than 25MB');
         return;
       }
+
+      // Validate file type: ONLY images, PDF, and safe documents
+      const ALLOWED_MIME_TYPES = new Set([
+        'application/pdf',                                                    // PDF
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',  // Images
+        'application/msword',                                                 // .doc
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  // .docx
+      ]);
+
+      if (!ALLOWED_MIME_TYPES.has(file.type)) {
+        toast.error('Only PDF, images (.jpg, .png, .gif, .webp), and documents (.doc, .docx) are allowed');
+        return;
+      }
+
+      // Validate filename to prevent malicious files
+      const fileName = file.name.toLowerCase();
+      const dangerousExtensions = ['.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js', '.jar', '.zip', '.rar', '.7z', '.tar', '.gz'];
+      const hasDangerousExt = dangerousExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (hasDangerousExt) {
+        toast.error('Executable and archive files are not allowed');
+        return;
+      }
+
       setUploadFile(file);
       setUploadTitle(file.name);
     }
@@ -168,6 +247,7 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
       formData.append('uploadedByRole', userRole);
       formData.append('relatedToId', userId);
       formData.append('relatedToType', userRole);
+      formData.append('sharedWithType', userRole);
       // Recipient: empty string means "myself only"
       formData.append('sharedWithId', uploadRecipientId === 'self' ? '' : uploadRecipientId);
 
@@ -472,7 +552,7 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileSelect}
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.jpg,.jpeg,.png,.gif"
+                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
               />
               {uploadFile && (
                 <p className="text-sm text-gray-600 mt-1">
@@ -518,7 +598,7 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
             </div>
 
             {/* Recipient selector — only shown when there are people to share with */}
-            {(children.length > 0 || bookedTutors.length > 0) && (
+            {(children.length > 0 || bookedTutors.length > 0 || bookedStudents.length > 0) && (
               <div>
                 <Label htmlFor="recipient">Share With</Label>
                 <Select value={uploadRecipientId} onValueChange={setUploadRecipientId}>
@@ -527,6 +607,7 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="self">Myself only (private)</SelectItem>
+                    {/* For parents: show children */}
                     {children.length > 0 && (
                       <>
                         <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">Children</div>
@@ -537,12 +618,24 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
                         ))}
                       </>
                     )}
+                    {/* For students/parents: show booked tutors */}
                     {bookedTutors.length > 0 && (
                       <>
                         <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">Tutors</div>
-                        {bookedTutors.map(tutor => (
-                          <SelectItem key={tutor.id} value={tutor.id}>
-                            {tutor.name}
+                        {bookedTutors.map(recipient => (
+                          <SelectItem key={recipient.id} value={recipient.id}>
+                            {recipient.name}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {/* For tutors: show booked students */}
+                    {bookedStudents.length > 0 && (
+                      <>
+                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">Students</div>
+                        {bookedStudents.map(recipient => (
+                          <SelectItem key={recipient.id} value={recipient.id}>
+                            {recipient.name}
                           </SelectItem>
                         ))}
                       </>
@@ -552,7 +645,9 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
                 <p className="text-xs text-gray-500 mt-1">
                   {uploadRecipientId === 'self'
                     ? 'Only you can see this document.'
-                    : 'The selected person will be able to view and download this document. All sharing is monitored by admins.'}
+                    : selectedRecipientName 
+                      ? `${selectedRecipientName} will be able to view and download this document. All sharing is monitored by admins.`
+                      : 'Select a recipient to share this document.'}
                 </p>
               </div>
             )}

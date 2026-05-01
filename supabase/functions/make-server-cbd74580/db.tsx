@@ -515,6 +515,31 @@ export async function getAllBookingsForAdmin(year?: number, month?: number): Pro
   }));
 }
 
+/** Returns payments for a specific user (as payer or tutor) from the DB. */
+export async function getPaymentsByUserId(userId: string): Promise<any[]> {
+  const { data, error } = await db()
+    .from('payments')
+    .select('*')
+    .or(`user_id.eq.${userId},tutor_id.eq.${userId}`)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    tutorId: row.tutor_id,
+    studentId: row.student_id,
+    amount: Number(row.amount),
+    subject: row.subject,
+    status: row.status,
+    reference: row.reference,
+    planType: row.plan_type,
+    createdAt: row.created_at,
+    verifiedAt: row.confirmed_at,
+    metadata: { planType: row.plan_type },
+    source: 'db',
+  }));
+}
+
 /**
  * Returns all payments from the DB, mapped to the same shape the KV store used.
  * Pass year + month to filter by created_at.

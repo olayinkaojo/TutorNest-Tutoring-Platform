@@ -23,6 +23,7 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       const uploadedByRole = formData.get('uploadedByRole') as string;
       // Recipient: the user (or child) this document is shared with
       const sharedWithId = formData.get('sharedWithId') as string || '';
+      const sharedWithType = formData.get('sharedWithType') as string || relatedToType;
 
       if (!file) {
         return c.json({ error: 'No file provided' }, 400);
@@ -33,23 +34,42 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         return c.json({ error: 'File size exceeds 25MB limit' }, 400);
       }
 
-      // Validate file type (documents only)
-      const allowedTypes = [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.ms-powerpoint',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'text/plain',
-        'image/jpeg',
-        'image/png',
-        'image/gif',
-      ];
+      // Validate file type: ONLY images, PDF, and safe documents
+      const ALLOWED_MIME_TYPES = new Set([
+        'application/pdf',                                                    // PDF
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',  // Images
+        'application/msword',                                                 // .doc
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  // .docx
+      ]);
 
-      if (!allowedTypes.includes(file.type)) {
-        return c.json({ error: 'Invalid file type. Only documents and images are allowed.' }, 400);
+      if (!ALLOWED_MIME_TYPES.has(file.type)) {
+        return c.json({ error: 'Invalid file type. Only PDF, images (.jpg, .png, .gif, .webp), and documents (.doc, .docx) are allowed.' }, 400);
+      }
+
+      // Validate filename to prevent malicious files
+      const fileName = file.name.toLowerCase();
+      const dangerousExtensions = ['.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js', '.jar', '.zip', '.rar', '.7z', '.tar', '.gz'];
+      const hasDangerousExt = dangerousExtensions.some(ext => fileName.endsWith(ext));
+      
+      if (hasDangerousExt) {
+        return c.json({ error: 'File type not allowed. Executable and archive files are prohibited.' }, 400);
+      }
+
+      // Additional validation: check that the MIME type matches the file extension
+      const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+      const validExtensions: Record<string, string[]> = {
+        'application/pdf': ['.pdf'],
+        'image/jpeg': ['.jpg', '.jpeg'],
+        'image/png': ['.png'],
+        'image/gif': ['.gif'],
+        'image/webp': ['.webp'],
+        'application/msword': ['.doc'],
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      };
+
+      const allowedExts = validExtensions[file.type] || [];
+      if (!allowedExts.includes(fileExt)) {
+        return c.json({ error: 'File extension does not match file type. Possible security risk.' }, 400);
       }
 
       // Create bucket if it doesn't exist
@@ -129,7 +149,7 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         relatedToType,
         sharedWithId,
         sharedWithName,
-        sharedWithType: relatedToType,
+        sharedWithType,
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -182,15 +202,34 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
 
       const documentType = c.req.query('documentType'); // Optional filter
       const relatedToId = c.req.query('relatedToId'); // Optional filter
+      const userRole = c.req.query('userRole'); // Current role (parent, tutor, student, admin)
 
       // Get all documents
       const allDocuments = await kv.getByPrefix('document:');
 
-      // Filter documents accessible by this user
+      // Filter documents accessible by this user based on their current role
       let userDocuments = allDocuments.filter((doc: any) => {
-        if (doc.uploadedBy === userId) return true;      // own documents
-        if (doc.relatedToId === userId) return true;     // related to user
-        if (doc.sharedWithId === userId) return true;    // explicitly shared with user
+        // Case 1: Own documents uploaded in current role (role-based isolation)
+        if (doc.uploadedBy === userId && doc.uploadedByRole === userRole) {
+          return true;
+        }
+
+        // Case 2: Students see documents explicitly shared with them
+        if (userRole === 'student' && doc.sharedWithId === userId) {
+          return true;
+        }
+
+        // Case 3: Tutors see documents explicitly shared with them
+        if (userRole === 'tutor' && doc.sharedWithId === userId) {
+          return true;
+        }
+
+        // Case 4: Parents see documents from tutors that are shared with parent context
+        // (intended for parents' children - tutors upload for parent's kids)
+        if (userRole === 'parent' && doc.uploadedByRole === 'tutor' && doc.sharedWithType === 'parent') {
+          return true;
+        }
+
         return false;
       });
 

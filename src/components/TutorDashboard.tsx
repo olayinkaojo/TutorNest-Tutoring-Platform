@@ -55,6 +55,7 @@ import { TutorStatsSection } from './tutor/TutorStatsSection';
 import { TutorOverviewTab } from './tutor/TutorOverviewTab';
 import { StudentProgressWidget } from './StudentProgressWidget';
 import { Chatroom } from './Chatroom';
+import { DocumentManager } from './DocumentManager';
 import tutorAPI from '../utils/tutor-api-client';
 import { parseWAT, bookingDateLabel, formatRawTimeWAT, WAT_TIMEZONE } from '../utils/timezone';
 
@@ -129,6 +130,7 @@ export function TutorDashboard({
     'reviews',
     'bookshop',
     'content',
+    'documents',
   ]);
 
   useEffect(() => {
@@ -1027,6 +1029,7 @@ export function TutorDashboard({
             <TabsTrigger value="gamification">Gamification</TabsTrigger>
             <TabsTrigger value="reporting">Reporting</TabsTrigger>
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
+            <TabsTrigger value="documents">Documents</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -1279,6 +1282,17 @@ export function TutorDashboard({
               <TutorReviewsTab 
                 accessToken={session.access_token} 
                 tutorId={profile.id || profile.userId}
+              />
+            )}
+          </TabsContent>
+
+          {/* Documents Tab */}
+          <TabsContent value="documents">
+            {session && (
+              <DocumentManager
+                session={session}
+                userId={profile.id || profile.userId}
+                userRole="tutor"
               />
             )}
           </TabsContent>
