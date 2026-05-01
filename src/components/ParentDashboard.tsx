@@ -201,50 +201,66 @@ export function ParentDashboard({
     });
   }, [children, profile.id, profile.userId]);
 
-  // Calculate stats when children data or filter changes
+  // Calculate stats when children data, filter, or active child changes
   useEffect(() => {
     if (session?.access_token) {
       calculateStats();
     }
-  }, [children, selectedYears, selectedMonths, session]);
+  }, [children, selectedYears, selectedMonths, session, activeChildId]);
 
   const calculateStats = async () => {
-    if (!session?.access_token) return;
+    if (!session?.access_token || children.length === 0) return;
 
     try {
-      // Fetch all bookings for all children
-      const parentId = profile.id || profile.userId;
+      // Fetch bookings for every child so we can also populate upcoming counts on each card
       const bookingsPromises = children.map(child =>
         fetch(
           `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings?studentId=${child.id}`,
-          {
-            headers: {
-              'Authorization': `Bearer ${session.access_token}`,
-            },
-          }
+          { headers: { 'Authorization': `Bearer ${session.access_token}` } }
         ).then(res => res.ok ? res.json() : { bookings: [] })
       );
 
       const allBookingsData = await Promise.all(bookingsPromises);
-      const allBookings = allBookingsData.flatMap(data => data.bookings || []);
 
-      // Filter bookings by selected years and months
-      const filteredBookings = allBookings.filter((b: any) => {
+      // Attach live upcoming / completed counts back to each child card
+      const enrichedChildren = children.map((child, i) => {
+        const childBookings: any[] = allBookingsData[i]?.bookings || [];
+        const upcoming = childBookings.filter((b: any) =>
+          (b.status === 'confirmed' || b.status === 'pending') &&
+          new Date(b.date) >= new Date()
+        ).length;
+        const completed = childBookings.filter((b: any) => b.status === 'completed').length;
+        return { ...child, upcomingSessions: upcoming, completedLessons: completed };
+      });
+      // Update children with live session counts without triggering a full reload
+      setChildren(prev =>
+        prev.map(c => {
+          const enriched = enrichedChildren.find(e => e.id === c.id);
+          return enriched ? { ...c, upcomingSessions: enriched.upcomingSessions, completedLessons: enriched.completedLessons } : c;
+        })
+      );
+
+      // Stats scope: if a specific child is active, show only their numbers
+      const relevantBookings = activeChildId
+        ? (allBookingsData[children.findIndex(c => c.id === activeChildId)]?.bookings || [])
+        : allBookingsData.flatMap((d: any) => d.bookings || []);
+
+      // Filter by selected years and months
+      const filteredBookings = relevantBookings.filter((b: any) => {
         const bookingDate = new Date(b.date);
         return selectedYears.includes(bookingDate.getFullYear()) &&
                selectedMonths.includes(bookingDate.getMonth() + 1);
       });
 
-      // Calculate stats
-      const lessonsScheduled = filteredBookings.filter((b: any) => 
+      const lessonsScheduled = filteredBookings.filter((b: any) =>
         b.status === 'confirmed' || b.status === 'pending'
       ).length;
 
-      const completedLessons = filteredBookings.filter((b: any) => 
+      const completedLessons = filteredBookings.filter((b: any) =>
         b.status === 'completed'
       ).length;
 
-      // Include confirmed (paid, upcoming) and completed (paid, done) — exclude cancelled refunds
+      // Include confirmed (paid, upcoming) and completed (paid, done)
       const totalSpent = filteredBookings
         .filter((b: any) => b.status === 'completed' || b.status === 'confirmed')
         .reduce((sum: number, b: any) => sum + (parseFloat(b.price) || 0), 0);
@@ -253,7 +269,7 @@ export function ParentDashboard({
         totalChildren: children.length,
         lessonsScheduled,
         completedLessons,
-        totalSpent
+        totalSpent,
       });
     } catch (error) {
       console.error('Error calculating stats:', error);
@@ -346,7 +362,7 @@ export function ParentDashboard({
     firstName: child.firstName,
     lastName: child.lastName,
     age: child.age || calculateAge(child.dateOfBirth),
-    yearGroup: child.gradeLevel?.replace('_', ' ').replace(/\b\w/g, (l: string) => l.toUpperCase()),
+    yearGroup: formatGradeLevel(child.gradeLevel || ''),
     upcomingSessions: child.upcomingSessions || 0,
     completedSessions: child.completedLessons || 0,
     currentProgress: child.progress || 0
@@ -582,9 +598,22 @@ export function ParentDashboard({
           </p>
         </div>
 
-        {/* Child Profile Switcher - only show if children exist */}
+        {/* Stats with Date Filter - shown first so the filter context is clear */}
+        <ParentStatsSection
+          stats={stats}
+          selectedMonths={selectedMonths}
+          selectedYears={selectedYears}
+          setSelectedMonths={setSelectedMonths}
+          setSelectedYears={setSelectedYears}
+          setActiveTab={setActiveTab}
+        />
+
+        {/* Child Profile Grid - click a card to switch the active child; stats above update to reflect selection */}
         {!loadingChildren && children.length > 0 && (
-          <div className="mb-4 lg:mb-8">
+          <div className="mb-6">
+            <p className="text-sm text-gray-500 mb-3">
+              Stats above reflect the <strong>selected child</strong>. Click a card to switch.
+            </p>
             <ChildProfileSwitcher
               children={childProfilesForSwitcher}
               activeChildId={activeChildId}
@@ -697,16 +726,6 @@ export function ParentDashboard({
             </AlertDescription>
           </Alert>
         )}
-
-        {/* Stats with Date Filter */}
-        <ParentStatsSection
-          stats={stats}
-          selectedMonths={selectedMonths}
-          selectedYears={selectedYears}
-          setSelectedMonths={setSelectedMonths}
-          setSelectedYears={setSelectedYears}
-          setActiveTab={setActiveTab}
-        />
 
         <ParentQuickActions setActiveTab={setActiveTab} />
 
@@ -1057,7 +1076,7 @@ export function ParentDashboard({
           {/* Analytics Tab */}
           <TabsContent value="analytics">
             {session && (
-              <ParentAnalyticsDashboard accessToken={session.access_token} />
+              <ParentAnalyticsDashboard accessToken={session.access_token} childProfiles={children} />
             )}
           </TabsContent>
 

@@ -93,9 +93,26 @@ export function SessionReportsViewer({
 
   // Load subjects from paid bookings so the filter shows all subjects, not just ones with reports
   useEffect(() => {
-    if (viewType !== 'student') return;
+    if (viewType !== 'student' && viewType !== 'parent') return;
     const fetchBookedSubjects = async () => {
       try {
+        // For parent view: fetch bookings for each child, then union all subjects
+        if (viewType === 'parent' && children.length > 0) {
+          const perChildResults = await Promise.all(
+            children.map((child: any) =>
+              fetch(
+                `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings?studentId=${child.id}`,
+                { headers: { Authorization: `Bearer ${accessToken}` } },
+              ).then(r => r.ok ? r.json() : { bookings: [] }).catch(() => ({ bookings: [] }))
+            )
+          );
+          const subjects = Array.from(new Set(
+            perChildResults.flatMap((d: any) => (d.bookings || []).map((b: any) => b.subject).filter(Boolean))
+          )) as string[];
+          setBookedSubjects(subjects);
+          return;
+        }
+        // Student view: own bookings
         const res = await fetch(
           `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`,
           { headers: { Authorization: `Bearer ${accessToken}` } },
@@ -109,7 +126,7 @@ export function SessionReportsViewer({
       } catch (_) {}
     };
     fetchBookedSubjects();
-  }, [viewType, accessToken]);
+  }, [viewType, accessToken, children.length]);
 
   // Real-time updates via WebSocket
   const handleRealtimeUpdate = (type: string, data: unknown) => {
@@ -306,9 +323,11 @@ export function SessionReportsViewer({
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="all">All Children</SelectItem>
-                    {children.map(child => (
+                    {children.map((child: any) => (
                       <SelectItem key={child.id} value={child.id}>
-                        {child.name || child.full_name}
+                        {child.firstName && child.lastName
+                          ? `${child.firstName} ${child.lastName}`
+                          : child.name || child.full_name || 'Child'}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -333,7 +352,7 @@ export function SessionReportsViewer({
               </Select>
             </div>
 
-            {viewType === 'admin' && (
+            {(viewType === 'admin' || viewType === 'parent') && uniqueTutors.length > 0 && (
               <div>
                 <Label>Filter by Tutor</Label>
                 <Select value={filterTutor} onValueChange={setFilterTutor}>

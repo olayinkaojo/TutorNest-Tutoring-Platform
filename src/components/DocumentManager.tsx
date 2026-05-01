@@ -403,7 +403,13 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
                         <span>•</span>
                         <span>{formatFileSize(doc.fileSize)}</span>
                         <span>•</span>
-                        <span>{new Date(doc.createdAt + 'T12:00:00+01:00').toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric', month: 'short', year: 'numeric' })}</span>
+                        <span>{(() => {
+                          if (!doc.createdAt) return 'Unknown date';
+                          // createdAt may already be a full ISO timestamp or just a date string
+                          const raw = doc.createdAt.includes('T') ? doc.createdAt : doc.createdAt + 'T12:00:00+01:00';
+                          const d = new Date(raw);
+                          return isNaN(d.getTime()) ? 'Invalid date' : d.toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric', month: 'short', year: 'numeric' });
+                        })()}</span>
                         {doc.sharedWithId && doc.sharedWithId !== '' && doc.sharedWithName && (
                           <>
                             <span>•</span>

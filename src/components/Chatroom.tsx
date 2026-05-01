@@ -344,20 +344,29 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
   const loadContacts = async () => {
     setContactsLoading(true);
     try {
-      const url = userRole === 'parent'
-        ? `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutors`
-        : `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`;
-      const res = await fetch(url, {
-        headers: { 'Authorization': `Bearer ${session.access_token}` },
-      });
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`,
+        { headers: { 'Authorization': `Bearer ${session.access_token}` } },
+      );
       if (!res.ok) return;
       const data = await res.json();
       if (userRole === 'parent') {
-        const tutors: Contact[] = (data.tutors || data || []).map((t: any) => ({
-          id: t.userId || t.id,
-          name: t.fullName || t.name || `${t.firstName || ''} ${t.lastName || ''}`.trim() || 'Tutor',
-          role: 'tutor',
-        })).filter((c: Contact) => c.id && c.id !== userId);
+        // Show only tutors the parent has paid bookings with
+        const bookings: any[] = data.bookings || [];
+        const seen = new Set<string>();
+        const tutors: Contact[] = [];
+        for (const b of bookings) {
+          const tutorId = b.tutorId;
+          if (tutorId && tutorId !== userId && !seen.has(tutorId)) {
+            seen.add(tutorId);
+            tutors.push({
+              id: tutorId,
+              name: b.tutorFullName || b.tutorName ||
+                (b.tutorFirstName ? `${b.tutorFirstName} ${b.tutorLastName || ''}`.trim() : 'Tutor'),
+              role: 'tutor',
+            });
+          }
+        }
         setContacts(tutors);
       } else if (userRole === 'student') {
         // Students can only message tutors they have active sessions with
