@@ -25,6 +25,7 @@ import contentModerationRoutes from './content-moderation-routes.tsx';
 import sanctionsRoutes from './sanctions-routes.tsx';
 import policiesRoutes from './policies-routes.tsx';
 import { studentAuthRoutes } from './student-auth-routes.tsx';
+import { parentAuthRoutes } from './parent-auth-routes.tsx';
 import bookshopRoutes from './bookshop-routes.tsx';
 import roleManagementRoutes from './role-management-routes.tsx';
 import assessmentsRoutes from './assessments-routes.tsx';
@@ -279,6 +280,9 @@ adminRoutes(app, getUserId);
 
 // Register student auth routes
 studentAuthRoutes(app, getUserId);
+
+// Register parent auth routes
+parentAuthRoutes(app, getUserId);
 
 // Register reviews and disputes routes
 app.route('/make-server-cbd74580', reviewsDisputesRoutes);
