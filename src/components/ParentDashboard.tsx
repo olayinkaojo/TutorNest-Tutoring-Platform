@@ -79,6 +79,9 @@ export function ParentDashboard({
   const [showEditChildDialog, setShowEditChildDialog] = useState(false);
   const [children, setChildren] = useState<any[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(true);
+  // Live session counts per child — stored separately so calculateStats doesn't mutate `children`
+  // and cause an infinite re-render loop
+  const [childSessionCounts, setChildSessionCounts] = useState<Record<string, { upcoming: number; completed: number }>>({});
   // Initialize from localStorage to persist across page refreshes
   const [activeChildId, setActiveChildId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
@@ -222,23 +225,20 @@ export function ParentDashboard({
 
       const allBookingsData = await Promise.all(bookingsPromises);
 
-      // Attach live upcoming / completed counts back to each child card
-      const enrichedChildren = children.map((child, i) => {
+      // Populate live session counts into a separate state so we don't mutate `children`
+      // (mutating children would re-trigger this effect and cause an infinite loop)
+      const counts: Record<string, { upcoming: number; completed: number }> = {};
+      children.forEach((child, i) => {
         const childBookings: any[] = allBookingsData[i]?.bookings || [];
-        const upcoming = childBookings.filter((b: any) =>
-          (b.status === 'confirmed' || b.status === 'pending') &&
-          new Date(b.date) >= new Date()
-        ).length;
-        const completed = childBookings.filter((b: any) => b.status === 'completed').length;
-        return { ...child, upcomingSessions: upcoming, completedLessons: completed };
+        counts[child.id] = {
+          upcoming: childBookings.filter((b: any) =>
+            (b.status === 'confirmed' || b.status === 'pending') &&
+            new Date(b.date) >= new Date()
+          ).length,
+          completed: childBookings.filter((b: any) => b.status === 'completed').length,
+        };
       });
-      // Update children with live session counts without triggering a full reload
-      setChildren(prev =>
-        prev.map(c => {
-          const enriched = enrichedChildren.find(e => e.id === c.id);
-          return enriched ? { ...c, upcomingSessions: enriched.upcomingSessions, completedLessons: enriched.completedLessons } : c;
-        })
-      );
+      setChildSessionCounts(counts);
 
       // Stats scope: if a specific child is active, show only their numbers
       const relevantBookings = activeChildId
@@ -357,16 +357,19 @@ export function ParentDashboard({
   };
 
   // Transform children data for ChildProfileSwitcher component
-  const childProfilesForSwitcher = children.map(child => ({
-    id: child.id,
-    firstName: child.firstName,
-    lastName: child.lastName,
-    age: child.age || calculateAge(child.dateOfBirth),
-    yearGroup: formatGradeLevel(child.gradeLevel || ''),
-    upcomingSessions: child.upcomingSessions || 0,
-    completedSessions: child.completedLessons || 0,
-    currentProgress: child.progress || 0
-  }));
+  const childProfilesForSwitcher = children.map(child => {
+    const counts = childSessionCounts[child.id];
+    return {
+      id: child.id,
+      firstName: child.firstName,
+      lastName: child.lastName,
+      age: child.age || calculateAge(child.dateOfBirth),
+      yearGroup: formatGradeLevel(child.gradeLevel || ''),
+      upcomingSessions: counts?.upcoming ?? 0,
+      completedSessions: counts?.completed ?? 0,
+      currentProgress: child.progress || 0,
+    };
+  });
 
   // Helper function to calculate age
   const calculateAge = (dateOfBirth: string): number => {
