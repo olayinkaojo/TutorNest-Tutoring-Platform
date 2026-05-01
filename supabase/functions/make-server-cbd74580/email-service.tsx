@@ -1,9 +1,13 @@
 import { Resend } from "npm:resend@3.2.0";
 
 const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
-const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "noreply@resend.dev"; // Switch to noreply@tutornest.org once domain is verified in Resend
+// Use verified domain if available, otherwise fallback to onboarding domain
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "noreply@tutornest.org";
+const FALLBACK_FROM_EMAIL = "onboarding@resend.dev"; // Resend's default verified domain for testing
 
 const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
+
+console.log(`📧 Email Service Initialized: API Key: ${RESEND_API_KEY ? '✅ Configured' : '❌ NOT configured'}, From: ${FROM_EMAIL}`);
 
 export interface EmailData {
   to: string;
@@ -14,8 +18,8 @@ export interface EmailData {
 
 export async function sendEmail(data: EmailData): Promise<{ success: boolean; error?: string }> {
   if (!resend) {
-    console.warn("⚠️ Resend API key not configured - email not sent");
-    return { success: false, error: "Email service not configured" };
+    console.error("❌ Resend API key not configured - configure RESEND_API_KEY environment variable");
+    return { success: false, error: "Email service not configured. Set RESEND_API_KEY environment variable." };
   }
 
   try {
@@ -28,11 +32,33 @@ export async function sendEmail(data: EmailData): Promise<{ success: boolean; er
     });
 
     if (result.error) {
-      console.error("❌ Email send failed:", result.error);
-      return { success: false, error: result.error.message };
+      console.warn(`⚠️ Email send failed with FROM_EMAIL "${FROM_EMAIL}": ${result.error.message}`);
+      console.log(`Retrying with fallback email: ${FALLBACK_FROM_EMAIL}`);
+      
+      // Retry with fallback email
+      try {
+        const fallbackResult = await resend.emails.send({
+          from: FALLBACK_FROM_EMAIL,
+          to: data.to,
+          subject: data.subject,
+          html: data.html,
+          reply_to: data.replyTo || FALLBACK_FROM_EMAIL,
+        });
+        
+        if (fallbackResult.error) {
+          console.error("❌ Email send failed (even with fallback):", fallbackResult.error.message);
+          return { success: false, error: fallbackResult.error.message };
+        }
+        
+        console.log("✅ Email sent successfully (via fallback) to:", data.to);
+        return { success: true };
+      } catch (fallbackErr) {
+        console.error("❌ Fallback email send failed:", fallbackErr);
+        return { success: false, error: (fallbackErr as Error).message };
+      }
     }
 
-    console.log("✅ Email sent successfully:", data.to, data.subject);
+    console.log("✅ Email sent successfully to:", data.to, "Subject:", data.subject);
     return { success: true };
   } catch (error) {
     console.error("❌ Email service error:", error);
