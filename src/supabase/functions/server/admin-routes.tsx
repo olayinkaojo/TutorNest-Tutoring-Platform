@@ -1,6 +1,40 @@
-import { Hono } from 'npm:hono';
+import { Hono } from 'npm:hono@4';
+import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
+import { sendEmail, emailTemplates } from './email-service.tsx';
+
+// Checks KV → DB profiles → auth user_metadata for admin role.
+// Auto-upserts the DB profile on first admin access so future checks work.
+async function isAdminUser(userId: string): Promise<boolean> {
+  const kvProfile = await kv.get(`user:${userId}`) as any;
+  if (kvProfile?.role === 'admin') return true;
+
+  const dbProfile = await db.getProfile(userId);
+  if (dbProfile?.role === 'admin') return true;
+
+  // Final fallback: check Supabase auth user_metadata
+  try {
+    const adminClient = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+    );
+    const { data } = await adminClient.auth.admin.getUserById(userId);
+    if (data?.user?.user_metadata?.role === 'admin') {
+      // Auto-upsert into DB so this route works without auth-metadata fallback next time
+      await db.upsertProfile(userId, {
+        id: userId,
+        userId,
+        role: 'admin',
+        email: data.user.email ?? '',
+        fullName: data.user.user_metadata?.name ?? data.user.user_metadata?.full_name ?? '',
+      }).catch(() => {});
+      return true;
+    }
+  } catch (_) { /* ignore */ }
+
+  return false;
+}
 
 // Helper function to format timestamp
 function formatTimestamp(timestamp: string): string {
@@ -34,67 +68,6 @@ function calculateAge(dateOfBirth: string): number {
   return age;
 }
 
-function getDisplayName(user: any): string {
-  const firstName = user?.firstName?.trim();
-  const lastName = user?.lastName?.trim();
-  const fullName = user?.fullName?.trim();
-  const name = user?.name?.trim();
-
-  if (firstName || lastName) {
-    return `${firstName || ''} ${lastName || ''}`.trim();
-  }
-
-  if (fullName) return fullName;
-  if (name) return name;
-  if (user?.email) return user.email.split('@')[0];
-  return 'Unknown Tutor';
-}
-
-function getInitials(displayName: string, email?: string): string {
-  const parts = displayName.split(/\s+/).filter(Boolean);
-  if (parts.length > 1) {
-    return `${parts[0][0] || ''}${parts[1][0] || ''}`.toUpperCase();
-  }
-
-  if (parts.length === 1 && parts[0]) {
-    return parts[0].slice(0, 2).toUpperCase();
-  }
-
-  if (email) {
-    return email.slice(0, 2).toUpperCase();
-  }
-
-  return 'UT';
-}
-
-function buildTutorSummary(user: any) {
-  return {
-    fullName: getDisplayName(user),
-    phone: user.phone || '',
-    location: user.location || '',
-    bio: user.bio || '',
-    hourlyRate: user.hourlyRate ?? user.hourly_rate ?? null,
-    experienceYears: user.experienceYears ?? user.experience_years ?? null,
-    qualifications: user.qualifications || '',
-    teachingStyle: user.teachingStyle || user.teaching_style || '',
-    subjects: user.subjects || [],
-    ageGroups: user.ageGroups || user.age_groups || [],
-    classes: user.classes || [],
-    teachingFormat: user.teachingFormat || user.teaching_format || '',
-    groupSize: user.groupSize || user.group_size || '',
-    travelRadius: user.travelRadius ?? user.travel_radius ?? null,
-    maxStudents: user.maxStudents ?? user.max_students ?? null,
-    examBoards: user.examBoards || user.exam_boards || [],
-    learningDifficulties: user.learningDifficulties || user.learning_difficulties || [],
-    methodologies: user.methodologies || [],
-    languages: user.languages || [],
-    dbsChecked: user.dbsChecked ?? user.dbs_checked ?? false,
-    hasInsurance: user.hasInsurance ?? user.has_insurance ?? false,
-    verificationStatus: user.verificationStatus || 'pending',
-    onboardingComplete: user.onboardingComplete ?? false,
-  };
-}
-
 export function adminRoutes(app: Hono, getUserId: (token: string | null) => Promise<string | null>) {
   
   // Admin Dashboard Overview Stats
@@ -104,22 +77,17 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       const userId = await getUserId(accessToken ?? null);
       if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
-      // Admin role guard
-      const adminProfile = await kv.get(`user:${userId}`) as any
-        ?? await db.getProfile(userId);
-      if (!adminProfile || adminProfile.role !== 'admin') {
-        return c.json({ error: 'Forbidden' }, 403);
-      }
+      if (!await isAdminUser(userId)) return c.json({ error: 'Forbidden' }, 403);
 
       const year  = c.req.query('year')  ? parseInt(c.req.query('year')!)  : new Date().getFullYear();
       const month = c.req.query('month') ? parseInt(c.req.query('month')!) : new Date().getMonth() + 1;
 
       // ── Fetch from both KV (legacy) and DB (new) in parallel ──────────────
       const [
-        dbProfiles, kvBookings, kvPayments, kvAlerts, kvNotifications,
+        kvUsers, kvBookings, kvPayments, kvAlerts, kvNotifications,
         dbBookings, dbPayments,
       ] = await Promise.all([
-        db.getAllProfilesForAdmin(),
+        kv.getByPrefix('user:'),
         kv.getByPrefix('booking:'),
         kv.getByPrefix('payment:'),
         kv.getByPrefix('alert:'),
@@ -164,7 +132,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       ];
 
       // ── Compute stats ──────────────────────────────────────────────────────
-      const allTutors = dbProfiles.filter((u: any) => u.role === 'tutor');
+      const allTutors = kvUsers.filter((u: any) => u.role === 'tutor');
       const activeTutorsCount = allTutors.filter((u: any) =>
         u.verificationStatus === 'verified'
       ).length;
@@ -206,24 +174,23 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       const userId = await getUserId(accessToken ?? null);
       if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
-      // Admin role guard
-      const adminProfile = await kv.get(`user:${userId}`) as any
-        ?? await db.getProfile(userId);
-      if (!adminProfile || adminProfile.role !== 'admin') {
-        return c.json({ error: 'Forbidden' }, 403);
-      }
+      if (!await isAdminUser(userId)) return c.json({ error: 'Forbidden' }, 403);
 
       // Fetch from KV (legacy) and DB (new) in parallel
-      const [dbProfiles, kvBookings, kvPayments, allVerifications, dbBookings, dbPayments] =
+      const [kvUsers, kvBookings, kvPayments, allVerifications, dbBookings, dbPayments, dbProfiles] =
         await Promise.all([
-          db.getAllProfilesForAdmin().catch(() => [] as any[]),
+          kv.getByPrefix('user:'),
           kv.getByPrefix('booking:'),
           kv.getByPrefix('payment:'),
           kv.getByPrefix('verification:'),
           db.getAllBookingsForAdmin(),
           db.getAllPaymentsForAdmin(),
+          db.getAllProfilesForAdmin().catch(() => [] as any[]),
         ]);
-      const allUsers = dbProfiles;
+
+      // Merge users (DB profiles take precedence for deduplication)
+      const dbProfileIds = new Set(dbProfiles.map((p: any) => p.id));
+      const allUsers = [...kvUsers.filter((u: any) => !dbProfileIds.has(u.id || u.userId)), ...dbProfiles];
 
       // Merge bookings and payments
       const kvBookingIds = new Set(kvBookings.map((b: any) => b.id));
@@ -391,7 +358,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
 
       // If no audit logs, create some sample activity from recent data
       if (activity.length === 0) {
-        const allUsers = await db.getAllProfilesForAdmin();
+        const allUsers = await kv.getByPrefix('user:');
         const allBookings = await kv.getByPrefix('booking:');
         
         const recentUsers = allUsers
@@ -429,7 +396,59 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       return c.json({ error: error.message || 'Internal server error' }, 500);
     }
   });
-  
+
+  // Admin Platform Metrics
+  app.get('/make-server-cbd74580/admin/metrics', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+      if (!await isAdminUser(userId)) return c.json({ error: 'Forbidden' }, 403);
+
+      // Get all users and metrics
+      const allUsers = await kv.getByPrefix('user:');
+      const allBookings = await kv.getByPrefix('booking:');
+      const allPayments = await kv.getByPrefix('payment:');
+
+      const totalStudents = allUsers.filter((u: any) => u.role === 'student').length;
+      const totalTutors = allUsers.filter((u: any) => u.role === 'tutor').length;
+      const totalSessions = allBookings.length;
+      const completedSessions = allBookings.filter((b: any) => b.status === 'completed').length;
+      const completionRate = totalSessions > 0 ? Math.round((completedSessions / totalSessions) * 100) : 0;
+      
+      // Calculate engagement (simplified - based on active bookings)
+      const activeBookings = allBookings.filter((b: any) => b.status === 'active' || b.status === 'upcoming').length;
+      const averageEngagement = Math.min(100, Math.round((activeBookings / totalTutors) * 20));
+      
+      const totalRevenue = allPayments.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
+      const activeUsers = Math.floor(allUsers.length * 0.25); // Estimate 25% active
+      
+      // New users this month
+      const thisMonth = new Date();
+      const monthStart = new Date(thisMonth.getFullYear(), thisMonth.getMonth(), 1);
+      const newUsersThisMonth = allUsers.filter((u: any) => {
+        if (!u.createdAt) return false;
+        const createdDate = new Date(u.createdAt);
+        return createdDate >= monthStart;
+      }).length;
+
+      return c.json({
+        totalStudents,
+        totalTutors,
+        totalSessions,
+        completionRate,
+        averageEngagement,
+        totalRevenue: Math.round(totalRevenue),
+        activeUsers,
+        newUsersThisMonth
+      });
+    } catch (error: any) {
+      console.error('Error fetching platform metrics:', error);
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
   // Admin Analytics
   app.get('/make-server-cbd74580/admin/analytics', async (c) => {
     try {
@@ -441,9 +460,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       // Get all users
-      // Source of truth for admin user list: DB profiles table only.
-      // This excludes stale legacy KV-only users.
-      const allUsers = await db.getAllProfilesForAdmin();
+      const allUsers = await kv.getByPrefix('user:');
       const allBookings = await kv.getByPrefix('booking:');
       const allPayments = await kv.getByPrefix('payment:');
 
@@ -501,22 +518,38 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const allUsers = await db.getAllProfilesForAdmin();
+      const allUsers = await kv.getByPrefix('user:');
       
       // Enhance users with additional admin data
-      const enhancedUsers = allUsers.map((user: any) => ({
-        ...user,
-        displayName: getDisplayName(user),
-        initials: getInitials(getDisplayName(user), user.email),
-        status: user.suspended ? 'suspended' : user.banned ? 'banned' : user.deleted ? 'deleted' : 'active',
-        verificationStatus: user.verificationStatus || (user.role === 'tutor' ? 'pending' : 'verified'),
-        totalSessions: user.totalSessions || 0,
-        totalSpent: user.totalSpent || 0,
-        flagCount: user.flagCount || 0,
-        notes: user.adminNotes || '',
-        lastLogin: user.lastLogin || user.createdAt,
-        profileSummary: user.role === 'tutor' ? buildTutorSummary(user) : undefined,
-      }));
+      const enhancedUsers = allUsers.map((user: any) => {
+        const resolvedName =
+          user.full_name || user.fullName || user.name ||
+          `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown';
+        return {
+          ...user,
+          displayName: resolvedName,
+          status: user.suspended ? 'suspended' : user.banned ? 'banned' : user.deleted ? 'deleted' : 'active',
+          verificationStatus: user.verificationStatus || (user.role === 'tutor' ? 'pending' : 'verified'),
+          totalSessions: user.totalSessions || 0,
+          totalSpent: user.totalSpent || 0,
+          flagCount: user.flagCount || 0,
+          notes: user.adminNotes || '',
+          lastLogin: user.lastLogin || user.createdAt,
+          // Ensure all tutor profile fields are surfaced for admin display
+          photo_url: user.photo_url || user.photoUrl || null,
+          photoUrl: user.photo_url || user.photoUrl || null,
+          headline: user.headline || '',
+          education_level: user.education_level || user.educationLevel || '',
+          educationLevel: user.education_level || user.educationLevel || '',
+          institution: user.institution || '',
+          experience_years: user.experience_years ?? user.experienceYears ?? null,
+          experienceYears: user.experience_years ?? user.experienceYears ?? null,
+          dbs_checked: user.dbs_checked === true || user.dbsChecked === true,
+          dbsChecked: user.dbs_checked === true || user.dbsChecked === true,
+          has_insurance: user.has_insurance === true || user.hasInsurance === true,
+          hasInsurance: user.has_insurance === true || user.hasInsurance === true,
+        };
+      });
       
       // Sort by creation date (newest first)
       const sortedUsers = enhancedUsers.sort((a: any, b: any) => {
@@ -824,7 +857,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       // Get recent activities
-      const allUsers = await db.getAllProfilesForAdmin();
+      const allUsers = await kv.getByPrefix('user:');
       const allBookings = await kv.getByPrefix('booking:');
       
       const activities: any[] = [];
@@ -888,8 +921,8 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       // Get all children
       const allChildren = await kv.getByPrefix('child:');
       
-      // Get all parent users from DB profiles only
-      const allParents = await db.getAllProfilesForAdmin();
+      // Get all parent users
+      const allParents = await kv.getByPrefix('user:');
       const parentMap = new Map();
       allParents.forEach((parent: any) => {
         if (parent.role === 'parent') {
@@ -976,7 +1009,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       // Get all parents
-      const allUsers = await db.getAllProfilesForAdmin();
+      const allUsers = await kv.getByPrefix('user:');
       const parents = allUsers.filter((u: any) => u.role === 'parent');
 
       const summaries = [];
@@ -1486,7 +1519,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       // Get all tutors with pending verification
-      const allUsers = await db.getAllProfilesForAdmin();
+      const allUsers = await kv.getByPrefix('user:');
       const pendingTutors = allUsers.filter((u: any) => 
         u.role === 'tutor' && u.verificationStatus === 'pending'
       );
@@ -1496,16 +1529,12 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       for (const tutor of pendingTutors) {
         const verification = await kv.get(`verification:${tutor.id || tutor.userId}`) as any;
         
+        const resolvedName =
+          tutor.full_name || tutor.fullName || tutor.name ||
+          `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim() || 'Unknown Tutor';
+
         verifications.push({
           userId: tutor.id || tutor.userId,
-          name: getDisplayName(tutor),
-          email: tutor.email,
-          subjects: tutor.subjects || [],
-          qualifications: tutor.qualifications || '',
-          experience: tutor.experience || '',
-          bio: tutor.bio || '',
-          hasDbsCheck: tutor.dbs_checked || false,
-          hasInsurance: tutor.has_insurance || false,
           submittedAt: tutor.createdAt,
           kycStatus: verification?.kycStatus || 'pending',
           dbsStatus: verification?.dbsStatus || 'pending',
@@ -1513,13 +1542,177 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
             dbs: tutor.dbsCertificateUrl || null,
             qualifications: tutor.qualificationCertificates || [],
             insurance: tutor.insuranceDocumentUrl || null
-          }
+          },
+          profile: {
+            ...tutor,
+            fullName: resolvedName,
+            full_name: resolvedName,
+            email: tutor.email,
+            phone: tutor.phone || tutor.phone_number || '',
+            location: tutor.location || '',
+            headline: tutor.headline || '',
+            bio: tutor.bio || '',
+            education_level: tutor.education_level || tutor.educationLevel || '',
+            institution: tutor.institution || '',
+            hourly_rate: tutor.hourly_rate || tutor.hourlyRate || null,
+            hourlyRate: tutor.hourly_rate || tutor.hourlyRate || null,
+            experience_years: tutor.experience_years ?? tutor.experienceYears ?? null,
+            experienceYears: tutor.experience_years ?? tutor.experienceYears ?? null,
+            qualifications: tutor.qualifications || '',
+            teaching_style: tutor.teaching_style || tutor.teachingStyle || '',
+            teachingStyle: tutor.teaching_style || tutor.teachingStyle || '',
+            subjects: tutor.subjects || [],
+            age_groups: tutor.age_groups || tutor.ageGroups || [],
+            ageGroups: tutor.age_groups || tutor.ageGroups || [],
+            classes: tutor.classes || [],
+            teaching_format: tutor.teaching_format || tutor.teachingFormat || '',
+            teachingFormat: tutor.teaching_format || tutor.teachingFormat || '',
+            group_size: tutor.group_size || tutor.groupSize || '',
+            groupSize: tutor.group_size || tutor.groupSize || '',
+            exam_boards: tutor.exam_boards || tutor.examBoards || [],
+            examBoards: tutor.exam_boards || tutor.examBoards || [],
+            learning_difficulties: tutor.learning_difficulties || tutor.learningDifficulties || [],
+            learningDifficulties: tutor.learning_difficulties || tutor.learningDifficulties || [],
+            methodologies: tutor.methodologies || [],
+            languages: tutor.languages || [],
+            dbs_checked: tutor.dbs_checked === true || tutor.dbsChecked === true,
+            dbsChecked: tutor.dbs_checked === true || tutor.dbsChecked === true,
+            has_insurance: tutor.has_insurance === true || tutor.hasInsurance === true,
+            hasInsurance: tutor.has_insurance === true || tutor.hasInsurance === true,
+            hasDbsCheck: tutor.dbs_checked === true || tutor.dbsChecked === true,
+            photo_url: tutor.photo_url || tutor.photoUrl || null,
+            photoUrl: tutor.photo_url || tutor.photoUrl || null,
+          },
         });
       }
 
       return c.json({ verifications });
     } catch (error: any) {
       console.error('Error fetching pending verifications:', error);
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
+  // Verification metrics
+  app.get('/make-server-cbd74580/admin/verifications/metrics', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+      const allUsers = await kv.getByPrefix('user:');
+      const tutors = allUsers.filter((u: any) => u.role === 'tutor');
+
+      const pending  = tutors.filter((u: any) => u.verificationStatus === 'pending').length;
+      const approved = tutors.filter((u: any) => u.verificationStatus === 'verified').length;
+      const rejected = tutors.filter((u: any) => u.verificationStatus === 'rejected').length;
+      const total    = approved + rejected;
+      const approvalRate = total > 0 ? (approved / total) * 100 : 0;
+
+      // Average hours from submission to review
+      const reviewedTutors = tutors.filter((u: any) =>
+        u.verificationStatus === 'verified' || u.verificationStatus === 'rejected'
+      );
+      let avgReviewTimeHours = 0;
+      if (reviewedTutors.length > 0) {
+        const times = await Promise.all(
+          reviewedTutors.map(async (tutor: any) => {
+            const v = await kv.get(`verification:${tutor.id || tutor.userId}`) as any;
+            if (!v?.reviewedAt || !tutor.createdAt) return null;
+            return (new Date(v.reviewedAt).getTime() - new Date(tutor.createdAt).getTime()) / (1000 * 60 * 60);
+          })
+        );
+        const valid = times.filter((t): t is number => t !== null && t > 0);
+        if (valid.length > 0) avgReviewTimeHours = valid.reduce((a, b) => a + b, 0) / valid.length;
+      }
+
+      // Pending tutors with no photo and no DBS cert
+      const pendingTutors = tutors.filter((u: any) => u.verificationStatus === 'pending');
+      const documentIssues = pendingTutors.filter((u: any) =>
+        !u.photo_url && !u.photoUrl && !u.dbsCertificateUrl
+      ).length;
+
+      return c.json({
+        metrics: {
+          total_pending: pending,
+          total_approved: approved,
+          total_rejected: rejected,
+          approval_rate: approvalRate,
+          avg_review_time_hours: avgReviewTimeHours,
+          document_issues: documentIssues,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error fetching verification metrics:', error);
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
+  // Verification history (approved + rejected)
+  app.get('/make-server-cbd74580/admin/verifications/history', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+      const allUsers = await kv.getByPrefix('user:');
+      const reviewedTutors = allUsers.filter((u: any) =>
+        u.role === 'tutor' &&
+        (u.verificationStatus === 'verified' || u.verificationStatus === 'rejected')
+      );
+
+      const verifications = [];
+      for (const tutor of reviewedTutors) {
+        const tutorId = tutor.id || tutor.userId;
+        const verification = await kv.get(`verification:${tutorId}`) as any;
+        const resolvedName =
+          tutor.full_name || tutor.fullName || tutor.name ||
+          `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim() || 'Unknown Tutor';
+
+        verifications.push({
+          userId: tutorId,
+          submittedAt: tutor.createdAt,
+          status: tutor.verificationStatus,
+          reviewer: verification?.reviewedBy || tutor.verifiedBy || tutor.rejectedBy || null,
+          reviewedAt: verification?.reviewedAt || tutor.verifiedAt || tutor.rejectedAt || null,
+          rejectionReason: tutor.rejectionReason || null,
+          kycStatus: verification?.kycStatus || (tutor.verificationStatus === 'verified' ? 'verified' : 'rejected'),
+          dbsStatus: verification?.dbsStatus || (tutor.verificationStatus === 'verified' ? 'verified' : 'rejected'),
+          documents: {
+            dbs: tutor.dbsCertificateUrl || null,
+            qualifications: tutor.qualificationCertificates || [],
+            insurance: tutor.insuranceDocumentUrl || null,
+          },
+          profile: {
+            ...tutor,
+            fullName: resolvedName,
+            full_name: resolvedName,
+            email: tutor.email,
+            phone: tutor.phone || tutor.phone_number || '',
+            location: tutor.location || '',
+            bio: tutor.bio || '',
+            qualifications: tutor.qualifications || '',
+            subjects: tutor.subjects || [],
+            experience_years: tutor.experience_years ?? tutor.experienceYears ?? null,
+            experienceYears: tutor.experience_years ?? tutor.experienceYears ?? null,
+            dbs_checked: tutor.dbs_checked === true || tutor.dbsChecked === true,
+            dbsChecked: tutor.dbs_checked === true || tutor.dbsChecked === true,
+            has_insurance: tutor.has_insurance === true || tutor.hasInsurance === true,
+            hasInsurance: tutor.has_insurance === true || tutor.hasInsurance === true,
+            photo_url: tutor.photo_url || tutor.photoUrl || null,
+            photoUrl: tutor.photo_url || tutor.photoUrl || null,
+          },
+        });
+      }
+
+      verifications.sort((a, b) =>
+        new Date(b.reviewedAt || b.submittedAt).getTime() -
+        new Date(a.reviewedAt || a.submittedAt).getTime()
+      );
+
+      return c.json({ verifications });
+    } catch (error: any) {
+      console.error('Error fetching verification history:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);
     }
   });
@@ -1544,6 +1737,16 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         return c.json({ error: 'Tutor not found' }, 404);
       }
 
+      // Ensure we have an email — fall back to DB profile if KV entry lacks one
+      if (!tutor.email) {
+        try {
+          const dbProfile = await db.getProfile(tutorId);
+          if (dbProfile?.email) tutor.email = dbProfile.email;
+        } catch (emailLookupErr) {
+          console.error('Could not look up tutor email from DB:', emailLookupErr);
+        }
+      }
+
       // Update verification status
       if (action === 'approve') {
         tutor.verificationStatus = 'verified';
@@ -1557,6 +1760,22 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       await kv.set(`user:${tutorId}`, tutor);
+
+      // Keep the role-specific profile in sync so that switching roles doesn't
+      // revert the verification status back to 'pending'.
+      const tutorRoleProfile = await kv.get(`profile_tutor_${tutorId}`) as any;
+      if (tutorRoleProfile) {
+        if (action === 'approve') {
+          tutorRoleProfile.verificationStatus = 'verified';
+          tutorRoleProfile.verifiedAt = tutor.verifiedAt;
+          tutorRoleProfile.verifiedBy = adminId;
+        } else if (action === 'reject') {
+          tutorRoleProfile.verificationStatus = 'rejected';
+          tutorRoleProfile.rejectionReason = rejectionReason;
+          tutorRoleProfile.rejectedAt = tutor.rejectedAt;
+        }
+        await kv.set(`profile_tutor_${tutorId}`, tutorRoleProfile);
+      }
 
       // Update or create verification record
       const verificationId = `verification:${tutorId}`;
@@ -1598,6 +1817,42 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         severity: 'info',
         metadata: { action, rejectionReason }
       });
+
+      // Send email notification (non-blocking — don't fail the request on email errors)
+      try {
+        if (action === 'approve' && tutor.email) {
+          console.log(`Sending approval email to ${tutor.email}`);
+          const emailData = emailTemplates.tutorVerificationApproved(
+            tutor.fullName || tutor.full_name || tutor.name || 'Tutor',
+            `https://tutornest.org/tutor-dashboard`
+          );
+          await sendEmail({
+            to: tutor.email,
+            subject: emailData.subject,
+            html: emailData.html,
+            replyTo: 'support@tutornest.org'
+          });
+          console.log('Approval email sent successfully');
+        } else if (action === 'reject' && tutor.email) {
+          console.log(`Sending rejection email to ${tutor.email}`);
+          const emailData = emailTemplates.tutorVerificationRejected(
+            tutor.fullName || tutor.full_name || tutor.name || 'Tutor',
+            rejectionReason,
+            `https://tutornest.org/tutor-dashboard`
+          );
+          await sendEmail({
+            to: tutor.email,
+            subject: emailData.subject,
+            html: emailData.html,
+            replyTo: 'support@tutornest.org'
+          });
+          console.log('Rejection email sent successfully');
+        } else {
+          console.warn(`No email sent: tutor.email=${tutor.email}, action=${action}`);
+        }
+      } catch (emailErr) {
+        console.error('Failed to send verification email (non-fatal):', emailErr);
+      }
 
       return c.json({ success: true });
     } catch (error: any) {

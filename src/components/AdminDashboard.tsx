@@ -188,9 +188,12 @@ export function AdminDashboard({
       console.log('Response ok:', response.ok);
 
       if (response.ok) {
-        const data = await response.json();
-        console.log('Dashboard stats:', data.stats);
-        setStats(data.stats);
+        const contentType = response.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+          const data = await response.json();
+          console.log('Dashboard stats:', data.stats);
+          setStats(data.stats);
+        }
       } else {
         const errorText = await response.text();
         console.error('Failed to fetch dashboard stats:', response.status, errorText);

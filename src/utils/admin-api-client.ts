@@ -100,6 +100,11 @@ async function fetchWithTimeout<T>(
       );
     }
 
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      throw new AdminAPIError('NON_JSON_RESPONSE', 'Service temporarily unavailable', response.status);
+    }
+
     return await response.json();
   } finally {
     clearTimeout(timeoutId);

@@ -101,18 +101,27 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
       );
 
       if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) {
+          console.error('Platform overview returned non-JSON response');
+          setError('Service temporarily unavailable. Please try again in a moment.');
+          return;
+        }
         const data = await response.json();
         setStats(data.stats);
+      } else if (response.status === 401 || response.status === 403) {
+        console.error('Admin access denied:', response.status);
+        setError('Admin access required. Please ensure your account has admin privileges.');
       } else if (response.status === 404) {
         console.error('API error: 404 - Endpoint not deployed');
-        setError('API error: 404 - Dashboard endpoint not yet deployed. Please ensure Supabase functions are deployed.');
+        setError('API error: 404 - Dashboard endpoint not yet deployed.');
       } else {
         console.error('Failed to fetch platform stats:', response.status);
         setError(`Failed to load statistics (HTTP ${response.status})`);
       }
     } catch (error: any) {
       console.error('Error fetching platform stats:', error);
-      setError(`Error: ${error.message || 'Failed to fetch data'}`);
+      setError('Service temporarily unavailable. Please try again in a moment.');
     } finally {
       setLoading(false);
     }
@@ -130,6 +139,8 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
       );
 
       if (response.ok) {
+        const contentType = response.headers.get('content-type') || '';
+        if (!contentType.includes('application/json')) return;
         const data = await response.json();
         setRecentActivity(data.activity || []);
       }
