@@ -42,7 +42,7 @@ import { MobileNavigation } from './MobileNavigation';
 import { NotificationCenter } from './NotificationCenter';
 import { TutorProfileEditor } from './TutorProfileEditor';
 import { GoogleCalendarSetup } from './GoogleCalendarSetup';
-import { TutorInvitations } from './TutorInvitations';
+
 import { TutorAvailabilityManager } from './TutorAvailabilityManager';
 import { BookingManager } from './BookingManager';
 import { TutorPerformanceDashboard } from './TutorPerformanceDashboard';
@@ -119,7 +119,7 @@ export function TutorDashboard({
     'overview',
     'profile',
     'messages',
-    'invitations',
+
     'availability',
     'bookings',
     'history',
@@ -334,34 +334,7 @@ export function TutorDashboard({
         );
         const uniqueStudentIds = new Set(relevantBookings.map((b: any) => b.studentId));
         
-        // Fetch all student subscription data to determine who is a paid subscriber
-        const studentSubscriptions = await Promise.all(
-          Array.from(uniqueStudentIds).map(async (studentId) => {
-            try {
-              const subResponse = await fetch(
-                `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/subscription/${studentId}`,
-                {
-                  headers: {
-                    'Authorization': `Bearer ${accessToken}`,
-                  },
-                }
-              );
-              if (subResponse.ok) {
-                const subData = await subResponse.json();
-                return { studentId, hasActiveSubscription: subData.tier !== 'basic' && subData.status === 'active' };
-              }
-            } catch (error) {
-              console.error(`Error fetching subscription for student ${studentId}:`, error);
-            }
-            return { studentId, hasActiveSubscription: false };
-          })
-        );
-
-        // Count only students with active paid subscriptions as "Active Students"
-        const paidStudentIds = studentSubscriptions
-          .filter(s => s.hasActiveSubscription)
-          .map(s => s.studentId);
-        const activeStudentsCount = paidStudentIds.length;
+        const allStudentIds = Array.from(uniqueStudentIds);
 
         // Calculate tutor's net earnings (80%) from completed lessons
         const earnings = bookings
@@ -369,15 +342,15 @@ export function TutorDashboard({
           .reduce((sum: number, b: any) => sum + (parseFloat(b.price) || 0) * 0.8, 0);
 
         setStats({
-          activeStudents: activeStudentsCount,
+          activeStudents: allStudentIds.length,
           lessonsThisWeek,
           totalLessons,
           earnings
         });
 
-        // Fetch student details for active (paid) students
+        // Fetch student details for all students with confirmed/completed bookings
         const studentDetails = await Promise.all(
-          paidStudentIds.map(async (studentId) => {
+          allStudentIds.map(async (studentId) => {
             try {
               const response = await fetch(
                 `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profiles/${studentId}`,
@@ -409,7 +382,6 @@ export function TutorDashboard({
         setStudents(studentDetails.filter(Boolean));
 
         // Fetch past students (students with completed sessions but no upcoming sessions)
-        const allStudentIds = Array.from(uniqueStudentIds);
         const pastStudentIds = allStudentIds.filter(studentId => {
           const studentBookings = bookings.filter((b: any) => b.studentId === studentId);
           const hasCompleted = studentBookings.some((b: any) => b.status === 'completed');
@@ -547,7 +519,7 @@ export function TutorDashboard({
     const mapping: Record<string, string> = {
       'overview': 'home',
       'profile': 'home',
-      'invitations': 'home',
+
       'availability': 'schedule',
       'bookings': 'sessions',
       'content': 'resources',
@@ -1020,7 +992,7 @@ export function TutorDashboard({
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="profile">Profile</TabsTrigger>
             <TabsTrigger value="messages">Messages</TabsTrigger>
-            <TabsTrigger value="invitations">Invitations</TabsTrigger>
+
             <TabsTrigger value="availability">Availability</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>
             <TabsTrigger value="history">History</TabsTrigger>
@@ -1082,23 +1054,6 @@ export function TutorDashboard({
             )}
           </TabsContent>
 
-          <TabsContent value="invitations">
-            <Card>
-              <CardHeader>
-                <CardTitle>Invitations</CardTitle>
-                <CardDescription>Manage your invitations and accept or decline them</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {session ? (
-                  <TutorInvitations session={session} />
-                ) : (
-                  <div className="text-center py-8 text-gray-600">
-                    <p>Loading invitations...</p>
-                  </div>
-                )}
-              </CardContent>
-            </Card>
-          </TabsContent>
 
           <TabsContent value="availability">
             {session && (
@@ -1158,7 +1113,7 @@ export function TutorDashboard({
                               </p>
                             </div>
                             <div className="text-right flex flex-col items-end gap-2">
-                              <p className="text-sm">£{parseFloat(lesson.price || 0).toFixed(2)}</p>
+                              <p className="text-sm">{formatNaira(lesson.price || '0')}</p>
                               {!lesson.assessed && (
                                 <Button
                                   size="sm"

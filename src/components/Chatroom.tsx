@@ -386,18 +386,29 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
         }
         setContacts(tutors);
       } else {
-        // For tutors: extract unique parents from bookings
+        // For tutors: extract unique students/parents from confirmed or completed paid bookings
         const bookings: any[] = data.bookings || data || [];
+        const paidBookings = bookings.filter((b: any) =>
+          b.status === 'confirmed' || b.status === 'completed'
+        );
         const seen = new Set<string>();
-        const parents: Contact[] = [];
-        for (const b of bookings) {
-          const parentId = b.parentId || b.userId;
-          if (parentId && parentId !== userId && !seen.has(parentId)) {
-            seen.add(parentId);
-            parents.push({ id: parentId, name: b.parentName || b.userName || 'Parent', role: 'parent' });
+        const contacts: Contact[] = [];
+        for (const b of paidBookings) {
+          // Prefer student contact; fall back to parent
+          const contactId = b.studentId || b.parentId || b.userId;
+          const contactName = b.studentName || b.studentFullName || b.parentName || b.userName || 'Student';
+          const contactRole = b.studentId ? 'student' : 'parent';
+          if (contactId && contactId !== userId && !seen.has(contactId)) {
+            seen.add(contactId);
+            contacts.push({ id: contactId, name: contactName, role: contactRole });
+          }
+          // Also add the parent separately if both student and parent IDs are present
+          if (b.parentId && b.parentId !== userId && !seen.has(b.parentId)) {
+            seen.add(b.parentId);
+            contacts.push({ id: b.parentId, name: b.parentName || b.userName || 'Parent', role: 'parent' });
           }
         }
-        setContacts(parents);
+        setContacts(contacts);
       }
     } catch (err) {
       console.error('Error loading contacts:', err);

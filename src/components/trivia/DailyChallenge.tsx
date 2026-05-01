@@ -1,8 +1,12 @@
-import React, { useEffect, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Flame, Gift, AlertCircle, Trophy } from 'lucide-react';
 import { toast } from 'sonner';
+import { getSupabaseClient } from '../../utils/supabase/client';
+import { projectId } from '../../utils/supabase/info';
+
+const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
 
 interface DailyChallenge {
   id: string;
@@ -24,6 +28,7 @@ interface StreakInfo {
 }
 
 export function DailyChallenge() {
+  const [token, setToken] = useState<string | null>(null);
   const [challenge, setChallenge] = useState<DailyChallenge | null>(null);
   const [streakInfo, setStreakInfo] = useState<StreakInfo | null>(null);
   const [hasCompleted, setHasCompleted] = useState(false);
@@ -35,18 +40,23 @@ export function DailyChallenge() {
   const [showUseFreeze, setShowUseFreeze] = useState(false);
 
   useEffect(() => {
-    fetchDailyChallenge();
+    getSupabaseClient().auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) {
+        setToken(session.access_token);
+      }
+    });
   }, []);
 
+  useEffect(() => {
+    if (token) fetchDailyChallenge();
+  }, [token]);
+
   const fetchDailyChallenge = async () => {
+    if (!token) return;
     try {
       setLoading(true);
-      const token = localStorage.getItem('access_token');
-
-      const response = await fetch('/make-server-cbd74580/trivia-extended/daily-challenge', {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+      const response = await fetch(`${BASE}/trivia-extended/daily-challenge`, {
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (!response.ok) throw new Error('Failed to fetch daily challenge');
@@ -64,38 +74,26 @@ export function DailyChallenge() {
   };
 
   const handleSubmitAnswer = async () => {
-    if (selectedAnswer === null) {
-      toast.error('Please select an answer');
-      return;
-    }
+    if (selectedAnswer === null) { toast.error('Please select an answer'); return; }
+    if (!token) return;
 
     try {
       setIsSubmitting(true);
-      const token = localStorage.getItem('access_token');
-
-      const response = await fetch('/make-server-cbd74580/trivia-extended/daily-challenge/submit', {
+      const response = await fetch(`${BASE}/trivia-extended/daily-challenge/submit`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-          isCorrect: selectedAnswer === challenge?.options.length - 1
-        })
+        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ isCorrect: selectedAnswer === (challenge?.options.length ?? 0) - 1 })
       });
 
       if (!response.ok) throw new Error('Failed to submit answer');
 
       const data = await response.json();
-      setIsCorrect(data.xpReward.totalXp > 0);
+      setIsCorrect(data.xpReward?.totalXp > 0);
       setShowFeedback(true);
       setStreakInfo(data.streakInfo);
       toast.success(data.message);
 
-      setTimeout(() => {
-        setHasCompleted(true);
-        setShowFeedback(false);
-      }, 2000);
+      setTimeout(() => { setHasCompleted(true); setShowFeedback(false); }, 2000);
     } catch (error) {
       console.error('Error submitting answer:', error);
       toast.error('Failed to submit answer');
@@ -105,24 +103,18 @@ export function DailyChallenge() {
   };
 
   const handleUseFreeze = async () => {
+    if (!token) return;
     try {
-      const token = localStorage.getItem('access_token');
-
-      const response = await fetch('/make-server-cbd74580/trivia-extended/daily-challenge/use-freeze', {
+      const response = await fetch(`${BASE}/trivia-extended/daily-challenge/use-freeze`, {
         method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
+        headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (!response.ok) throw new Error('Failed to use freeze');
 
       const data = await response.json();
       if (data.success) {
-        setStreakInfo({
-          ...streakInfo!,
-          streakFreezeCount: data.freezesRemaining
-        });
+        setStreakInfo(prev => prev ? { ...prev, streakFreezeCount: data.freezesRemaining } : prev);
         toast.success(data.message);
         setShowUseFreeze(false);
       } else {
@@ -155,11 +147,17 @@ export function DailyChallenge() {
         {streakInfo && (
           <div className="flex items-center gap-2 p-3 bg-white rounded-lg border border-green-200">
             <Flame className="w-5 h-5 text-orange-500" />
-            <span className="font-semibold text-green-700">
-              {streakInfo.currentStreak} Day Streak 🔥
-            </span>
+            <span className="font-semibold text-green-700">{streakInfo.currentStreak} Day Streak 🔥</span>
           </div>
         )}
+      </Card>
+    );
+  }
+
+  if (!challenge) {
+    return (
+      <Card className="w-full bg-gradient-to-br from-purple-50 to-blue-50 p-6">
+        <p className="text-center text-gray-500">No daily challenge available. Check back later!</p>
       </Card>
     );
   }
@@ -179,18 +177,18 @@ export function DailyChallenge() {
       <div className="space-y-6">
         <div className="space-y-3">
           <div className="flex justify-between items-center">
-            <span className="text-purple-100">Topic: {challenge?.topic}</span>
+            <span className="text-purple-100">Topic: {challenge.topic}</span>
             <span className="px-2 py-1 bg-white/20 rounded text-xs font-semibold">
-              {challenge?.difficulty.toUpperCase()}
+              {challenge.difficulty.toUpperCase()}
             </span>
           </div>
-          <p className="text-lg font-semibold">{challenge?.question}</p>
+          <p className="text-lg font-semibold">{challenge.question}</p>
         </div>
 
         <div className="flex gap-4 text-sm">
           <div className="flex items-center gap-1">
             <Gift className="w-4 h-4" />
-            Base XP: {challenge?.baseXpReward}
+            Base XP: {challenge.baseXpReward}
           </div>
           {streakInfo && streakInfo.currentStreak > 0 && (
             <div className="flex items-center gap-1">
@@ -202,7 +200,7 @@ export function DailyChallenge() {
 
         {!showFeedback && (
           <div className="space-y-2">
-            {challenge?.options.map((option, index) => (
+            {challenge.options.map((option, index) => (
               <button
                 key={index}
                 onClick={() => setSelectedAnswer(index)}
@@ -221,9 +219,7 @@ export function DailyChallenge() {
 
         {showFeedback && (
           <div className={`p-4 rounded-lg font-semibold text-center ${
-            isCorrect
-              ? 'bg-green-500/30 text-green-100'
-              : 'bg-red-500/30 text-red-100'
+            isCorrect ? 'bg-green-500/30 text-green-100' : 'bg-red-500/30 text-red-100'
           }`}>
             {isCorrect ? '✓ Correct!' : '✗ Incorrect'}
           </div>
@@ -257,18 +253,10 @@ export function DailyChallenge() {
               <p className="text-sm">Use freeze to skip today and keep your streak?</p>
             </div>
             <div className="flex gap-2">
-              <Button
-                onClick={handleUseFreeze}
-                size="sm"
-                className="bg-blue-400 hover:bg-blue-300 text-white flex-1"
-              >
+              <Button onClick={handleUseFreeze} size="sm" className="bg-blue-400 hover:bg-blue-300 text-white flex-1">
                 Use Freeze
               </Button>
-              <Button
-                onClick={() => setShowUseFreeze(false)}
-                size="sm"
-                className="bg-white/10 hover:bg-white/20 text-white flex-1"
-              >
+              <Button onClick={() => setShowUseFreeze(false)} size="sm" className="bg-white/10 hover:bg-white/20 text-white flex-1">
                 Cancel
               </Button>
             </div>

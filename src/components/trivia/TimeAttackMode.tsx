@@ -1,8 +1,12 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState } from 'react';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Clock, Zap, Target } from 'lucide-react';
+import { Clock, Zap } from 'lucide-react';
 import { toast } from 'sonner';
+import { getSupabaseClient } from '../../utils/supabase/client';
+import { projectId } from '../../utils/supabase/info';
+
+const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
 
 interface TimeAttackQuestion {
   id: string;
@@ -11,29 +15,45 @@ interface TimeAttackQuestion {
 }
 
 export function TimeAttackMode() {
+  const [token, setToken] = useState<string | null>(null);
+  const [grade, setGrade] = useState('year_5');
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [questions, setQuestions] = useState<TimeAttackQuestion[]>([]);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
-  const [timeLeftMs, setTimeLeftMs] = useState(300000); // 5 minutes
+  const [timeLeftMs, setTimeLeftMs] = useState(300000);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
+  const [questionStartTime, setQuestionStartTime] = useState(Date.now());
   const [score, setScore] = useState(0);
   const [status, setStatus] = useState<'idle' | 'loading' | 'playing' | 'completed'>('idle');
   const [results, setResults] = useState<any>(null);
-  const questionTimeStart = useCallback(() => Date.now(), []);
 
-  // Start new session
+  useEffect(() => {
+    getSupabaseClient().auth.getSession().then(({ data: { session } }) => {
+      if (session?.access_token) {
+        setToken(session.access_token);
+      }
+    });
+  }, []);
+
+  // Timer countdown
+  useEffect(() => {
+    if (status !== 'playing') return;
+    const interval = setInterval(() => {
+      setTimeLeftMs(prev => {
+        if (prev <= 0) { completeSession(); return 0; }
+        return prev - 100;
+      });
+    }, 100);
+    return () => clearInterval(interval);
+  }, [status, sessionId]);
+
   const handleStartTimeAttack = async () => {
+    if (!token) { toast.error('Not logged in'); return; }
     try {
       setStatus('loading');
-      const token = localStorage.getItem('access_token');
-      const grade = localStorage.getItem('user_grade') || 'year_5';
-
       const response = await fetch(
-        `/make-server-cbd74580/trivia-extended/time-attack/start?grade=${grade}`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
-        }
+        `${BASE}/trivia-extended/time-attack/start?grade=${grade}`,
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
       );
 
       if (!response.ok) throw new Error('Failed to start session');
@@ -41,10 +61,11 @@ export function TimeAttackMode() {
       const data = await response.json();
       setSessionId(data.sessionId);
       setQuestions(data.questions);
-      setStatus('playing');
       setCurrentQuestionIndex(0);
       setScore(0);
       setTimeLeftMs(300000);
+      setQuestionStartTime(Date.now());
+      setStatus('playing');
     } catch (error) {
       console.error('Error starting time attack:', error);
       toast.error('Failed to start time attack');
@@ -52,86 +73,57 @@ export function TimeAttackMode() {
     }
   };
 
-  // Timer countdown
-  useEffect(() => {
-    if (status !== 'playing') return;
-
-    const interval = setInterval(() => {
-      setTimeLeftMs(prev => {
-        if (prev <= 0) {
-          completeSession();
-          return 0;
-        }
-        return prev - 100;
-      });
-    }, 100);
-
-    return () => clearInterval(interval);
-  }, [status]);
-
   const completeSession = async () => {
-    if (!sessionId) return;
-
+    if (!sessionId || !token) return;
     try {
-      const token = localStorage.getItem('access_token');
       const response = await fetch(
-        `/make-server-cbd74580/trivia-extended/time-attack/${sessionId}/complete`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${token}` }
-        }
+        `${BASE}/trivia-extended/time-attack/${sessionId}/complete`,
+        { method: 'POST', headers: { 'Authorization': `Bearer ${token}` } }
       );
-
       if (!response.ok) throw new Error('Failed to complete session');
-
       const data = await response.json();
       setResults(data.results);
       setStatus('completed');
-      toast.success(`Session Complete! Score: ${data.results.score}/10`);
+      toast.success(`Session Complete! Score: ${data.results?.score ?? score}/10`);
     } catch (error) {
       console.error('Error completing session:', error);
-      toast.error('Failed to complete session');
+      setStatus('completed');
     }
   };
 
   const handleSelectAnswer = async (answerIndex: number) => {
+    if (!token || !sessionId) return;
     setSelectedAnswer(answerIndex);
+    const question = questions[currentQuestionIndex];
+    const timeSpentMs = Date.now() - questionStartTime;
 
-    // Auto-submit after selection
     try {
-      const token = localStorage.getItem('access_token');
-      const question = questions[currentQuestionIndex];
-      const timeSpentMs = Date.now() - questionTimeStart();
-
       const response = await fetch(
-        `/make-server-cbd74580/trivia-extended/time-attack/${sessionId}/answer`,
+        `${BASE}/trivia-extended/time-attack/${sessionId}/answer`,
         {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json'
-          },
-          body: JSON.stringify({
-            questionId: question.id,
-            answerIndex,
-            timeSpentMs,
-            isCorrect: answerIndex === 0 // Placeholder
-          })
+          headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ questionId: question.id, answerIndex, timeSpentMs, isCorrect: answerIndex === 0 })
         }
       );
 
-      if (!response.ok) throw new Error('Failed to record answer');
-
-      // Move to next question
-      if (currentQuestionIndex < questions.length - 1) {
-        setCurrentQuestionIndex(prev => prev + 1);
-        setSelectedAnswer(null);
-      } else {
-        completeSession();
+      if (response.ok) {
+        const data = await response.json();
+        if (data.isCorrect) setScore(s => s + 1);
       }
     } catch (error) {
       console.error('Error recording answer:', error);
     }
+
+    setTimeout(() => {
+      if (currentQuestionIndex < questions.length - 1) {
+        setCurrentQuestionIndex(prev => prev + 1);
+        setSelectedAnswer(null);
+        setQuestionStartTime(Date.now());
+      } else {
+        completeSession();
+      }
+    }, 400);
   };
 
   const formatTime = (ms: number) => {
@@ -159,6 +151,16 @@ export function TimeAttackMode() {
     );
   }
 
+  if (status === 'loading') {
+    return (
+      <Card className="w-full bg-gradient-to-br from-red-600 to-orange-600 text-white p-6">
+        <div className="flex justify-center py-12">
+          <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-white"></div>
+        </div>
+      </Card>
+    );
+  }
+
   if (status === 'completed' && results) {
     return (
       <Card className="w-full bg-gradient-to-br from-green-50 to-emerald-50 border border-green-200 p-6">
@@ -178,14 +180,13 @@ export function TimeAttackMode() {
           </div>
           <div className="p-4 bg-white rounded-lg border border-green-200">
             <p className="text-sm text-gray-600">Avg Speed</p>
-            <p className="text-3xl font-bold text-orange-600">{(results.averageTimePerQuestion / 1000).toFixed(1)}s</p>
+            <p className="text-3xl font-bold text-orange-600">
+              {results.averageTimePerQuestion ? (results.averageTimePerQuestion / 1000).toFixed(1) : '-'}s
+            </p>
           </div>
         </div>
         <Button
-          onClick={() => {
-            setStatus('idle');
-            setSelectedAnswer(null);
-          }}
+          onClick={() => { setStatus('idle'); setSelectedAnswer(null); setResults(null); }}
           className="w-full bg-green-600 hover:bg-green-700 text-white"
         >
           Try Again
@@ -194,10 +195,11 @@ export function TimeAttackMode() {
     );
   }
 
+  const currentQuestion = questions[currentQuestionIndex];
   return (
     <Card className="w-full bg-gradient-to-br from-red-600 to-orange-600 text-white p-6">
       <div className="flex justify-between items-center mb-6">
-        <span className="text-lg font-bold">Q{currentQuestionIndex + 1}/10</span>
+        <span className="text-lg font-bold">Q{currentQuestionIndex + 1}/{questions.length}</span>
         <div className={`flex items-center gap-2 px-3 py-1 rounded-full ${
           timeLeftMs < 60000 ? 'bg-red-500/50' : 'bg-white/20'
         }`}>
@@ -210,15 +212,15 @@ export function TimeAttackMode() {
         <div className="w-full bg-white/20 rounded-full h-2 overflow-hidden">
           <div
             className="bg-white h-full transition-all"
-            style={{ width: `${((currentQuestionIndex + 1) / 10) * 100}%` }}
-          ></div>
+            style={{ width: `${((currentQuestionIndex + 1) / questions.length) * 100}%` }}
+          />
         </div>
       </div>
 
-      <p className="text-lg font-semibold mb-6">{questions[currentQuestionIndex]?.question}</p>
+      <p className="text-lg font-semibold mb-6">{currentQuestion?.question}</p>
 
       <div className="space-y-2">
-        {questions[currentQuestionIndex]?.options.map((option, index) => (
+        {currentQuestion?.options.map((option, index) => (
           <button
             key={index}
             onClick={() => handleSelectAnswer(index)}

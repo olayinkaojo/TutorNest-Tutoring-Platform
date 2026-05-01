@@ -500,10 +500,10 @@ app.get('/make-server-cbd74580/google-calendar/status', async (c) => {
     
     const tokens = await kv.get(`google_calendar_tokens:${userId}`) as any;
     const userProfile = await kv.get(`user:${userId}`) as any;
-    
-    return c.json({ 
-      connected: !!tokens && !!userProfile?.googleCalendarConnected,
-      connectedAt: userProfile?.googleCalendarConnectedAt || null,
+
+    return c.json({
+      connected: !!tokens,
+      connectedAt: userProfile?.googleCalendarConnectedAt || tokens?.createdAt || null,
     });
   } catch (error: any) {
     console.error('Error checking connection status:', error);

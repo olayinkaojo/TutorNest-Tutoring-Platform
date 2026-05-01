@@ -173,9 +173,10 @@ export function GamificationSystem({ userId, userType }: GamificationSystemProps
 
     setLoading(true);
     try {
-      // Load bookings/sessions
+      // Load bookings/sessions — use the correct ID field based on user type
+      const bookingsParam = userType === 'tutor' ? `tutorId=${userId}` : `studentId=${userId}`;
       const bookingsResponse = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings?studentId=${userId}`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings?${bookingsParam}`,
         {
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
@@ -189,47 +190,49 @@ export function GamificationSystem({ userId, userType }: GamificationSystemProps
       if (bookingsResponse.ok) {
         const bookingsData = await bookingsResponse.json();
         const allBookings = bookingsData.bookings || [];
-        
+
         const completed = allBookings.filter((b: any) => b.status === 'completed');
         completedSessions = completed.length;
-        
+
         // Get session dates for streak calculation
         sessionDates = completed.map((b: any) => new Date(b.date));
       }
 
-      // Load assessments
-      const assessmentsResponse = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/assessments/student/${userId}`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
       let averageScore = 0;
       let perfectScores = 0;
 
-      if (assessmentsResponse.ok) {
-        const assessmentsData = await assessmentsResponse.json();
-        const studentAssessments = assessmentsData.assessments || [];
+      // Students: load assessments for score tracking; tutors skip this
+      if (userType !== 'tutor') {
+        const assessmentsResponse = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/assessments/student/${userId}`,
+          {
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`,
+            },
+          }
+        );
 
-        if (studentAssessments.length > 0) {
-          const totalScore = studentAssessments.reduce((sum: number, a: any) => {
-            const avgScore = (
-              a.understanding + 
-              a.participation + 
-              a.homeworkCompletion + 
-              a.attentiveness + 
-              a.improvement
-            ) / 5;
-            
-            if (avgScore === 100) perfectScores++;
-            
-            return sum + avgScore;
-          }, 0);
-          
-          averageScore = Math.round(totalScore / studentAssessments.length);
+        if (assessmentsResponse.ok) {
+          const assessmentsData = await assessmentsResponse.json();
+          const studentAssessments = assessmentsData.assessments || [];
+
+          if (studentAssessments.length > 0) {
+            const totalScore = studentAssessments.reduce((sum: number, a: any) => {
+              const avgScore = (
+                a.understanding +
+                a.participation +
+                a.homeworkCompletion +
+                a.attentiveness +
+                a.improvement
+              ) / 5;
+
+              if (avgScore === 100) perfectScores++;
+
+              return sum + avgScore;
+            }, 0);
+
+            averageScore = Math.round(totalScore / studentAssessments.length);
+          }
         }
       }
 

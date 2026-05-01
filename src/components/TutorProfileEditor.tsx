@@ -660,7 +660,7 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="hourly_rate">Hourly Rate (£) *</Label>
+                <Label htmlFor="hourly_rate">Hourly Rate (₦) *</Label>
                 <Input
                   id="hourly_rate"
                   type="number"

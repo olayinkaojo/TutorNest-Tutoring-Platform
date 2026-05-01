@@ -308,7 +308,7 @@ export function TutorPayoutDashboard({ session, tutorId }: TutorPayoutDashboardP
       <Alert className="bg-blue-50 border-blue-200">
         <Calendar className="h-4 w-4 text-blue-600" />
         <AlertDescription className="text-blue-800">
-          <strong>Payout Schedule:</strong> {settings.schedule.charAt(0).toUpperCase() + settings.schedule.slice(1)} payouts.
+          <strong>Payout Schedule:</strong> Payouts are processed every Monday.
           Minimum payout amount: {formatNaira(settings.minimumAmount.toString())}
         </AlertDescription>
       </Alert>
