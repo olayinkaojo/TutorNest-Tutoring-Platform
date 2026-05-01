@@ -567,21 +567,50 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         ...(existingUserPhotoUrl ? { photo_url: existingUserPhotoUrl } : {}),
       };
 
-      const profileResponse = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profiles/${userId}`,
-        {
-          method: 'PUT',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${tutorSession.access_token}`,
-          },
-          body: JSON.stringify(profileData),
+      let profileSaved = false;
+      try {
+        const profileResponse = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profiles/${userId}`,
+          {
+            method: 'PUT',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: `Bearer ${tutorSession.access_token}`,
+            },
+            body: JSON.stringify(profileData),
+            signal: AbortSignal.timeout(15000),
+          }
+        );
+        if (profileResponse.ok) {
+          profileSaved = true;
+        } else {
+          const errorData = await profileResponse.json().catch(() => ({}));
+          throw new Error('Failed to create profile: ' + (errorData.error || 'Unknown error'));
         }
-      );
+      } catch (fetchErr: any) {
+        // Network / timeout failure — fall back to writing just the role via POST /profile
+        // so the user lands on the dashboard. They can complete profile details later.
+        const isNetworkErr =
+          fetchErr instanceof TypeError ||
+          fetchErr.name === 'TimeoutError' ||
+          fetchErr.name === 'AbortError';
+        if (!isNetworkErr) throw fetchErr; // re-throw server-side errors
 
-      if (!profileResponse.ok) {
-        const errorData = await profileResponse.json();
-        throw new Error('Failed to create profile: ' + (errorData.error || 'Unknown error'));
+        console.warn('PUT /profiles failed with network error, falling back to role-only save:', fetchErr.message);
+        try {
+          await fetch(
+            `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profile`,
+            {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${tutorSession.access_token}` },
+              body: JSON.stringify({ role: 'tutor' }),
+              signal: AbortSignal.timeout(10000),
+            }
+          );
+        } catch (_) {
+          // Last resort: write role to auth metadata directly
+          await getSupabaseClient().auth.updateUser({ data: { role: 'tutor' } });
+        }
       }
 
       console.log('✅ Tutor profile updated successfully!');

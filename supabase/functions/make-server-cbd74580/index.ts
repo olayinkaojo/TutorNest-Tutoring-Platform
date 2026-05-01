@@ -977,7 +977,8 @@ app.get('/make-server-cbd74580/profile', async (c) => {
     // Profile doesn't exist - create it quickly
     console.log('⚠️  No profile found in KV store, creating basic profile from user metadata');
     const supabase = getSupabaseClient();
-    const { data: { user }, error: getUserError } = await supabase.auth.admin.getUserById(userId);
+    const { data: getUserData2, error: getUserError } = await supabase.auth.admin.getUserById(userId);
+    const user = getUserData2?.user ?? null;
 
     if (getUserError || !user) {
       console.error('Error getting user by ID:', getUserError?.message);
@@ -1162,8 +1163,9 @@ app.put('/make-server-cbd74580/profiles/:userId', async (c) => {
     
     // Get user info from Supabase auth
     const supabase = getSupabaseClient();
-    const { data: { user }, error: getUserError } = await supabase.auth.admin.getUserById(targetUserId);
-    
+    const { data: getUserData, error: getUserError } = await supabase.auth.admin.getUserById(targetUserId);
+    const user = getUserData?.user ?? null;
+
     if (getUserError || !user) {
       console.error('❌ Error getting user:', getUserError);
       return c.json({ error: 'User not found' }, 404);
