@@ -359,6 +359,23 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
           role: 'tutor',
         })).filter((c: Contact) => c.id && c.id !== userId);
         setContacts(tutors);
+      } else if (userRole === 'student') {
+        // Students can only message tutors they have active sessions with
+        const bookings: any[] = data.bookings || [];
+        const seen = new Set<string>();
+        const tutors: Contact[] = [];
+        for (const b of bookings) {
+          const tutorId = b.tutorId;
+          if (tutorId && tutorId !== userId && !seen.has(tutorId)) {
+            seen.add(tutorId);
+            tutors.push({
+              id: tutorId,
+              name: b.tutorName || b.tutorFullName || 'Tutor',
+              role: 'tutor',
+            });
+          }
+        }
+        setContacts(tutors);
       } else {
         // For tutors: extract unique parents from bookings
         const bookings: any[] = data.bookings || data || [];
@@ -416,7 +433,9 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
     <Dialog open={showNewConvDialog} onOpenChange={(open) => { setShowNewConvDialog(open); if (!open) setContactSearch(''); }}>
       <DialogContent>
         <DialogHeader>
-          <DialogTitle>Start a New Conversation</DialogTitle>
+          <DialogTitle>
+            {userRole === 'student' ? 'Message a Tutor' : 'Start a New Conversation'}
+          </DialogTitle>
         </DialogHeader>
         <div className="space-y-3">
           <div className="relative">
@@ -432,7 +451,11 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
             {contactsLoading ? (
               <p className="text-sm text-center py-4 text-gray-500">Loading contacts...</p>
             ) : filteredContacts.length === 0 ? (
-              <p className="text-sm text-center py-4 text-gray-500">No contacts found</p>
+              <p className="text-sm text-center py-4 text-gray-500">
+                {userRole === 'student'
+                  ? 'No tutors found. Book a session to start messaging your tutor.'
+                  : 'No contacts found'}
+              </p>
             ) : (
               <div className="divide-y">
                 {filteredContacts.map(contact => (
@@ -523,7 +546,9 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
                 <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
                 <p className="mb-1">No conversations yet</p>
                 <p className="text-xs text-gray-400">
-                  Start a conversation with a tutor, student, or parent
+                  {userRole === 'student'
+                    ? 'Start a conversation with one of your tutors'
+                    : 'Start a conversation with a tutor, student, or parent'}
                 </p>
               </div>
             ) : (

@@ -106,6 +106,27 @@ export function StudentDashboard({
 }) {
   const supabase = getSupabaseClient();
   const hasMountedTabSync = useRef(false);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const onSignOutRef = useRef(onSignOut);
+  // Keep ref fresh without adding onSignOut to idle effect deps
+  useEffect(() => { onSignOutRef.current = onSignOut; });
+
+  // 3-hour idle timeout — signs out after 3 h of no mouse/key/scroll/touch activity
+  useEffect(() => {
+    const IDLE_MS = 3 * 60 * 60 * 1000; // 3 hours
+    const reset = () => {
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+      idleTimerRef.current = setTimeout(() => onSignOutRef.current(), IDLE_MS);
+    };
+    const events = ['mousemove', 'keydown', 'mousedown', 'scroll', 'touchstart'] as const;
+    events.forEach(e => window.addEventListener(e, reset, { passive: true }));
+    reset();
+    return () => {
+      events.forEach(e => window.removeEventListener(e, reset));
+      if (idleTimerRef.current) clearTimeout(idleTimerRef.current);
+    };
+  }, []);
+
   const [session, setSession] = useState<any>(null);
   const [profile, setProfile] = useState<UserProfile>(initialProfile);
   const [loading, setLoading] = useState(false);

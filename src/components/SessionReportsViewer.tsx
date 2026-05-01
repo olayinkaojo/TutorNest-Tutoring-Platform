@@ -33,8 +33,6 @@ import {
   MessageSquare,
   User,
   Download,
-  Wifi,
-  WifiOff,
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
 import { useRealtimeReports, WebSocketEvents } from '../hooks/useWebSocket';
@@ -90,6 +88,28 @@ export function SessionReportsViewer({
   const [filterTutor, setFilterTutor] = useState('all');
   const [filterStatus, setFilterStatus] = useState('all');
   const [selectedStudent, setSelectedStudent] = useState(initialStudentId || 'all');
+  // Subjects from paid bookings (superset of report subjects)
+  const [bookedSubjects, setBookedSubjects] = useState<string[]>([]);
+
+  // Load subjects from paid bookings so the filter shows all subjects, not just ones with reports
+  useEffect(() => {
+    if (viewType !== 'student') return;
+    const fetchBookedSubjects = async () => {
+      try {
+        const res = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        if (!res.ok) return;
+        const data = await res.json();
+        const subjects = Array.from(new Set(
+          (data.bookings || []).map((b: any) => b.subject).filter(Boolean)
+        )) as string[];
+        setBookedSubjects(subjects);
+      } catch (_) {}
+    };
+    fetchBookedSubjects();
+  }, [viewType, accessToken]);
 
   // Real-time updates via WebSocket
   const handleRealtimeUpdate = (type: string, data: unknown) => {
@@ -209,7 +229,11 @@ export function SessionReportsViewer({
     return true;
   });
 
-  const uniqueSubjects = Array.from(new Set(reports.map(r => r.subject)));
+  // Merge subjects from paid bookings (bookedSubjects) with any subjects in existing reports
+  const uniqueSubjects = Array.from(new Set([
+    ...bookedSubjects,
+    ...reports.map(r => r.subject).filter(Boolean),
+  ]));
   const uniqueTutors = Array.from(new Set(reports.map(r => ({ id: r.tutorId, name: r.tutorName || 'Unknown Tutor' }))));
 
   const exportToPDF = () => {
@@ -260,20 +284,6 @@ export function SessionReportsViewer({
             {viewType === 'parent' && 'Track your children\'s progress through detailed tutor feedback'}
             {viewType === 'student' && 'Review feedback and insights from your tutoring sessions'}
           </p>
-          {/* Connection Status Indicator */}
-          <div className="text-xs text-gray-500 flex items-center gap-2 mt-2">
-            {isConnected ? (
-              <>
-                <Wifi className="w-3 h-3 text-green-600" />
-                <span>Real-time updates active</span>
-              </>
-            ) : (
-              <>
-                <WifiOff className="w-3 h-3 text-gray-400" />
-                <span>Connecting...</span>
-              </>
-            )}
-          </div>
         </div>
         {filteredReports.length > 0 && (
           <Button onClick={exportToPDF} variant="outline">

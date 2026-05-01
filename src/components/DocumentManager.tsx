@@ -75,7 +75,8 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
 
   useEffect(() => {
     loadDocuments();
-    if (userRole === 'parent') loadBookedTutors();
+    // Parents and students both need the booked-tutors list for the recipient selector
+    if (userRole === 'parent' || userRole === 'student') loadBookedTutors();
   }, [filterType]);
 
   const loadBookedTutors = async () => {
