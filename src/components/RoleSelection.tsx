@@ -89,7 +89,13 @@ export function RoleSelection({ session, currentProfile, onComplete, onTutorSele
     } catch (err: any) {
       console.error('Error setting role via edge function:', err);
       // Edge function unreachable or profile missing — update auth metadata directly
-      const isNetworkError = err.message === 'Failed to fetch' || err.name === 'TimeoutError' || err.name === 'AbortError' || err.message === 'Profile not found';
+      // TypeError covers all browser-level fetch failures:
+      //   Chrome → "Failed to fetch", Safari → "Load failed", Firefox → "NetworkError when attempting to fetch resource."
+      const isNetworkError =
+        err instanceof TypeError ||
+        err.name === 'TimeoutError' ||
+        err.name === 'AbortError' ||
+        err.message === 'Profile not found';
       if (isNetworkError) {
         try {
           await supabase.auth.updateUser({ data: { role: selectedRole } });

@@ -1046,14 +1046,26 @@ app.post('/make-server-cbd74580/profile', async (c) => {
     let profile = await kv.get(`user:${userId}`) as any;
 
     if (!profile) {
-      // Profile missing from KV — create it from auth metadata rather than failing
-      const adminSupa = getSupabaseClient();
-      const { data: { user: authUser } } = await adminSupa.auth.admin.getUserById(userId);
+      let email = '';
+      let full_name = '';
+      try {
+        const adminSupa = getSupabaseClient();
+        const { data, error } = await adminSupa.auth.admin.getUserById(userId);
+        if (!error && data?.user) {
+          email = data.user.email || '';
+          full_name =
+            data.user.user_metadata?.name ||
+            data.user.user_metadata?.full_name ||
+            '';
+        }
+      } catch (_) {
+        // Non-fatal
+      }
       profile = {
         userId,
         id: userId,
-        email: authUser?.email || '',
-        full_name: authUser?.user_metadata?.name || '',
+        email,
+        full_name,
         role: null,
         profileData: {},
         createdAt: new Date().toISOString(),
