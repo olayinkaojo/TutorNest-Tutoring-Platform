@@ -1,5 +1,4 @@
 import { Hono } from 'npm:hono@4';
-import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
@@ -13,25 +12,19 @@ async function isAdminUser(userId: string): Promise<boolean> {
   const dbProfile = await db.getProfile(userId);
   if (dbProfile?.role === 'admin') return true;
 
-  // Final fallback: check Supabase auth user_metadata
-  try {
-    const adminClient = createClient(
-      Deno.env.get('SUPABASE_URL') ?? '',
-      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
-    );
-    const { data } = await adminClient.auth.admin.getUserById(userId);
-    if (data?.user?.user_metadata?.role === 'admin') {
-      // Auto-upsert into DB so this route works without auth-metadata fallback next time
-      await db.upsertProfile(userId, {
-        id: userId,
-        userId,
-        role: 'admin',
-        email: data.user.email ?? '',
-        fullName: data.user.user_metadata?.name ?? data.user.user_metadata?.full_name ?? '',
-      }).catch(() => {});
-      return true;
-    }
-  } catch (_) { /* ignore */ }
+  // Final fallback: check Supabase auth user_metadata (uses db.tsx service-role client)
+  const metadata = await db.getUserAuthMetadata(userId);
+  if (metadata?.role === 'admin') {
+    // Auto-upsert into DB so future checks find the role without hitting auth API
+    await db.upsertProfile(userId, {
+      id: userId,
+      userId,
+      role: 'admin',
+      email: '',
+      fullName: metadata?.name ?? metadata?.full_name ?? '',
+    }).catch(() => {});
+    return true;
+  }
 
   return false;
 }

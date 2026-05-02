@@ -808,3 +808,14 @@ export async function updateTriviaSubscription(
 
   if (error) throw new Error(error.message);
 }
+
+/** Returns auth user_metadata for a user via service-role admin API. Returns null on error. */
+export async function getUserAuthMetadata(userId: string): Promise<Record<string, any> | null> {
+  try {
+    const { data, error } = await db().auth.admin.getUserById(userId);
+    if (error || !data?.user) return null;
+    return data.user.user_metadata ?? null;
+  } catch (_) {
+    return null;
+  }
+}

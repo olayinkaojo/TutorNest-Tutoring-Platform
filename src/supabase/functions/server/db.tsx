@@ -84,6 +84,7 @@ export interface BookingRow {
   subject: string | null;
   status: string;
   paymentStatus: string;
+  meetLink?: string;
 }
 
 export async function createBooking(booking: BookingRow): Promise<void> {
@@ -110,15 +111,16 @@ export async function createBooking(booking: BookingRow): Promise<void> {
 }
 
 /** Returns all bookings for a tutor on a specific date (for availability checks). */
-export async function getBookingsByTutorAndDate(tutorId: string, date: string): Promise<Pick<BookingRow, 'startTime' | 'endTime' | 'status'>[]> {
+export async function getBookingsByTutorAndDate(tutorId: string, date: string): Promise<Pick<BookingRow, 'id' | 'startTime' | 'endTime' | 'status'>[]> {
   const { data, error } = await db()
     .from('bookings')
-    .select('start_time, end_time, status')
+    .select('id, start_time, end_time, status')
     .eq('tutor_id', tutorId)
     .eq('date', date)
     .in('status', ['scheduled', 'confirmed']);
   if (error) throw new Error(error.message);
   return (data ?? []).map((row) => ({
+    id: row.id,
     startTime: row.start_time,
     endTime: row.end_time,
     status: row.status,
@@ -165,7 +167,97 @@ export async function getBookingsByUserId(userId: string): Promise<BookingRow[]>
     subject: row.subject,
     status: row.status,
     paymentStatus: row.payment_status,
+    meetLink: row.meet_link ?? undefined,
   }));
+}
+
+/** Returns only bookings where the user is the TUTOR (teaching sessions). */
+export async function getBookingsByTutorId(tutorId: string): Promise<BookingRow[]> {
+  const { data, error } = await db()
+    .from('bookings')
+    .select('*')
+    .eq('tutor_id', tutorId)
+    .order('date', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    paymentId: row.payment_id,
+    planType: row.plan_type,
+    sessionNumber: row.session_number,
+    totalSessions: row.total_sessions,
+    tutorId: row.tutor_id,
+    studentId: row.student_id,
+    userId: row.user_id,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    duration: row.duration,
+    subject: row.subject,
+    status: row.status,
+    paymentStatus: row.payment_status,
+    meetLink: row.meet_link ?? undefined,
+  }));
+}
+
+/** Returns only bookings where the user is the STUDENT (attending sessions). */
+export async function getBookingsByStudentId(studentId: string): Promise<BookingRow[]> {
+  const { data, error } = await db()
+    .from('bookings')
+    .select('*')
+    .eq('student_id', studentId)
+    .order('date', { ascending: true });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    paymentId: row.payment_id,
+    planType: row.plan_type,
+    sessionNumber: row.session_number,
+    totalSessions: row.total_sessions,
+    tutorId: row.tutor_id,
+    studentId: row.student_id,
+    userId: row.user_id,
+    date: row.date,
+    startTime: row.start_time,
+    endTime: row.end_time,
+    duration: row.duration,
+    subject: row.subject,
+    status: row.status,
+    paymentStatus: row.payment_status,
+    meetLink: row.meet_link ?? undefined,
+  }));
+}
+
+/** Get a single booking by ID from the database. */
+export async function getBooking(bookingId: string): Promise<BookingRow | null> {
+  const { data, error } = await db()
+    .from('bookings')
+    .select('*')
+    .eq('id', bookingId)
+    .single();
+  if (error) {
+    // PGRST116: No rows found. 22P02: Invalid input (usually non-UUID string in UUID column)
+    if (error.code === 'PGRST116' || error.code === '22P02') return null;
+    throw new Error(error.message);
+  }
+  if (!data) return null;
+  return {
+    id: data.id,
+    paymentId: data.payment_id,
+    planType: data.plan_type,
+    sessionNumber: data.session_number,
+    totalSessions: data.total_sessions,
+    tutorId: data.tutor_id,
+    studentId: data.student_id,
+    userId: data.user_id,
+    date: data.date,
+    startTime: data.start_time,
+    endTime: data.end_time,
+    duration: data.duration,
+    subject: data.subject,
+    status: data.status,
+    paymentStatus: data.payment_status,
+    meetLink: data.meet_link ?? undefined,
+  };
 }
 
 // ─── Payments ─────────────────────────────────────────────────────────────────
@@ -184,6 +276,7 @@ export interface PaymentRow {
   status: string;
   bookingIds?: string[];
   confirmedAt?: string;
+  paymentExpiresAt?: string;  // Chat access expires when payment duration ends
 }
 
 export async function createPayment(payment: PaymentRow): Promise<void> {
@@ -227,6 +320,33 @@ export async function getPaymentByReference(reference: string): Promise<PaymentR
     status: data.status,
     bookingIds: data.booking_ids ?? [],
     confirmedAt: data.confirmed_at,
+    paymentExpiresAt: data.payment_expires_at,
+  };
+}
+
+export async function getPaymentById(paymentId: string): Promise<PaymentRow | null> {
+  const { data, error } = await db()
+    .from('payments')
+    .select('*')
+    .eq('id', paymentId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return {
+    id: data.id,
+    userId: data.user_id,
+    tutorId: data.tutor_id,
+    studentId: data.student_id,
+    planType: data.plan_type,
+    amount: data.amount,
+    reference: data.reference,
+    startDate: data.start_date,
+    startTime: data.start_time,
+    subject: data.subject,
+    status: data.status,
+    bookingIds: data.booking_ids ?? [],
+    confirmedAt: data.confirmed_at,
+    paymentExpiresAt: data.payment_expires_at,
   };
 }
 
@@ -234,11 +354,13 @@ export async function updatePayment(id: string, updates: {
   status?: string;
   bookingIds?: string[];
   confirmedAt?: string;
+  paymentExpiresAt?: string;
 }): Promise<void> {
   const row: Record<string, unknown> = {};
   if (updates.status !== undefined) row.status = updates.status;
   if (updates.bookingIds !== undefined) row.booking_ids = updates.bookingIds;
   if (updates.confirmedAt !== undefined) row.confirmed_at = updates.confirmedAt;
+  if (updates.paymentExpiresAt !== undefined) row.payment_expires_at = updates.paymentExpiresAt;
   const { error } = await db().from('payments').update(row).eq('id', id);
   if (error) throw new Error(error.message);
 }
@@ -393,6 +515,31 @@ export async function getAllBookingsForAdmin(year?: number, month?: number): Pro
   }));
 }
 
+/** Returns payments for a specific user (as payer or tutor) from the DB. */
+export async function getPaymentsByUserId(userId: string): Promise<any[]> {
+  const { data, error } = await db()
+    .from('payments')
+    .select('*')
+    .or(`user_id.eq.${userId},tutor_id.eq.${userId}`)
+    .order('created_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    userId: row.user_id,
+    tutorId: row.tutor_id,
+    studentId: row.student_id,
+    amount: Number(row.amount),
+    subject: row.subject,
+    status: row.status,
+    reference: row.reference,
+    planType: row.plan_type,
+    createdAt: row.created_at,
+    verifiedAt: row.confirmed_at,
+    metadata: { planType: row.plan_type },
+    source: 'db',
+  }));
+}
+
 /**
  * Returns all payments from the DB, mapped to the same shape the KV store used.
  * Pass year + month to filter by created_at.
@@ -456,4 +603,219 @@ export async function getAllProfilesForAdmin(): Promise<any[]> {
     fullName: row.full_name,
     createdAt: row.created_at,
   }));
+}
+
+// ─── Trivia Subscriptions ──────────────────────────────────────────────────────
+
+export interface TriviaSubscription {
+  id: string;
+  studentId: string;
+  subjectId: string;
+  subjectName: string;
+  status: 'free' | 'active' | 'expired';
+  freeTrialStartedAt?: string;
+  freeTrialExpiresAt?: string;
+  paidExpiresAt?: string;
+  paymentId?: string;
+  pricePerMonth: number;
+}
+
+/**
+ * Get or create trivia subscription for a student-subject combo.
+ * First access starts 7-day free trial. After trial: requires payment.
+ */
+export async function getOrCreateTriviaSubscription(
+  studentId: string,
+  subjectId: string,
+  subjectName: string
+): Promise<TriviaSubscription> {
+  const { data, error } = await db()
+    .from('trivia_subscriptions')
+    .select('*')
+    .eq('student_id', studentId)
+    .eq('subject_id', subjectId)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') throw new Error(error.message);
+
+  // Subscription exists
+  if (data) {
+    return {
+      id: data.id,
+      studentId: data.student_id,
+      subjectId: data.subject_id,
+      subjectName: data.subject_name,
+      status: data.status,
+      freeTrialStartedAt: data.free_trial_started_at,
+      freeTrialExpiresAt: data.free_trial_expires_at,
+      paidExpiresAt: data.paid_expires_at,
+      paymentId: data.payment_id,
+      pricePerMonth: data.price_per_month,
+    };
+  }
+
+  // Create new subscription with 7-day free trial
+  const now = new Date();
+  const trialExpiresAt = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
+  const { data: newSub, error: createError } = await db()
+    .from('trivia_subscriptions')
+    .insert({
+      student_id: studentId,
+      subject_id: subjectId,
+      subject_name: subjectName,
+      status: 'free',
+      free_trial_started_at: now.toISOString(),
+      free_trial_expires_at: trialExpiresAt.toISOString(),
+      price_per_month: 3000,
+    })
+    .select()
+    .single();
+
+  if (createError) throw new Error(createError.message);
+
+  return {
+    id: newSub.id,
+    studentId: newSub.student_id,
+    subjectId: newSub.subject_id,
+    subjectName: newSub.subject_name,
+    status: newSub.status,
+    freeTrialStartedAt: newSub.free_trial_started_at,
+    freeTrialExpiresAt: newSub.free_trial_expires_at,
+    paidExpiresAt: newSub.paid_expires_at,
+    paymentId: newSub.payment_id,
+    pricePerMonth: newSub.price_per_month,
+  };
+}
+
+/**
+ * Check if student has access to trivia for a subject.
+ * Returns: { hasAccess, status, expiresAt, reason }
+ */
+export async function checkTriviaAccess(
+  studentId: string,
+  subjectId: string
+): Promise<{ hasAccess: boolean; status: string; expiresAt?: string; daysRemaining?: number; reason?: string }> {
+  const { data, error } = await db()
+    .from('trivia_subscriptions')
+    .select('*')
+    .eq('student_id', studentId)
+    .eq('subject_id', subjectId)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') throw new Error(error.message);
+
+  // No subscription = first-time access (will be created on trivia endpoint call)
+  if (!data) {
+    return {
+      hasAccess: true,
+      status: 'free',
+      reason: 'First-time access (free trial starting)',
+    };
+  }
+
+  const now = new Date();
+
+  // Check free trial
+  if (data.status === 'free' && data.free_trial_expires_at) {
+    const trialExpires = new Date(data.free_trial_expires_at);
+    const daysLeft = Math.ceil((trialExpires.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+
+    if (now < trialExpires) {
+      return {
+        hasAccess: true,
+        status: 'free_trial',
+        expiresAt: data.free_trial_expires_at,
+        daysRemaining: daysLeft,
+      };
+    }
+
+    // Trial expired, check paid subscription
+    if (data.paid_expires_at) {
+      const paidExpires = new Date(data.paid_expires_at);
+      const paidDaysLeft = Math.ceil((paidExpires.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+
+      if (now < paidExpires) {
+        return {
+          hasAccess: true,
+          status: 'paid_active',
+          expiresAt: data.paid_expires_at,
+          daysRemaining: paidDaysLeft,
+        };
+      }
+    }
+
+    // No paid subscription or paid subscription expired
+    return {
+      hasAccess: false,
+      status: 'trial_expired',
+      reason: 'Free trial expired. Subscribe to continue.',
+    };
+  }
+
+  // Check paid subscription
+  if (data.status === 'active' && data.paid_expires_at) {
+    const paidExpires = new Date(data.paid_expires_at);
+    const daysLeft = Math.ceil((paidExpires.getTime() - now.getTime()) / (24 * 60 * 60 * 1000));
+
+    if (now < paidExpires) {
+      return {
+        hasAccess: true,
+        status: 'paid_active',
+        expiresAt: data.paid_expires_at,
+        daysRemaining: daysLeft,
+      };
+    }
+
+    // Paid subscription expired
+    return {
+      hasAccess: false,
+      status: 'subscription_expired',
+      reason: 'Subscription expired. Renew to continue.',
+    };
+  }
+
+  // Fallback
+  return {
+    hasAccess: false,
+    status: 'no_access',
+    reason: 'No active subscription.',
+  };
+}
+
+/**
+ * Update trivia subscription status after payment.
+ */
+export async function updateTriviaSubscription(
+  studentId: string,
+  subjectId: string,
+  updates: {
+    status?: string;
+    paidExpiresAt?: string;
+    paymentId?: string;
+  }
+): Promise<void> {
+  const row: Record<string, unknown> = {};
+  if (updates.status !== undefined) row.status = updates.status;
+  if (updates.paidExpiresAt !== undefined) row.paid_expires_at = updates.paidExpiresAt;
+  if (updates.paymentId !== undefined) row.payment_id = updates.paymentId;
+
+  const { error } = await db()
+    .from('trivia_subscriptions')
+    .update(row)
+    .eq('student_id', studentId)
+    .eq('subject_id', subjectId);
+
+  if (error) throw new Error(error.message);
+}
+
+/** Returns auth user_metadata for a user via service-role admin API. Returns null on error. */
+export async function getUserAuthMetadata(userId: string): Promise<Record<string, any> | null> {
+  try {
+    const { data, error } = await db().auth.admin.getUserById(userId);
+    if (error || !data?.user) return null;
+    return data.user.user_metadata ?? null;
+  } catch (_) {
+    return null;
+  }
 }
