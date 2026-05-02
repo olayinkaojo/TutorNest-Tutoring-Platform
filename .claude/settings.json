@@ -21,7 +21,19 @@
       "Bash(sed -i '' 's|import extendedTriviaRoutes from '\\\\''./extended-trivia-routes.tsx'\\\\'';|// import extendedTriviaRoutes from '\\\\''./extended-trivia-routes.tsx'\\\\''; // disabled: imports broken time-attack/multiplayer/daily-challenge services|' /Users/admin/Documents/TutorNest_Github/TutorNest-Tutoring-Platform/supabase/functions/make-server-cbd74580/index.ts)",
       "Bash(sed -i '' 's|app.route\\('\\\\''/make-server-cbd74580/trivia-extended'\\\\'', extendedTriviaRoutes\\);|// app.route\\('\\\\''/make-server-cbd74580/trivia-extended'\\\\'', extendedTriviaRoutes\\);|' /Users/admin/Documents/TutorNest_Github/TutorNest-Tutoring-Platform/supabase/functions/make-server-cbd74580/index.ts)",
       "Bash(curl -s -w '\\\\nStatus: %{http_code}' -X POST https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/signup -H 'Content-Type: application/json' -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indldm12YnNrdW5obmh1eHphcW96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjQzNDcsImV4cCI6MjA3ODcwMDM0N30.L_N8kMAOitpFO28SJx_OpS7uAb7NYwMCOo5RiRBvx5c' -d '{\"email\":\"finaltest01@mailinator.com\",\"password\":\"Test1234!!\",\"name\":\"Final Test\"}')",
-      "Bash(git commit -m ' *)"
+      "Bash(git commit -m ' *)",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/profile\" -H \"Authorization: Bearer invalid\")",
+      "Bash(curl -s -o /dev/null -w \"%{http_code}\" \"https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/admin/platform-overview\" -H \"Authorization: Bearer invalid\")",
+      "Bash(curl -s \"https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/admin/platform-overview\" -H \"Authorization: Bearer invalid\")",
+      "Bash(curl -s https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/admin/platform-overview -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indldm12YnNrdW5obmh1eHphcW96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Mzc0MTM2OTYsImV4cCI6MjA1Mjk4OTY5Nn0.YQvTGi8vOVd3aHlHkVHNsNzULPfsBKMHHPgFpBNwMgU' -w '\\\\nHTTP_CODE: %{http_code}\\\\nCONTENT_TYPE: %{content_type}')",
+      "Bash(curl -sv https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/admin/dashboard-stats -H 'Authorization: Bearer test.invalid.token')",
+      "Bash(curl -s -D - https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/admin/dashboard-stats -H 'Authorization: Bearer test.invalid.token')",
+      "Bash(curl -s -D - -X OPTIONS https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/admin/platform-overview -H 'Origin: http://localhost:5173' -H 'Access-Control-Request-Method: GET' -H 'Access-Control-Request-Headers: Authorization')",
+      "Bash(curl -s -D - https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/admin/platform-overview -H 'Authorization: Bearer invalid')",
+      "Bash(curl -s -D - -X OPTIONS \"https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/admin/platform-overview\")",
+      "Bash(curl -s -D - \"https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/health\")",
+      "Bash(curl -s -D - \"https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/\")",
+      "Bash(curl -v \"https://wevmvbskunhnhuxzaqoz.supabase.co/functions/v1/make-server-cbd74580/\")"
     ]
   }
 }
