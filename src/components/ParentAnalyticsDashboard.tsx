@@ -40,14 +40,17 @@ interface ChildProfile {
 export function ParentAnalyticsDashboard({
   accessToken,
   childProfiles = [],
+  activeChildId: initialChildId,
 }: {
   accessToken: string;
   childProfiles?: ChildProfile[];
+  activeChildId?: string | null;
 }) {
   const [spendingData, setSpendingData] = useState<SpendingData[]>([]);
   const [subjectAnalytics, setSubjectAnalytics] = useState<SubjectAnalytics[]>([]);
   const [tutorSpending, setTutorSpending] = useState<TutorSpending[]>([]);
   const [timeframe, setTimeframe] = useState<'3m' | '6m' | '1y' | 'all'>('6m');
+  const [selectedChildId, setSelectedChildId] = useState<string>(initialChildId || 'all');
   const [loading, setLoading] = useState(true);
 
   const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
@@ -63,7 +66,7 @@ export function ParentAnalyticsDashboard({
 
   useEffect(() => {
     loadAnalytics();
-  }, [timeframe, accessToken, childProfiles.length]);
+  }, [timeframe, accessToken, childProfiles.length, selectedChildId]);
 
   const loadAnalytics = async () => {
     setLoading(true);
@@ -81,11 +84,15 @@ export function ParentAnalyticsDashboard({
         ? allPayments.filter(p => new Date(p.createdAt || p.confirmedAt || 0).getTime() >= cutoff)
         : allPayments;
 
-      // Fetch bookings for each child (for subject breakdown)
+      // Fetch bookings for the selected child (or all children)
       let allBookings: any[] = [];
-      if (childProfiles.length > 0) {
+      const profilesToFetch = selectedChildId === 'all'
+        ? childProfiles
+        : childProfiles.filter(c => c.id === selectedChildId);
+
+      if (profilesToFetch.length > 0) {
         const results = await Promise.all(
-          childProfiles.map(c =>
+          profilesToFetch.map(c =>
             fetch(`${BASE}/bookings?studentId=${c.id}`, { headers })
               .then(r => r.ok ? r.json() : { bookings: [] })
               .catch(() => ({ bookings: [] }))
@@ -214,7 +221,22 @@ export function ParentAnalyticsDashboard({
           <h2 className="text-2xl font-bold">Analytics & Insights</h2>
           <p className="text-gray-600 text-sm mt-1">Real spending and learning analytics from your bookings</p>
         </div>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
+          {childProfiles.length > 1 && (
+            <Select value={selectedChildId} onValueChange={setSelectedChildId}>
+              <SelectTrigger className="w-40">
+                <SelectValue placeholder="All children" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All children</SelectItem>
+                {childProfiles.map(c => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.firstName ? `${c.firstName} ${c.lastName ?? ''}`.trim() : 'Child'}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          )}
           <Select value={timeframe} onValueChange={(v: any) => setTimeframe(v)}>
             <SelectTrigger className="w-36">
               <SelectValue />

@@ -3856,6 +3856,41 @@ app.get('/make-server-cbd74580/health', (c) => {
   return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// Test email endpoint — sends a verification email to the authenticated user
+app.post('/make-server-cbd74580/test-email', async (c: any) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) return c.json({ error: 'Unauthorized' }, 401);
+
+    const supabase = getSupabaseClient();
+    const { data: { user }, error: authError } = await supabase.auth.getUser(accessToken);
+    if (authError || !user) return c.json({ error: 'Unauthorized' }, 401);
+
+    const body = await c.req.json().catch(() => ({}));
+    const toEmail = body.email || user.email;
+    if (!toEmail) return c.json({ error: 'No email address available' }, 400);
+
+    const result = await sendEmail({
+      to: toEmail,
+      subject: 'TutorNest — Email Delivery Test',
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
+          <h2 style="color:#625d9c">Email is working!</h2>
+          <p>This is a test email from TutorNest to confirm that email delivery is functioning correctly.</p>
+          <p style="color:#888;font-size:12px">Sent at ${new Date().toISOString()}</p>
+        </div>
+      `,
+    });
+
+    if (!result.success) {
+      return c.json({ success: false, error: result.error, to: toEmail }, 500);
+    }
+    return c.json({ success: true, to: toEmail });
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Failed to send test email' }, 500);
+  }
+});
+
 // Create test tutors for demo purposes (no auth required for development)
 app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
   try {

@@ -1082,7 +1082,7 @@ export function ParentDashboard({
           {/* Analytics Tab */}
           <TabsContent value="analytics">
             {session && (
-              <ParentAnalyticsDashboard accessToken={session.access_token} childProfiles={children} />
+              <ParentAnalyticsDashboard accessToken={session.access_token} childProfiles={children} activeChildId={activeChildId} />
             )}
           </TabsContent>
 

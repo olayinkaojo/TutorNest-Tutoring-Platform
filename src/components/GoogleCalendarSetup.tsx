@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
@@ -18,23 +19,25 @@ export function GoogleCalendarSetup({ session, onConnectionChange }: GoogleCalen
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [checkingStatus, setCheckingStatus] = useState(true);
+  const location = useLocation();
+  const navigate = useNavigate();
 
   useEffect(() => {
     checkConnectionStatus();
   }, []);
 
   useEffect(() => {
-    // Handle OAuth callback
-    const urlParams = new URLSearchParams(window.location.search);
+    // Handle OAuth callback — use React Router location so the preserved query params are visible
+    const urlParams = new URLSearchParams(location.search);
     const code = urlParams.get('code');
     const state = urlParams.get('state');
-    
+
     if (code && state) {
       handleOAuthCallback(code);
-      // Clean up URL
-      window.history.replaceState({}, document.title, window.location.pathname);
+      // Strip the OAuth params from the URL without a full navigation
+      navigate(location.pathname, { replace: true });
     }
-  }, []);
+  }, [location.search]);
 
   const checkConnectionStatus = async () => {
     setCheckingStatus(true);

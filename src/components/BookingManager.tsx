@@ -28,7 +28,6 @@ import {
   FileText,
   BookOpen,
   Wifi,
-  WifiOff,
   Loader2,
 } from 'lucide-react';
 
@@ -801,20 +800,13 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
         </TabsContent>
       </Tabs>
 
-      {/* Connection Status Indicator */}
-      <div className="text-xs text-gray-500 flex items-center gap-2">
-        {isConnected ? (
-          <>
-            <Wifi className="w-3 h-3 text-green-600" />
-            <span>Real-time updates active</span>
-          </>
-        ) : (
-          <>
-            <WifiOff className="w-3 h-3 text-gray-400" />
-            <span>Connecting...</span>
-          </>
-        )}
-      </div>
+      {/* Connection Status Indicator - only shown when connected */}
+      {isConnected && (
+        <div className="text-xs text-gray-500 flex items-center gap-2">
+          <Wifi className="w-3 h-3 text-green-600" />
+          <span>Real-time updates active</span>
+        </div>
+      )}
       </div>
     </div>
   );

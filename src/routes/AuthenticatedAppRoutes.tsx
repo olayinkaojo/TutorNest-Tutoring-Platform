@@ -1,5 +1,5 @@
 import type { Session } from '@supabase/supabase-js';
-import { Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import { AdminDashboard } from '../components/AdminDashboard';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { Button } from '../components/ui/button';
@@ -135,6 +135,17 @@ export function AuthenticatedAppRoutes({
     );
   }
 
+  // Preserves Google OAuth code+state in the URL when redirecting so
+  // GoogleCalendarSetup can detect and exchange the code.
+  function WildcardRedirect({ role, buildDashboardPath }: { role: string; buildDashboardPath: (r: string, t?: string) => string }) {
+    const loc = useLocation();
+    const params = new URLSearchParams(loc.search);
+    if (params.has('code') && params.has('state') && role === 'tutor') {
+      return <Navigate to={`/dashboard/tutor/profile${loc.search}`} replace />;
+    }
+    return <Navigate to={buildDashboardPath(role)} replace />;
+  }
+
   return (
     <Routes>
       <Route
@@ -156,7 +167,7 @@ export function AuthenticatedAppRoutes({
       />
       <Route path="/dashboard/:role" element={<DashboardRouteRenderer />} />
       <Route path="/dashboard/:role/:tab" element={<DashboardRouteRenderer />} />
-      <Route path="*" element={<Navigate to={buildDashboardPath(profile.role)} replace />} />
+      <Route path="*" element={<WildcardRedirect role={profile.role} buildDashboardPath={buildDashboardPath} />} />
     </Routes>
   );
 }
