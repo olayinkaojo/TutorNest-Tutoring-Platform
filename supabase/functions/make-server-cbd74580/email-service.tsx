@@ -348,21 +348,69 @@ export const emailTemplates = {
       </td></tr></table></body></html>`,
   }),
 
-  // Session report notification
-  sessionReportNotification: (parentName: string, tutorName: string, date: string, reportLink: string) => ({
-    subject: "Session Report Available",
+  // Session report notification — world-class
+  sessionReportNotification: (parentName: string, tutorName: string, studentName: string, subject: string, date: string, progressStatus: string, reportLink: string) => ({
+    subject: `Session report ready — ${studentName} with ${tutorName}`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Session Report from ${tutorName}</h2>
-        <p>Hi ${parentName},</p>
-        <p>The session report for your session on ${date} is now available.</p>
-        
-        <p><a href="${reportLink}" style="display: inline-block; background-color: #625d9c; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 20px 0;">View Report</a></p>
-        
-        <p style="color: #666; font-size: 14px;">
-          Check the report to see what topics were covered and recommended focus areas.
-        </p>
-      </div>
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#0ea5e9;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">📋 &nbsp;Session Report Available</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Dear ${parentName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              ${tutorName} has submitted a session report for ${studentName}'s tutoring session. You can review it below.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:24px;">
+                <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:0.8px;">Session Summary</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding:7px 0;font-size:14px;color:#6b7280;width:130px;">👨‍🎓 Student</td>
+                    <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${studentName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:7px 0;font-size:14px;color:#6b7280;">👨‍🏫 Tutor</td>
+                    <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${tutorName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:7px 0;font-size:14px;color:#6b7280;">📚 Subject</td>
+                    <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${subject}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:7px 0;font-size:14px;color:#6b7280;">📅 Date</td>
+                    <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${date}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:7px 0;font-size:14px;color:#6b7280;">📈 Progress</td>
+                    <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${progressStatus.charAt(0).toUpperCase() + progressStatus.slice(1)}</td>
+                  </tr>
+                </table>
+              </td></tr>
+            </table>
+            <div style="text-align:center;margin-bottom:24px;">
+              <a href="${reportLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">View Full Report</a>
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:16px 24px;">
+                <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
+                  💡 Reports help you track your child's progress over time. Review strengths, areas for improvement, and homework set by the tutor.
+                </p>
+              </td></tr>
+            </table>
+            <p style="font-size:14px;color:#374151;">Warm regards,<br><strong>The TutorNest Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
     `,
   }),
 
@@ -464,23 +512,165 @@ export const emailTemplates = {
     `,
   }),
 
-  // Payout notification for tutors
-  payoutNotification: (tutorName: string, amount: string, currency: string, date: string) => ({
-    subject: "Payout Processed",
+  // Payout notification for tutors — world-class
+  payoutNotification: (tutorName: string, amount: string, currency: string, date: string, bookingsCount?: number) => ({
+    subject: `Payout processed — ${currency} ${amount}`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Payout Processed ✅</h2>
-        <p>Hi ${tutorName},</p>
-        <p>Your earnings have been processed and transferred to your account.</p>
-        
-        <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <p><strong>Payout Details:</strong></p>
-          <p>💰 Amount: ${currency} ${amount}</p>
-          <p>📅 Date: ${date}</p>
-        </div>
-        
-        <p>The amount will appear in your account within 1-2 business days depending on your bank.</p>
-      </div>
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#22c55e;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">✓ &nbsp;Payout Approved &amp; Processed</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${tutorName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              Great news! Your payout request has been approved and is being processed. The funds will arrive in your bank account within 1–3 business days.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:24px;">
+                <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.8px;">Payout Details</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;width:130px;">💰 Amount</td>
+                    <td style="padding:8px 0;font-size:15px;color:#166534;font-weight:700;">${currency} ${amount}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">📅 Date</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${date}</td>
+                  </tr>
+                  ${bookingsCount ? `<tr><td style="padding:8px 0;font-size:14px;color:#6b7280;">📚 Sessions</td><td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${bookingsCount} completed session${bookingsCount !== 1 ? 's' : ''}</td></tr>` : ''}
+                </table>
+              </td></tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:16px 24px;">
+                <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
+                  💡 <strong>Tip:</strong> Track all your earnings, session history, and upcoming payouts from your tutor dashboard.
+                  <a href="https://tutornest.org/dashboard" style="color:#1d4ed8;font-weight:600;"> Visit Dashboard →</a>
+                </p>
+              </td></tr>
+            </table>
+            <p style="font-size:14px;color:#374151;">Thank you for being part of TutorNest.<br><strong>The TutorNest Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
+    `,
+  }),
+
+  // Payout rejected notification for tutors — world-class
+  payoutRejected: (tutorName: string, amount: string, currency: string, reason: string, dashboardLink: string) => ({
+    subject: `Payout request update — ${currency} ${amount}`,
+    html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#f59e0b;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">⚠ &nbsp;Payout Request Requires Attention</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${tutorName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              We were unable to process your payout request at this time. Please review the details below.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:24px;">
+                <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.8px;">Request Details</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;width:130px;">💰 Amount</td>
+                    <td style="padding:8px 0;font-size:15px;color:#111827;font-weight:700;">${currency} ${amount}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;vertical-align:top;">📝 Reason</td>
+                    <td style="padding:8px 0;font-size:14px;color:#374151;">${reason}</td>
+                  </tr>
+                </table>
+              </td></tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:16px 24px;">
+                <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
+                  💡 <strong>What to do next:</strong> Your earnings remain safely in your balance. You can submit a new payout request from your dashboard once any issues are resolved. If you believe this is an error, please contact support.
+                  <a href="${dashboardLink}" style="color:#1d4ed8;font-weight:600;"> Visit Dashboard →</a>
+                </p>
+              </td></tr>
+            </table>
+            <p style="font-size:14px;color:#374151;">If you have any questions, please reply to this email or contact support@tutornest.org.<br><strong>The TutorNest Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
+    `,
+  }),
+
+  // Refund request confirmation — world-class
+  refundRequested: (userName: string, amountDisplay: string, refundPercentage: number, reference: string, sessionDate: string, dashboardLink: string) => ({
+    subject: `Refund request received — ${amountDisplay}`,
+    html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#0ea5e9;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">↩ &nbsp;Refund Request Received</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${userName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              We have received your refund request and it is now under review. Our team will process it within 3–5 business days.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:24px;">
+                <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:0.8px;">Refund Details</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;width:130px;">💰 Refund Amount</td>
+                    <td style="padding:8px 0;font-size:15px;color:#0369a1;font-weight:700;">${amountDisplay}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">📊 Refund %</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${refundPercentage}% of original payment</td>
+                  </tr>
+                  ${sessionDate ? `<tr><td style="padding:8px 0;font-size:14px;color:#6b7280;">📅 Session Date</td><td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${sessionDate}</td></tr>` : ''}
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">🔖 Reference</td>
+                    <td style="padding:8px 0;font-size:12px;color:#6b7280;word-break:break-all;">${reference}</td>
+                  </tr>
+                </table>
+              </td></tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:16px 24px;">
+                <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
+                  💡 Once approved, the refund will be returned to your original payment method. You can track the status from your dashboard.
+                  <a href="${dashboardLink}" style="color:#1d4ed8;font-weight:600;"> View Dashboard →</a>
+                </p>
+              </td></tr>
+            </table>
+            <p style="font-size:14px;color:#374151;">For questions, reply to this email or contact support@tutornest.org.<br><strong>The TutorNest Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
     `,
   }),
 

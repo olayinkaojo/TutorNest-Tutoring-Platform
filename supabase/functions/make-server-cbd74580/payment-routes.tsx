@@ -1480,7 +1480,30 @@ app.post('/payments/:paymentId/refund', async (c) => {
     };
     await kv.set(`payment:${paymentId}`, updatedPayment);
 
-    // TODO: Send email notification to user about refund request
+    // Send refund confirmation email (non-fatal)
+    try {
+      const userProfile = (await kv.get(`user:${userId}`) as any) || await db.getProfile(userId).catch(() => null);
+      const userName = userProfile?.fullName || userProfile?.name || 'Customer';
+      const userEmail = userProfile?.email;
+
+      if (userEmail) {
+        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+        const sessionDate = booking?.date
+          ? new Date(`${booking.date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+          : '';
+        const tpl = emailTemplates.refundRequested(
+          userName,
+          formatNaira(refundAmount),
+          refundPercentage,
+          payment.reference || refundId,
+          sessionDate,
+          `${dashboardBase}/dashboard`,
+        );
+        await sendEmail({ to: userEmail, ...tpl }).catch((e) => console.warn('refund email:', e));
+      }
+    } catch (e) {
+      console.warn('Refund notification email (non-fatal):', e);
+    }
 
     return c.json({
       success: true,

@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { sendEmail, emailTemplates } from './email-service.tsx';
 
 const app = new Hono();
 
@@ -151,10 +152,50 @@ app.post('/', async (c) => {
 
     console.log(`Created session report ${reportId} for tutor ${tutorId}`);
 
-    return c.json({ 
+    // Send session report email to parent (non-fatal)
+    try {
+      const tutorProfile = await kv.get(`user:${tutorId}`) as any;
+      const resolvedTutorName = tutorProfile?.fullName || tutorProfile?.name || tutorName;
+
+      let parentEmail: string | undefined;
+      let parentName = 'Parent';
+
+      if (report.studentId) {
+        const child = await kv.get(`child:${report.studentId}`) as any;
+        const childUser = child || await kv.get(`user:${report.studentId}`) as any;
+        const parentId = child?.parentId || childUser?.parentId;
+        if (parentId) {
+          const parent = await kv.get(`user:${parentId}`) as any;
+          parentEmail = parent?.email;
+          parentName = parent?.fullName || parent?.name || 'Parent';
+        }
+      }
+
+      if (parentEmail) {
+        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+        const reportLink = `${dashboardBase}/dashboard?tab=reports&reportId=${reportId}`;
+        const formattedDate = report.date
+          ? new Date(`${report.date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+          : report.date;
+        const tpl = emailTemplates.sessionReportNotification(
+          parentName,
+          resolvedTutorName,
+          report.studentName,
+          report.subject,
+          formattedDate,
+          report.progressStatus || 'satisfactory',
+          reportLink,
+        );
+        await sendEmail({ to: parentEmail, ...tpl }).catch((e) => console.warn('session report email:', e));
+      }
+    } catch (e) {
+      console.warn('Session report notification email (non-fatal):', e);
+    }
+
+    return c.json({
       success: true,
       report,
-      message: 'Session report created successfully' 
+      message: 'Session report created successfully'
     });
   } catch (error) {
     console.error('Error creating session report:', error);

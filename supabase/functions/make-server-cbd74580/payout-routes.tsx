@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { sendEmail, emailTemplates } from './email-service.tsx';
 
 const payoutRoutes = new Hono();
 
@@ -323,6 +324,28 @@ payoutRoutes.patch('/admin/requests/:requestId', async (c) => {
     }
 
     await kv.set(`payout_request:${requestId}`, payoutRequest);
+
+    // Send email notification to tutor (non-fatal)
+    try {
+      const tutorProfile = await kv.get(`user:${payoutRequest.tutorId}`) as any;
+      const tutorEmail = tutorProfile?.email;
+      const tutorName = tutorProfile?.fullName || tutorProfile?.name || 'Tutor';
+      const amountDisplay = `₦${Number(payoutRequest.amount).toLocaleString('en-NG', { minimumFractionDigits: 0 })}`;
+      const processedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
+      const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+
+      if (tutorEmail) {
+        if (action === 'approve') {
+          const tpl = emailTemplates.payoutNotification(tutorName, amountDisplay, 'NGN', processedDate, payoutRequest.bookingIds?.length);
+          await sendEmail({ to: tutorEmail, ...tpl }).catch((e) => console.warn('payout approval email:', e));
+        } else if (action === 'reject') {
+          const tpl = emailTemplates.payoutRejected(tutorName, amountDisplay, 'NGN', notes || 'Please contact support for further details.', `${dashboardBase}/dashboard`);
+          await sendEmail({ to: tutorEmail, ...tpl }).catch((e) => console.warn('payout rejection email:', e));
+        }
+      }
+    } catch (e) {
+      console.warn('Payout notification email (non-fatal):', e);
+    }
 
     return c.json({ success: true, request: payoutRequest });
   } catch (error: any) {
