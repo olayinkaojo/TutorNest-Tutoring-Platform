@@ -1,12 +1,19 @@
 import { Hono } from 'npm:hono';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
-import { COMPREHENSIVE_TRIVIA } from './comprehensive-trivia-data.tsx';
 
 const app = new Hono();
 
-// Use the comprehensive trivia question database
-const TRIVIA_QUESTIONS = COMPREHENSIVE_TRIVIA;
+type TriviaBank = Record<string, Record<string, unknown[]>>;
+let triviaQuestionsCache: TriviaBank | null = null;
+
+async function getTriviaQuestions(): Promise<TriviaBank> {
+  if (!triviaQuestionsCache) {
+    const mod = await import('./comprehensive-trivia-data.tsx');
+    triviaQuestionsCache = mod.COMPREHENSIVE_TRIVIA as TriviaBank;
+  }
+  return triviaQuestionsCache;
+}
 
 // Get random trivia questions
 app.get('/questions', async (c) => {
@@ -15,9 +22,11 @@ app.get('/questions', async (c) => {
     const subject = c.req.query('subject') || 'Mathematics';
     const count = parseInt(c.req.query('count') || '5');
 
+    const TRIVIA_QUESTIONS = await getTriviaQuestions();
+
     // Get questions for the specified grade and subject
-    const allQuestions = TRIVIA_QUESTIONS[grade as keyof typeof TRIVIA_QUESTIONS]?.[subject] || [];
-    
+    const allQuestions = (TRIVIA_QUESTIONS[grade]?.[subject] as unknown[] | undefined) || [];
+
     if (allQuestions.length === 0) {
       return c.json({
         error: 'No questions available for this grade and subject',
@@ -223,8 +232,9 @@ app.get('/stats', async (c) => {
 app.get('/subjects/:grade', async (c) => {
   try {
     const grade = c.req.param('grade');
-    const gradeQuestions = TRIVIA_QUESTIONS[grade as keyof typeof TRIVIA_QUESTIONS];
-    
+    const TRIVIA_QUESTIONS = await getTriviaQuestions();
+    const gradeQuestions = TRIVIA_QUESTIONS[grade];
+
     if (!gradeQuestions) {
       return c.json({
         error: 'Grade not found',

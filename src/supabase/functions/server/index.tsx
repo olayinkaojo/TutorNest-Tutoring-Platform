@@ -50,6 +50,21 @@ import paymentPlansRoutes from './payment-plans-routes.tsx';
 
 const app = new Hono();
 
+/**
+ * Supabase Edge forwards paths after `/functions/v1/<function-name>/` (e.g. `/profile`).
+ * Routes are registered as `/make-server-cbd74580/...`; rewrite so they match.
+ */
+const ROUTE_PREFIX = '/make-server-cbd74580';
+
+app.use('*', async (c, next) => {
+  const url = new URL(c.req.url);
+  if (!url.pathname.startsWith(ROUTE_PREFIX)) {
+    url.pathname = ROUTE_PREFIX + (url.pathname === '/' ? '' : url.pathname);
+    return app.fetch(new Request(url.toString(), c.req.raw));
+  }
+  await next();
+});
+
 // Middleware
 const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') ?? '').split(',').map(o => o.trim()).filter(Boolean);
 

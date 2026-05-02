@@ -50,6 +50,22 @@ import paymentPlansRoutes from './payment-plans-routes.tsx';
 
 const app = new Hono();
 
+/**
+ * Supabase Edge forwards request paths after `/functions/v1/<function-name>/`
+ * (e.g. `/profile`, `/admin/platform-overview`). Routes in this app are registered
+ * as `/make-server-cbd74580/...`. Rewrite short paths so existing handlers match.
+ */
+const ROUTE_PREFIX = '/make-server-cbd74580';
+
+app.use('*', async (c, next) => {
+  const url = new URL(c.req.url);
+  if (!url.pathname.startsWith(ROUTE_PREFIX)) {
+    url.pathname = ROUTE_PREFIX + (url.pathname === '/' ? '' : url.pathname);
+    return app.fetch(new Request(url.toString(), c.req.raw));
+  }
+  await next();
+});
+
 // Middleware
 // Handle OPTIONS preflight requests manually
 app.options('*', (c) => {

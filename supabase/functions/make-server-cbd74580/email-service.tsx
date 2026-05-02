@@ -1,9 +1,6 @@
-import { Resend } from "npm:resend@3.2.0";
-
-const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+// Load Resend only when sending email. A top-level `import "npm:resend"` + `new Resend()` can throw
+// during module init and take down the whole Edge Function worker (HTTP 503 BOOT_ERROR).
 const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "noreply@resend.dev"; // Switch to noreply@tutornest.org once domain is verified in Resend
-
-const resend = RESEND_API_KEY ? new Resend(RESEND_API_KEY) : null;
 
 export interface EmailData {
   to: string;
@@ -13,12 +10,15 @@ export interface EmailData {
 }
 
 export async function sendEmail(data: EmailData): Promise<{ success: boolean; error?: string }> {
-  if (!resend) {
+  const RESEND_API_KEY = Deno.env.get("RESEND_API_KEY");
+  if (!RESEND_API_KEY) {
     console.warn("⚠️ Resend API key not configured - email not sent");
     return { success: false, error: "Email service not configured" };
   }
 
   try {
+    const { Resend } = await import("npm:resend@3.2.0");
+    const resend = new Resend(RESEND_API_KEY);
     const result = await resend.emails.send({
       from: FROM_EMAIL,
       to: data.to,

@@ -47,9 +47,9 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       }
 
       // Validate filename to prevent malicious files
-      const fileName = file.name.toLowerCase();
+      const lowerOriginalName = file.name.toLowerCase();
       const dangerousExtensions = ['.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js', '.jar', '.zip', '.rar', '.7z', '.tar', '.gz'];
-      const hasDangerousExt = dangerousExtensions.some(ext => fileName.endsWith(ext));
+      const hasDangerousExt = dangerousExtensions.some((ext) => lowerOriginalName.endsWith(ext));
       
       if (hasDangerousExt) {
         return c.json({ error: 'File type not allowed. Executable and archive files are prohibited.' }, 400);
@@ -81,10 +81,10 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         await supabase.storage.createBucket(bucketName, { public: false });
       }
 
-      // Upload file to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-      const filePath = `${userId}/${fileName}`;
+      // Upload file to Supabase Storage (use a distinct name — `fileExt` above is the dotted extension for validation)
+      const uploadExt = file.name.split('.').pop() || 'bin';
+      const storageObjectName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${uploadExt}`;
+      const filePath = `${userId}/${storageObjectName}`;
 
       const fileBuffer = await file.arrayBuffer();
       const { data: uploadData, error: uploadError } = await supabase.storage
