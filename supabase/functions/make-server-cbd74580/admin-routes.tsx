@@ -3,32 +3,6 @@ import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 
-// Checks KV → DB profiles → auth user_metadata for admin role.
-// Auto-upserts the DB profile on first admin access so future checks work.
-async function isAdminUser(userId: string): Promise<boolean> {
-  const kvProfile = await kv.get(`user:${userId}`) as any;
-  if (kvProfile?.role === 'admin') return true;
-
-  const dbProfile = await db.getProfile(userId);
-  if (dbProfile?.role === 'admin') return true;
-
-  // Final fallback: check Supabase auth user_metadata (uses db.tsx service-role client)
-  const metadata = await db.getUserAuthMetadata(userId);
-  if (metadata?.role === 'admin') {
-    // Auto-upsert into DB so future checks find the role without hitting auth API
-    await db.upsertProfile(userId, {
-      id: userId,
-      userId,
-      role: 'admin',
-      email: '',
-      fullName: metadata?.name ?? metadata?.full_name ?? '',
-    }).catch(() => {});
-    return true;
-  }
-
-  return false;
-}
-
 // Helper function to format timestamp
 function formatTimestamp(timestamp: string): string {
   if (!timestamp) return 'Recently';
@@ -70,7 +44,12 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       const userId = await getUserId(accessToken ?? null);
       if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
-      if (!await isAdminUser(userId)) return c.json({ error: 'Forbidden' }, 403);
+      // Admin role guard
+      const adminProfile = await kv.get(`user:${userId}`) as any
+        ?? await db.getProfile(userId);
+      if (!adminProfile || adminProfile.role !== 'admin') {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
 
       const year  = c.req.query('year')  ? parseInt(c.req.query('year')!)  : new Date().getFullYear();
       const month = c.req.query('month') ? parseInt(c.req.query('month')!) : new Date().getMonth() + 1;
@@ -167,7 +146,12 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       const userId = await getUserId(accessToken ?? null);
       if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
-      if (!await isAdminUser(userId)) return c.json({ error: 'Forbidden' }, 403);
+      // Admin role guard
+      const adminProfile = await kv.get(`user:${userId}`) as any
+        ?? await db.getProfile(userId);
+      if (!adminProfile || adminProfile.role !== 'admin') {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
 
       // Fetch from KV (legacy) and DB (new) in parallel
       const [kvUsers, kvBookings, kvPayments, allVerifications, dbBookings, dbPayments, dbProfiles] =
@@ -395,9 +379,17 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
     try {
       const accessToken = c.req.header('Authorization')?.split(' ')[1];
       const userId = await getUserId(accessToken ?? null);
-      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
-      if (!await isAdminUser(userId)) return c.json({ error: 'Forbidden' }, 403);
+      if (!userId) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+
+      // Admin role guard
+      const adminProfile = await kv.get(`user:${userId}`) as any
+        ?? await db.getProfile(userId);
+      if (!adminProfile || adminProfile.role !== 'admin') {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
 
       // Get all users and metrics
       const allUsers = await kv.getByPrefix('user:');
