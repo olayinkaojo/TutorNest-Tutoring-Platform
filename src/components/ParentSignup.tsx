@@ -8,7 +8,7 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
-import { CheckCircle, AlertCircle, User, Users } from 'lucide-react';
+import { Users, AlertCircle, CheckCircle } from 'lucide-react';
 import TutorNestLogo from './TutorNestLogo';
 
 const supabase = getSupabaseClient();
@@ -23,8 +23,6 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
-  const [emailCheckLoading, setEmailCheckLoading] = useState(false);
-  const [emailExists, setEmailExists] = useState(false);
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
 
   // Form data
@@ -38,46 +36,8 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
   const [childrenAges, setChildrenAges] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
 
-  // Function to check if email exists
-  const checkEmailAvailability = async () => {
-    if (!email || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
-      return;
-    }
-
-    setEmailCheckLoading(true);
-    setEmailExists(false);
-
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/check-email`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${publicAnonKey}`,
-          },
-          body: JSON.stringify({ email }),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        if (data.exists) {
-          setEmailExists(true);
-          setError('This email is already registered. Please sign in or use a different email.');
-        } else {
-          setEmailExists(false);
-          if (error.includes('already registered') || error.includes('already exists')) {
-            setError('');
-          }
-        }
-      }
-    } catch (err) {
-      console.error('Error checking email:', err);
-    } finally {
-      setEmailCheckLoading(false);
-    }
-  };
+  // Function removed: client-side email validation triggers CORS preflight that causes issues
+  // Email availability is now checked during signup submission instead
 
   const validateForm = () => {
     if (!email || !password || !fullName) {
@@ -261,46 +221,14 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
                       value={email}
                       onChange={(e) => {
                         setEmail(e.target.value);
-                        setEmailExists(false);
                         if (error.includes('already registered') || error.includes('already exists')) {
                           setError('');
                         }
                       }}
-                      onBlur={checkEmailAvailability}
                       placeholder="john@example.com"
-                      className={emailExists ? 'border-red-500 pr-10' : emailCheckLoading ? 'pr-10' : ''}
                       required
                     />
-                    {emailCheckLoading && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <div className="animate-spin h-5 w-5 border-2 border-gray-300 border-t-[#625d9c] rounded-full" />
-                      </div>
-                    )}
-                    {!emailCheckLoading && emailExists && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <AlertCircle className="h-5 w-5 text-red-500" />
-                      </div>
-                    )}
-                    {!emailCheckLoading && email && !emailExists && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && (
-                      <div className="absolute right-3 top-1/2 -translate-y-1/2">
-                        <CheckCircle className="h-5 w-5 text-green-500" />
-                      </div>
-                    )}
                   </div>
-                  {emailExists && (
-                    <p className="text-sm text-red-600 mt-1 flex items-center gap-1">
-                      <AlertCircle className="h-4 w-4" />
-                      This email is already registered.{' '}
-                      <button
-                        type="button"
-                        onClick={() => onBackToSignIn?.()}
-                        className="underline hover:no-underline"
-                        style={{ color: '#625d9c' }}
-                      >
-                        Sign in instead?
-                      </button>
-                    </p>
-                  )}
                 </div>
 
                 <div>
