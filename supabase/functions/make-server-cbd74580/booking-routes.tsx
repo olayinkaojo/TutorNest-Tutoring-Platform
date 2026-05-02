@@ -5,6 +5,26 @@ import { sendEmail, emailTemplates } from './email-service.tsx';
 
 const app = new Hono();
 
+function resolveParticipantName(p: any, fallback: string): string {
+  return (
+    p?.fullName ||
+    p?.full_name ||
+    p?.name ||
+    (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
+    fallback
+  );
+}
+
+function formatSessionDate(dateStr: string): string {
+  return new Date(`${dateStr}T12:00:00+01:00`).toLocaleDateString('en-GB', {
+    weekday: 'long',
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    timeZone: 'Africa/Lagos',
+  });
+}
+
 // Helper to get user from access token
 async function getUserFromToken(accessToken: string | undefined) {
   if (!accessToken) return null;
@@ -253,12 +273,6 @@ app.post('/bookings', async (c) => {
       return c.json({ error: 'Time slot is no longer available' }, 409);
     }
 
-    // Resolve a display name from any profile shape (KV camelCase, DB snake_case, child record)
-    const resolveName = (p: any, fallback: string): string =>
-      p?.fullName || p?.full_name || p?.name ||
-      (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
-      fallback;
-
     // Tutor: KV first (most up-to-date for tutor-specific fields), then DB
     let tutor: any = await kv.get(`user:${tutorId}`);
     if (!tutor) tutor = await db.getProfile(tutorId);
@@ -279,9 +293,9 @@ app.post('/bookings', async (c) => {
 
     const parentEmail = parent?.email || '';
     const tutorEmail  = tutor?.email  || '';
-    const tutorName   = resolveName(tutor,   'Your Tutor');
-    const studentName = resolveName(student, 'Your Student');
-    const parentName  = resolveName(parent,  'Parent');
+    const tutorName   = resolveParticipantName(tutor,   'Your Tutor');
+    const studentName = resolveParticipantName(student, 'Your Student');
+    const parentName  = resolveParticipantName(parent,  'Parent');
 
     // Create a real Google Calendar event with Meet link using the tutor's connected calendar.
     // Falls back to a generic Meet URL if the tutor hasn't connected their calendar.
@@ -315,15 +329,13 @@ app.post('/bookings', async (c) => {
     await kv.set(`booking:${bookingId}`, booking);
 
     // Send confirmation emails to parent and tutor
-    const formattedDate = new Date(`${date}T12:00:00+01:00`).toLocaleDateString('en-GB', {
-      weekday: 'long',
-      year: 'numeric',
-      month: 'long',
-      day: 'numeric',
-      timeZone: 'Africa/Lagos',
-    });
-    const formattedTime = `${startTime} WAT`;
+    const formattedDate = formatSessionDate(date);
+    const timeOnly = String(startTime).replace(/\s*WAT\s*$/i, '').trim();
     const subject = notes || 'Tutoring Session'; // Use notes as subject if provided
+    const dashboardBase =
+      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+    const dashboardLink = `${dashboardBase}/dashboard`;
+    const meet = meetLink || 'https://meet.google.com/new';
 
     // Send email to parent
     if (parentEmail) {
@@ -332,9 +344,9 @@ app.post('/bookings', async (c) => {
         studentName,
         tutorName,
         formattedDate,
-        formattedTime,
+        timeOnly,
         subject,
-        meetLink || 'https://meet.google.com/new'
+        meet,
       );
       await sendEmail({
         to: parentEmail,
@@ -351,15 +363,37 @@ app.post('/bookings', async (c) => {
         parentName,
         studentName,
         formattedDate,
-        formattedTime,
+        timeOnly,
         subject,
-        `https://tutornest.org/dashboard?tab=bookings&bookingId=${bookingId}`
+        `${dashboardBase}/dashboard?tab=bookings&bookingId=${bookingId}`,
       );
       await sendEmail({
         to: tutorEmail,
         subject: tutorEmailData.subject,
         html: tutorEmailData.html,
       });
+    }
+
+    const studentEmail =
+      typeof student?.email === 'string' && student.email.includes('@')
+        ? student.email.trim()
+        : undefined;
+    if (studentEmail) {
+      const whenLabel = `${formattedDate} · ${timeOnly} WAT`;
+      const stuTpl = emailTemplates.studentSessionUpdate(
+        studentName,
+        tutorName,
+        subject,
+        whenLabel,
+        meet,
+        dashboardLink,
+        false,
+      );
+      await sendEmail({
+        to: studentEmail,
+        subject: stuTpl.subject,
+        html: stuTpl.html,
+      }).catch((err) => console.error('Error sending student booking email:', err));
     }
 
     return c.json({
@@ -401,8 +435,9 @@ app.post('/bookings/:bookingId/calculate-refund', async (c) => {
     const bookingDateTime = new Date(`${booking.date}T${booking.startTime}`);
     const now = new Date();
     const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-    
-    const price = parseFloat(booking.price);
+
+    const b = booking as any;
+    const price = parseFloat(String(b.price ?? '0'));
     let refundPercentage = 0;
     let refundAmount = '0.00';
     let policy = '';
@@ -421,13 +456,13 @@ app.post('/bookings/:bookingId/calculate-refund', async (c) => {
       policy = 'No refund - booking has already started';
     }
 
-    return c.json({ 
+    return c.json({
       refundAmount,
       refundPercentage,
       policy,
       bookingId,
-      price: booking.price,
-      hoursUntilBooking: Math.max(0, hoursUntilBooking).toFixed(2)
+      price: b.price,
+      hoursUntilBooking: Math.max(0, hoursUntilBooking).toFixed(2),
     });
   } catch (error: any) {
     console.error('Error calculating refund:', error);
@@ -443,11 +478,21 @@ app.post('/bookings/:bookingId/cancel', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
+    const { createClient } = await import('jsr:@supabase/supabase-js@2');
+    const supabaseAuth = createClient(
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    );
+    const { data: { user } } = await supabaseAuth.auth.getUser(accessToken);
+    if (!user) return c.json({ error: 'Unauthorized' }, 401);
+
     const bookingId = c.req.param('bookingId');
-    
+
     let booking = await db.getBooking(bookingId);
+    let isKvBooking = false;
     if (!booking) {
       booking = await kv.get(`booking:${bookingId}`) as any;
+      if (booking) isKvBooking = true;
     }
 
     if (!booking) {
@@ -456,6 +501,11 @@ app.post('/bookings/:bookingId/cancel', async (c) => {
 
     if (booking.status !== 'confirmed') {
       return c.json({ error: 'Booking cannot be cancelled' }, 400);
+    }
+
+    const ownerId = isKvBooking ? (booking as any).parentId : (booking as any).userId;
+    if (user.id !== ownerId && user.id !== booking.tutorId) {
+      return c.json({ error: 'Forbidden' }, 403);
     }
 
     // Get refund calculation
@@ -469,19 +519,82 @@ app.post('/bookings/:bookingId/cancel', async (c) => {
       refundAmount: refundCalc.refundAmount,
       refundPercentage: refundCalc.refundPercentage,
       refundPolicy: refundCalc.policy,
-      cancellationReason: 'Cancelled by user'
+      cancellationReason: 'Cancelled by user',
     };
 
     await kv.set(`booking:${bookingId}`, updatedBooking);
 
-    // TODO: Delete Google Calendar events
-    // TODO: Process refund
-    // TODO: Send cancellation notifications
+    const dateLabel = formatSessionDate(booking.date);
+    const timeOnly = String(booking.startTime).replace(/\s*WAT\s*$/i, '').trim();
+    const timeLabel = `${timeOnly} WAT`;
 
-    return c.json({ 
-      success: true, 
+    try {
+      let tutor: any = await kv.get(`user:${booking.tutorId}`);
+      if (!tutor) tutor = await db.getProfile(booking.tutorId);
+
+      let student: any = await kv.get(`child:${booking.studentId}`);
+      if (!student) student = await kv.get(`user:${booking.studentId}`);
+      if (!student) student = await db.getProfile(booking.studentId);
+
+      const parentUserId = isKvBooking ? (booking as any).parentId : (booking as any).userId;
+      let parent: any = parentUserId ? await kv.get(`user:${parentUserId}`) : null;
+      if (!parent && parentUserId) parent = await db.getProfile(parentUserId);
+
+      const tutorName = resolveParticipantName(tutor, 'Tutor');
+      const studentName = resolveParticipantName(student, 'Student');
+      const parentName = resolveParticipantName(parent, 'Parent');
+      const reasonLine = user.id === booking.tutorId
+        ? 'Cancelled by the tutor'
+        : 'Cancelled by the parent or guardian';
+
+      if (parent?.email) {
+        const tpl = emailTemplates.bookingCancellation(
+          parentName,
+          tutorName,
+          dateLabel,
+          timeLabel,
+          reasonLine,
+        );
+        await sendEmail({ to: parent.email, ...tpl }).catch((e) =>
+          console.warn('cancel email parent:', e)
+        );
+      }
+      if (tutor?.email) {
+        const tpl = emailTemplates.bookingCancellation(
+          tutorName,
+          parentName,
+          dateLabel,
+          timeLabel,
+          reasonLine,
+        );
+        await sendEmail({ to: tutor.email, ...tpl }).catch((e) =>
+          console.warn('cancel email tutor:', e)
+        );
+      }
+      const studentEmail =
+        typeof student?.email === 'string' && student.email.includes('@')
+          ? student.email.trim()
+          : undefined;
+      if (studentEmail) {
+        const stuTpl = emailTemplates.bookingCancellation(
+          studentName,
+          tutorName,
+          dateLabel,
+          timeLabel,
+          reasonLine,
+        );
+        await sendEmail({ to: studentEmail, ...stuTpl }).catch((e) =>
+          console.warn('cancel email student:', e)
+        );
+      }
+    } catch (e) {
+      console.warn('Cancellation emails (non-fatal):', e);
+    }
+
+    return c.json({
+      success: true,
       booking: updatedBooking,
-      message: 'Booking cancelled successfully' 
+      message: 'Booking cancelled successfully',
     });
   } catch (error: any) {
     console.error('Error cancelling booking:', error);
@@ -516,6 +629,9 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
 
     if (!booking) return c.json({ error: 'Booking not found' }, 404);
     if (booking.status !== 'confirmed') return c.json({ error: 'Only confirmed bookings can be rescheduled' }, 400);
+
+    const oldDate = booking.date;
+    const oldStartTime = booking.startTime;
 
     // Must be >24 h before the original session
     const originalDT = new Date(`${booking.date}T${booking.startTime}+01:00`);
@@ -599,6 +715,92 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
         throw new Error(`Failed to update booking: ${updateError.message}`);
       }
       updated = await db.getBooking(bookingId);
+    }
+
+    const finalRecord = { ...booking, ...(updated || {}) };
+    const dashboardBase =
+      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+    const dashboardLink = `${dashboardBase}/dashboard`;
+    const meetLink =
+      (finalRecord as any).googleMeetLink ||
+      (finalRecord as any).meetLink ||
+      'https://meet.google.com/new';
+    const movedByLabel =
+      user.id === booking.tutorId
+        ? 'Rescheduled by your tutor'
+        : 'Rescheduled by the parent or guardian';
+
+    const oldWhen = `${formatSessionDate(oldDate)} · ${String(oldStartTime).replace(/\s*WAT\s*$/i, '').trim()} WAT`;
+    const newWhen = `${formatSessionDate(newDate)} · ${String(newStartTime).replace(/\s*WAT\s*$/i, '').trim()} WAT`;
+    const subjectLine =
+      (finalRecord as any).subject || (finalRecord as any).notes || 'Tutoring session';
+
+    try {
+      const parentUserId = isKvBooking ? (booking as any).parentId : (booking as any).userId;
+      let parent: any = parentUserId ? await kv.get(`user:${parentUserId}`) : null;
+      if (!parent && parentUserId) parent = await db.getProfile(parentUserId);
+
+      let tutor: any = await kv.get(`user:${booking.tutorId}`);
+      if (!tutor) tutor = await db.getProfile(booking.tutorId);
+
+      let student: any = await kv.get(`child:${booking.studentId}`);
+      if (!student) student = await kv.get(`user:${booking.studentId}`);
+      if (!student) student = await db.getProfile(booking.studentId);
+
+      const tutorName = resolveParticipantName(tutor, 'Tutor');
+      const studentName = resolveParticipantName(student, 'Student');
+      const parentName = resolveParticipantName(parent, 'Parent');
+
+      if (parent?.email) {
+        const tpl = emailTemplates.sessionRescheduled(
+          parentName,
+          studentName,
+          tutorName,
+          oldWhen,
+          newWhen,
+          meetLink,
+          dashboardLink,
+          movedByLabel,
+        );
+        await sendEmail({ to: parent.email, ...tpl }).catch((e) =>
+          console.warn('reschedule email parent:', e)
+        );
+      }
+      if (tutor?.email) {
+        const tpl = emailTemplates.sessionRescheduled(
+          tutorName,
+          studentName,
+          tutorName,
+          oldWhen,
+          newWhen,
+          meetLink,
+          dashboardLink,
+          movedByLabel,
+        );
+        await sendEmail({ to: tutor.email, ...tpl }).catch((e) =>
+          console.warn('reschedule email tutor:', e)
+        );
+      }
+      const studentEmail =
+        typeof student?.email === 'string' && student.email.includes('@')
+          ? student.email.trim()
+          : undefined;
+      if (studentEmail) {
+        const stuTpl = emailTemplates.studentSessionUpdate(
+          studentName,
+          tutorName,
+          subjectLine,
+          newWhen,
+          meetLink,
+          dashboardLink,
+          true,
+        );
+        await sendEmail({ to: studentEmail, ...stuTpl }).catch((e) =>
+          console.warn('reschedule email student:', e)
+        );
+      }
+    } catch (e) {
+      console.warn('Reschedule emails (non-fatal):', e);
     }
 
     return c.json({ success: true, booking: updated, message: 'Booking rescheduled successfully' });

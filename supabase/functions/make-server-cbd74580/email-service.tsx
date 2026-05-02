@@ -252,48 +252,100 @@ export const emailTemplates = {
     `,
   }),
 
-  // Session reminder email
+  // Session reminder email — world-class
   sessionReminder: (name: string, otherParty: string, date: string, time: string, roomLink: string) => ({
-    subject: "Reminder: Your tutoring session is in 1 hour",
+    subject: `Reminder: Your session with ${otherParty} starts in 1 hour`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Session Reminder 🔔</h2>
-        <p>Hi ${name},</p>
-        <p>Your tutoring session with <strong>${otherParty}</strong> starts in 1 hour!</p>
-        
-        <div style="background-color: #fff3cd; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <p><strong>Session Details:</strong></p>
-          <p>📅 Date: ${date}</p>
-          <p>⏰ Time: ${time}</p>
-        </div>
-        
-        <p><a href="${roomLink}" style="display: inline-block; background-color: #625d9c; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 20px 0;">Join Now</a></p>
-      </div>
+      <!DOCTYPE html>
+      <html lang="en">
+      <body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;">
+        <tr><td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+            <tr>
+              <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+                <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#f59e0b;padding:14px 40px;text-align:center;">
+                <p style="margin:0;color:#ffffff;font-size:15px;font-weight:600;">&#128276; &nbsp;Session Reminder — Starting in 1 Hour</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:36px 40px;">
+                <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${name},</p>
+                <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+                  Your tutoring session with <strong>${otherParty}</strong> is starting in <strong>1 hour</strong>. Get ready!
+                </p>
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#fefce8;border:1px solid #fef08a;border-radius:8px;margin-bottom:24px;">
+                  <tr><td style="padding:24px;">
+                    <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#a16207;text-transform:uppercase;letter-spacing:0.8px;">Session Details</p>
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:7px 0;font-size:14px;color:#6b7280;width:130px;">👤 With</td>
+                        <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${otherParty}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:7px 0;font-size:14px;color:#6b7280;">📅 Date</td>
+                        <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${date}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:7px 0;font-size:14px;color:#6b7280;">⏰ Time</td>
+                        <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${time} WAT</td>
+                      </tr>
+                    </table>
+                  </td></tr>
+                </table>
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:24px;">
+                  <tr><td style="padding:20px 24px;text-align:center;">
+                    <p style="margin:0 0 16px;font-size:14px;color:#374151;">Click below to join your virtual classroom</p>
+                    <a href="${roomLink}" style="display:inline-block;background:#1d4ed8;color:#ffffff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">
+                      &#127909; &nbsp;Join Session Now
+                    </a>
+                  </td></tr>
+                </table>
+                <p style="font-size:14px;color:#374151;">Best of luck,<br><strong>The TutorNest Team</strong></p>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+      </table>
+      </body>
+      </html>
     `,
   }),
 
-  // Payment confirmation email
+  // Payment confirmation email (legacy signature — same as receipt style)
   paymentConfirmation: (parentName: string, amount: string, currency: string, transactionId: string) => ({
-    subject: "Payment Received - Tutoring Session Confirmed",
+    subject: `Payment received — ${currency} ${amount}`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Payment Confirmed ✅</h2>
-        <p>Hi ${parentName},</p>
-        <p>We've received your payment successfully!</p>
-        
-        <div style="background-color: #d4edda; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <p><strong>Payment Details:</strong></p>
-          <p>💰 Amount: ${currency} ${amount}</p>
-          <p>🔔 Transaction ID: ${transactionId}</p>
-        </div>
-        
-        <p>Your tutoring session is now confirmed. You'll receive additional details before the session begins.</p>
-        
-        <p style="color: #666; font-size: 14px; margin-top: 30px;">
-          Thank you for using TutorNest!
-        </p>
-      </div>
-    `,
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:#22c55e;padding:18px 36px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:16px;font-weight:700;">Payment successful</p>
+          </td></tr>
+          <tr><td style="padding:32px 36px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#111827;">Hi ${parentName},</p>
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">We have received your payment. Your booking will show as confirmed in your dashboard.</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;">
+              <tr><td style="padding:18px;">
+                <p style="margin:0 0 6px;font-size:15px;color:#166534;font-weight:700;">${currency} ${amount}</p>
+                <p style="margin:0;font-size:12px;color:#6b7280;word-break:break-all;">Transaction: ${transactionId}</p>
+              </td></tr>
+            </table>
+            <p style="margin:22px 0 0;font-size:13px;color:#6b7280;">You will receive session details and reminders by email. Thank you for choosing TutorNest.</p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()}</td></tr>
+        </table>
+      </td></tr></table></body></html>`,
   }),
 
   // Session report notification
@@ -314,27 +366,74 @@ export const emailTemplates = {
     `,
   }),
 
-  // Booking cancellation email
+  // Booking cancellation email — world-class
   bookingCancellation: (name: string, otherParty: string, date: string, time: string, reason: string) => ({
-    subject: "Session Cancelled",
+    subject: `Session Cancelled — ${date}`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Session Cancelled</h2>
-        <p>Hi ${name},</p>
-        <p>Your tutoring session has been cancelled.</p>
-        
-        <div style="background-color: #f8d7da; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <p><strong>Cancelled Session:</strong></p>
-          <p>👤 With: ${otherParty}</p>
-          <p>📅 Date: ${date}</p>
-          <p>⏰ Time: ${time}</p>
-          ${reason ? `<p>📝 Reason: ${reason}</p>` : ""}
-        </div>
-        
-        <p style="color: #666; font-size: 14px; margin-top: 30px;">
-          If you have any questions, please contact our support team.
-        </p>
-      </div>
+      <!DOCTYPE html>
+      <html lang="en">
+      <body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;">
+        <tr><td align="center">
+          <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+            <tr>
+              <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+                <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#ef4444;padding:14px 40px;text-align:center;">
+                <p style="margin:0;color:#ffffff;font-size:15px;font-weight:600;">&#10005; &nbsp;Session Cancelled</p>
+              </td>
+            </tr>
+            <tr>
+              <td style="padding:36px 40px;">
+                <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${name},</p>
+                <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+                  We wanted to let you know that a tutoring session has been cancelled. Please review the details below.
+                </p>
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;margin-bottom:24px;">
+                  <tr><td style="padding:24px;">
+                    <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.8px;">Cancelled Session</p>
+                    <table width="100%" cellpadding="0" cellspacing="0">
+                      <tr>
+                        <td style="padding:7px 0;font-size:14px;color:#6b7280;width:130px;">👤 With</td>
+                        <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${otherParty}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:7px 0;font-size:14px;color:#6b7280;">📅 Date</td>
+                        <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${date}</td>
+                      </tr>
+                      <tr>
+                        <td style="padding:7px 0;font-size:14px;color:#6b7280;">⏰ Time</td>
+                        <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${time}</td>
+                      </tr>
+                      ${reason ? `<tr><td style="padding:7px 0;font-size:14px;color:#6b7280;vertical-align:top;">📝 Note</td><td style="padding:7px 0;font-size:14px;color:#111827;">${reason}</td></tr>` : ''}
+                    </table>
+                  </td></tr>
+                </table>
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:24px;">
+                  <tr><td style="padding:16px 24px;">
+                    <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
+                      💡 <strong>What's next?</strong> You can book another session anytime from your dashboard.
+                      <a href="https://tutornest.org/dashboard" style="color:#1d4ed8;font-weight:600;">Visit Dashboard →</a>
+                    </p>
+                  </td></tr>
+                </table>
+                <p style="font-size:14px;color:#374151;">Warm regards,<br><strong>The TutorNest Team</strong></p>
+              </td>
+            </tr>
+            <tr>
+              <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+              </td>
+            </tr>
+          </table>
+        </td></tr>
+      </table>
+      </body>
+      </html>
     `,
   }),
 
@@ -1004,5 +1103,208 @@ export const emailTemplates = {
         </div>
       </div>
     `,
+  }),
+
+  /** Branded signup confirmation — all roles (parent, tutor, student). */
+  signupConfirmEmail: (name: string, role: string, confirmationLink: string) => {
+    const r = (role || '').toLowerCase();
+    let headline = 'Confirm your email';
+    let sub = 'You are one step away from activating your TutorNest account.';
+    let tip =
+      'After confirming, sign in to complete your profile and explore the platform.';
+    if (r === 'parent') {
+      headline = 'Welcome, parent — confirm your email';
+      sub = 'Thank you for joining TutorNest. Confirm your address so we can keep you updated on bookings, sessions, and payments.';
+      tip = 'You will be able to add children, browse vetted tutors, and book sessions securely.';
+    } else if (r === 'tutor') {
+      headline = 'Tutor application — confirm your email';
+      sub =
+        'Confirm your address to activate your account. You will receive a separate note about verification once this step is complete.';
+      tip = 'Complete your profile and credentials while our team reviews your application.';
+    } else if (r === 'student') {
+      headline = 'Student account — confirm your email';
+      sub = 'Confirm your address to unlock your dashboard, messages, and learning tools.';
+      tip = 'If you are under 13, a parent or guardian may manage bookings on your behalf.';
+    }
+    return {
+      subject: `Confirm your email — TutorNest`,
+      html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:32px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">${headline}</p>
+          </td></tr>
+          <tr><td style="padding:32px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#111827;">Hi ${name},</p>
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">${sub}</p>
+            <div style="text-align:center;margin:28px 0;">
+              <a href="${confirmationLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">Confirm email address</a>
+            </div>
+            <p style="margin:0 0 12px;font-size:13px;color:#6b7280;word-break:break-all;">Or paste this link:<br/><span style="color:#4338ca">${confirmationLink}</span></p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-top:20px;"><tr><td style="padding:16px 20px;">
+              <p style="margin:0;font-size:14px;color:#4c1d95;line-height:1.5;"><strong>Tip:</strong> ${tip}</p>
+            </td></tr></table>
+            <p style="margin:24px 0 0;font-size:13px;color:#9ca3af;">This link expires in 24 hours. If you did not create an account, you can ignore this message.</p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()} · <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>`,
+    };
+  },
+
+  /** Session moved — send to parent, tutor, and optionally student. */
+  sessionRescheduled: (
+    recipientName: string,
+    studentName: string,
+    tutorName: string,
+    oldWhen: string,
+    newWhen: string,
+    meetLink: string,
+    dashboardLink: string,
+    movedByLabel: string,
+  ) => ({
+    subject: `Session rescheduled — ${studentName} with ${tutorName}`,
+    html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#0ea5e9 0%,#6366f1 100%);padding:28px 36px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">📅 Session rescheduled</p>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:13px;">${movedByLabel}</p>
+          </td></tr>
+          <tr><td style="padding:32px 36px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#111827;">Hi ${recipientName},</p>
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">Your tutoring session for <strong>${studentName}</strong> with <strong>${tutorName}</strong> has a new time.</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e5e7eb;border-radius:8px;margin-bottom:16px;">
+              <tr><td style="padding:14px 18px;background:#fef2f2;font-size:13px;font-weight:700;color:#991b1b;text-transform:uppercase;">Previous</td></tr>
+              <tr><td style="padding:14px 18px;font-size:15px;color:#111827;">${oldWhen}</td></tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #bbf7d0;border-radius:8px;margin-bottom:22px;">
+              <tr><td style="padding:14px 18px;background:#ecfdf5;font-size:13px;font-weight:700;color:#166534;text-transform:uppercase;">New schedule</td></tr>
+              <tr><td style="padding:14px 18px;font-size:15px;color:#111827;font-weight:600;">${newWhen}</td></tr>
+            </table>
+            <a href="${meetLink}" style="display:inline-block;background:#1d4ed8;color:#fff;font-size:14px;font-weight:600;padding:12px 22px;border-radius:6px;text-decoration:none;">Join link (same room where applicable)</a>
+            <p style="margin:10px 0 0;font-size:11px;color:#6b7280;word-break:break-all;">${meetLink}</p>
+            <div style="text-align:center;margin-top:24px;">
+              <a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px;text-decoration:none;">Open dashboard</a>
+            </div>
+            <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">Please update your calendar. If this change was unexpected, contact support from your dashboard.</p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px;text-align:center;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()}</td></tr>
+        </table>
+      </td></tr></table></body></html>`,
+  }),
+
+  /** Student / teen with own email — session booked or updated. */
+  studentSessionUpdate: (
+    studentName: string,
+    tutorName: string,
+    subject: string,
+    whenLabel: string,
+    meetLink: string,
+    dashboardLink: string,
+    isReschedule: boolean,
+  ) => ({
+    subject: isReschedule
+      ? `Your session was rescheduled — ${subject}`
+      : `Your tutoring session is booked — ${subject}`,
+    html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#5d9827 0%,#16a34a 100%);padding:28px 36px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:16px;font-weight:600;">${isReschedule ? 'Session rescheduled' : 'Session confirmed'}</p>
+          </td></tr>
+          <tr><td style="padding:32px 36px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#111827;">Hi ${studentName},</p>
+            <p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">
+              ${isReschedule ? 'Your lesson time has been updated.' : 'A tutoring session has been scheduled for you.'}
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:18px;">
+              <tr><td style="padding:18px;">
+                <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#166534;">Details</p>
+                <p style="margin:4px 0;font-size:14px;color:#374151;"><strong>Subject:</strong> ${subject}</p>
+                <p style="margin:4px 0;font-size:14px;color:#374151;"><strong>Tutor:</strong> ${tutorName}</p>
+                <p style="margin:4px 0;font-size:14px;color:#374151;"><strong>When:</strong> ${whenLabel}</p>
+              </td></tr>
+            </table>
+            <a href="${meetLink}" style="display:inline-block;background:#1d4ed8;color:#fff;font-size:14px;font-weight:600;padding:12px 22px;border-radius:6px;text-decoration:none;">Join session</a>
+            <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">A parent or guardian may manage bookings on your behalf. Questions? Use Messages in your dashboard.</p>
+            <div style="text-align:center;margin-top:20px;"><a href="${dashboardLink}" style="color:#625d9c;font-weight:600;">Dashboard</a></div>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()}</td></tr>
+        </table>
+      </td></tr></table></body></html>`,
+  }),
+
+  /** Single-session or generic payment receipt (Flutterwave verify, etc.). */
+  paymentSuccessReceipt: (
+    payerName: string,
+    amountDisplay: string,
+    reference: string,
+    contextLine: string,
+    dashboardLink: string,
+  ) => ({
+    subject: `Payment received — ${amountDisplay}`,
+    html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:#22c55e;padding:18px 36px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:16px;font-weight:700;">Payment successful</p>
+          </td></tr>
+          <tr><td style="padding:32px 36px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#111827;">Hi ${payerName},</p>
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">We have successfully received your payment. Thank you — your support helps us run a safe, quality learning platform.</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:20px;">
+              <tr><td style="padding:18px;">
+                <p style="margin:0 0 8px;font-size:14px;color:#166534;"><strong>Amount</strong> · ${amountDisplay}</p>
+                <p style="margin:0;font-size:13px;color:#374151;word-break:break-all;"><strong>Reference</strong><br/>${reference}</p>
+              </td></tr>
+            </table>
+            <p style="margin:0 0 20px;font-size:14px;color:#374151;">${contextLine}</p>
+            <a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:14px;font-weight:600;padding:12px 26px;border-radius:8px;text-decoration:none;">View dashboard</a>
+            <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Keep this email for your records. For billing questions, reply to this thread or contact support@tutornest.org.</p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()}</td></tr>
+        </table>
+      </td></tr></table></body></html>`,
+  }),
+
+  /** Tutor: payment landed for a session (single-session flow). */
+  tutorPaymentReceived: (
+    tutorName: string,
+    amountDisplay: string,
+    reference: string,
+    contextLine: string,
+    dashboardLink: string,
+  ) => ({
+    subject: `Payment received for a session — ${amountDisplay}`,
+    html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#5d9827 0%,#4d7c0f 100%);padding:24px 36px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:16px;font-weight:600;">New payment on TutorNest</p>
+          </td></tr>
+          <tr><td style="padding:32px 36px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#111827;">Hi ${tutorName},</p>
+            <p style="margin:0 0 18px;font-size:15px;color:#374151;line-height:1.6;">A parent payment has cleared. Your share will follow your payout schedule.</p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#ecfdf5;border:1px solid #bbf7d0;border-radius:8px;">
+              <tr><td style="padding:18px;">
+                <p style="margin:0 0 6px;font-size:15px;color:#166534;font-weight:700;">${amountDisplay}</p>
+                <p style="margin:0;font-size:12px;color:#6b7280;word-break:break-all;">Ref: ${reference}</p>
+              </td></tr>
+            </table>
+            <p style="margin:18px 0 0;font-size:14px;color:#374151;">${contextLine}</p>
+            <div style="text-align:center;margin-top:22px;"><a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px;text-decoration:none;">Tutor dashboard</a></div>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()}</td></tr>
+        </table>
+      </td></tr></table></body></html>`,
   }),
 };

@@ -281,6 +281,73 @@ app.post('/payments/verify/:reference', async (c) => {
       },
     });
 
+    const dashboardBase =
+      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+    const dashboardLink = `${dashboardBase}/dashboard`;
+    const tutorDash = `${dashboardBase}/dashboard?tutor=1`;
+
+    try {
+      let bookingForEmail: any = null;
+      if (payment.bookingId) {
+        bookingForEmail = (await kv.get(`booking:${payment.bookingId}`)) as any;
+        if (!bookingForEmail && String(payment.bookingId).startsWith('booking:')) {
+          bookingForEmail = (await kv.get(payment.bookingId)) as any;
+        }
+        if (!bookingForEmail) {
+          try {
+            bookingForEmail = await db.getBooking(String(payment.bookingId));
+          } catch {
+            /* non-fatal */
+          }
+        }
+      }
+
+      const resolveName = (p: any, fb: string): string =>
+        p?.fullName || p?.full_name || p?.name ||
+        (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
+        fb;
+
+      const payer = await getUserFromToken(accessToken);
+      const payerKv = (await kv.get(`user:${userId}`)) as any;
+      const payerName = resolveName(payerKv || payer, 'there');
+      const payerEmail = payerKv?.email || payer?.email;
+
+      const tutorProfile = (await kv.get(`user:${payment.tutorId}`)) as any;
+      const tutorName = resolveName(tutorProfile, 'Tutor');
+
+      const amountDisplay = `₦${Number(payment.amount).toLocaleString('en-NG')}`;
+      const subj = payment.subject || bookingForEmail?.subject || bookingForEmail?.notes || 'Tutoring session';
+      const studentHint = bookingForEmail?.studentName ? ` for ${bookingForEmail.studentName}` : '';
+
+      if (payerEmail) {
+        const receipt = emailTemplates.paymentSuccessReceipt(
+          payerName,
+          amountDisplay,
+          reference,
+          `Your payment is confirmed${studentHint}. ${subj}.`,
+          dashboardLink,
+        );
+        await sendEmail({ to: payerEmail, ...receipt }).catch((e) =>
+          console.warn('paymentSuccessReceipt email:', e)
+        );
+      }
+
+      if (tutorProfile?.email) {
+        const tutorMail = emailTemplates.tutorPaymentReceived(
+          tutorName,
+          amountDisplay,
+          reference,
+          `Session booking payment cleared. Ref: ${payment.bookingId}. ${subj}.`,
+          tutorDash,
+        );
+        await sendEmail({ to: tutorProfile.email, ...tutorMail }).catch((e) =>
+          console.warn('tutorPaymentReceived email:', e)
+        );
+      }
+    } catch (e) {
+      console.warn('Post-verify payment emails (non-fatal):', e);
+    }
+
     return c.json({
       success: true,
       payment: {

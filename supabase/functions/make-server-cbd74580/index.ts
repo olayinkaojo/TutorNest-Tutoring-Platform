@@ -724,21 +724,12 @@ app.post('/make-server-cbd74580/signup', async (c) => {
       } else {
         const verificationUrl = linkData?.properties?.action_link;
         if (verificationUrl) {
+          const roleForEmail = userRole || profileData?.role || 'user';
+          const confirmTpl = emailTemplates.signupConfirmEmail(name, roleForEmail, verificationUrl);
           await sendEmail({
             to: email,
-            subject: `Confirm your TutorNest account`,
-            html: `
-              <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
-                <h2 style="color:#625d9c">Almost there, ${name}!</h2>
-                <p>Thank you for signing up to TutorNest. Please confirm your email address to activate your account.</p>
-                <p style="margin:24px 0">
-                  <a href="${verificationUrl}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
-                    Confirm Email Address
-                  </a>
-                </p>
-                <p style="color:#666;font-size:14px">This link expires in 24 hours. If you did not create this account, please ignore this email.</p>
-              </div>
-            `,
+            subject: confirmTpl.subject,
+            html: confirmTpl.html,
           });
           console.log('✅ Verification email sent to:', email);
         }
@@ -800,87 +791,13 @@ app.post('/make-server-cbd74580/signup', async (c) => {
         });
         console.log('✅ Verification record created for tutor:', data.user.id);
 
-        // Send "application received" email to the tutor
         try {
+          const dash = `${appUrl}/dashboard`;
+          const pendingTpl = emailTemplates.tutorVerificationPending(name, dash);
           await sendEmail({
             to: email,
-            subject: 'Your TutorNest Application Has Been Received',
-            html: `
-              <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
-                <!-- Header -->
-                <div style="background:linear-gradient(135deg,#625d9c 0%,#4e4a7a 100%);padding:40px 32px;text-align:center">
-                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px">TutorNest</h1>
-                  <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:15px">Connecting students with great tutors</p>
-                </div>
-
-                <!-- Body -->
-                <div style="padding:40px 32px">
-                  <h2 style="margin:0 0 8px;font-size:22px;font-weight:700;color:#111827">Application Received! 🎉</h2>
-                  <p style="margin:0 0 24px;font-size:16px;color:#374151">Hi <strong>${name}</strong>,</p>
-
-                  <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
-                    Thank you for applying to become a tutor on TutorNest. We're excited to have you on board and have received your application successfully.
-                  </p>
-
-                  <!-- Status box -->
-                  <div style="background:#faf5ff;border-left:4px solid #625d9c;border-radius:0 8px 8px 0;padding:20px 24px;margin:0 0 28px">
-                    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#625d9c;text-transform:uppercase;letter-spacing:0.5px">Application Status</p>
-                    <p style="margin:0;font-size:18px;font-weight:700;color:#111827">Pending Review</p>
-                  </div>
-
-                  <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
-                    Our team carefully reviews every application to ensure the highest quality of tutors for our students. Here's what happens next:
-                  </p>
-
-                  <!-- Steps -->
-                  <table style="width:100%;border-collapse:collapse;margin:0 0 28px">
-                    <tr>
-                      <td style="width:40px;vertical-align:top;padding:0 16px 20px 0">
-                        <div style="width:32px;height:32px;border-radius:50%;background:#625d9c;color:white;font-weight:700;font-size:14px;text-align:center;line-height:32px">1</div>
-                      </td>
-                      <td style="vertical-align:top;padding:0 0 20px">
-                        <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:15px">Email Confirmation</p>
-                        <p style="margin:0;color:#6b7280;font-size:14px;line-height:1.5">Confirm your email address using the link we sent separately.</p>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style="width:40px;vertical-align:top;padding:0 16px 20px 0">
-                        <div style="width:32px;height:32px;border-radius:50%;background:#625d9c;color:white;font-weight:700;font-size:14px;text-align:center;line-height:32px">2</div>
-                      </td>
-                      <td style="vertical-align:top;padding:0 0 20px">
-                        <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:15px">Profile Review (24–48 hours)</p>
-                        <p style="margin:0;color:#6b7280;font-size:14px;line-height:1.5">Our team will verify your qualifications, experience, and background information.</p>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style="width:40px;vertical-align:top;padding:0 16px 0 0">
-                        <div style="width:32px;height:32px;border-radius:50%;background:#5d9827;color:white;font-weight:700;font-size:14px;text-align:center;line-height:32px">3</div>
-                      </td>
-                      <td style="vertical-align:top">
-                        <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:15px">Get Approved &amp; Start Teaching</p>
-                        <p style="margin:0;color:#6b7280;font-size:14px;line-height:1.5">Once approved, you'll receive a confirmation email and gain full access to your tutor dashboard, where you can start accepting bookings.</p>
-                      </td>
-                    </tr>
-                  </table>
-
-                  <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:16px 20px;margin:0 0 28px">
-                    <p style="margin:0;font-size:14px;color:#166534;line-height:1.5">
-                      <strong>In the meantime:</strong> Make sure you've confirmed your email address so we can contact you about your application. You can also sign in to view your pending dashboard.
-                    </p>
-                  </div>
-
-                  <p style="margin:0;font-size:15px;color:#374151;line-height:1.6">
-                    If you have any questions, don't hesitate to reply to this email. We're happy to help.
-                  </p>
-                </div>
-
-                <!-- Footer -->
-                <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:24px 32px;text-align:center">
-                  <p style="margin:0 0 8px;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} TutorNest. All rights reserved.</p>
-                  <p style="margin:0;font-size:13px;color:#9ca3af">You're receiving this because you applied to become a TutorNest tutor.</p>
-                </div>
-              </div>
-            `,
+            subject: pendingTpl.subject,
+            html: pendingTpl.html,
           });
           console.log('✅ Application received email sent to tutor:', email);
         } catch (emailErr: any) {
@@ -2707,10 +2624,18 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
       return c.json({ error: 'This slot has just been booked. Please select another time.' }, 409);
     }
 
-    // Get tutor, student, and parent profiles
+    // Get tutor, student (child or user), and parent profiles
     const tutorProfile = await kv.get(`user:${tutorId}`) as any;
-    const studentProfile = await kv.get(`user:${studentId}`) as any;
+    let studentRecord: any = await kv.get(`child:${studentId}`);
+    if (!studentRecord) studentRecord = await kv.get(`user:${studentId}`) as any;
     const parentProfile = await kv.get(`user:${parentId}`) as any;
+
+    const resolveDisplayName = (p: any, fallback: string) =>
+      p?.full_name ||
+      p?.fullName ||
+      p?.name ||
+      (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
+      fallback;
 
     const bookingId = `booking:${tutorId}:${studentId}:${Date.now()}`;
     const booking = {
@@ -2723,8 +2648,8 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
       endTime,
       price,
       status: 'confirmed',
-      tutorName: `${tutorProfile?.firstName} ${tutorProfile?.lastName}`,
-      studentName: studentProfile?.firstName || 'Student',
+      tutorName: resolveDisplayName(tutorProfile, 'Tutor'),
+      studentName: resolveDisplayName(studentRecord, 'Student'),
       tutorEmail: tutorProfile?.email,
       parentEmail: parentProfile?.email,
       createdAt: new Date().toISOString(),
@@ -2893,42 +2818,84 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
         .catch(err => console.error('Error creating calendar events:', err));
     }
 
-    // Send confirmation emails to parent and tutor
     try {
-      const dailyRoomLink = `https://daily.co/${booking.roomName}` || `${Deno.env.get('FRONTEND_URL') || 'https://tutornest.org'}/session/${bookingId}`;
-      
-      if (parentEmail) {
+      const dashboardBase =
+        Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+      const parentName = resolveDisplayName(parentProfile, 'Parent');
+      const studentName = resolveDisplayName(studentRecord, 'Student');
+      const tutorName = resolveDisplayName(tutorProfile, 'Tutor');
+      const subjectLine =
+        (Array.isArray(tutorProfile?.subjects) && tutorProfile.subjects[0]) ||
+        tutorProfile?.subject ||
+        'Tutoring session';
+      const parentEmailAddr = parentProfile?.email;
+      const tutorEmailAddr = tutorProfile?.email;
+      const studentEmailAddr =
+        typeof studentRecord?.email === 'string' && studentRecord.email.includes('@')
+          ? studentRecord.email.trim()
+          : undefined;
+      const formattedDate = new Date(`${date}T12:00:00+01:00`).toLocaleDateString('en-GB', {
+        weekday: 'long',
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric',
+        timeZone: 'Africa/Lagos',
+      });
+      const timeOnly = String(startTime).replace(/\s*WAT\s*$/i, '').trim();
+      const roomSafe = encodeURIComponent(bookingId.replace(/[^a-zA-Z0-9]/g, '').slice(-24));
+      const meetLink = `https://meet.jit.si/tutornest-${roomSafe}`;
+      const dashboardLink = `${dashboardBase}/dashboard`;
+
+      if (parentEmailAddr) {
         const parentEmailData = emailTemplates.bookingConfirmation(
-          parentData?.full_name || 'Parent',
-          tutorData?.full_name || 'Your Tutor',
-          booking.date,
-          booking.startTime,
-          dailyRoomLink
+          parentName,
+          studentName,
+          tutorName,
+          formattedDate,
+          timeOnly,
+          subjectLine,
+          meetLink,
         );
-        
         await sendEmail({
-          to: parentEmail,
+          to: parentEmailAddr,
           ...parentEmailData,
-        }).catch(err => console.error('Error sending parent confirmation email:', err));
+        }).catch((err) => console.error('Error sending parent confirmation email:', err));
       }
-      
-      if (tutorEmail) {
-        const tutorEmailData = emailTemplates.bookingConfirmation(
-          tutorData?.full_name || 'Tutor',
-          parentData?.full_name || 'A parent',
-          booking.date,
-          booking.startTime,
-          dailyRoomLink
+
+      if (tutorEmailAddr) {
+        const tutorEmailData = emailTemplates.tutorBookingNotification(
+          tutorName,
+          parentName,
+          studentName,
+          formattedDate,
+          timeOnly,
+          subjectLine,
+          `${dashboardBase}/dashboard?tab=bookings`,
         );
-        
         await sendEmail({
-          to: tutorEmail,
+          to: tutorEmailAddr,
           ...tutorEmailData,
-        }).catch(err => console.error('Error sending tutor confirmation email:', err));
+        }).catch((err) => console.error('Error sending tutor confirmation email:', err));
+      }
+
+      if (studentEmailAddr) {
+        const whenLabel = `${formattedDate} · ${timeOnly} WAT`;
+        const stuTpl = emailTemplates.studentSessionUpdate(
+          studentName,
+          tutorName,
+          subjectLine,
+          whenLabel,
+          meetLink,
+          dashboardLink,
+          false,
+        );
+        await sendEmail({
+          to: studentEmailAddr,
+          ...stuTpl,
+        }).catch((err) => console.error('Error sending student confirmation email:', err));
       }
     } catch (emailError) {
       console.error('Error sending confirmation emails:', emailError);
-      // Don't fail the request if email fails
     }
 
     return c.json({ success: true, booking });
