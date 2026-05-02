@@ -50,6 +50,18 @@ import paymentPlansRoutes from './payment-plans-routes.tsx';
 
 const app = new Hono();
 
+/** CORS preflight must succeed before cross-origin fetches with Authorization + apikey. */
+app.use('*', async (c, next) => {
+  if (c.req.method === 'OPTIONS') {
+    c.header('Access-Control-Allow-Origin', '*');
+    c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-client-info, apikey');
+    c.header('Access-Control-Max-Age', '86400');
+    return c.body(null, 204);
+  }
+  await next();
+});
+
 /**
  * Supabase Edge forwards paths after `/functions/v1/<function-name>/` (e.g. `/profile`).
  * Routes are registered as `/make-server-cbd74580/...`; rewrite so they match.
@@ -80,7 +92,7 @@ app.use('*', cors({
     return origin ?? '*';
   },
   allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
+  allowHeaders: ['Content-Type', 'Authorization', 'x-client-info', 'apikey'],
   credentials: true,
 }));
 app.use('*', logger());

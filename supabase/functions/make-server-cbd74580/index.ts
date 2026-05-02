@@ -51,6 +51,22 @@ import paymentPlansRoutes from './payment-plans-routes.tsx';
 const app = new Hono();
 
 /**
+ * Browsers send OPTIONS before cross-origin GET with `Authorization` + `apikey`.
+ * This must return CORS headers or the real request never runs ("Failed to fetch").
+ * Run before path rewrite so preflight never depends on route matching.
+ */
+app.use('*', async (c, next) => {
+  if (c.req.method === 'OPTIONS') {
+    c.header('Access-Control-Allow-Origin', '*');
+    c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-client-info, apikey');
+    c.header('Access-Control-Max-Age', '86400');
+    return c.body(null, 204);
+  }
+  await next();
+});
+
+/**
  * Supabase Edge forwards request paths after `/functions/v1/<function-name>/`
  * (e.g. `/profile`, `/admin/platform-overview`). Routes in this app are registered
  * as `/make-server-cbd74580/...`. Rewrite short paths so existing handlers match.
@@ -67,12 +83,7 @@ app.use('*', async (c, next) => {
 });
 
 // Middleware
-// Handle OPTIONS preflight requests manually
-app.options('*', (c) => {
-  return c.text('OK');
-});
-
-// Add CORS headers to all responses
+// Add CORS headers to all non-OPTIONS responses (OPTIONS handled above)
 app.use('*', async (c, next) => {
   await next();
   c.header('Access-Control-Allow-Origin', '*');
