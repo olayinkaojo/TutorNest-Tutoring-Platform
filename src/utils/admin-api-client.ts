@@ -4,10 +4,8 @@
  * Provides platform-wide analytics, metrics, and management
  */
 
-import { projectId } from './supabase/info';
+import { edgeFunctionHeaders, edgeFunctionUrl } from './supabase-edge-fetch';
 
-// Configuration
-const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
 const TIMEOUT_MS = 30000;
 
 // Request cache
@@ -79,33 +77,50 @@ async function fetchWithTimeout<T>(
   const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
-    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+    const path = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
+    const response = await fetch(edgeFunctionUrl(path), {
       method: options.method || 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         ...options.headers,
       },
       body: options.body ? JSON.stringify(options.body) : undefined,
       signal: controller.signal,
     });
 
+    const raw = await response.text();
+
     if (!response.ok) {
-      const errorData = await response.json().catch(() => ({}));
+      let errorData: Record<string, unknown> = {};
+      if (raw.trim()) {
+        try {
+          errorData = JSON.parse(raw) as Record<string, unknown>;
+        } catch {
+          /* ignore */
+        }
+      }
       throw new AdminAPIError(
         'API_ERROR',
-        errorData.error || `API error: ${response.status}`,
+        (errorData.error as string) || `API error: ${response.status}`,
         response.status,
         errorData
       );
     }
 
-    const contentType = response.headers.get('content-type') || '';
-    if (!contentType.includes('application/json')) {
-      throw new AdminAPIError('NON_JSON_RESPONSE', 'Service temporarily unavailable', response.status);
+    if (!raw.trim()) {
+      throw new AdminAPIError('EMPTY_BODY', 'Empty response from server', response.status);
     }
 
-    return await response.json();
+    try {
+      return JSON.parse(raw) as T;
+    } catch {
+      throw new AdminAPIError(
+        'INVALID_JSON',
+        'Server returned invalid JSON (check Edge Function logs).',
+        response.status
+      );
+    }
   } finally {
     clearTimeout(timeoutId);
   }
