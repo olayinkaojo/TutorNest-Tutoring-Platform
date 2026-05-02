@@ -27,6 +27,7 @@ import {
   FileCheck
 } from 'lucide-react';
 import { projectId } from '../../utils/supabase/info';
+import { edgeFunctionHeaders, edgeFunctionUrl } from '../../utils/supabase-edge-fetch';
 
 interface PlatformOverviewProps {
   session: any;
@@ -93,27 +94,32 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
       setError(null);
       if (!projectId?.trim()) {
         setError(
-          'Missing Supabase project ID. Set VITE_SUPABASE_PROJECT_ID in .env.local (see .env.example), then restart the dev server or redeploy the frontend.'
+          'Missing Supabase project ID. Set VITE_SUPABASE_PROJECT_ID in Vercel (and .env.local for dev), then redeploy.'
         );
         return;
       }
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/platform-overview`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
+      const response = await fetch(edgeFunctionUrl('/admin/platform-overview'), {
+        headers: edgeFunctionHeaders(session.access_token),
+      });
 
       if (response.ok) {
-        const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) {
-          console.error('Platform overview returned non-JSON response');
-          setError('Service temporarily unavailable. Please try again in a moment.');
+        const raw = await response.text();
+        if (!raw.trim()) {
+          setError('Empty response from the overview API. Try again in a moment.');
           return;
         }
-        const data = await response.json();
+        let data: { stats?: PlatformStats; error?: string };
+        try {
+          data = JSON.parse(raw);
+        } catch {
+          console.error('Platform overview: body is not valid JSON', raw.slice(0, 200));
+          setError('Server returned an invalid response. If this persists after a refresh, contact support.');
+          return;
+        }
+        if (data.stats == null || typeof data.stats !== 'object') {
+          setError(data.error || 'Overview data was missing from the server response.');
+          return;
+        }
         setStats(data.stats);
       } else if (response.status === 401 || response.status === 403) {
         console.error('Admin access denied:', response.status);
@@ -133,8 +139,8 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
         String(error?.message || '').includes('Load failed');
       setError(
         isNetwork
-          ? 'Could not reach the server API. Confirm VITE_SUPABASE_PROJECT_ID matches your Supabase project, deploy the Edge Function `make-server-cbd74580`, and check your network or firewall.'
-          : 'Service temporarily unavailable. Please try again in a moment.'
+          ? 'Could not reach the server API. Confirm VITE_SUPABASE_PROJECT_ID and VITE_SUPABASE_ANON_KEY are set in Vercel, deploy the Edge Function `make-server-cbd74580`, and check your network or firewall.'
+          : `Something went wrong: ${error?.message || 'unknown error'}`
       );
     } finally {
       setLoading(false);
@@ -143,20 +149,19 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
 
   const fetchRecentActivity = async () => {
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/recent-activity?limit=5`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
+      const response = await fetch(edgeFunctionUrl('/admin/recent-activity?limit=5'), {
+        headers: edgeFunctionHeaders(session.access_token),
+      });
 
       if (response.ok) {
-        const contentType = response.headers.get('content-type') || '';
-        if (!contentType.includes('application/json')) return;
-        const data = await response.json();
-        setRecentActivity(data.activity || []);
+        const raw = await response.text();
+        if (!raw.trim()) return;
+        try {
+          const data = JSON.parse(raw);
+          setRecentActivity(data.activity || []);
+        } catch {
+          /* ignore malformed activity payload */
+        }
       }
     } catch (error) {
       console.error('Error fetching recent activity:', error);

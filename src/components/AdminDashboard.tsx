@@ -13,6 +13,7 @@ import { CurriculumUploader } from './admin/CurriculumUploader';
 import { ResourcesUploader } from './admin/ResourcesUploader';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { projectId } from '../utils/supabase/info';
+import { edgeFunctionHeaders, edgeFunctionUrl } from '../utils/supabase-edge-fetch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -175,24 +176,30 @@ export function AdminDashboard({
       console.log('Access token exists:', !!accessToken);
       console.log('Year:', selectedYear, 'Month:', selectedMonth);
       
-      const url = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/dashboard-stats?year=${selectedYear}&month=${selectedMonth}`;
+      const url = edgeFunctionUrl(
+        `/admin/dashboard-stats?year=${selectedYear}&month=${selectedMonth}`
+      );
       console.log('Fetch URL:', url);
-      
+
       const response = await fetch(url, {
-        headers: {
-          Authorization: `Bearer ${accessToken}`,
-        },
+        headers: edgeFunctionHeaders(accessToken),
       });
 
       console.log('Response status:', response.status);
       console.log('Response ok:', response.ok);
 
       if (response.ok) {
-        const contentType = response.headers.get('content-type') || '';
-        if (contentType.includes('application/json')) {
-          const data = await response.json();
-          console.log('Dashboard stats:', data.stats);
-          setStats(data.stats);
+        const raw = await response.text();
+        if (raw.trim()) {
+          try {
+            const data = JSON.parse(raw);
+            if (data.stats) {
+              console.log('Dashboard stats:', data.stats);
+              setStats(data.stats);
+            }
+          } catch {
+            console.warn('Dashboard stats: response was not valid JSON');
+          }
         }
       } else {
         const errorText = await response.text();
