@@ -212,24 +212,6 @@ app.post('/switch-role', async (c) => {
     console.log(`User ${userId} switching to role: ${targetRole}`);
     console.log('Updated main user profile with target role');
 
-    // Send email confirmation when switching to tutor role
-    if (targetRole === 'tutor') {
-      const userProfile = await kv.get(`user:${userId}`) as any;
-      if (userProfile?.email) {
-        const emailData = emailTemplates.tutorVerificationPending(
-          userProfile.fullName || userProfile.firstName || userProfile.name || 'Tutor',
-          `https://tutornest.org/dashboard/tutor`
-        );
-        await sendEmail({
-          to: userProfile.email,
-          subject: emailData.subject,
-          html: emailData.html,
-          replyTo: 'support@tutornest.org'
-        });
-        console.log(`✅ Tutor verification pending email sent to ${userProfile.email}`);
-      }
-    }
-
     return c.json({
       success: true,
       profile: targetProfile,
