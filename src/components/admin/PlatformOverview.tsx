@@ -91,6 +91,12 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
   const fetchPlatformStats = async () => {
     try {
       setError(null);
+      if (!projectId?.trim()) {
+        setError(
+          'Missing Supabase project ID. Set VITE_SUPABASE_PROJECT_ID in .env.local (see .env.example), then restart the dev server or redeploy the frontend.'
+        );
+        return;
+      }
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/platform-overview`,
         {
@@ -121,7 +127,15 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
       }
     } catch (error: any) {
       console.error('Error fetching platform stats:', error);
-      setError('Service temporarily unavailable. Please try again in a moment.');
+      const isNetwork =
+        error?.message === 'Failed to fetch' ||
+        error?.name === 'TypeError' ||
+        String(error?.message || '').includes('Load failed');
+      setError(
+        isNetwork
+          ? 'Could not reach the server API. Confirm VITE_SUPABASE_PROJECT_ID matches your Supabase project, deploy the Edge Function `make-server-cbd74580`, and check your network or firewall.'
+          : 'Service temporarily unavailable. Please try again in a moment.'
+      );
     } finally {
       setLoading(false);
     }
@@ -169,8 +183,10 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
             {error || 'Unable to load platform statistics'}
           </p>
           <p className="text-sm text-orange-700 mb-4">
-            {error?.includes('404') 
-              ? 'The dashboard endpoint needs to be deployed. Contact your administrator or run `supabase functions deploy`.'
+            {error?.includes('404')
+              ? 'The dashboard endpoint needs to be deployed. Contact your administrator or run `supabase functions deploy make-server-cbd74580`.'
+              : error?.includes('VITE_SUPABASE_PROJECT_ID') || error?.includes('Could not reach')
+              ? 'Rebuild the app after changing env vars. For local dev, restart Vite so VITE_* variables are picked up.'
               : 'Please check your connection and try again.'}
           </p>
           <Button 
