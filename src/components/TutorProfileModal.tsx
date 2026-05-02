@@ -381,7 +381,10 @@ export function TutorProfileModal({
                   Qualifications
                 </h3>
                 <ul className="space-y-2">
-                  {tutor.qualifications.map((qual: string, idx: number) => (
+                  {(Array.isArray(tutor.qualifications)
+                    ? tutor.qualifications
+                    : String(tutor.qualifications).split(/[,\n]+/).map((s: string) => s.trim()).filter(Boolean)
+                  ).map((qual: string, idx: number) => (
                     <li key={idx} className="flex items-start gap-2">
                       <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
                       <span className="text-sm text-gray-700">{qual}</span>
