@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Star, TrendingUp, MessageSquare, AlertTriangle } from 'lucide-react';
+import { Star, MessageSquare, AlertTriangle, TrendingUp, Loader2 } from 'lucide-react';
 import { ReviewsList } from './ReviewsList';
 import { DisputeManager } from './DisputeManager';
 import { projectId } from '../utils/supabase/info';
@@ -11,115 +11,119 @@ interface TutorReviewsTabProps {
   tutorId: string;
 }
 
+const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
+
 export function TutorReviewsTab({ accessToken, tutorId }: TutorReviewsTabProps) {
   const [ratingData, setRatingData] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     loadRatingData();
-  }, []);
+  }, [tutorId]);
 
   const loadRatingData = async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutor/${tutorId}/rating`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
-
-      const data = await response.json();
-      if (response.ok) {
-        setRatingData(data);
-      }
-    } catch (error) {
-      console.error('Error loading rating data:', error);
+      const res = await fetch(`${BASE}/tutor/${tutorId}/rating`, {
+        headers: { Authorization: `Bearer ${accessToken}` },
+      });
+      if (res.ok) setRatingData(await res.json());
+    } catch (err) {
+      console.error('Error loading rating data:', err);
     } finally {
       setLoading(false);
     }
   };
 
-  const renderStars = (rating: number) => {
-    return (
-      <div className="flex gap-1">
-        {[1, 2, 3, 4, 5].map((star) => (
-          <Star
-            key={star}
-            className={`w-5 h-5 ${
-              star <= Math.round(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-300'
-            }`}
-          />
-        ))}
-      </div>
-    );
-  };
+  const avg = ratingData?.averageRating ?? 0;
+  const total = ratingData?.totalReviews ?? 0;
+  const dist = ratingData?.ratingDistribution ?? { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+
+  const ratingColor = avg >= 4.5 ? '#5d9827' : avg >= 3.5 ? '#f59e0b' : avg > 0 ? '#ef4444' : '#9ca3af';
+
+  const renderStars = (r: number) => (
+    <div className="flex gap-0.5">
+      {[1, 2, 3, 4, 5].map((s) => (
+        <Star
+          key={s}
+          className={`w-5 h-5 ${s <= Math.round(r) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'}`}
+        />
+      ))}
+    </div>
+  );
 
   return (
     <div className="space-y-6">
-      {/* Rating Summary */}
-      <div className="grid md:grid-cols-2 gap-6">
+      {/* Rating summary */}
+      <div className="grid md:grid-cols-2 gap-5">
+        {/* Overall rating */}
         <Card>
-          <CardHeader>
-            <CardTitle>Overall Rating</CardTitle>
-            <CardDescription>Your average rating from all reviews</CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle className="flex items-center gap-2">
+              <TrendingUp className="w-5 h-5" style={{ color: '#625d9c' }} />
+              Overall Rating
+            </CardTitle>
+            <CardDescription>Your average score across all sessions</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8">
-                <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-                <p className="text-sm text-gray-500">Loading...</p>
+              <div className="flex items-center gap-3 py-4">
+                <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
+                <span className="text-sm text-gray-400">Loading…</span>
               </div>
             ) : (
-              <div className="space-y-4">
-                <div className="flex items-center gap-4">
-                  <div className="text-5xl" style={{ color: '#625d9c' }}>
-                    {ratingData?.averageRating?.toFixed(1) || '0.0'}
-                  </div>
-                  <div>
-                    {renderStars(ratingData?.averageRating || 0)}
-                    <p className="text-sm text-gray-600 mt-1">
-                      Based on {ratingData?.totalReviews || 0} review{ratingData?.totalReviews !== 1 ? 's' : ''}
-                    </p>
-                  </div>
+              <div className="flex items-center gap-5">
+                <div className="text-6xl font-bold" style={{ color: ratingColor }}>
+                  {avg > 0 ? avg.toFixed(1) : '—'}
+                </div>
+                <div>
+                  {renderStars(avg)}
+                  <p className="text-sm text-gray-500 mt-2">
+                    Based on <strong>{total}</strong> review{total !== 1 ? 's' : ''}
+                  </p>
+                  {total === 0 && (
+                    <p className="text-xs text-gray-400 mt-1">Complete sessions to receive ratings</p>
+                  )}
                 </div>
               </div>
             )}
           </CardContent>
         </Card>
 
+        {/* Rating distribution */}
         <Card>
-          <CardHeader>
-            <CardTitle>Rating Distribution</CardTitle>
-            <CardDescription>Breakdown of your ratings</CardDescription>
+          <CardHeader className="pb-3">
+            <CardTitle>Rating Breakdown</CardTitle>
+            <CardDescription>Distribution of your star ratings</CardDescription>
           </CardHeader>
           <CardContent>
             {loading ? (
-              <div className="text-center py-8">
-                <div className="w-8 h-8 border-4 border-purple-600 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
+              <div className="flex items-center gap-3 py-4">
+                <Loader2 className="w-6 h-6 animate-spin text-gray-300" />
               </div>
             ) : (
               <div className="space-y-2">
                 {[5, 4, 3, 2, 1].map((stars) => {
-                  const count = ratingData?.ratingDistribution?.[stars] || 0;
-                  const total = ratingData?.totalReviews || 1;
-                  const percentage = (count / total) * 100;
-
+                  const count = dist[stars] || 0;
+                  const pct = total > 0 ? (count / total) * 100 : 0;
+                  const barColor = stars >= 4 ? '#5d9827' : stars >= 3 ? '#f59e0b' : '#ef4444';
                   return (
-                    <div key={stars} className="flex items-center gap-2">
-                      <span className="text-sm w-8">{stars}★</span>
-                      <div className="flex-1 h-3 bg-gray-200 rounded-full overflow-hidden">
+                    <div key={stars} className="flex items-center gap-3">
+                      <div className="flex items-center gap-0.5 w-20 flex-shrink-0">
+                        {[1, 2, 3, 4, 5].map((s) => (
+                          <Star
+                            key={s}
+                            className={`w-3 h-3 ${s <= stars ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'}`}
+                          />
+                        ))}
+                      </div>
+                      <div className="flex-1 h-2.5 bg-gray-100 rounded-full overflow-hidden">
                         <div
-                          className="h-full transition-all"
-                          style={{
-                            width: `${percentage}%`,
-                            backgroundColor: stars >= 4 ? '#5d9827' : stars >= 3 ? '#f59e0b' : '#ef4444',
-                          }}
+                          className="h-full rounded-full transition-all duration-500"
+                          style={{ width: `${pct}%`, backgroundColor: barColor }}
                         />
                       </div>
-                      <span className="text-sm text-gray-600 w-12 text-right">{count}</span>
+                      <span className="text-xs text-gray-500 w-8 text-right font-medium">{count}</span>
                     </div>
                   );
                 })}
@@ -129,23 +133,26 @@ export function TutorReviewsTab({ accessToken, tutorId }: TutorReviewsTabProps) 
         </Card>
       </div>
 
-      {/* Reviews and Disputes */}
+      {/* Reviews & Disputes */}
       <Card>
-        <CardHeader>
-          <CardTitle>Reviews & Disputes</CardTitle>
-          <CardDescription>
-            Manage your reviews and respond to feedback
-          </CardDescription>
+        <CardHeader className="pb-3">
+          <CardTitle>Feedback &amp; Disputes</CardTitle>
+          <CardDescription>Respond to reviews and manage any disputes</CardDescription>
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="reviews">
-            <TabsList className="mb-4">
-              <TabsTrigger value="reviews">
-                <MessageSquare className="w-4 h-4 mr-2" />
+            <TabsList className="mb-5">
+              <TabsTrigger value="reviews" className="flex items-center gap-1.5">
+                <MessageSquare className="w-3.5 h-3.5" />
                 All Reviews
+                {total > 0 && (
+                  <span className="ml-1 bg-gray-200 text-gray-700 text-xs rounded-full px-1.5 py-0.5 font-medium">
+                    {total}
+                  </span>
+                )}
               </TabsTrigger>
-              <TabsTrigger value="disputes">
-                <AlertTriangle className="w-4 h-4 mr-2" />
+              <TabsTrigger value="disputes" className="flex items-center gap-1.5">
+                <AlertTriangle className="w-3.5 h-3.5" />
                 Disputes
               </TabsTrigger>
             </TabsList>
