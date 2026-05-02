@@ -903,77 +903,80 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      // Get all children
+      // Get all children from KV
       const allChildren = await kv.getByPrefix('child:');
-      
-      // Get all parent users
-      const allParents = await kv.getByPrefix('user:');
+
+      // Get all parent users from Postgres (source of truth for profiles)
+      const allParents = await db.getProfilesByRole('parent');
       const parentMap = new Map();
       allParents.forEach((parent: any) => {
-        if (parent.role === 'parent') {
-          parentMap.set(parent.id, parent);
-        }
+        parentMap.set(parent.id, parent);
       });
 
       // Enhance child profiles with parent info and session stats
       const profiles = [];
       for (const child of allChildren) {
         const parent = parentMap.get(child.parentId);
-        if (parent) {
-          // Get session statistics
-          const sessions = await kv.getByPrefix(`session:${child.id}:`);
-          const totalSessions = sessions.length;
-          const completedSessions = sessions.filter((s: any) => s.status === 'completed').length;
-          const upcomingSessions = sessions.filter((s: any) => 
-            new Date(s.scheduledTime) > new Date() && s.status === 'scheduled'
-          ).length;
-          const totalHours = sessions
-            .filter((s: any) => s.status === 'completed')
-            .reduce((sum: number, s: any) => sum + (s.duration || 1), 0);
+        // Include all children regardless of whether parent is found
+        const parentName = parent
+          ? (`${parent.firstName || ''} ${parent.lastName || ''}`.trim() || parent.fullName || parent.email || 'Unknown')
+          : 'Unknown Parent';
+        const parentEmail = parent?.email || '';
 
-          // Get current tutors
-          const tutorIds = [...new Set(sessions.map((s: any) => s.tutorId))];
-          const currentTutors = [];
-          for (const tutorId of tutorIds.slice(0, 3)) {
-            const tutor = await kv.get(`user:${tutorId}`);
-            if (tutor) {
-              currentTutors.push({
-                id: tutor.id,
-                name: `${tutor.firstName} ${tutor.lastName}`,
-                subject: tutor.subjects?.[0] || 'General'
-              });
-            }
+        // Get session statistics
+        const sessions = await kv.getByPrefix(`session:${child.id}:`);
+        const totalSessions = sessions.length;
+        const completedSessions = sessions.filter((s: any) => s.status === 'completed').length;
+        const upcomingSessions = sessions.filter((s: any) =>
+          new Date(s.scheduledTime) > new Date() && s.status === 'scheduled'
+        ).length;
+        const totalHours = sessions
+          .filter((s: any) => s.status === 'completed')
+          .reduce((sum: number, s: any) => sum + (s.duration || 1), 0);
+
+        // Get current tutors — check Postgres first, fall back to KV
+        const tutorIds = [...new Set(sessions.map((s: any) => s.tutorId))];
+        const currentTutors = [];
+        for (const tutorId of (tutorIds as string[]).slice(0, 3)) {
+          const tutor = (await db.getProfile(tutorId)) || (await kv.get(`user:${tutorId}`));
+          if (tutor) {
+            const tutorName = `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim() || tutor.fullName || 'Tutor';
+            currentTutors.push({
+              id: tutor.id,
+              name: tutorName,
+              subject: tutor.subjects?.[0] || 'General'
+            });
           }
-
-          // Calculate age
-          const age = calculateAge(child.dateOfBirth);
-
-          profiles.push({
-            id: child.id,
-            firstName: child.firstName,
-            lastName: child.lastName,
-            dateOfBirth: child.dateOfBirth,
-            age,
-            yearGroup: child.gradeLevel,
-            parentId: child.parentId,
-            parentName: `${parent.firstName || ''} ${parent.lastName || ''}`.trim(),
-            parentEmail: parent.email,
-            createdAt: child.createdAt,
-            learningPreferences: {
-              subjects: child.subjects || [],
-              learningStyle: child.learningStyle || 'Visual',
-              specialNeeds: child.specialNeeds ? [child.specialNeeds] : []
-            },
-            sessionStats: {
-              totalSessions,
-              completedSessions,
-              upcomingSessions,
-              totalHours
-            },
-            currentTutors,
-            status: child.status || 'active'
-          });
         }
+
+        // Calculate age
+        const age = calculateAge(child.dateOfBirth);
+
+        profiles.push({
+          id: child.id,
+          firstName: child.firstName,
+          lastName: child.lastName,
+          dateOfBirth: child.dateOfBirth,
+          age,
+          yearGroup: child.gradeLevel,
+          parentId: child.parentId,
+          parentName,
+          parentEmail,
+          createdAt: child.createdAt,
+          learningPreferences: {
+            subjects: child.subjects || [],
+            learningStyle: child.learningStyle || 'Visual',
+            specialNeeds: child.specialNeeds ? [child.specialNeeds] : []
+          },
+          sessionStats: {
+            totalSessions,
+            completedSessions,
+            upcomingSessions,
+            totalHours
+          },
+          currentTutors,
+          status: child.status || 'active'
+        });
       }
 
       return c.json({ profiles });
@@ -993,24 +996,25 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      // Get all parents
-      const allUsers = await kv.getByPrefix('user:');
-      const parents = allUsers.filter((u: any) => u.role === 'parent');
+      // Get all parents from Postgres (source of truth for profiles)
+      const parents = await db.getProfilesByRole('parent');
 
       const summaries = [];
 
       for (const parent of parents) {
         // Get subscription
         const subscription = await kv.get(`subscription_parent_${parent.id}`);
-        
-        // Get children
+
+        // Get children — list stores raw child IDs (UUID) or prefixed IDs
         const parentChildrenKey = `parent_children:${parent.id}`;
         const childrenIds = (await kv.get(parentChildrenKey)) || [];
-        
+
         const children = [];
         if (Array.isArray(childrenIds)) {
-          for (const childId of childrenIds) {
-            const child = await kv.get(`child:${childId}`);
+          for (const rawId of childrenIds) {
+            // Handle both "child:UUID" and plain "UUID" stored in the list
+            const kvKey = rawId.startsWith('child:') ? rawId : `child:${rawId}`;
+            const child = await kv.get(kvKey);
             if (child) {
               const age = calculateAge(child.dateOfBirth);
               children.push({
@@ -1025,7 +1029,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
 
         summaries.push({
           parentId: parent.id,
-          parentName: `${parent.firstName || ''} ${parent.lastName || ''}`.trim(),
+          parentName: (`${parent.firstName || ''} ${parent.lastName || ''}`.trim() || parent.fullName || parent.email || 'Unknown'),
           parentEmail: parent.email,
           subscriptionTier: subscription?.tierName || 'basic',
           childLimit: subscription?.maxChildren || 1,

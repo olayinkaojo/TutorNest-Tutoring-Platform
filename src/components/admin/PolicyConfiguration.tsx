@@ -549,7 +549,7 @@ export function PolicyConfiguration({ opsId, accessToken }: PolicyConfigurationP
             </div>
 
             <div>
-              <Label htmlFor="min-payout">Minimum Payout Amount (£)</Label>
+              <Label htmlFor="min-payout">Minimum Payout Amount (₦)</Label>
               <Input
                 id="min-payout"
                 type="number"

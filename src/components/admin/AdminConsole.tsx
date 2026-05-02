@@ -96,7 +96,7 @@ export function AdminConsole({ userId, accessToken, userRole, userName }: AdminC
                 <BarChart3 className="w-5 h-5 text-[#5d9827]" />
                 <Badge variant="outline" className="text-green-600">+12%</Badge>
               </div>
-              <div className="text-2xl font-bold">£15.2K</div>
+              <div className="text-2xl font-bold">₦15.2K</div>
               <div className="text-sm text-gray-600">Revenue (Week)</div>
             </Card>
 

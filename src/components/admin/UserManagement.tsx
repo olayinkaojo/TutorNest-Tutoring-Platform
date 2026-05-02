@@ -483,7 +483,7 @@ export function UserManagement({ adminId, accessToken, adminRole }: UserManageme
                       <span>ID: {user.id.slice(0, 8)}...</span>
                       <span>Sessions: {user.totalSessions}</span>
                       {user.role === 'parent' && (
-                        <span>Spent: £{user.totalSpent.toFixed(2)}</span>
+                        <span>Spent: ₦{user.totalSpent.toFixed(2)}</span>
                       )}
                     </div>
                   </div>
@@ -564,7 +564,7 @@ export function UserManagement({ adminId, accessToken, adminRole }: UserManageme
                     </Card>
                     <Card className="p-3 text-center">
                       <div className="text-2xl font-bold text-[#5d9827]">
-                        £{selectedUser.totalSpent.toFixed(0)}
+                        ₦{selectedUser.totalSpent.toFixed(0)}
                       </div>
                       <div className="text-xs text-gray-600">Spent</div>
                     </Card>

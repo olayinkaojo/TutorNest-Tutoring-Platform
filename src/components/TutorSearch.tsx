@@ -1,350 +1,367 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { projectId } from '../utils/supabase/info';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Label } from './ui/label';
-import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
+import { Card, CardContent } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Slider } from './ui/slider';
 import { Badge } from './ui/badge';
-import { Alert, AlertDescription } from './ui/alert';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { TutorProfileModal } from './TutorProfileModal';
-import { 
-  Search, 
-  Filter, 
-  Star, 
-  Shield, 
-  Clock, 
-  DollarSign, 
+import {
+  Search,
+  Filter,
+  Star,
+  Shield,
+  Clock,
+  TrendingUp,
   Sparkles,
-  UserPlus,
   CheckCircle,
   AlertCircle,
   MessageSquare,
   Eye,
-  ArrowUpDown
+  Calendar,
+  X,
+  Loader2,
+  ChevronDown,
+  ChevronUp,
+  GraduationCap,
+  BookOpen,
 } from 'lucide-react';
 
 interface TutorSearchProps {
   session: any;
   studentProfile?: any;
-  onInviteTutor?: (tutorId: string) => void;
   activeChildId?: string | null;
   onStartConversation?: (tutorId: string, tutorName: string) => void;
+  onBookSession?: (tutor: any) => void;
 }
 
-export function TutorSearch({ session, studentProfile, onInviteTutor, activeChildId, onStartConversation }: TutorSearchProps) {
-  const [keyword, setKeyword] = useState('');
-  const [sortBy, setSortBy] = useState('rating');
-  const [filters, setFilters] = useState({
-    subject: '',
-    level: '',
-    availability: '',
-    minPrice: 0,
-    maxPrice: 100,
-    minRating: 0,
-    dbsRequired: false,
+const SUBJECTS = [
+  'Mathematics', 'English', 'Science', 'Physics', 'Chemistry',
+  'Biology', 'History', 'Geography', 'Computer Science', 'Languages',
+];
+
+const LEVELS = [
+  { value: 'all-levels', label: 'All Levels' },
+  { value: 'Primary (Year 1-6)', label: 'Primary (Yr 1–6)' },
+  { value: 'KS3 (Year 7-9)', label: 'KS3 (Yr 7–9)' },
+  { value: 'GCSE (Year 10-11)', label: 'GCSE (Yr 10–11)' },
+  { value: 'A-Level (Year 12-13)', label: 'A-Level (Yr 12–13)' },
+  { value: 'University Level', label: 'University' },
+];
+
+const SORT_OPTIONS = [
+  { value: 'rating', label: 'Highest Rated' },
+  { value: 'lessons', label: 'Most Experienced' },
+  { value: 'price-low', label: 'Price: Low → High' },
+  { value: 'price-high', label: 'Price: High → Low' },
+];
+
+function sortTutors(tutors: any[], sortBy: string) {
+  return [...tutors].sort((a, b) => {
+    if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
+    if (sortBy === 'lessons') return (b.totalLessons || 0) - (a.totalLessons || 0);
+    if (sortBy === 'price-low') return (a.hourlyRate || 0) - (b.hourlyRate || 0);
+    if (sortBy === 'price-high') return (b.hourlyRate || 0) - (a.hourlyRate || 0);
+    return 0;
   });
+}
+
+export function TutorSearch({
+  session,
+  studentProfile,
+  activeChildId,
+  onStartConversation,
+  onBookSession,
+}: TutorSearchProps) {
+  const [keyword, setKeyword] = useState('');
+  const [selectedSubject, setSelectedSubject] = useState('');
+  const [sortBy, setSortBy] = useState('rating');
   const [showFilters, setShowFilters] = useState(false);
-  const [tutors, setTutors] = useState<any[]>([]);
+  const [filters, setFilters] = useState({
+    level: 'all-levels',
+    availability: 'any-time',
+    maxRate: 'any-price',
+    minRating: 'any-rating',
+    dbsOnly: false,
+  });
+  const [allTutors, setAllTutors] = useState<any[]>([]);
   const [recommendations, setRecommendations] = useState<any[]>([]);
-  const [loading, setLoading] = useState(false);
-  const [searchPerformed, setSearchPerformed] = useState(false);
+  const [loading, setLoading] = useState(true);
   const [invitedTutors, setInvitedTutors] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [selectedTutor, setSelectedTutor] = useState<any | null>(null);
   const [showProfileModal, setShowProfileModal] = useState(false);
 
-  const subjects = [
-    'All Subjects',
-    'Mathematics',
-    'English',
-    'Science',
-    'Physics',
-    'Chemistry',
-    'Biology',
-    'History',
-    'Geography',
-    'Computer Science',
-    'Languages',
-  ];
-
-  const levels = [
-    'All Levels',
-    'Primary (Year 1-6)',
-    'KS3 (Year 7-9)',
-    'GCSE (Year 10-11)',
-    'A-Level (Year 12-13)',
-    'University Level',
-  ];
-
-  const availabilities = [
-    'Any Time',
-    'weekdays-daytime',
-    'weekdays-evenings',
-    'weekends',
-    'flexible',
-  ];
-
+  // Load all tutors on mount
   useEffect(() => {
-    // Load AI recommendations if student profile is available
-    if (studentProfile) {
-      loadRecommendations();
-    }
-  }, [studentProfile]);
+    fetchTutors();
+    if (studentProfile) loadRecommendations();
+  }, []);
 
-  const loadRecommendations = async () => {
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/search/recommendations`,
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify({ studentProfile }),
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setRecommendations(data.recommendations || []);
-      }
-    } catch (err) {
-      console.error('Error loading recommendations:', err);
-    }
-  };
-
-  const handleSearch = async () => {
+  const fetchTutors = async () => {
     setLoading(true);
     setError('');
-    setSearchPerformed(true);
-
     try {
-      const queryParams = new URLSearchParams();
-      if (keyword) queryParams.append('keyword', keyword);
-      if (filters.subject && filters.subject !== 'All Subjects') 
-        queryParams.append('subject', filters.subject);
-      if (filters.level && filters.level !== 'All Levels') 
-        queryParams.append('level', filters.level);
-      if (filters.availability && filters.availability !== 'Any Time') 
-        queryParams.append('availability', filters.availability);
-      queryParams.append('minPrice', filters.minPrice.toString());
-      queryParams.append('maxPrice', filters.maxPrice.toString());
-      queryParams.append('minRating', filters.minRating.toString());
-      queryParams.append('dbsRequired', filters.dbsRequired.toString());
-
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/search/tutors?${queryParams}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/search/tutors`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } }
       );
-
-      if (!response.ok) {
-        throw new Error('Failed to search tutors');
-      }
-
-      const data = await response.json();
-      setTutors(data.tutors || []);
+      if (!res.ok) throw new Error('Failed to load tutors');
+      const data = await res.json();
+      setAllTutors(data.tutors || []);
     } catch (err: any) {
-      console.error('Error searching tutors:', err);
-      setError(err.message);
+      setError('Could not load tutors. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
-  const handleInviteTutor = async (tutorId: string) => {
+  const loadRecommendations = async () => {
     try {
-      setError('');
-      
-      // Log for debugging
-      console.log('Inviting tutor with ID:', tutorId);
-      
-      // Validate tutorId
-      if (!tutorId) {
-        throw new Error('Tutor ID is missing. Please try again.');
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/search/recommendations`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify({ studentProfile }),
+        }
+      );
+      if (res.ok) {
+        const data = await res.json();
+        setRecommendations(data.recommendations || []);
       }
-      
-      // Determine which ID to send (prioritize activeChildId from Parent Dashboard)
-      const invitationBody: any = { tutorId };
-      
-      if (activeChildId) {
-        // Parent Dashboard flow: use childId
-        invitationBody.childId = activeChildId;
-        console.log('Using activeChildId:', activeChildId);
-      } else if (studentProfile?.userId) {
-        // Student Dashboard flow: use studentId
-        invitationBody.studentId = studentProfile.userId;
-        console.log('Using studentProfile.userId:', studentProfile.userId);
-      } else {
-        // No valid ID
-        throw new Error('Please select a child before sending an invitation');
-      }
-      
-      console.log('Sending invitation body:', invitationBody);
-      
-      const response = await fetch(
+    } catch { /* silent */ }
+  };
+
+  const handleInviteTutor = async (tutorId: string) => {
+    setError('');
+    if (!tutorId) { setError('Tutor ID missing.'); return; }
+    const body: any = { tutorId };
+    if (activeChildId) body.childId = activeChildId;
+    else if (studentProfile?.userId) body.studentId = studentProfile.userId;
+    else { setError('Please select a child before sending an invitation.'); return; }
+
+    try {
+      const res = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/invitations/send`,
         {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: JSON.stringify(invitationBody),
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
+          body: JSON.stringify(body),
         }
       );
-
-      if (!response.ok) {
-        const data = await response.json();
-        throw new Error(data.error || 'Failed to send invitation');
+      if (!res.ok) {
+        const d = await res.json();
+        throw new Error(d.error || 'Failed to send invitation');
       }
-
       setInvitedTutors(prev => new Set(prev).add(tutorId));
       setSuccess('Invitation sent! The tutor will be notified.');
-      
-      if (onInviteTutor) {
-        onInviteTutor(tutorId);
-      }
-
-      setTimeout(() => setSuccess(''), 3000);
+      setTimeout(() => setSuccess(''), 4000);
     } catch (err: any) {
-      console.error('Error inviting tutor:', err);
       setError(err.message);
     }
   };
 
-  const TutorCard = ({ tutor, isRecommendation = false }: any) => {
-    // Handle both userId and id fields for backward compatibility
-    const tutorUserId = tutor.userId || tutor.id;
-    const isInvited = invitedTutors.has(tutorUserId);
-    
+  // Client-side filtering + search
+  const filteredTutors = useCallback(() => {
+    let list = allTutors;
+
+    if (keyword.trim()) {
+      const q = keyword.toLowerCase();
+      list = list.filter(t =>
+        `${t.firstName} ${t.lastName}`.toLowerCase().includes(q) ||
+        t.bio?.toLowerCase().includes(q) ||
+        t.subjects?.some((s: string) => s.toLowerCase().includes(q))
+      );
+    }
+
+    if (selectedSubject) {
+      list = list.filter(t => t.subjects?.some((s: string) =>
+        s.toLowerCase().includes(selectedSubject.toLowerCase())
+      ));
+    }
+
+    if (filters.level !== 'all-levels') {
+      list = list.filter(t =>
+        t.levels?.some((l: string) => l.includes(filters.level)) ||
+        t.gradeLevel?.includes(filters.level) ||
+        t.classes?.some((c: string) => c.includes(filters.level))
+      );
+    }
+
+    if (filters.availability !== 'any-time') {
+      list = list.filter(t => {
+        const avail = (t.availability || '').toLowerCase();
+        return avail.includes(filters.availability) || avail.includes('flexible');
+      });
+    }
+
+    if (filters.maxRate !== 'any-price') {
+      const max = parseInt(filters.maxRate);
+      list = list.filter(t => !t.hourlyRate || t.hourlyRate <= max);
+    }
+
+    if (filters.minRating !== 'any-rating') {
+      const min = parseFloat(filters.minRating);
+      list = list.filter(t => (t.rating || 0) >= min);
+    }
+
+    if (filters.dbsOnly) {
+      list = list.filter(t => t.dbsStatus === 'verified' || t.dbsChecked);
+    }
+
+    return sortTutors(list, sortBy);
+  }, [allTutors, keyword, selectedSubject, filters, sortBy]);
+
+  const results = filteredTutors();
+  const recommendedIds = new Set(recommendations.map((r: any) => r.userId || r.id));
+
+  const TutorCard = ({ tutor }: { tutor: any }) => {
+    const tutorId = tutor.userId || tutor.id;
+    const isInvited = invitedTutors.has(tutorId);
+    const isRecommended = recommendedIds.has(tutorId);
+    const initials = `${tutor.firstName?.[0] || ''}${tutor.lastName?.[0] || ''}`;
+    const rating = tutor.rating ? parseFloat(tutor.rating).toFixed(1) : '5.0';
+    const canBook = !!onBookSession;
+
     return (
-      <Card className={isRecommendation ? 'border-purple-200 bg-purple-50' : 'hover:shadow-lg transition-shadow'}>
-        <CardContent className="pt-6">
-          <div className="flex items-start gap-4">
-            <Avatar className="w-16 h-16 flex-shrink-0">
-              <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
-                {tutor.firstName?.[0]}{tutor.lastName?.[0]}
+      <Card className={`overflow-hidden transition-all hover:shadow-md ${isRecommended ? 'ring-2 ring-purple-300' : 'border-gray-100'}`}>
+        {isRecommended && (
+          <div className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium" style={{ backgroundColor: '#625d9c15', color: '#625d9c' }}>
+            <Sparkles className="w-3.5 h-3.5" />
+            AI Recommended Match
+          </div>
+        )}
+        <CardContent className="pt-5 pb-4">
+          <div className="flex items-start gap-3 mb-4">
+            <Avatar className="w-14 h-14 flex-shrink-0">
+              {tutor.profilePhoto && <AvatarImage src={tutor.profilePhoto} />}
+              <AvatarFallback className="text-white text-sm font-bold" style={{ backgroundColor: '#625d9c' }}>
+                {initials || '?'}
               </AvatarFallback>
             </Avatar>
-
             <div className="flex-1 min-w-0">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div className="min-w-0">
-                  <h3 className="font-semibold truncate">
+              <div className="flex items-start justify-between gap-2">
+                <div>
+                  <h3 className="font-semibold text-gray-900 truncate">
                     {tutor.firstName} {tutor.lastName}
                   </h3>
-                  <div className="flex items-center gap-2 flex-wrap">
-                    <Badge variant="secondary">
-                      <Star className="w-3 h-3 mr-1 fill-current" />
-                      {tutor.rating || '5.0'}
-                    </Badge>
-                    {tutor.dbsStatus === 'verified' && (
-                      <Badge style={{ backgroundColor: '#5d9827' }}>
-                        <Shield className="w-3 h-3 mr-1" />
-                        DBS
-                      </Badge>
-                    )}
-                    {tutor.isTopRated && (
-                      <Badge style={{ backgroundColor: '#ea580c' }} className="text-white">
-                        Top Rated
-                      </Badge>
-                    )}
+                  {tutor.headline && (
+                    <p className="text-xs text-gray-500 truncate">{tutor.headline}</p>
+                  )}
+                </div>
+                <div className="flex flex-col items-end gap-1 flex-shrink-0">
+                  <div className="flex items-center gap-1 text-sm font-semibold" style={{ color: '#625d9c' }}>
+                    ₦{(tutor.hourlyRate || 0).toLocaleString()}<span className="text-xs font-normal text-gray-400">/hr</span>
                   </div>
                 </div>
               </div>
-
-              <p className="text-sm text-gray-700 mb-3 line-clamp-2">
-                {tutor.bio || 'Experienced tutor'}
-              </p>
-
-              <div className="flex flex-wrap gap-1 mb-3">
-                {tutor.subjects?.slice(0, 3).map((subject: string) => (
-                  <Badge key={subject} variant="outline" className="text-xs">
-                    {subject}
+              <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
+                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                  {rating}
+                </span>
+                {tutor.totalLessons > 0 && (
+                  <span className="text-xs text-gray-400">{tutor.totalLessons} lessons</span>
+                )}
+                {(tutor.dbsStatus === 'verified' || tutor.dbsChecked) && (
+                  <Badge className="text-[10px] px-1.5 py-0 h-5" style={{ backgroundColor: '#5d982715', color: '#5d9827', border: 'none' }}>
+                    <Shield className="w-2.5 h-2.5 mr-0.5" />
+                    DBS
                   </Badge>
-                ))}
-                {tutor.subjects?.length > 3 && (
-                  <Badge variant="outline" className="text-xs">+{tutor.subjects.length - 3}</Badge>
+                )}
+                {(tutor.verificationStatus === 'verified' || tutor.isVerified) && (
+                  <Badge className="text-[10px] px-1.5 py-0 h-5" style={{ backgroundColor: '#3b82f615', color: '#3b82f6', border: 'none' }}>
+                    <CheckCircle className="w-2.5 h-2.5 mr-0.5" />
+                    Verified
+                  </Badge>
                 )}
               </div>
-
-              <div className="flex items-center gap-3 text-xs text-gray-600 mb-4">
-                <span className="flex items-center flex-shrink-0">
-                  <Clock className="w-3 h-3 mr-1" />
-                  {tutor.availability || 'Flexible'}
-                </span>
-                <span>•</span>
-                <span className="flex-shrink-0">₦{tutor.hourlyRate || '0'}/hr</span>
-                <span>•</span>
-                <span className="flex-shrink-0">{tutor.totalLessons || 0} lessons</span>
-              </div>
-
-              {isRecommendation && tutor.matchReasons && (
-                <Alert className="mb-3 bg-white border-purple-200 py-2">
-                  <Sparkles className="h-4 w-4 text-purple-600 flex-shrink-0" />
-                  <AlertDescription className="text-xs ml-2">
-                    <strong>Match:</strong> {tutor.matchReasons}
-                  </AlertDescription>
-                </Alert>
-              )}
-
-              {/* Action Buttons */}
-              <div className="flex gap-2">
-                <Button
-                  onClick={() => {
-                    setSelectedTutor(tutor);
-                    setShowProfileModal(true);
-                  }}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 text-xs h-8"
-                >
-                  <Eye className="w-3 h-3 mr-1" />
-                  View Profile
-                </Button>
-                <Button
-                  onClick={() => {
-                    if (onStartConversation) {
-                      onStartConversation(tutorUserId, `${tutor.firstName} ${tutor.lastName}`);
-                    }
-                  }}
-                  size="sm"
-                  variant="outline"
-                  className="flex-1 text-xs h-8"
-                >
-                  <MessageSquare className="w-3 h-3 mr-1" />
-                  Message
-                </Button>
-                <Button
-                  onClick={() => handleInviteTutor(tutorUserId)}
-                  disabled={isInvited}
-                  size="sm"
-                  className="flex-1 text-xs h-8 text-white"
-                  style={{ backgroundColor: isInvited ? '#9ca3af' : '#625d9c' }}
-                >
-                  {isInvited ? (
-                    <>
-                      <CheckCircle className="w-3 h-3 mr-1" />
-                      Invited
-                    </>
-                  ) : (
-                    <>
-                      <UserPlus className="w-3 h-3 mr-1" />
-                      Invite
-                    </>
-                  )}
-                </Button>
-              </div>
             </div>
+          </div>
+
+          {/* Bio */}
+          {tutor.bio && (
+            <p className="text-sm text-gray-600 line-clamp-2 mb-3">{tutor.bio}</p>
+          )}
+
+          {/* Subjects */}
+          {tutor.subjects?.length > 0 && (
+            <div className="flex flex-wrap gap-1.5 mb-3">
+              {tutor.subjects.slice(0, 4).map((s: string) => (
+                <Badge key={s} variant="outline" className="text-[11px] px-2 py-0 h-5 border-gray-200">
+                  {s}
+                </Badge>
+              ))}
+              {tutor.subjects.length > 4 && (
+                <Badge variant="outline" className="text-[11px] px-2 py-0 h-5 border-gray-200">
+                  +{tutor.subjects.length - 4}
+                </Badge>
+              )}
+            </div>
+          )}
+
+          {/* Availability / experience row */}
+          <div className="flex items-center gap-3 text-xs text-gray-500 mb-4">
+            {tutor.availability && (
+              <span className="flex items-center gap-1">
+                <Clock className="w-3 h-3" />
+                {tutor.availability}
+              </span>
+            )}
+            {tutor.experienceYears && (
+              <span className="flex items-center gap-1">
+                <GraduationCap className="w-3 h-3" />
+                {tutor.experienceYears}yr exp
+              </span>
+            )}
+          </div>
+
+          {/* Actions */}
+          <div className="grid grid-cols-3 gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs h-8 border-gray-200"
+              onClick={() => { setSelectedTutor(tutor); setShowProfileModal(true); }}
+            >
+              <Eye className="w-3 h-3 mr-1" />
+              Profile
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              className="text-xs h-8 border-gray-200"
+              onClick={() => onStartConversation?.(tutorId, `${tutor.firstName} ${tutor.lastName}`)}
+            >
+              <MessageSquare className="w-3 h-3 mr-1" />
+              Message
+            </Button>
+            {canBook ? (
+              <Button
+                size="sm"
+                className="text-xs h-8 text-white col-span-1"
+                style={{ backgroundColor: '#625d9c' }}
+                onClick={() => onBookSession!(tutor)}
+              >
+                <Calendar className="w-3 h-3 mr-1" />
+                Book
+              </Button>
+            ) : (
+              <Button
+                size="sm"
+                className="text-xs h-8 text-white"
+                style={{ backgroundColor: isInvited ? '#9ca3af' : '#625d9c' }}
+                disabled={isInvited}
+                onClick={() => handleInviteTutor(tutorId)}
+              >
+                {isInvited ? <CheckCircle className="w-3 h-3 mr-1" /> : null}
+                {isInvited ? 'Invited' : 'Invite'}
+              </Button>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -352,246 +369,218 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
   };
 
   return (
-    <div className="space-y-6">
-      {/* Success/Error Messages */}
+    <div className="space-y-5">
+      {/* Feedback messages */}
       {success && (
-        <Alert className="bg-green-50 border-green-200">
-          <CheckCircle className="h-4 w-4 text-green-600" />
-          <AlertDescription className="text-green-800">{success}</AlertDescription>
-        </Alert>
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-green-50 border border-green-200 text-sm text-green-800">
+          <CheckCircle className="w-4 h-4 flex-shrink-0" />
+          {success}
+        </div>
       )}
-
       {error && (
-        <Alert className="bg-red-50 border-red-200">
-          <AlertCircle className="h-4 w-4 text-red-600" />
-          <AlertDescription className="text-red-800">{error}</AlertDescription>
-        </Alert>
-      )}
-
-      {/* AI Recommendations */}
-      {recommendations.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-4">
-            <Sparkles className="w-5 h-5" style={{ color: '#625d9c' }} />
-            <h2 className="font-bold text-lg" style={{ color: '#625d9c' }}>Recommended for You</h2>
-          </div>
-          <div className="grid gap-4 mb-6">
-            {recommendations.map((tutor) => (
-              <TutorCard key={tutor.userId || tutor.id} tutor={tutor} isRecommendation />
-            ))}
-          </div>
+        <div className="flex items-center gap-2 p-3 rounded-lg bg-red-50 border border-red-200 text-sm text-red-800">
+          <AlertCircle className="w-4 h-4 flex-shrink-0" />
+          {error}
+          <button className="ml-auto" onClick={() => setError('')}><X className="w-4 h-4" /></button>
         </div>
       )}
 
-      {/* Search Bar & Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex gap-2 flex-col sm:flex-row">
-            <div className="flex-1 relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 w-5 h-5 text-gray-400" />
-              <Input
-                value={keyword}
-                onChange={(e) => setKeyword(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-                placeholder="Search by name, subject, or bio..."
-                className="pl-10 h-12"
-              />
-            </div>
-            <Button
-              variant="outline"
-              onClick={() => setShowFilters(!showFilters)}
-              className="h-12"
-            >
-              <Filter className="w-4 h-4 mr-2" />
-              Filters
-            </Button>
-            <Button
-              onClick={handleSearch}
-              disabled={loading}
-              className="h-12 text-white"
-              style={{ backgroundColor: '#625d9c' }}
-            >
-              {loading ? 'Searching...' : 'Search'}
-            </Button>
-          </div>
+      {/* Search bar */}
+      <div className="flex gap-2">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <Input
+            value={keyword}
+            onChange={e => setKeyword(e.target.value)}
+            placeholder="Search by name, subject, or keyword…"
+            className="pl-9 h-11 border-gray-200"
+          />
+          {keyword && (
+            <button className="absolute right-3 top-1/2 -translate-y-1/2" onClick={() => setKeyword('')}>
+              <X className="w-4 h-4 text-gray-400 hover:text-gray-600" />
+            </button>
+          )}
+        </div>
+        <Button
+          variant="outline"
+          onClick={() => setShowFilters(f => !f)}
+          className={`h-11 gap-2 ${showFilters ? 'border-purple-300 text-purple-700 bg-purple-50' : ''}`}
+        >
+          <Filter className="w-4 h-4" />
+          Filters
+          {showFilters ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+        </Button>
+        <Select value={sortBy} onValueChange={setSortBy}>
+          <SelectTrigger className="h-11 w-44 hidden sm:flex">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
+            {SORT_OPTIONS.map(o => (
+              <SelectItem key={o.value} value={o.value}>{o.label}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
 
-          {/* Filters */}
-          {showFilters && (
-            <div className="mt-6 pt-6 border-t space-y-4">
-              <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
-                <div>
-                  <Label>Subject</Label>
-                  <Select
-                    value={filters.subject}
-                    onValueChange={(value) => setFilters({ ...filters, subject: value })}
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select subject" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All Subjects</SelectItem>
-                      <SelectItem value="Mathematics">Mathematics</SelectItem>
-                      <SelectItem value="English">English</SelectItem>
-                      <SelectItem value="Science">Science</SelectItem>
-                      <SelectItem value="Physics">Physics</SelectItem>
-                      <SelectItem value="Chemistry">Chemistry</SelectItem>
-                      <SelectItem value="Biology">Biology</SelectItem>
-                      <SelectItem value="History">History</SelectItem>
-                      <SelectItem value="Geography">Geography</SelectItem>
-                      <SelectItem value="Computer Science">Computer Science</SelectItem>
-                      <SelectItem value="Languages">Languages</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
+      {/* Subject quick-filter chips */}
+      <div className="flex flex-wrap gap-2">
+        <button
+          onClick={() => setSelectedSubject('')}
+          className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+            !selectedSubject
+              ? 'text-white shadow-sm'
+              : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+          }`}
+          style={!selectedSubject ? { backgroundColor: '#625d9c' } : {}}
+        >
+          All Subjects
+        </button>
+        {SUBJECTS.map(s => (
+          <button
+            key={s}
+            onClick={() => setSelectedSubject(selectedSubject === s ? '' : s)}
+            className={`px-3 py-1.5 rounded-full text-xs font-medium transition-all ${
+              selectedSubject === s
+                ? 'text-white shadow-sm'
+                : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+            }`}
+            style={selectedSubject === s ? { backgroundColor: '#625d9c' } : {}}
+          >
+            {s}
+          </button>
+        ))}
+      </div>
 
-                <div>
-                  <Label>Level</Label>
-                  <Select
-                    value={filters.level}
-                    onValueChange={(value) => setFilters({ ...filters, level: value })}
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select level" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">All Levels</SelectItem>
-                      <SelectItem value="Primary (Year 1-6)">Primary (Year 1-6)</SelectItem>
-                      <SelectItem value="KS3 (Year 7-9)">KS3 (Year 7-9)</SelectItem>
-                      <SelectItem value="GCSE (Year 10-11)">GCSE (Year 10-11)</SelectItem>
-                      <SelectItem value="A-Level (Year 12-13)">A-Level (Year 12-13)</SelectItem>
-                      <SelectItem value="University Level">University Level</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Availability</Label>
-                  <Select
-                    value={filters.availability}
-                    onValueChange={(value) => setFilters({ ...filters, availability: value })}
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Select availability" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="">Any Time</SelectItem>
-                      <SelectItem value="weekdays-daytime">Weekdays (Daytime)</SelectItem>
-                      <SelectItem value="weekdays-evenings">Weekdays (Evenings)</SelectItem>
-                      <SelectItem value="weekends">Weekends</SelectItem>
-                      <SelectItem value="flexible">Flexible</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Minimum Rating</Label>
-                  <Select
-                    value={filters.minRating.toString()}
-                    onValueChange={(value) => setFilters({ ...filters, minRating: parseFloat(value) })}
-                  >
-                    <SelectTrigger className="mt-2">
-                      <SelectValue placeholder="Any rating" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="0">Any rating</SelectItem>
-                      <SelectItem value="3">3+ stars</SelectItem>
-                      <SelectItem value="4">4+ stars</SelectItem>
-                      <SelectItem value="4.5">4.5+ stars</SelectItem>
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                <div>
-                  <Label>Max Price per Hour</Label>
-                  <div className="flex items-center gap-4 mt-2">
-                    <Slider
-                      value={[filters.maxPrice]}
-                      onValueChange={(val) => setFilters({ ...filters, maxPrice: val[0] })}
-                      min={10}
-                      max={200}
-                      step={10}
-                      className="flex-1"
-                    />
-                    <span className="text-sm font-medium min-w-fit">₦{filters.maxPrice}</span>
-                  </div>
-                </div>
+      {/* Expanded filters */}
+      {showFilters && (
+        <Card className="border-gray-100">
+          <CardContent className="pt-4 pb-4">
+            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+              <div>
+                <Label className="text-xs text-gray-600 mb-1.5 block">Level</Label>
+                <Select value={filters.level} onValueChange={v => setFilters(f => ({ ...f, level: v }))}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {LEVELS.map(l => (
+                      <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
-              <div className="flex items-center gap-2">
+              <div>
+                <Label className="text-xs text-gray-600 mb-1.5 block">Availability</Label>
+                <Select value={filters.availability} onValueChange={v => setFilters(f => ({ ...f, availability: v }))}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any-time">Any Time</SelectItem>
+                    <SelectItem value="weekdays-daytime">Weekdays (Daytime)</SelectItem>
+                    <SelectItem value="weekdays-evenings">Weekdays (Evenings)</SelectItem>
+                    <SelectItem value="weekends">Weekends</SelectItem>
+                    <SelectItem value="flexible">Flexible</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs text-gray-600 mb-1.5 block">Max Rate/hr</Label>
+                <Select value={filters.maxRate} onValueChange={v => setFilters(f => ({ ...f, maxRate: v }))}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any-price">Any Price</SelectItem>
+                    <SelectItem value="5000">Up to ₦5,000</SelectItem>
+                    <SelectItem value="10000">Up to ₦10,000</SelectItem>
+                    <SelectItem value="20000">Up to ₦20,000</SelectItem>
+                    <SelectItem value="50000">Up to ₦50,000</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+
+              <div>
+                <Label className="text-xs text-gray-600 mb-1.5 block">Min Rating</Label>
+                <Select value={filters.minRating} onValueChange={v => setFilters(f => ({ ...f, minRating: v }))}>
+                  <SelectTrigger className="h-9">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="any-rating">Any Rating</SelectItem>
+                    <SelectItem value="3">3+ stars</SelectItem>
+                    <SelectItem value="4">4+ stars</SelectItem>
+                    <SelectItem value="4.5">4.5+ stars</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="flex items-center gap-3 mt-4 pt-3 border-t border-gray-100">
+              <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
-                  id="dbsRequired"
-                  checked={filters.dbsRequired}
-                  onChange={(e) => setFilters({ ...filters, dbsRequired: e.target.checked })}
-                  className="w-4 h-4 rounded"
+                  checked={filters.dbsOnly}
+                  onChange={e => setFilters(f => ({ ...f, dbsOnly: e.target.checked }))}
+                  className="w-4 h-4 rounded accent-purple-600"
                 />
-                <label htmlFor="dbsRequired" className="text-sm cursor-pointer">
-                  DBS Verified tutors only
-                </label>
-              </div>
+                <span className="text-sm text-gray-700">DBS verified tutors only</span>
+              </label>
+              <button
+                className="ml-auto text-xs text-gray-500 hover:text-gray-700 underline"
+                onClick={() => setFilters({ level: 'all-levels', availability: 'any-time', maxRate: 'any-price', minRating: 'any-rating', dbsOnly: false })}
+              >
+                Reset filters
+              </button>
             </div>
-          )}
-        </CardContent>
-      </Card>
+          </CardContent>
+        </Card>
+      )}
 
-      {/* Search Results with Sorting */}
-      {searchPerformed && (
-        <div>
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="font-semibold text-lg">
-              {tutors.length === 0 ? 'No Results Found' : `${tutors.length} Tutor${tutors.length !== 1 ? 's' : ''} Found`}
-            </h2>
-            {tutors.length > 0 && (
-              <Select value={sortBy} onValueChange={setSortBy}>
-                <SelectTrigger className="w-48">
-                  <ArrowUpDown className="w-4 h-4 mr-2" />
-                  <SelectValue placeholder="Sort by" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rating">Highest Rated</SelectItem>
-                  <SelectItem value="lessons">Most Experienced</SelectItem>
-                  <SelectItem value="price-low">Price: Low to High</SelectItem>
-                  <SelectItem value="price-high">Price: High to Low</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-          </div>
+      {/* Results header */}
+      <div className="flex items-center justify-between">
+        <p className="text-sm text-gray-600">
+          {loading ? 'Loading tutors…' : `${results.length} tutor${results.length !== 1 ? 's' : ''} found`}
+        </p>
+        {!loading && results.length > 0 && onBookSession && (
+          <p className="text-xs text-gray-400 flex items-center gap-1">
+            <Calendar className="w-3 h-3" />
+            Click <strong>Book</strong> to schedule a session
+          </p>
+        )}
+      </div>
 
-          {tutors.length === 0 ? (
-            <Card>
-              <CardContent className="py-12 text-center">
-                <Search className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                <p className="text-gray-600 mb-4 font-medium">
-                  No tutors match your criteria
-                </p>
-                <p className="text-sm text-gray-500 mb-4">Try adjusting your filters or search terms</p>
-                <Button
-                  onClick={() => {
-                    setFilters({
-                      subject: '',
-                      level: '',
-                      availability: '',
-                      minPrice: 0,
-                      maxPrice: 100,
-                      minRating: 0,
-                      dbsRequired: false,
-                    });
-                    setKeyword('');
-                    setSearchPerformed(false);
-                  }}
-                  variant="outline"
-                >
-                  Reset Filters
-                </Button>
-              </CardContent>
-            </Card>
-          ) : (
-            <div className="grid gap-4">
-              {tutors.map((tutor) => (
-                <TutorCard key={tutor.userId || tutor.id} tutor={tutor} />
-              ))}
+      {/* Tutor grid */}
+      {loading ? (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {[1, 2, 3, 4, 5, 6].map(i => (
+            <div key={i} className="h-56 rounded-xl bg-gray-100 animate-pulse" />
+          ))}
+        </div>
+      ) : results.length === 0 ? (
+        <Card className="border-gray-100">
+          <CardContent className="py-14 text-center">
+            <div className="w-14 h-14 rounded-2xl mx-auto mb-4 flex items-center justify-center bg-gray-100">
+              <Search className="w-7 h-7 text-gray-400" />
             </div>
-          )}
+            <h3 className="font-semibold text-gray-900 mb-1">No tutors match your filters</h3>
+            <p className="text-sm text-gray-500 mb-4">Try adjusting the filters or clearing the subject selection.</p>
+            <Button variant="outline" size="sm" onClick={() => {
+              setKeyword('');
+              setSelectedSubject('');
+              setFilters({ level: 'all-levels', availability: 'any-time', maxRate: 'any-price', minRating: 'any-rating', dbsOnly: false });
+            }}>
+              Clear All Filters
+            </Button>
+          </CardContent>
+        </Card>
+      ) : (
+        <div className="grid sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {results.map(tutor => (
+            <TutorCard key={tutor.userId || tutor.id} tutor={tutor} />
+          ))}
         </div>
       )}
 
@@ -600,21 +589,18 @@ export function TutorSearch({ session, studentProfile, onInviteTutor, activeChil
         <TutorProfileModal
           tutor={selectedTutor}
           isOpen={showProfileModal}
-          onClose={() => {
-            setShowProfileModal(false);
-            setSelectedTutor(null);
-          }}
+          onClose={() => { setShowProfileModal(false); setSelectedTutor(null); }}
           session={session}
           activeChildId={activeChildId}
-          onInvite={async (tutorId) => {
-            await handleInviteTutor(tutorId);
-          }}
+          onInvite={async (tutorId) => { await handleInviteTutor(tutorId); }}
           onMessage={(tutorId, tutorName) => {
-            if (onStartConversation) {
-              onStartConversation(tutorId, tutorName);
-              setShowProfileModal(false);
-            }
+            onStartConversation?.(tutorId, tutorName);
+            setShowProfileModal(false);
           }}
+          onBook={onBookSession ? (tutor) => {
+            onBookSession(tutor);
+            setShowProfileModal(false);
+          } : undefined}
         />
       )}
     </div>

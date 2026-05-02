@@ -94,6 +94,7 @@ export function ParentDashboard({
   const [selectedYears, setSelectedYears] = useState<number[]>([new Date().getFullYear()]);
   const [selectedMonths, setSelectedMonths] = useState<number[]>([new Date().getMonth() + 1]);
   const [showRoleCongrats, setShowRoleCongrats] = useState(false);
+  const [preSelectedTutorId, setPreSelectedTutorId] = useState<string | undefined>(undefined);
 
   const validTabs = new Set([
     'overview',
@@ -808,14 +809,17 @@ export function ParentDashboard({
                       </CardContent>
                     </Card>
                   )}
-                  <TutorSearch 
-                    session={session} 
+                  <TutorSearch
+                    session={session}
                     activeChildId={activeChildId}
                     onStartConversation={(tutorId, tutorName) => {
-                      // Set the initial tutor to message with
                       setInitialMessageTutor({ id: tutorId, name: tutorName });
-                      // Switch to messages tab (which will auto-start the conversation)
                       setActiveTab('messages');
+                    }}
+                    onBookSession={(tutor) => {
+                      setPreSelectedTutorId(tutor.userId || tutor.id);
+                      setBookingsSubTab('book-session');
+                      setActiveTab('bookings');
                     }}
                   />
                 </div>
@@ -864,7 +868,11 @@ export function ParentDashboard({
                     activeChildId={activeChildId}
                     childName={activeChild ? `${activeChild.firstName} ${activeChild.lastName}` : undefined}
                     childSubjects={activeChild?.subjects ?? []}
-                    onBookingSuccess={() => setBookingsSubTab('my-bookings')}
+                    preSelectedTutorId={preSelectedTutorId}
+                    onBookingSuccess={() => {
+                      setPreSelectedTutorId(undefined);
+                      setBookingsSubTab('my-bookings');
+                    }}
                   />
                 </TabsContent>
 

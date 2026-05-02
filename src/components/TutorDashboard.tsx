@@ -1009,8 +1009,14 @@ export function TutorDashboard({
               session={session}
               students={students}
               loading={loading}
+              stats={stats}
+              profile={profile}
               onViewBookings={() => setActiveTab('bookings')}
-              onUpdateAvailability={() => setActiveTab('availability')}
+              onViewAvailability={() => setActiveTab('availability')}
+              onViewPayouts={() => setActiveTab('payouts')}
+              onViewPerformance={() => setActiveTab('performance')}
+              onViewMessages={() => setActiveTab('messages')}
+              onViewProfile={() => setActiveTab('profile')}
             />
           </TabsContent>
 

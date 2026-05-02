@@ -40,6 +40,7 @@ interface SessionBookingCalendarProps {
   activeChildId: string;
   childName?: string;
   childSubjects?: string[];
+  preSelectedTutorId?: string;
   onBookingSuccess?: () => void;
 }
 
@@ -91,10 +92,11 @@ export function SessionBookingCalendar({
   activeChildId,
   childName,
   childSubjects = [],
+  preSelectedTutorId,
   onBookingSuccess,
 }: SessionBookingCalendarProps) {
   const [selectedDate, setSelectedDate] = useState<Date | undefined>(new Date());
-  const [selectedTutor, setSelectedTutor] = useState<string>('');
+  const [selectedTutor, setSelectedTutor] = useState<string>(preSelectedTutorId ?? '');
   const [tutors, setTutors] = useState<Tutor[]>([]);
   const [loadingTutors, setLoadingTutors] = useState(true);
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
@@ -208,6 +210,10 @@ export function SessionBookingCalendar({
         const normalized = normalizeTutors(data.tutors || []);
         if (normalized.length > 0) {
           setTutors(normalized);
+          // Auto-select pre-selected tutor after load
+          if (preSelectedTutorId && normalized.some(t => t.id === preSelectedTutorId)) {
+            setSelectedTutor(preSelectedTutorId);
+          }
           return;
         }
       }
@@ -219,7 +225,11 @@ export function SessionBookingCalendar({
 
       if (!fallbackResponse.ok) throw new Error('Failed to fetch tutors');
       const fallbackData = await fallbackResponse.json();
-      setTutors(normalizeTutors(fallbackData.tutors || []));
+      const normalized2 = normalizeTutors(fallbackData.tutors || []);
+      setTutors(normalized2);
+      if (preSelectedTutorId && normalized2.some(t => t.id === preSelectedTutorId)) {
+        setSelectedTutor(preSelectedTutorId);
+      }
     } catch (err: any) {
       console.error('Error fetching tutors:', err);
       setError('Failed to load tutors. Please try again.');

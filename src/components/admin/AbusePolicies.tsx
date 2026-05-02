@@ -78,7 +78,7 @@ const DEFAULT_POLICIES: Omit<Policy, 'id'>[] = [
     userImpact: 'Wastes time and creates scheduling gaps for the other party',
     consequences: [
       '1st offense: Warning and educational notice',
-      '2nd offense: £10 fine and final warning',
+      '2nd offense: ₦10 fine and final warning',
       '3rd offense: 7-day suspension',
       '4th offense: Permanent account ban'
     ],

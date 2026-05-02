@@ -39,6 +39,7 @@ interface TutorProfileModalProps {
   activeChildId?: string | null;
   onInvite?: (tutorId: string) => Promise<void>;
   onMessage?: (tutorId: string, tutorName: string) => void;
+  onBook?: (tutor: any) => void;
 }
 
 interface Review {
@@ -58,6 +59,7 @@ export function TutorProfileModal({
   activeChildId,
   onInvite,
   onMessage,
+  onBook,
 }: TutorProfileModalProps) {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loadingReviews, setLoadingReviews] = useState(false);
@@ -392,33 +394,44 @@ export function TutorProfileModal({
         </ScrollArea>
 
         {/* Action Buttons */}
-        <div className="border-t pt-4 flex gap-2 mt-4">
+        <div className="border-t pt-4 flex gap-2 mt-4 flex-wrap">
           <Button
             onClick={handleMessage}
-            className="flex-1 text-white"
-            style={{ backgroundColor: '#625d9c' }}
+            variant="outline"
+            className="flex-1"
           >
             <MessageSquare className="w-4 h-4 mr-2" />
-            Message Tutor
+            Message
           </Button>
-          <Button
-            onClick={handleInvite}
-            disabled={isInviting || invited}
-            className="flex-1 text-white"
-            style={{ backgroundColor: invited ? '#9ca3af' : '#625d9c' }}
-          >
-            {invited ? (
-              <>
-                <CheckCircle className="w-4 h-4 mr-2" />
-                Invited
-              </>
-            ) : (
-              <>
-                <Send className="w-4 h-4 mr-2" />
-                Send Invitation
-              </>
-            )}
-          </Button>
+          {onBook ? (
+            <Button
+              onClick={() => onBook(tutor)}
+              className="flex-1 text-white"
+              style={{ backgroundColor: '#625d9c' }}
+            >
+              <Calendar className="w-4 h-4 mr-2" />
+              Book Session
+            </Button>
+          ) : (
+            <Button
+              onClick={handleInvite}
+              disabled={isInviting || invited}
+              className="flex-1 text-white"
+              style={{ backgroundColor: invited ? '#9ca3af' : '#625d9c' }}
+            >
+              {invited ? (
+                <>
+                  <CheckCircle className="w-4 h-4 mr-2" />
+                  Invited
+                </>
+              ) : (
+                <>
+                  <Send className="w-4 h-4 mr-2" />
+                  Send Invitation
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </DialogContent>
     </Dialog>

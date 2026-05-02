@@ -171,7 +171,7 @@ export function PerformanceScalabilityDashboard({
               <DollarSign className="w-5 h-5 text-purple-600" />
               <Badge variant="outline">MTD</Badge>
             </div>
-            <div className="text-2xl font-bold">£8.2K</div>
+            <div className="text-2xl font-bold">₦8.2K</div>
             <div className="text-sm text-gray-600">Current Spend</div>
           </Card>
         )}
@@ -256,7 +256,7 @@ export function PerformanceScalabilityDashboard({
                   <ul className="space-y-2 text-sm text-gray-700">
                     <li>• Consider CDN for static assets to improve FCP</li>
                     <li>• Schedule monthly load testing for capacity validation</li>
-                    <li>• Review cost optimizations - potential £2.3K/mo savings</li>
+                    <li>• Review cost optimizations - potential ₦2.3K/mo savings</li>
                     <li>• Monitor resource allocation during peak hours (4-7pm)</li>
                     <li>• Enable rate limiting for API endpoints</li>
                   </ul>
@@ -410,14 +410,14 @@ export function PerformanceScalabilityDashboard({
                       <span>Cost per Booked Hour</span>
                       <Badge className="bg-green-100 text-green-800">
                         <CheckCircle2 className="w-3 h-3 mr-1" />
-                        £2.34 tracked
+                        ₦2.34 tracked
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between p-2 bg-white rounded">
                       <span>Cost per Active User</span>
                       <Badge className="bg-green-100 text-green-800">
                         <CheckCircle2 className="w-3 h-3 mr-1" />
-                        £1.62 tracked
+                        ₦1.62 tracked
                       </Badge>
                     </div>
                     <div className="flex items-center justify-between p-2 bg-white rounded">

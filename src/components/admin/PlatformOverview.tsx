@@ -364,17 +364,17 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
           </CardHeader>
           <CardContent>
             <div className="mb-4">
-              <div className="text-3xl font-bold mb-1">£{stats.revenue.total.toLocaleString()}</div>
+              <div className="text-3xl font-bold mb-1">₦{stats.revenue.total.toLocaleString()}</div>
               <div className="text-sm text-gray-600">Total revenue</div>
             </div>
             <div className="space-y-2">
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">This Month</span>
-                <span className="font-semibold">£{stats.revenue.thisMonth.toLocaleString()}</span>
+                <span className="font-semibold">₦{stats.revenue.thisMonth.toLocaleString()}</span>
               </div>
               <div className="flex items-center justify-between text-sm">
                 <span className="text-gray-600">Last Month</span>
-                <span className="font-semibold">£{stats.revenue.lastMonth.toLocaleString()}</span>
+                <span className="font-semibold">₦{stats.revenue.lastMonth.toLocaleString()}</span>
               </div>
               <div className="pt-2 border-t">
                 <div className="flex items-center justify-between text-sm">
