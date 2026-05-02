@@ -1,5 +1,4 @@
 import { Hono } from 'npm:hono@4';
-import { cors } from 'npm:hono@4/cors';
 import { logger } from 'npm:hono@4/logger';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
@@ -52,23 +51,18 @@ import paymentPlansRoutes from './payment-plans-routes.tsx';
 const app = new Hono();
 
 // Middleware
-const allowedOrigins = (Deno.env.get('ALLOWED_ORIGINS') ?? '').split(',').map(o => o.trim()).filter(Boolean);
+// Handle OPTIONS preflight requests manually
+app.options('*', (c) => {
+  return c.text('OK');
+});
 
-app.use('*', cors({
-  origin: (origin) => {
-    // Always allow localhost on any port (development)
-    if (origin && /^https?:\/\/localhost(:\d+)?$/.test(origin)) return origin;
-    // Always allow tutornest.org and any subdomain (production)
-    if (origin && /https?:\/\/(.*\.)?tutornest\.com$/.test(origin)) return origin;
-    // Allow any explicitly configured origin
-    if (allowedOrigins.includes(origin)) return origin;
-    // Default: reflect the origin back (Supabase dashboard calls, Postman, etc.)
-    return origin ?? '*';
-  },
-  allowMethods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowHeaders: ['Content-Type', 'Authorization'],
-  credentials: true,
-}));
+// Add CORS headers to all responses
+app.use('*', async (c, next) => {
+  await next();
+  c.header('Access-Control-Allow-Origin', '*');
+  c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
+  c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-client-info, apikey');
+});
 app.use('*', logger());
 
 // Initialize Supabase client with service role (for admin operations)
