@@ -342,7 +342,6 @@ export function ParentPaymentsDashboard({ accessToken }: { accessToken: string }
                   </p>
                 </div>
               ) : (
-                <div className="overflow-x-auto">
                   <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
@@ -408,7 +407,6 @@ export function ParentPaymentsDashboard({ accessToken }: { accessToken: string }
                       ))}
                     </TableBody>
                   </Table>
-                </div>
               )}
             </CardContent>
           </Card>

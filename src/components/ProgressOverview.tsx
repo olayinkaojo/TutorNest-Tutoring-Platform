@@ -268,7 +268,7 @@ export function ProgressOverview({ session, studentId }: ProgressOverviewProps) 
       </div>
 
       <Tabs defaultValue="trends">
-        <TabsList className="grid w-full grid-cols-4">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-4 gap-1">
           <TabsTrigger value="trends">Trends</TabsTrigger>
           <TabsTrigger value="subjects">By Subject</TabsTrigger>
           <TabsTrigger value="topics">Topics</TabsTrigger>

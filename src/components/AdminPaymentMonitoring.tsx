@@ -296,7 +296,6 @@ export function AdminPaymentMonitoring() {
               <p>No payments found</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -329,7 +328,6 @@ export function AdminPaymentMonitoring() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
         </CardContent>
       </Card>

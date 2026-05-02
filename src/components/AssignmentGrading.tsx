@@ -160,8 +160,8 @@ export default function AssignmentGrading({
       </div>
 
       {/* Responses Table */}
-      <div className="overflow-x-auto">
-        <table className="w-full border-collapse">
+      <div className="max-w-full min-w-0 overflow-x-auto overscroll-x-contain touch-pan-x [-webkit-overflow-scrolling:touch]">
+        <table className="w-full min-w-max border-collapse">
           <thead>
             <tr className="bg-gray-100 border-b">
               <th className="text-left px-4 py-3 font-semibold">Student</th>

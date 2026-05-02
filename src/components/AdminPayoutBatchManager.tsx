@@ -302,7 +302,6 @@ export function AdminPayoutBatchManager() {
               <p>No batches found</p>
             </div>
           ) : (
-            <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
@@ -381,7 +380,6 @@ export function AdminPayoutBatchManager() {
                   ))}
                 </TableBody>
               </Table>
-            </div>
           )}
         </CardContent>
       </Card>

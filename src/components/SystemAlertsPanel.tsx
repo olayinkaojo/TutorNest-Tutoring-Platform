@@ -275,7 +275,7 @@ export function SystemAlertsPanel({ session }: SystemAlertsPanelProps) {
       )}
 
       <Tabs value={activeTab} onValueChange={setActiveTab}>
-        <TabsList className="grid w-full grid-cols-5">
+        <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1">
           <TabsTrigger value="active">
             Active
             {alerts.filter(a => a.status !== 'resolved').length > 0 && (

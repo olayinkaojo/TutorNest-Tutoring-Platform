@@ -232,24 +232,28 @@ export function AdminDashboard({
     <div className="min-h-screen bg-gray-50">
       {/* Header */}
       <header className="bg-white border-b">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <TutorNestLogo />
-          <div className="flex items-center gap-4">
+        <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
+          <div className="min-w-0 shrink-0">
+            <TutorNestLogo />
+          </div>
+          <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0 justify-start sm:justify-end">
             {/* Notification Center */}
             {session && (
               <NotificationCenter session={session} userId={profile.id || profile.userId} />
             )}
-            <span className="text-sm text-gray-600">Admin: {profile.name || 'Administrator'}</span>
-            <Button variant="ghost" size="sm" onClick={onSignOut}>
-              <LogOut className="w-4 h-4 mr-2" />
-              Sign Out
+            <span className="text-xs sm:text-sm text-gray-600 truncate max-w-[11rem] sm:max-w-[16rem]">
+              Admin: {profile.name || 'Administrator'}
+            </span>
+            <Button variant="ghost" size="sm" onClick={onSignOut} className="shrink-0">
+              <LogOut className="w-4 h-4 sm:mr-2" />
+              <span className="hidden sm:inline">Sign Out</span>
             </Button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 py-8">
+      <main className="max-w-7xl mx-auto px-3 sm:px-4 py-6 sm:py-8 min-w-0">
         <div className="mb-8">
           <h1 className="mb-2">Admin Dashboard</h1>
           <p className="text-gray-600">
@@ -375,8 +379,8 @@ export function AdminDashboard({
         </Card>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
+          <TabsList className="mb-4 shadow-sm">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="alerts">System Alerts</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>

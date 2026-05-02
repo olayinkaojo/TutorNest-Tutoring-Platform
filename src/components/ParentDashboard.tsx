@@ -737,7 +737,7 @@ export function ParentDashboard({
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList className="mb-4 inline-flex w-full max-w-full overflow-x-auto overflow-y-hidden h-auto min-h-10 flex-nowrap justify-start">
+          <TabsList className="mb-4">
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="find-tutors">Find Tutors</TabsTrigger>
             <TabsTrigger value="bookings">Bookings</TabsTrigger>

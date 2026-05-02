@@ -186,7 +186,7 @@ export function EnhancedAddChildDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto">
+      <DialogContent className="w-[calc(100vw-1rem)] max-w-4xl max-h-[90vh] overflow-y-auto overflow-x-hidden sm:w-full">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Sparkles className="w-5 h-5" style={{ color: '#625d9c' }} />
@@ -198,7 +198,7 @@ export function EnhancedAddChildDialog({
         </DialogHeader>
 
         <Tabs value={currentTab} onValueChange={setCurrentTab} className="mt-4">
-          <TabsList className="grid grid-cols-5 mb-6">
+          <TabsList className="grid w-full grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-1 mb-6">
             <TabsTrigger value="basic" className="relative">
               <User className="w-4 h-4 mr-1" />
               Basic

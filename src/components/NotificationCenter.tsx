@@ -240,14 +240,14 @@ export function NotificationCenter({ session, userId }: NotificationCenterProps)
           </div>
         ) : (
           <Tabs defaultValue="all" className="w-full">
-            <TabsList className="w-full grid grid-cols-3 rounded-none border-b">
-              <TabsTrigger value="all" className="rounded-none">
+            <TabsList className="w-full grid grid-cols-3 gap-0 rounded-none border-b min-w-0">
+              <TabsTrigger value="all" className="rounded-none px-1.5 text-xs sm:px-3 sm:text-sm">
                 All ({notifications.length})
               </TabsTrigger>
-              <TabsTrigger value="unread" className="rounded-none">
+              <TabsTrigger value="unread" className="rounded-none px-1.5 text-xs sm:px-3 sm:text-sm">
                 Unread ({unreadCount})
               </TabsTrigger>
-              <TabsTrigger value="read" className="rounded-none">
+              <TabsTrigger value="read" className="rounded-none px-1.5 text-xs sm:px-3 sm:text-sm">
                 Read ({readNotifications.length})
               </TabsTrigger>
             </TabsList>

@@ -217,8 +217,7 @@ export function PaymentHistory() {
             <p className="text-muted-foreground">No payments yet</p>
           </div>
         ) : (
-          <div className="overflow-x-auto">
-            <Table>
+          <Table>
               <TableHeader>
                 <TableRow>
                   <TableHead>Date</TableHead>
@@ -257,7 +256,6 @@ export function PaymentHistory() {
                 ))}
               </TableBody>
             </Table>
-          </div>
         )}
       </CardContent>
     </Card>
