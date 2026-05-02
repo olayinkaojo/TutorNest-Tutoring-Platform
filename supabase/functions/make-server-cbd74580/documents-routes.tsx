@@ -1,5 +1,10 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import {
+  assertDocumentShareAllowed,
+  parseChildIdsQuery,
+  userCanAccessDocument,
+} from './document-share-access.tsx';
 
 export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) => {
 
@@ -20,10 +25,10 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       const relatedToType = formData.get('relatedToType') as string;
       const title = formData.get('title') as string;
       const description = formData.get('description') as string;
-      const uploadedByRole = formData.get('uploadedByRole') as string;
-      // Recipient: the user (or child) this document is shared with
-      const sharedWithId = formData.get('sharedWithId') as string || '';
-      const sharedWithType = formData.get('sharedWithType') as string || relatedToType;
+      const uploadedByRole = (formData.get('uploadedByRole') as string || '').toLowerCase();
+      // Recipient: the user (or child profile) this document is meant for — type must be tutor|parent|student|child
+      const sharedWithId = (formData.get('sharedWithId') as string)?.trim() || '';
+      const sharedWithType = ((formData.get('sharedWithType') as string) || '').toLowerCase();
 
       if (!file) {
         return c.json({ error: 'No file provided' }, 400);
@@ -44,6 +49,17 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
 
       if (!ALLOWED_MIME_TYPES.has(file.type)) {
         return c.json({ error: 'Invalid file type. Only PDF, images (.jpg, .png, .gif, .webp), and documents (.doc, .docx) are allowed.' }, 400);
+      }
+
+      if (!['parent', 'tutor', 'student', 'admin'].includes(uploadedByRole)) {
+        return c.json({ error: 'Invalid uploadedByRole' }, 400);
+      }
+
+      if (sharedWithId) {
+        const gate = await assertDocumentShareAllowed(userId, uploadedByRole, sharedWithId, sharedWithType);
+        if (!gate.ok) {
+          return c.json({ error: gate.error, code: 'DOCUMENT_SHARE_NOT_ALLOWED' }, 403);
+        }
       }
 
       // Validate filename to prevent malicious files
@@ -118,13 +134,23 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       let sharedWithName = '';
       if (sharedWithId && sharedWithId !== '') {
         try {
-          const sharedWithProfile = await kv.get(`user:${sharedWithId}`) as any;
-          if (sharedWithProfile) {
-            if (sharedWithProfile.full_name) sharedWithName = sharedWithProfile.full_name;
-            else if (sharedWithProfile.firstName && sharedWithProfile.lastName)
-              sharedWithName = `${sharedWithProfile.firstName} ${sharedWithProfile.lastName}`;
-            else if (sharedWithProfile.firstName) sharedWithName = sharedWithProfile.firstName;
-            else if (sharedWithProfile.email) sharedWithName = sharedWithProfile.email.split('@')[0];
+          if (sharedWithType === 'child') {
+            const ch = (await kv.get(`child:${sharedWithId}`)) as Record<string, unknown> | null;
+            if (ch) {
+              sharedWithName =
+                (ch.firstName && ch.lastName
+                  ? `${ch.firstName} ${ch.lastName}`
+                  : String(ch.firstName || ch.name || 'Student')) as string;
+            }
+          } else {
+            const sharedWithProfile = (await kv.get(`user:${sharedWithId}`)) as Record<string, unknown> | null;
+            if (sharedWithProfile) {
+              if (sharedWithProfile.full_name) sharedWithName = String(sharedWithProfile.full_name);
+              else if (sharedWithProfile.firstName && sharedWithProfile.lastName)
+                sharedWithName = `${sharedWithProfile.firstName} ${sharedWithProfile.lastName}`;
+              else if (sharedWithProfile.firstName) sharedWithName = String(sharedWithProfile.firstName);
+              else if (sharedWithProfile.email) sharedWithName = String(sharedWithProfile.email).split('@')[0];
+            }
           }
         } catch (e) {
           console.error('Error fetching shared with profile:', e);
@@ -146,10 +172,10 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         uploadedByRole,
         documentType,
         relatedToId,
-        relatedToType,
+        relatedToType: relatedToType || uploadedByRole,
         sharedWithId,
         sharedWithName,
-        sharedWithType,
+        sharedWithType: sharedWithId ? sharedWithType || 'user' : '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -202,36 +228,15 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
 
       const documentType = c.req.query('documentType'); // Optional filter
       const relatedToId = c.req.query('relatedToId'); // Optional filter
-      const userRole = c.req.query('userRole'); // Current role (parent, tutor, student, admin)
+      const userRole = (c.req.query('userRole') || 'parent').toLowerCase();
+      const childIds = parseChildIdsQuery(c.req.query('childIds'));
 
-      // Get all documents
       const allDocuments = await kv.getByPrefix('document:');
 
-      // Filter documents accessible by this user based on their current role
-      let userDocuments = allDocuments.filter((doc: any) => {
-        // Case 1: Own documents uploaded in current role (role-based isolation)
-        if (doc.uploadedBy === userId && doc.uploadedByRole === userRole) {
-          return true;
-        }
-
-        // Case 2: Students see documents explicitly shared with them
-        if (userRole === 'student' && doc.sharedWithId === userId) {
-          return true;
-        }
-
-        // Case 3: Tutors see documents explicitly shared with them
-        if (userRole === 'tutor' && doc.sharedWithId === userId) {
-          return true;
-        }
-
-        // Case 4: Parents see documents from tutors that are shared with parent context
-        // (intended for parents' children - tutors upload for parent's kids)
-        if (userRole === 'parent' && doc.uploadedByRole === 'tutor' && doc.sharedWithType === 'parent') {
-          return true;
-        }
-
-        return false;
-      });
+      const visibility: boolean[] = await Promise.all(
+        allDocuments.map((doc: Record<string, unknown>) => userCanAccessDocument(doc, userId, userRole, childIds)),
+      );
+      let userDocuments = allDocuments.filter((_: unknown, i: number) => visibility[i]);
 
       // Apply filters
       if (documentType) {
@@ -253,8 +258,20 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         
         // Add sharedWithName
         if (doc.sharedWithId && doc.sharedWithId !== '') {
-          enriched.sharedWithName = await getProfileName(doc.sharedWithId);
-          enriched.sharedWithType = doc.relatedToType; // e.g., 'parent', 'tutor', 'student'
+          if (String(doc.sharedWithType || '').toLowerCase() === 'child') {
+            try {
+              const ch = (await kv.get(`child:${doc.sharedWithId}`)) as Record<string, unknown> | null;
+              enriched.sharedWithName = ch
+                ? (ch.firstName && ch.lastName
+                    ? `${ch.firstName} ${ch.lastName}`
+                    : String(ch.firstName || ch.name || 'Student'))
+                : await getProfileName(doc.sharedWithId);
+            } catch {
+              enriched.sharedWithName = await getProfileName(doc.sharedWithId);
+            }
+          } else {
+            enriched.sharedWithName = await getProfileName(doc.sharedWithId);
+          }
         }
         
         return enriched;
@@ -283,17 +300,15 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       }
 
       const documentId = c.req.param('documentId');
-      const document = await kv.get(documentId) as any;
+      const document = (await kv.get(documentId)) as Record<string, unknown> | null;
 
       if (!document) {
         return c.json({ error: 'Document not found' }, 404);
       }
 
-      // Check if user has access to this document
-      const hasAccess =
-        document.uploadedBy === userId ||
-        document.relatedToId === userId ||
-        document.sharedWithId === userId;
+      const userRole = (c.req.query('userRole') || 'parent').toLowerCase();
+      const childIds = parseChildIdsQuery(c.req.query('childIds'));
+      const hasAccess = await userCanAccessDocument(document, userId, userRole, childIds);
 
       if (!hasAccess) {
         return c.json({ error: 'Unauthorized to access this document' }, 403);

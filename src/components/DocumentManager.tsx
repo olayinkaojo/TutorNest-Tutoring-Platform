@@ -14,7 +14,7 @@ import {
   Filter,
   Search,
 } from 'lucide-react';
-import { projectId } from '../utils/supabase/info';
+import { edgeFunctionBaseUrl, edgeFunctionHeaders } from '../utils/supabase-edge-fetch';
 import { toast } from 'sonner@2.0.3';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Textarea } from './ui/textarea';
@@ -39,6 +39,7 @@ interface Document {
   sharedWithId?: string;
   sharedWithName?: string;
   sharedWithType?: string;
+  uploadedByRole?: string;
   createdAt: string;
   updatedAt: string;
 }
@@ -46,17 +47,30 @@ interface Document {
 interface Recipient {
   id: string;
   name: string;
-  type: 'child' | 'tutor' | 'self';
+  type: 'child' | 'tutor' | 'self' | 'parent' | 'student';
 }
 
 interface DocumentManagerProps {
   session: any;
   userId: string;
   userRole: string;
+  /** Parent dashboard: child profile IDs so the server can include tutor→child shares */
+  childIds?: string[];
   children?: { id: string; name?: string; full_name?: string; firstName?: string; lastName?: string }[];
 }
 
-export function DocumentManager({ session, userId, userRole, children = [] }: DocumentManagerProps) {
+function parseRecipientKey(key: string): { type: Recipient['type']; id: string } | null {
+  if (key === 'self') return { type: 'self', id: '' };
+  const idx = key.indexOf(':');
+  if (idx < 1) return null;
+  const type = key.slice(0, idx) as Recipient['type'];
+  const id = key.slice(idx + 1);
+  if (!id) return null;
+  if (!['tutor', 'parent', 'student', 'child'].includes(type)) return null;
+  return { type, id };
+}
+
+export function DocumentManager({ session, userId, userRole, childIds = [], children = [] }: DocumentManagerProps) {
   const [documents, setDocuments] = useState<Document[]>([]);
   const [loading, setLoading] = useState(true);
   const [uploading, setUploading] = useState(false);
@@ -65,6 +79,8 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
   const [searchQuery, setSearchQuery] = useState('');
   const [bookedTutors, setBookedTutors] = useState<Recipient[]>([]);
   const [bookedStudents, setBookedStudents] = useState<Recipient[]>([]);
+  const [bookedParents, setBookedParents] = useState<Recipient[]>([]);
+  const [bookedParentsForTutor, setBookedParentsForTutor] = useState<Recipient[]>([]);
 
   // Upload form state
   const [uploadFile, setUploadFile] = useState<File | null>(null);
@@ -75,50 +91,67 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
   const [selectedRecipientName, setSelectedRecipientName] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    loadDocuments();
-    // Parents and students need booked tutors; Tutors need booked students
-    if (userRole === 'parent' || userRole === 'student') loadBookedTutors();
-    else if (userRole === 'tutor') loadBookedStudents();
-  }, [filterType]);
+  const childIdsKey = childIds.join(',');
 
   useEffect(() => {
-    // Update selected recipient name when uploading or recipient changes
+    loadDocuments();
+    if (userRole === 'parent' || userRole === 'student') {
+      void loadBookedTutors();
+      if (userRole === 'student') void loadBookedParentsForStudent();
+    } else if (userRole === 'tutor') {
+      void loadBookedStudents();
+      void loadBookedParentsForTutorFromBookings();
+    }
+  }, [filterType, userRole, childIdsKey, session?.access_token]);
+
+  useEffect(() => {
     if (uploadRecipientId === 'self') {
       setSelectedRecipientName('');
-    } else if (children && children.length > 0) {
-      const child = children.find(c => c.id === uploadRecipientId);
-      if (child) {
-        setSelectedRecipientName(child.name || child.full_name || (child.firstName ? `${child.firstName} ${child.lastName || ''}`.trim() : 'Child'));
-      }
-    } else if (bookedTutors && bookedTutors.length > 0) {
-      const recipient = bookedTutors.find(t => t.id === uploadRecipientId);
-      if (recipient) {
-        setSelectedRecipientName(recipient.name);
-      }
-    } else if (bookedStudents && bookedStudents.length > 0) {
-      const recipient = bookedStudents.find(t => t.id === uploadRecipientId);
-      if (recipient) {
-        setSelectedRecipientName(recipient.name);
-      }
+      return;
     }
-  }, [uploadRecipientId, children, bookedTutors, bookedStudents]);
+    const parsed = parseRecipientKey(uploadRecipientId);
+    if (!parsed || parsed.type === 'self') {
+      setSelectedRecipientName('');
+      return;
+    }
+    if (parsed.type === 'child') {
+      const c = children.find((x) => x.id === parsed.id);
+      setSelectedRecipientName(
+        c
+          ? c.name || c.full_name || (c.firstName ? `${c.firstName} ${c.lastName || ''}`.trim() : 'Child')
+          : '',
+      );
+      return;
+    }
+    const pool =
+      parsed.type === 'tutor'
+        ? bookedTutors
+        : parsed.type === 'student'
+          ? bookedStudents
+          : [...bookedParents, ...bookedParentsForTutor];
+    const hit = pool.find((r) => r.id === parsed.id);
+    setSelectedRecipientName(hit?.name || '');
+  }, [uploadRecipientId, children, bookedTutors, bookedStudents, bookedParents, bookedParentsForTutor]);
+
+  const ACTIVE = new Set(['confirmed', 'completed', 'scheduled']);
 
   const loadBookedTutors = async () => {
     try {
       const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`,
-        { headers: { 'Authorization': `Bearer ${session.access_token}` } }
+        `${edgeFunctionBaseUrl()}/bookings?persona=${encodeURIComponent(userRole)}`,
+        { headers: edgeFunctionHeaders(session.access_token) },
       );
       if (!res.ok) return;
       const data = await res.json();
       const seen = new Set<string>();
       const tutors: Recipient[] = [];
-      for (const b of (data.bookings || [])) {
-        if (b.tutorId && !seen.has(b.tutorId)) {
+      for (const b of data.bookings || []) {
+        if (!ACTIVE.has(String(b.status || '').toLowerCase())) continue;
+        if (b.tutorId && b.tutorId !== userId && !seen.has(b.tutorId)) {
           seen.add(b.tutorId);
-          // Use full name if available, fallback to firstName lastName, then generic label
-          const tutorName = b.tutorFullName || b.tutorName || 
+          const tutorName =
+            b.tutorFullName ||
+            b.tutorName ||
             (b.tutorFirstName ? `${b.tutorFirstName} ${b.tutorLastName || ''}`.trim() : 'Tutor');
           tutors.push({ id: b.tutorId, name: tutorName, type: 'tutor' });
         }
@@ -127,50 +160,98 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
     } catch (_) {}
   };
 
-  // Load booked students for tutors
+  const loadBookedParentsForStudent = async () => {
+    try {
+      const res = await fetch(
+        `${edgeFunctionBaseUrl()}/bookings?persona=student`,
+        { headers: edgeFunctionHeaders(session.access_token) },
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const seen = new Set<string>();
+      const parents: Recipient[] = [];
+      for (const b of data.bookings || []) {
+        if (!ACTIVE.has(String(b.status || '').toLowerCase())) continue;
+        const pid = b.parentId ?? b.userId;
+        if (pid && pid !== userId && !seen.has(pid)) {
+          seen.add(pid);
+          const name =
+            b.parentName ||
+            b.parentFullName ||
+            (b.parentFirstName ? `${b.parentFirstName} ${b.parentLastName || ''}`.trim() : 'Parent / guardian');
+          parents.push({ id: pid, name, type: 'parent' });
+        }
+      }
+      setBookedParents(parents);
+    } catch (_) {}
+  };
+
   const loadBookedStudents = async () => {
     try {
       const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`,
-        { headers: { 'Authorization': `Bearer ${session.access_token}` } }
+        `${edgeFunctionBaseUrl()}/bookings?persona=tutor`,
+        { headers: edgeFunctionHeaders(session.access_token) },
       );
       if (!res.ok) return;
       const data = await res.json();
       const seen = new Set<string>();
       const students: Recipient[] = [];
-      for (const b of (data.bookings || [])) {
-        if (b.studentId && !seen.has(b.studentId)) {
+      for (const b of data.bookings || []) {
+        if (!ACTIVE.has(String(b.status || '').toLowerCase())) continue;
+        if (b.studentId && b.studentId !== userId && !seen.has(b.studentId)) {
           seen.add(b.studentId);
-          // Use full name if available
-          const studentName = b.studentFullName || b.studentName || 
+          const studentName =
+            b.studentFullName ||
+            b.studentName ||
             (b.studentFirstName ? `${b.studentFirstName} ${b.studentLastName || ''}`.trim() : 'Student');
-          students.push({ id: b.studentId, name: studentName, type: 'child' });
+          students.push({ id: b.studentId, name: studentName, type: 'student' });
         }
       }
       setBookedStudents(students);
     } catch (_) {}
   };
 
+  const loadBookedParentsForTutorFromBookings = async () => {
+    try {
+      const res = await fetch(
+        `${edgeFunctionBaseUrl()}/bookings?persona=tutor`,
+        { headers: edgeFunctionHeaders(session.access_token) },
+      );
+      if (!res.ok) return;
+      const data = await res.json();
+      const seen = new Set<string>();
+      const parents: Recipient[] = [];
+      for (const b of data.bookings || []) {
+        if (!ACTIVE.has(String(b.status || '').toLowerCase())) continue;
+        const pid = b.parentId ?? b.userId;
+        if (pid && pid !== userId && !seen.has(pid)) {
+          seen.add(pid);
+          const name =
+            b.parentName ||
+            b.parentFullName ||
+            (b.parentFirstName ? `${b.parentFirstName} ${b.parentLastName || ''}`.trim() : 'Parent');
+          parents.push({ id: pid, name, type: 'parent' });
+        }
+      }
+      setBookedParentsForTutor(parents);
+    } catch (_) {}
+  };
+
   const loadDocuments = async () => {
     setLoading(true);
-    
+
     try {
-      let url = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/documents`;
-      
       const params = new URLSearchParams();
-      if (filterType !== 'all') {
-        params.append('documentType', filterType);
-      }
+      if (filterType !== 'all') params.append('documentType', filterType);
       params.append('userRole', userRole);
-      
-      if (params.toString()) {
-        url += `?${params.toString()}`;
+      if (userRole === 'parent' && childIds.length > 0) {
+        params.append('childIds', childIds.join(','));
       }
+      const qs = params.toString();
+      const url = `${edgeFunctionBaseUrl()}/documents${qs ? `?${qs}` : ''}`;
 
       const response = await fetch(url, {
-        headers: {
-          'Authorization': `Bearer ${session.access_token}`,
-        },
+        headers: edgeFunctionHeaders(session.access_token),
       });
 
       if (response.ok) {
@@ -247,20 +328,18 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
       formData.append('uploadedByRole', userRole);
       formData.append('relatedToId', userId);
       formData.append('relatedToType', userRole);
-      formData.append('sharedWithType', userRole);
-      // Recipient: empty string means "myself only"
-      formData.append('sharedWithId', uploadRecipientId === 'self' ? '' : uploadRecipientId);
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/documents/upload`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-          body: formData,
-        }
-      );
+      const parsed = parseRecipientKey(uploadRecipientId);
+      const sharedWithId = parsed && parsed.type !== 'self' ? parsed.id : '';
+      const sharedWithType = parsed && parsed.type !== 'self' ? parsed.type : '';
+      formData.append('sharedWithId', sharedWithId);
+      formData.append('sharedWithType', sharedWithType);
+
+      const response = await fetch(`${edgeFunctionBaseUrl()}/documents/upload`, {
+        method: 'POST',
+        headers: edgeFunctionHeaders(session.access_token),
+        body: formData,
+      });
 
       if (response.ok) {
         toast.success('Document uploaded successfully');
@@ -281,13 +360,11 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
 
   const downloadDocument = async (document: Document) => {
     try {
+      const q = new URLSearchParams({ userRole });
+      if (userRole === 'parent' && childIds.length) q.set('childIds', childIds.join(','));
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/documents/${document.id}/download`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
+        `${edgeFunctionBaseUrl()}/documents/${encodeURIComponent(document.id)}/download?${q.toString()}`,
+        { headers: edgeFunctionHeaders(session.access_token) },
       );
 
       if (response.ok) {
@@ -311,15 +388,10 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
     }
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/documents/${documentId}`,
-        {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
+      const response = await fetch(`${edgeFunctionBaseUrl()}/documents/${encodeURIComponent(documentId)}`, {
+        method: 'DELETE',
+        headers: edgeFunctionHeaders(session.access_token),
+      });
 
       if (response.ok) {
         toast.success('Document deleted successfully');
@@ -400,7 +472,8 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
                 Document Manager
               </CardTitle>
               <CardDescription>
-                Upload and manage assignments, reviews, and resources
+                Upload and manage learning materials. Files are stored securely; sharing is limited to people on your
+                active sessions. Dates and sizes follow your device locale.
               </CardDescription>
             </div>
             <Button
@@ -483,13 +556,13 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
                         <span>•</span>
                         <span>{formatFileSize(doc.fileSize)}</span>
                         <span>•</span>
-                        <span>{(() => {
-                          if (!doc.createdAt) return 'Unknown date';
-                          // createdAt may already be a full ISO timestamp or just a date string
-                          const raw = doc.createdAt.includes('T') ? doc.createdAt : doc.createdAt + 'T12:00:00+01:00';
-                          const d = new Date(raw);
-                          return isNaN(d.getTime()) ? 'Invalid date' : d.toLocaleDateString('en-GB', { timeZone: 'Africa/Lagos', day: 'numeric', month: 'short', year: 'numeric' });
-                        })()}</span>
+                        <span>
+                          {(() => {
+                            if (!doc.createdAt) return '—';
+                            const d = new Date(doc.createdAt.includes('T') ? doc.createdAt : `${doc.createdAt}T12:00:00Z`);
+                            return isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
+                          })()}
+                        </span>
                         {doc.sharedWithId && doc.sharedWithId !== '' && doc.sharedWithName && (
                           <>
                             <span>•</span>
@@ -516,16 +589,17 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
                       <Download className="w-4 h-4 mr-2" />
                       Download
                     </Button>
-                    {doc.uploadedBy === userId && (
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => deleteDocument(doc.id)}
-                        className="text-red-600 hover:text-red-800 hover:bg-red-50"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    )}
+                    {doc.uploadedBy === userId &&
+                      String(doc.uploadedByRole || userRole).toLowerCase() === userRole && (
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => deleteDocument(doc.id)}
+                          className="text-red-600 hover:text-red-800 hover:bg-red-50"
+                        >
+                          <Trash2 className="w-4 h-4" />
+                        </Button>
+                      )}
                   </div>
                 </div>
               ))}
@@ -540,7 +614,8 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
           <DialogHeader>
             <DialogTitle>Upload Document</DialogTitle>
             <DialogDescription>
-              Upload assignments, reviews, resources, or other documents (max 25MB)
+              PDF, images, or Word documents up to 25&nbsp;MB. Choose who this file is for — only people linked through
+              your sessions can receive shares.
             </DialogDescription>
           </DialogHeader>
 
@@ -597,45 +672,77 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
               </Select>
             </div>
 
-            {/* Recipient selector — only shown when there are people to share with */}
-            {(children.length > 0 || bookedTutors.length > 0 || bookedStudents.length > 0) && (
+            {(children.length > 0 ||
+              bookedTutors.length > 0 ||
+              bookedStudents.length > 0 ||
+              bookedParents.length > 0 ||
+              bookedParentsForTutor.length > 0) && (
               <div>
-                <Label htmlFor="recipient">Share With</Label>
+                <Label htmlFor="recipient">Who is this for?</Label>
                 <Select value={uploadRecipientId} onValueChange={setUploadRecipientId}>
-                  <SelectTrigger>
+                  <SelectTrigger id="recipient">
                     <SelectValue placeholder="Select recipient" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="self">Myself only (private)</SelectItem>
-                    {/* For parents: show children */}
-                    {children.length > 0 && (
+                    {userRole === 'parent' && children.length > 0 && (
                       <>
-                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">Children</div>
-                        {children.map(child => (
-                          <SelectItem key={child.id} value={child.id}>
-                            {child.name || child.full_name || (child.firstName ? `${child.firstName} ${child.lastName || ''}`.trim() : 'Child')}
+                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                          Children
+                        </div>
+                        {children.map((child) => (
+                          <SelectItem key={child.id} value={`child:${child.id}`}>
+                            {child.name ||
+                              child.full_name ||
+                              (child.firstName ? `${child.firstName} ${child.lastName || ''}`.trim() : 'Child')}
                           </SelectItem>
                         ))}
                       </>
                     )}
-                    {/* For students/parents: show booked tutors */}
-                    {bookedTutors.length > 0 && (
+                    {(userRole === 'parent' || userRole === 'student') && bookedTutors.length > 0 && (
                       <>
-                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">Tutors</div>
-                        {bookedTutors.map(recipient => (
-                          <SelectItem key={recipient.id} value={recipient.id}>
-                            {recipient.name}
+                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                          Tutors
+                        </div>
+                        {bookedTutors.map((t) => (
+                          <SelectItem key={t.id} value={`tutor:${t.id}`}>
+                            {t.name}
                           </SelectItem>
                         ))}
                       </>
                     )}
-                    {/* For tutors: show booked students */}
-                    {bookedStudents.length > 0 && (
+                    {userRole === 'student' && bookedParents.length > 0 && (
                       <>
-                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">Students</div>
-                        {bookedStudents.map(recipient => (
-                          <SelectItem key={recipient.id} value={recipient.id}>
-                            {recipient.name}
+                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                          Parent / guardian
+                        </div>
+                        {bookedParents.map((p) => (
+                          <SelectItem key={p.id} value={`parent:${p.id}`}>
+                            {p.name}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {userRole === 'tutor' && bookedStudents.length > 0 && (
+                      <>
+                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                          Students
+                        </div>
+                        {bookedStudents.map((s) => (
+                          <SelectItem key={s.id} value={`student:${s.id}`}>
+                            {s.name}
+                          </SelectItem>
+                        ))}
+                      </>
+                    )}
+                    {userRole === 'tutor' && bookedParentsForTutor.length > 0 && (
+                      <>
+                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                          Parents
+                        </div>
+                        {bookedParentsForTutor.map((p) => (
+                          <SelectItem key={p.id} value={`parent:${p.id}`}>
+                            {p.name}
                           </SelectItem>
                         ))}
                       </>
@@ -644,10 +751,10 @@ export function DocumentManager({ session, userId, userRole, children = [] }: Do
                 </Select>
                 <p className="text-xs text-gray-500 mt-1">
                   {uploadRecipientId === 'self'
-                    ? 'Only you can see this document.'
-                    : selectedRecipientName 
-                      ? `${selectedRecipientName} will be able to view and download this document. All sharing is monitored by admins.`
-                      : 'Select a recipient to share this document.'}
+                    ? 'Only you can see this document in this role.'
+                    : selectedRecipientName
+                      ? `${selectedRecipientName} can view and download it. Shares are audit-logged.`
+                      : 'Pick who should receive this file.'}
                 </p>
               </div>
             )}

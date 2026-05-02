@@ -1,4 +1,4 @@
-import { projectId } from './supabase/info';
+import { edgeFunctionBaseUrl, edgeFunctionHeaders } from './supabase-edge-fetch';
 import { validateChildId, validateFilter, validateGradeLevel, safeValidateFilter } from './validation';
 import type { 
   Child, 
@@ -13,7 +13,7 @@ import type {
 } from '../types/dashboard';
 
 // Configuration
-const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
+const API_BASE_URL = edgeFunctionBaseUrl();
 const TIMEOUT_MS = 30000;
 
 // Request cache to prevent duplicate requests
@@ -76,7 +76,7 @@ async function makeRequest<T>(
         method,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          ...edgeFunctionHeaders(accessToken),
           ...headers,
         },
         body: body ? JSON.stringify(body) : undefined,

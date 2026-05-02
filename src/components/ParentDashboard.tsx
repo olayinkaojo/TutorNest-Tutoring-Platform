@@ -1033,6 +1033,7 @@ export function ParentDashboard({
                 session={session}
                 userId={profile.id || profile.userId}
                 userRole="parent"
+                childIds={children.map((c) => c.id).filter(Boolean)}
                 children={children}
               />
             ) : (

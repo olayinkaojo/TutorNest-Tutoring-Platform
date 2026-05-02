@@ -2951,14 +2951,27 @@ app.get('/make-server-cbd74580/bookings', async (c) => {
     const userProfile = await kv.get(`user:${userId}`) as any;
     const allBookings = await kv.getByPrefix('booking:');
 
+    /** Prefer explicit `?persona=` from the client (current dashboard) over cached KV profile — fixes role-switch edge cases. */
+    const persona = (c.req.query('persona') || userProfile?.role || 'parent').toLowerCase();
+
+    const activeStatuses = new Set(['confirmed', 'completed', 'scheduled', 'paid']);
+
     let bookings = [];
-    if (userProfile.role === 'parent') {
-      bookings = allBookings.filter((b: any) => b.parentId === userId);
-    } else if (userProfile.role === 'tutor') {
+    if (persona === 'parent') {
+      bookings = allBookings.filter((b: any) =>
+        (b.parentId === userId || b.userId === userId) && b.tutorId && b.tutorId !== userId,
+      );
+    } else if (persona === 'tutor') {
       bookings = allBookings.filter((b: any) => b.tutorId === userId);
-    } else if (userProfile.role === 'student') {
+    } else if (persona === 'student') {
       bookings = allBookings.filter((b: any) => b.studentId === userId);
+    } else {
+      bookings = allBookings.filter(
+        (b: any) => b.parentId === userId || b.tutorId === userId || b.studentId === userId || b.userId === userId,
+      );
     }
+
+    bookings = bookings.filter((b: any) => !b.status || activeStatuses.has(String(b.status).toLowerCase()));
 
     // Sort by date (most recent first)
     bookings.sort((a: any, b: any) => {

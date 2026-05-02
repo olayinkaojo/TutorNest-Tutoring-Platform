@@ -4,9 +4,9 @@
  * (Student, Parent, Tutor, Admin)
  */
 
-import { projectId } from './supabase/info';
+import { edgeFunctionBaseUrl, edgeFunctionHeaders } from './supabase-edge-fetch';
 
-const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
+const API_BASE_URL = edgeFunctionBaseUrl();
 const TIMEOUT_MS = 30000;
 const CACHE_TTL_MS = 5000; // 5 seconds
 
@@ -88,7 +88,7 @@ async function makeRequest<T>(
         method,
         headers: {
           'Content-Type': 'application/json',
-          'Authorization': `Bearer ${accessToken}`,
+          ...edgeFunctionHeaders(accessToken),
         },
         body: body ? JSON.stringify(body) : undefined,
         signal: controller.signal,

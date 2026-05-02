@@ -1,5 +1,10 @@
-import { Hono } from 'npm:hono';
+import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import {
+  assertDocumentShareAllowed,
+  parseChildIdsQuery,
+  userCanAccessDocument,
+} from './document-share-access.tsx';
 
 export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) => {
 
@@ -15,12 +20,15 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
 
       const formData = await c.req.formData();
       const file = formData.get('file') as File;
-      const documentType = formData.get('documentType') as string; // 'assignment', 'review', 'resource', 'other'
-      const relatedToId = formData.get('relatedToId') as string; // booking ID, student ID, etc.
-      const relatedToType = formData.get('relatedToType') as string; // 'booking', 'student', 'tutor'
+      const documentType = formData.get('documentType') as string;
+      const relatedToId = formData.get('relatedToId') as string;
+      const relatedToType = formData.get('relatedToType') as string;
       const title = formData.get('title') as string;
       const description = formData.get('description') as string;
-      const uploadedByRole = formData.get('uploadedByRole') as string;
+      const uploadedByRole = (formData.get('uploadedByRole') as string || '').toLowerCase();
+      // Recipient: the user (or child profile) this document is meant for — type must be tutor|parent|student|child
+      const sharedWithId = (formData.get('sharedWithId') as string)?.trim() || '';
+      const sharedWithType = ((formData.get('sharedWithType') as string) || '').toLowerCase();
 
       if (!file) {
         return c.json({ error: 'No file provided' }, 400);
@@ -31,23 +39,53 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         return c.json({ error: 'File size exceeds 25MB limit' }, 400);
       }
 
-      // Validate file type (documents only)
-      const allowedTypes = [
-        'application/pdf',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-        'application/vnd.ms-excel',
-        'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-        'application/vnd.ms-powerpoint',
-        'application/vnd.openxmlformats-officedocument.presentationml.presentation',
-        'text/plain',
-        'image/jpeg',
-        'image/png',
-        'image/gif',
-      ];
+      // Validate file type: ONLY images, PDF, and safe documents
+      const ALLOWED_MIME_TYPES = new Set([
+        'application/pdf',                                                    // PDF
+        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',  // Images
+        'application/msword',                                                 // .doc
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  // .docx
+      ]);
 
-      if (!allowedTypes.includes(file.type)) {
-        return c.json({ error: 'Invalid file type. Only documents and images are allowed.' }, 400);
+      if (!ALLOWED_MIME_TYPES.has(file.type)) {
+        return c.json({ error: 'Invalid file type. Only PDF, images (.jpg, .png, .gif, .webp), and documents (.doc, .docx) are allowed.' }, 400);
+      }
+
+      if (!['parent', 'tutor', 'student', 'admin'].includes(uploadedByRole)) {
+        return c.json({ error: 'Invalid uploadedByRole' }, 400);
+      }
+
+      if (sharedWithId) {
+        const gate = await assertDocumentShareAllowed(userId, uploadedByRole, sharedWithId, sharedWithType);
+        if (!gate.ok) {
+          return c.json({ error: gate.error, code: 'DOCUMENT_SHARE_NOT_ALLOWED' }, 403);
+        }
+      }
+
+      // Validate filename to prevent malicious files
+      const lowerOriginalName = file.name.toLowerCase();
+      const dangerousExtensions = ['.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js', '.jar', '.zip', '.rar', '.7z', '.tar', '.gz'];
+      const hasDangerousExt = dangerousExtensions.some((ext) => lowerOriginalName.endsWith(ext));
+      
+      if (hasDangerousExt) {
+        return c.json({ error: 'File type not allowed. Executable and archive files are prohibited.' }, 400);
+      }
+
+      // Additional validation: check that the MIME type matches the file extension
+      const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
+      const validExtensions: Record<string, string[]> = {
+        'application/pdf': ['.pdf'],
+        'image/jpeg': ['.jpg', '.jpeg'],
+        'image/png': ['.png'],
+        'image/gif': ['.gif'],
+        'image/webp': ['.webp'],
+        'application/msword': ['.doc'],
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      };
+
+      const allowedExts = validExtensions[file.type] || [];
+      if (!allowedExts.includes(fileExt)) {
+        return c.json({ error: 'File extension does not match file type. Possible security risk.' }, 400);
       }
 
       // Create bucket if it doesn't exist
@@ -59,10 +97,10 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         await supabase.storage.createBucket(bucketName, { public: false });
       }
 
-      // Upload file to Supabase Storage
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${fileExt}`;
-      const filePath = `${userId}/${fileName}`;
+      // Upload file to Supabase Storage (use a distinct name — `fileExt` above is the dotted extension for validation)
+      const uploadExt = file.name.split('.').pop() || 'bin';
+      const storageObjectName = `${Date.now()}-${Math.random().toString(36).substr(2, 9)}.${uploadExt}`;
+      const filePath = `${userId}/${storageObjectName}`;
 
       const fileBuffer = await file.arrayBuffer();
       const { data: uploadData, error: uploadError } = await supabase.storage
@@ -77,6 +115,48 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         return c.json({ error: 'Failed to upload file' }, 500);
       }
 
+      // Get uploader's name
+      let uploadedByName = 'User';
+      try {
+        const uploaderProfile = await kv.get(`user:${userId}`) as any;
+        if (uploaderProfile) {
+          if (uploaderProfile.full_name) uploadedByName = uploaderProfile.full_name;
+          else if (uploaderProfile.firstName && uploaderProfile.lastName) 
+            uploadedByName = `${uploaderProfile.firstName} ${uploaderProfile.lastName}`;
+          else if (uploaderProfile.firstName) uploadedByName = uploaderProfile.firstName;
+          else if (uploaderProfile.email) uploadedByName = uploaderProfile.email.split('@')[0];
+        }
+      } catch (e) {
+        console.error('Error fetching uploader profile:', e);
+      }
+
+      // Get shared with user's name if applicable
+      let sharedWithName = '';
+      if (sharedWithId && sharedWithId !== '') {
+        try {
+          if (sharedWithType === 'child') {
+            const ch = (await kv.get(`child:${sharedWithId}`)) as Record<string, unknown> | null;
+            if (ch) {
+              sharedWithName =
+                (ch.firstName && ch.lastName
+                  ? `${ch.firstName} ${ch.lastName}`
+                  : String(ch.firstName || ch.name || 'Student')) as string;
+            }
+          } else {
+            const sharedWithProfile = (await kv.get(`user:${sharedWithId}`)) as Record<string, unknown> | null;
+            if (sharedWithProfile) {
+              if (sharedWithProfile.full_name) sharedWithName = String(sharedWithProfile.full_name);
+              else if (sharedWithProfile.firstName && sharedWithProfile.lastName)
+                sharedWithName = `${sharedWithProfile.firstName} ${sharedWithProfile.lastName}`;
+              else if (sharedWithProfile.firstName) sharedWithName = String(sharedWithProfile.firstName);
+              else if (sharedWithProfile.email) sharedWithName = String(sharedWithProfile.email).split('@')[0];
+            }
+          }
+        } catch (e) {
+          console.error('Error fetching shared with profile:', e);
+        }
+      }
+
       // Create document metadata
       const document = {
         id: `document:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
@@ -88,10 +168,14 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         filePath: uploadData.path,
         bucketName,
         uploadedBy: userId,
+        uploadedByName,
         uploadedByRole,
         documentType,
         relatedToId,
-        relatedToType,
+        relatedToType: relatedToType || uploadedByRole,
+        sharedWithId,
+        sharedWithName,
+        sharedWithType: sharedWithId ? sharedWithType || 'user' : '',
         createdAt: new Date().toISOString(),
         updatedAt: new Date().toISOString(),
       };
@@ -115,6 +199,23 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
     }
   });
 
+  // Helper function to get profile name
+  const getProfileName = async (userId: string): Promise<string> => {
+    try {
+      const profile = await kv.get(`user:${userId}`) as any;
+      if (profile) {
+        // Try different name formats
+        if (profile.full_name) return profile.full_name;
+        if (profile.firstName && profile.lastName) return `${profile.firstName} ${profile.lastName}`;
+        if (profile.firstName) return profile.firstName;
+        if (profile.email) return profile.email.split('@')[0]; // fallback to email prefix
+      }
+    } catch (e) {
+      console.error('Error getting profile name:', e);
+    }
+    return 'User'; // ultimate fallback
+  };
+
   // Get documents for a user
   app.get('/make-server-cbd74580/documents', async (c) => {
     try {
@@ -127,23 +228,15 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
 
       const documentType = c.req.query('documentType'); // Optional filter
       const relatedToId = c.req.query('relatedToId'); // Optional filter
+      const userRole = (c.req.query('userRole') || 'parent').toLowerCase();
+      const childIds = parseChildIdsQuery(c.req.query('childIds'));
 
-      // Get all documents
       const allDocuments = await kv.getByPrefix('document:');
 
-      // Filter documents accessible by this user
-      let userDocuments = allDocuments.filter((doc: any) => {
-        // User can see documents they uploaded
-        if (doc.uploadedBy === userId) return true;
-        
-        // User can see documents related to them
-        if (doc.relatedToId === userId) return true;
-        
-        // TODO: Add more access control logic based on relationships
-        // (e.g., tutor can see student's documents if they have sessions together)
-        
-        return false;
-      });
+      const visibility: boolean[] = await Promise.all(
+        allDocuments.map((doc: Record<string, unknown>) => userCanAccessDocument(doc, userId, userRole, childIds)),
+      );
+      let userDocuments = allDocuments.filter((_: unknown, i: number) => visibility[i]);
 
       // Apply filters
       if (documentType) {
@@ -154,12 +247,42 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         userDocuments = userDocuments.filter((doc: any) => doc.relatedToId === relatedToId);
       }
 
+      // Enrich documents with profile names
+      const enrichedDocuments = await Promise.all(userDocuments.map(async (doc: any) => {
+        const enriched = { ...doc };
+        
+        // Add uploadedByName
+        if (doc.uploadedBy) {
+          enriched.uploadedByName = await getProfileName(doc.uploadedBy);
+        }
+        
+        // Add sharedWithName
+        if (doc.sharedWithId && doc.sharedWithId !== '') {
+          if (String(doc.sharedWithType || '').toLowerCase() === 'child') {
+            try {
+              const ch = (await kv.get(`child:${doc.sharedWithId}`)) as Record<string, unknown> | null;
+              enriched.sharedWithName = ch
+                ? (ch.firstName && ch.lastName
+                    ? `${ch.firstName} ${ch.lastName}`
+                    : String(ch.firstName || ch.name || 'Student'))
+                : await getProfileName(doc.sharedWithId);
+            } catch {
+              enriched.sharedWithName = await getProfileName(doc.sharedWithId);
+            }
+          } else {
+            enriched.sharedWithName = await getProfileName(doc.sharedWithId);
+          }
+        }
+        
+        return enriched;
+      }));
+
       // Sort by most recent
-      userDocuments.sort((a: any, b: any) => 
+      enrichedDocuments.sort((a: any, b: any) => 
         new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
       );
 
-      return c.json({ documents: userDocuments });
+      return c.json({ documents: enrichedDocuments });
     } catch (error: any) {
       console.error('Error fetching documents:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);
@@ -177,17 +300,15 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       }
 
       const documentId = c.req.param('documentId');
-      const document = await kv.get(documentId) as any;
+      const document = (await kv.get(documentId)) as Record<string, unknown> | null;
 
       if (!document) {
         return c.json({ error: 'Document not found' }, 404);
       }
 
-      // Check if user has access to this document
-      const hasAccess = 
-        document.uploadedBy === userId || 
-        document.relatedToId === userId;
-        // TODO: Add more access control logic
+      const userRole = (c.req.query('userRole') || 'parent').toLowerCase();
+      const childIds = parseChildIdsQuery(c.req.query('childIds'));
+      const hasAccess = await userCanAccessDocument(document, userId, userRole, childIds);
 
       if (!hasAccess) {
         return c.json({ error: 'Unauthorized to access this document' }, 403);

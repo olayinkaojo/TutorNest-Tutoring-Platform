@@ -4,7 +4,7 @@
  * Uses ISO 8601 timestamps and RFC 3339 formatting
  */
 
-import { projectId } from './supabase/info';
+import { edgeFunctionBaseUrl, edgeFunctionHeaders } from './supabase-edge-fetch';
 
 interface PayoutRequest {
   tutorId: string;
@@ -32,7 +32,7 @@ interface PayoutBatchResponse {
   processedAt?: string;
 }
 
-const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
+const BASE_URL = edgeFunctionBaseUrl();
 
 /**
  * Generate unique idempotency key to prevent duplicate payouts
@@ -53,7 +53,7 @@ export const getPayoutSummary = async (
   try {
     const response = await fetch(`${BASE_URL}/payouts/tutor/${tutorId}/summary`, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         Accept: 'application/json',
         'Content-Type': 'application/json',
       },
@@ -86,7 +86,7 @@ export const getEarningsBreakdown = async (
   try {
     const response = await fetch(`${BASE_URL}/payouts/tutor/${tutorId}/breakdown`, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         Accept: 'application/json',
       },
     });
@@ -117,7 +117,7 @@ export const requestPayout = async (
     const response = await fetch(`${BASE_URL}/payouts/request`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         'Content-Type': 'application/json',
         'Idempotency-Key': idempotencyKey,
       },
@@ -151,7 +151,7 @@ export const getPayoutStatus = async (
   try {
     const response = await fetch(`${BASE_URL}/payouts/${payoutId}`, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         Accept: 'application/json',
       },
     });
@@ -177,7 +177,7 @@ export const getPayoutAuditTrail = async (
   try {
     const response = await fetch(`${BASE_URL}/payouts/${payoutId}/audit`, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         Accept: 'application/json',
       },
     });
@@ -200,7 +200,7 @@ export const getNextPayoutDate = async (accessToken: string): Promise<string> =>
   try {
     const response = await fetch(`${BASE_URL}/payouts/schedule/next`, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         Accept: 'application/json',
       },
     });
@@ -239,7 +239,7 @@ export const updatePayoutSettings = async (
     const response = await fetch(`${BASE_URL}/payouts/settings/${tutorId}`, {
       method: 'PUT',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(settings),
@@ -269,7 +269,7 @@ export const verifyBankAccount = async (
     const response = await fetch(`${BASE_URL}/payouts/verify-bank`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -313,7 +313,7 @@ export const getPayoutBatches = async (
       `${BASE_URL}/payouts/admin/batches?${queryParams.toString()}`,
       {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          ...edgeFunctionHeaders(accessToken),
           Accept: 'application/json',
         },
       }
@@ -342,7 +342,7 @@ export const approveBatch = async (
     const response = await fetch(`${BASE_URL}/payouts/admin/batches/${batchId}/approve`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -373,7 +373,7 @@ export const processBatch = async (
     const response = await fetch(`${BASE_URL}/payouts/admin/batches/${batchId}/process`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -403,7 +403,7 @@ export const retryFailedPayouts = async (
     const response = await fetch(`${BASE_URL}/payouts/admin/batches/${batchId}/retry`, {
       method: 'POST',
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -432,7 +432,7 @@ export const getPayoutBatchDetails = async (
   try {
     const response = await fetch(`${BASE_URL}/payouts/admin/batches/${batchId}`, {
       headers: {
-        Authorization: `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         Accept: 'application/json',
       },
     });
@@ -469,7 +469,7 @@ export const exportPayoutReport = async (
       `${BASE_URL}/payouts/admin/export?${queryParams.toString()}`,
       {
         headers: {
-          Authorization: `Bearer ${accessToken}`,
+          ...edgeFunctionHeaders(accessToken),
           Accept: 'text/csv',
         },
       }

@@ -1,3 +1,8 @@
+/**
+ * IDE / tooling mirror of the deployed Edge bundle. Canonical source for deploy:
+ * `supabase/functions/make-server-cbd74580/`. After changing shared routing, CORS, or middleware there,
+ * align this tree (or regenerate it) so local analysis stays accurate.
+ */
 import { Hono } from 'npm:hono';
 import { cors } from 'npm:hono/cors';
 import { logger } from 'npm:hono/logger';

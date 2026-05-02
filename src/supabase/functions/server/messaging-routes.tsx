@@ -1,5 +1,53 @@
-import { Hono } from 'npm:hono';
+import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
+
+function containsContactInfo(content: string): boolean {
+  const pattern = /\b(\d{10,}|[\w.-]+@[\w.-]+\.\w+|(?:whatsapp|telegram|facebook|instagram|twitter)\b)/gi;
+  return pattern.test(content);
+}
+
+function isBookingParty(booking: Record<string, unknown>, userId: string): boolean {
+  const parentId = (booking.parentId ?? booking.userId) as string | undefined;
+  return (
+    booking.tutorId === userId ||
+    parentId === userId ||
+    booking.studentId === userId
+  );
+}
+
+// Check if a payment associated with a booking has expired
+async function isPaymentExpired(bookingId: string): Promise<{ expired: boolean; expiresAt?: string }> {
+  try {
+    // Get booking to find the payment ID
+    const booking = await db.getBooking(bookingId);
+    if (!booking || !booking.paymentId) {
+      // No payment means no expiration (legacy or free booking)
+      return { expired: false };
+    }
+
+    // Get payment to check expiration date
+    const payment = await db.getPaymentById(booking.paymentId);
+    if (!payment || !payment.paymentExpiresAt) {
+      // No expiration date set yet or payment not found
+      return { expired: false };
+    }
+
+    // Check if expiration date has passed
+    const now = new Date();
+    const expiresAt = new Date(payment.paymentExpiresAt);
+    const isExpired = now > expiresAt;
+
+    return {
+      expired: isExpired,
+      expiresAt: payment.paymentExpiresAt,
+    };
+  } catch (error: any) {
+    console.warn('Error checking payment expiration:', error.message);
+    // On error, allow access (fail open) to prevent blocking users
+    return { expired: false };
+  }
+}
 
 export const messagingRoutes = (app: Hono, getUserId: Function) => {
 
@@ -21,8 +69,19 @@ export const messagingRoutes = (app: Hono, getUserId: Function) => {
         return c.json({ error: 'Booking not found' }, 404);
       }
 
-      if (booking.tutorId !== userId && booking.parentId !== userId) {
+      if (!isBookingParty(booking as Record<string, unknown>, userId)) {
         return c.json({ error: 'Unauthorized to view these messages' }, 403);
+      }
+
+      // Check if payment has expired
+      const paymentExpiration = await isPaymentExpired(bookingId);
+      if (paymentExpiration.expired) {
+        return c.json({
+          error: 'Payment expired',
+          errorCode: 'PAYMENT_EXPIRED',
+          message: 'Chat access has ended because the payment duration has expired. Please renew your subscription to continue messaging.',
+          expiresAt: paymentExpiration.expiresAt,
+        }, 403);
       }
 
       // Get all messages for this booking
@@ -61,20 +120,54 @@ export const messagingRoutes = (app: Hono, getUserId: Function) => {
         return c.json({ error: 'Booking not found' }, 404);
       }
 
-      if (booking.tutorId !== userId && booking.parentId !== userId) {
+      if (!isBookingParty(booking as Record<string, unknown>, userId)) {
         return c.json({ error: 'Unauthorized to send messages for this booking' }, 403);
       }
 
-      // Check for personal contact info (basic pattern matching)
-      const contactInfoPattern = /\b(\d{10,}|[\w.-]+@[\w.-]+\.\w+|(?:whatsapp|telegram|facebook|instagram|twitter)\b)/gi;
-      if (contactInfoPattern.test(content)) {
-        return c.json({ 
-          error: 'Personal contact information detected. Please use the in-app messaging system.' 
+      if (senderId !== userId) {
+        return c.json({ error: 'Sender must match the authenticated user' }, 403);
+      }
+
+      const allowedRoles = ['tutor', 'parent', 'student'];
+      if (!senderRole || !allowedRoles.includes(senderRole)) {
+        return c.json({ error: 'Invalid senderRole' }, 400);
+      }
+
+      if (senderRole === 'tutor' && booking.tutorId !== userId) {
+        return c.json({ error: 'Not the tutor on this booking' }, 403);
+      }
+      if (senderRole === 'parent') {
+        const parentId = (booking.parentId ?? booking.userId) as string | undefined;
+        if (parentId !== userId) {
+          return c.json({ error: 'Not the parent on this booking' }, 403);
+        }
+      }
+      if (senderRole === 'student' && booking.studentId !== userId) {
+        return c.json({ error: 'Not the student on this booking' }, 403);
+      }
+
+      // Check if payment has expired
+      const paymentExpiration = await isPaymentExpired(bookingId);
+      if (paymentExpiration.expired) {
+        return c.json({
+          error: 'Payment expired',
+          errorCode: 'PAYMENT_EXPIRED',
+          message: 'Chat access has ended because the payment duration has expired. Please renew your subscription to continue messaging.',
+          expiresAt: paymentExpiration.expiresAt,
+        }, 403);
+      }
+
+      if (content && containsContactInfo(content)) {
+        return c.json({
+          error: 'Personal contact information detected. Please use the in-app messaging system.',
         }, 400);
       }
 
-      // Get sender name (masked for privacy)
-      const senderName = senderRole === 'tutor' ? booking.tutorName : 'Parent';
+      // Display name: tutor uses booking name; parent/student generic labels for privacy
+      let senderName = 'User';
+      if (senderRole === 'tutor') senderName = (booking.tutorName as string) || 'Tutor';
+      else if (senderRole === 'parent') senderName = 'Parent';
+      else if (senderRole === 'student') senderName = (booking.studentName as string) || 'Student';
 
       // Handle attachments
       const attachments: any[] = [];
@@ -114,23 +207,33 @@ export const messagingRoutes = (app: Hono, getUserId: Function) => {
 
       await kv.set(message.id, message);
 
+      const parentRecipient = (booking.parentId ?? booking.userId) as string | undefined;
+      const recipientId: string | undefined =
+        senderRole === 'tutor'
+          ? parentRecipient || (booking.studentId as string | undefined)
+          : (booking.tutorId as string | undefined);
+
       // Create log entry for audit trail
       const logEntry = {
         id: `message-log:${Date.now()}`,
         messageId: message.id,
         bookingId,
         senderId,
-        recipientId: senderRole === 'tutor' ? booking.parentId : booking.tutorId,
+        recipientId,
         timestamp: new Date().toISOString(),
         action: 'message_sent',
       };
       await kv.set(logEntry.id, logEntry);
 
       // Notify recipient
-      const recipientId = senderRole === 'tutor' ? booking.parentId : booking.tutorId;
-      const recipientPrefs = await kv.get(`notification-preferences:${recipientId}`) as any;
+      const recipientPrefs = recipientId
+        ? ((await kv.get(`notification-preferences:${recipientId}`)) as Record<string, unknown> | null)
+        : null;
 
-      if (!recipientPrefs || recipientPrefs.inApp.messages) {
+      if (
+        recipientId &&
+        (!recipientPrefs || (recipientPrefs.inApp as { messages?: boolean } | undefined)?.messages !== false)
+      ) {
         const notification = {
           id: `notification:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
           userId: recipientId,
@@ -163,15 +266,15 @@ export const messagingRoutes = (app: Hono, getUserId: Function) => {
       }
 
       const messageId = c.req.param('messageId');
-      const { reportedByUserId, reportReason } = await c.req.json();
+      const { reportReason } = await c.req.json();
 
       const message = await kv.get(messageId) as any;
       if (!message) {
         return c.json({ error: 'Message not found' }, 404);
       }
 
-      // Update message with report info
-      message.reportedByUserId = reportedByUserId;
+      // Update message with report info (reporter is always the authenticated user)
+      message.reportedByUserId = userId;
       message.reportReason = reportReason;
       message.reportedAt = new Date().toISOString();
       await kv.set(messageId, message);
@@ -196,7 +299,7 @@ export const messagingRoutes = (app: Hono, getUserId: Function) => {
       const logEntry = {
         id: `message-report-log:${Date.now()}`,
         messageId,
-        reportedBy: reportedByUserId,
+        reportedBy: userId,
         reason: reportReason,
         timestamp: new Date().toISOString(),
         action: 'message_reported',

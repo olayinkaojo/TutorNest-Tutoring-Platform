@@ -3,7 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { AuthBackground } from './components/AuthBackground';
 import { getSupabaseClient } from './utils/supabase/client';
-import { projectId } from './utils/supabase/info';
+import { edgeFunctionHeaders, edgeFunctionUrl } from './utils/supabase-edge-fetch';
 import { logger } from './utils/logger';
 import { PublicAuthRoutes } from './routes/PublicAuthRoutes';
 import { RoleSetupRoutes } from './routes/RoleSetupRoutes';
@@ -110,15 +110,10 @@ export default function App() {
 
   const fetchProfile = async (accessToken: string) => {
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profile`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-          signal: AbortSignal.timeout(10000),
-        }
-      );
+      const response = await fetch(edgeFunctionUrl('profile'), {
+        headers: edgeFunctionHeaders(accessToken),
+        signal: AbortSignal.timeout(10000),
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -176,14 +171,9 @@ export default function App() {
 
   const fetchAvailableRoles = async (accessToken: string, userId: string) => {
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/role-management/user-roles/${userId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${accessToken}`,
-          },
-        }
-      );
+      const response = await fetch(edgeFunctionUrl(`role-management/user-roles/${userId}`), {
+        headers: edgeFunctionHeaders(accessToken),
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -211,20 +201,17 @@ export default function App() {
     logger.info('Switching role', { newRole });
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/role-management/switch-role`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            userId: profile.id || profile.userId,
-            targetRole: newRole,
-          }),
-        }
-      );
+      const response = await fetch(edgeFunctionUrl('role-management/switch-role'), {
+        method: 'POST',
+        headers: {
+          ...edgeFunctionHeaders(session.access_token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          userId: profile.id || profile.userId,
+          targetRole: newRole,
+        }),
+      });
 
       if (response.ok) {
         await fetchProfile(session.access_token);

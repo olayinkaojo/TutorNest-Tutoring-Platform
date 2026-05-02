@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -18,13 +18,9 @@ import {
   CheckCheck,
   Loader2,
 } from 'lucide-react';
-import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { toast } from 'sonner@2.0.3';
 import { Alert, AlertDescription } from './ui/alert';
-import { createClient } from '@supabase/supabase-js';
-
-// Initialize Supabase client for Realtime
-const supabase = createClient(`https://${projectId}.supabase.co`, publicAnonKey);
+import { edgeFunctionBaseUrl, edgeFunctionHeaders } from '../utils/supabase-edge-fetch';
 
 interface Message {
   id: string;
@@ -42,11 +38,29 @@ interface Message {
 interface Conversation {
   id: string;
   participants: string[];
+  /** When set, separates parent-home vs tutor-home threads for the same two user IDs */
+  channel?: string;
   participantRoles: Record<string, string>;
   participantNames: Record<string, string>;
   lastMessage?: Message;
   unreadCount: number;
   updatedAt: string;
+}
+
+const ACTIVE_BOOKING = new Set(['confirmed', 'completed', 'scheduled']);
+
+/** Must match Edge `messaging-access` channel names */
+function messagingChannelForContact(
+  dashboardRole: string,
+  contactRole: string,
+): 'parent-tutor' | 'tutor-parent' | 'tutor-student' | null {
+  const d = dashboardRole.toLowerCase();
+  const c = contactRole.toLowerCase();
+  if (d === 'parent' && c === 'tutor') return 'parent-tutor';
+  if (d === 'tutor' && c === 'parent') return 'tutor-parent';
+  if (d === 'tutor' && c === 'student') return 'tutor-student';
+  if (d === 'student' && c === 'tutor') return 'tutor-student';
+  return null;
 }
 
 interface ChatroomProps {
@@ -92,15 +106,19 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
   useEffect(() => {
     if (initialContactId && !hasInitiatedRef.current && conversations.length > 0) {
       hasInitiatedRef.current = true;
-      // Find existing conversation with this contact or create new one
-      const existingConv = conversations.find(conv => 
-        conv.participants.includes(initialContactId)
-      );
+      const expected = initialContactRole
+        ? messagingChannelForContact(userRole, initialContactRole)
+        : null;
+      const existingConv = conversations.find((conv) => {
+        const other = conv.participants.find((p) => p !== userId);
+        if (other !== initialContactId) return false;
+        if (!expected) return true;
+        return !conv.channel || conv.channel === expected;
+      });
       if (existingConv) {
         setSelectedConversation(existingConv);
         loadMessages(existingConv.id);
       } else if (initialContactName && initialContactRole) {
-        // Start new conversation
         startConversation({
           id: initialContactId,
           name: initialContactName,
@@ -108,61 +126,29 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
         });
       }
     }
-  }, [initialContactId, conversations]);
+  }, [initialContactId, conversations, initialContactName, initialContactRole, userId, userRole]);
 
-  // Real-time subscription logic
   useEffect(() => {
     loadConversations();
+    const id = window.setInterval(loadConversations, 30000);
+    return () => window.clearInterval(id);
+  }, [session?.access_token, userRole]);
 
-    if (!selectedConversation) return;
-
-    // Subscribe to new messages for the selected conversation
-    const messageChannel = supabase
-      .channel(`room:${selectedConversation.id}`)
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'messages',
-          filter: `conversationId=eq.${selectedConversation.id}`,
-        },
-        (payload) => {
-          const newMessage = payload.new as Message;
-          setMessages((current) => {
-            // Avoid duplicates from optimistic updates
-            if (current.some((m) => m.id === newMessage.id)) return current;
-            return [...current, newMessage];
-          });
-          loadConversations(); // Refresh list to update last message preview
-        }
-      )
-      .subscribe();
-
-    // Subscribe to conversation updates (unread counts, etc.)
-    const convChannel = supabase
-      .channel('conversations_updates')
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'conversations' }, () => {
-        loadConversations();
-      })
-      .subscribe();
-
-    return () => {
-      supabase.removeChannel(messageChannel);
-      supabase.removeChannel(convChannel);
-    };
-  }, [selectedConversation?.id]);
+  // Messages live in KV (not Postgres Realtime) — poll while a thread is open
+  useEffect(() => {
+    if (!selectedConversation?.id) return;
+    const t = window.setInterval(() => {
+      loadMessages(selectedConversation.id, true);
+    }, 8000);
+    return () => window.clearInterval(t);
+  }, [selectedConversation?.id, session?.access_token]);
 
   const loadConversations = async () => {
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/conversations`,
-        {
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-          },
-        }
-      );
+      const url = `${edgeFunctionBaseUrl()}/conversations?persona=${encodeURIComponent(userRole)}`;
+      const response = await fetch(url, {
+        headers: edgeFunctionHeaders(session.access_token),
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -179,10 +165,11 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
 
   const markConversationRead = async (conversationId: string) => {
     try {
-      await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/conversations/${conversationId}/read`,
-        { method: 'POST', headers: { 'Authorization': `Bearer ${session.access_token}` } }
-      );
+      const enc = encodeURIComponent(conversationId);
+      await fetch(`${edgeFunctionBaseUrl()}/conversations/${enc}/read`, {
+        method: 'POST',
+        headers: edgeFunctionHeaders(session.access_token),
+      });
       // Zero out unread locally immediately
       setConversations(prev => prev.map(c => c.id === conversationId ? { ...c, unreadCount: 0 } : c));
     } catch (_) {}
@@ -191,10 +178,10 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
   const loadMessages = async (conversationId: string, silent = false) => {
     if (!silent) setLoading(true);
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/conversations/${conversationId}/messages`,
-        { headers: { 'Authorization': `Bearer ${session.access_token}` } }
-      );
+      const enc = encodeURIComponent(conversationId);
+      const response = await fetch(`${edgeFunctionBaseUrl()}/conversations/${enc}/messages`, {
+        headers: edgeFunctionHeaders(session.access_token),
+      });
       if (response.ok) {
         const data = await response.json();
         setMessages(data.messages || []);
@@ -248,14 +235,15 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
     setMessages(prev => [...prev, optimistic]);
     setSending(true);
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/conversations/${selectedConversation.id}/messages`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ content, senderName: userName }),
-        }
-      );
+      const enc = encodeURIComponent(selectedConversation.id);
+      const response = await fetch(`${edgeFunctionBaseUrl()}/conversations/${enc}/messages`, {
+        method: 'POST',
+        headers: {
+          ...edgeFunctionHeaders(session.access_token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ content, senderName: userName }),
+      });
       if (response.ok) {
         const data = await response.json();
         // Replace optimistic message with real one
@@ -303,15 +291,15 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
 
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/conversations/messages/${messageId}/report`,
+        `${edgeFunctionBaseUrl()}/conversations/messages/${encodeURIComponent(messageId)}/report`,
         {
           method: 'POST',
           headers: {
-            'Authorization': `Bearer ${session.access_token}`,
+            ...edgeFunctionHeaders(session.access_token),
             'Content-Type': 'application/json',
           },
           body: JSON.stringify({ reportReason: reason }),
-        }
+        },
       );
 
       if (response.ok) {
@@ -345,23 +333,25 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
     setContactsLoading(true);
     try {
       const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`,
-        { headers: { 'Authorization': `Bearer ${session.access_token}` } },
+        `${edgeFunctionBaseUrl()}/bookings?persona=${encodeURIComponent(userRole)}`,
+        { headers: edgeFunctionHeaders(session.access_token) },
       );
       if (!res.ok) return;
       const data = await res.json();
       if (userRole === 'parent') {
-        // Show only tutors the parent has paid bookings with
         const bookings: any[] = data.bookings || [];
         const seen = new Set<string>();
         const tutors: Contact[] = [];
         for (const b of bookings) {
+          if (!ACTIVE_BOOKING.has(String(b.status || '').toLowerCase())) continue;
           const tutorId = b.tutorId;
           if (tutorId && tutorId !== userId && !seen.has(tutorId)) {
             seen.add(tutorId);
             tutors.push({
               id: tutorId,
-              name: b.tutorFullName || b.tutorName ||
+              name:
+                b.tutorFullName ||
+                b.tutorName ||
                 (b.tutorFirstName ? `${b.tutorFirstName} ${b.tutorLastName || ''}`.trim() : 'Tutor'),
               role: 'tutor',
             });
@@ -369,11 +359,11 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
         }
         setContacts(tutors);
       } else if (userRole === 'student') {
-        // Students can only message tutors they have active sessions with
         const bookings: any[] = data.bookings || [];
         const seen = new Set<string>();
         const tutors: Contact[] = [];
         for (const b of bookings) {
+          if (!ACTIVE_BOOKING.has(String(b.status || '').toLowerCase())) continue;
           const tutorId = b.tutorId;
           if (tutorId && tutorId !== userId && !seen.has(tutorId)) {
             seen.add(tutorId);
@@ -386,26 +376,26 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
         }
         setContacts(tutors);
       } else {
-        // For tutors: extract unique students/parents from confirmed or completed paid bookings
-        const bookings: any[] = data.bookings || data || [];
-        const paidBookings = bookings.filter((b: any) =>
-          b.status === 'confirmed' || b.status === 'completed'
-        );
+        const bookings: any[] = data.bookings || [];
         const seen = new Set<string>();
         const contacts: Contact[] = [];
-        for (const b of paidBookings) {
-          // Prefer student contact; fall back to parent
-          const contactId = b.studentId || b.parentId || b.userId;
-          const contactName = b.studentName || b.studentFullName || b.parentName || b.userName || 'Student';
-          const contactRole = b.studentId ? 'student' : 'parent';
-          if (contactId && contactId !== userId && !seen.has(contactId)) {
-            seen.add(contactId);
-            contacts.push({ id: contactId, name: contactName, role: contactRole });
+        for (const b of bookings) {
+          if (!ACTIVE_BOOKING.has(String(b.status || '').toLowerCase())) continue;
+          if (b.parentId && b.parentId !== userId && !seen.has(`p:${b.parentId}`)) {
+            seen.add(`p:${b.parentId}`);
+            contacts.push({
+              id: b.parentId,
+              name: b.parentName || b.userName || 'Parent',
+              role: 'parent',
+            });
           }
-          // Also add the parent separately if both student and parent IDs are present
-          if (b.parentId && b.parentId !== userId && !seen.has(b.parentId)) {
-            seen.add(b.parentId);
-            contacts.push({ id: b.parentId, name: b.parentName || b.userName || 'Parent', role: 'parent' });
+          if (b.studentId && b.studentId !== userId && !seen.has(`s:${b.studentId}`)) {
+            seen.add(`s:${b.studentId}`);
+            contacts.push({
+              id: b.studentId,
+              name: b.studentName || b.studentFullName || 'Student',
+              role: 'student',
+            });
           }
         }
         setContacts(contacts);
@@ -420,16 +410,30 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
   const startConversation = async (contact: Contact) => {
     setStartingConv(true);
     try {
-      const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/conversations/get-or-create`,
-        {
-          method: 'POST',
-          headers: { 'Authorization': `Bearer ${session.access_token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ participantId: contact.id, participantName: contact.name, participantRole: contact.role }),
-        }
-      );
-      if (!res.ok) { toast.error('Failed to start conversation'); return; }
-      const data = await res.json();
+      const channel = messagingChannelForContact(userRole, contact.role);
+      if (!channel) {
+        toast.error('You cannot message this contact from your current role.');
+        return;
+      }
+      const res = await fetch(`${edgeFunctionBaseUrl()}/conversations/get-or-create`, {
+        method: 'POST',
+        headers: {
+          ...edgeFunctionHeaders(session.access_token),
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          participantId: contact.id,
+          participantName: contact.name,
+          participantRole: contact.role,
+          channel,
+          dashboardRole: userRole,
+        }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error((data as { error?: string }).error || 'Failed to start conversation');
+        return;
+      }
       setShowNewConvDialog(false);
       setContactSearch('');
       await loadConversations();

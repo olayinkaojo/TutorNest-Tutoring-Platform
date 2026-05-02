@@ -4,11 +4,11 @@
  * Provides caching, deduplication, validation, and error handling
  */
 
-import { projectId } from './supabase/info';
+import { edgeFunctionBaseUrl, edgeFunctionHeaders } from './supabase-edge-fetch';
 import type { APIResponse } from '../types/dashboard';
 
 // Configuration
-const API_BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
+const API_BASE_URL = edgeFunctionBaseUrl();
 const TIMEOUT_MS = 30000;
 
 // Request cache to prevent duplicate requests
@@ -86,7 +86,7 @@ async function fetchWithTimeout<T>(
       method: options.method || 'GET',
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${accessToken}`,
+        ...edgeFunctionHeaders(accessToken),
         ...options.headers,
       },
       body: options.body ? JSON.stringify(options.body) : undefined,

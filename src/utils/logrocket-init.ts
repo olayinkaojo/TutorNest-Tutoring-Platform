@@ -8,7 +8,9 @@ export const initLogRocket = () => {
   const appId = import.meta.env.VITE_LOGROCKET_APP_ID;
 
   if (!appId) {
-    console.warn('LogRocket app ID not configured. Session replay disabled.');
+    if (import.meta.env.PROD) {
+      console.warn('LogRocket app ID not configured. Session replay disabled.');
+    }
     return;
   }
 

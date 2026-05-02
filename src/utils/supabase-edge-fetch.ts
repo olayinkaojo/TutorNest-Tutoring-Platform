@@ -1,9 +1,30 @@
 import { projectId, publicAnonKey } from './supabase/info';
 
-/** Base URL for the bundled Edge Function (path after hostname is `/functions/v1/<name>/…`). */
+/** Base URL with no trailing slash: `https://<ref>.supabase.co/functions/v1/make-server-cbd74580` */
+export function edgeFunctionBaseUrl(): string {
+  return `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
+}
+
+/** Full URL for a path under the bundled Edge Function (suffix may omit leading `/`). */
 export function edgeFunctionUrl(suffix: string): string {
   const s = suffix.startsWith('/') ? suffix : `/${suffix}`;
-  return `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580${s}`;
+  return `${edgeFunctionBaseUrl()}${s}`;
+}
+
+/** `fetch` to the Edge function with standard Supabase headers (including `apikey` when configured). */
+export async function edgeFetch(
+  path: string,
+  accessToken: string,
+  init?: RequestInit
+): Promise<Response> {
+  const normalized = path.startsWith('/') ? path : `/${path}`;
+  return fetch(`${edgeFunctionBaseUrl()}${normalized}`, {
+    ...init,
+    headers: {
+      ...edgeFunctionHeaders(accessToken),
+      ...(init?.headers as Record<string, string> | undefined),
+    },
+  });
 }
 
 /**

@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { projectId } from '../utils/supabase/info';
+import { edgeFunctionBaseUrl, edgeFunctionHeaders } from '../utils/supabase-edge-fetch';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Badge } from './ui/badge';
@@ -22,14 +22,14 @@ interface MessageThreadProps {
   session: any;
   bookingId: string;
   currentUserId: string;
-  currentUserRole: 'parent' | 'tutor';
+  currentUserRole: 'parent' | 'tutor' | 'student';
 }
 
 interface Message {
   id: string;
   bookingId: string;
   senderId: string;
-  senderRole: 'parent' | 'tutor';
+  senderRole: 'parent' | 'tutor' | 'student';
   senderName: string;
   content: string;
   attachments?: Attachment[];
@@ -73,14 +73,10 @@ export function MessageThread({ session, bookingId, currentUserId, currentUserRo
 
   const fetchMessages = async () => {
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/messages/${bookingId}`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
+      const enc = encodeURIComponent(bookingId);
+      const response = await fetch(`${edgeFunctionBaseUrl()}/messages/${enc}`, {
+        headers: edgeFunctionHeaders(session.access_token),
+      });
 
       if (response.ok) {
         const data = await response.json();
@@ -150,16 +146,11 @@ export function MessageThread({ session, bookingId, currentUserId, currentUserRo
         formData.append('attachments', file);
       });
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/messages`,
-        {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-          body: formData,
-        }
-      );
+      const response = await fetch(`${edgeFunctionBaseUrl()}/messages`, {
+        method: 'POST',
+        headers: edgeFunctionHeaders(session.access_token),
+        body: formData,
+      });
 
       if (!response.ok) {
         const data = await response.json();
@@ -190,15 +181,14 @@ export function MessageThread({ session, bookingId, currentUserId, currentUserRo
 
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/messages/${messageId}/report`,
+        `${edgeFunctionBaseUrl()}/messages/${encodeURIComponent(messageId)}/report`,
         {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${session.access_token}`,
+            ...edgeFunctionHeaders(session.access_token),
           },
           body: JSON.stringify({
-            reportedByUserId: currentUserId,
             reportReason,
           }),
         }
