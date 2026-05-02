@@ -2964,7 +2964,10 @@ app.get('/make-server-cbd74580/bookings', async (c) => {
     } else if (persona === 'tutor') {
       bookings = allBookings.filter((b: any) => b.tutorId === userId);
     } else if (persona === 'student') {
-      bookings = allBookings.filter((b: any) => b.studentId === userId);
+      const linkedChildId = userProfile?.linkedChildId as string | undefined;
+      bookings = allBookings.filter(
+        (b: any) => b.studentId === userId || (!!linkedChildId && b.studentId === linkedChildId),
+      );
     } else {
       bookings = allBookings.filter(
         (b: any) => b.parentId === userId || b.tutorId === userId || b.studentId === userId || b.userId === userId,

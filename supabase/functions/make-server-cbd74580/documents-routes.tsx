@@ -1,10 +1,74 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
 import {
   assertDocumentShareAllowed,
   parseChildIdsQuery,
   userCanAccessDocument,
 } from './document-share-access.tsx';
+import {
+  bookingIdentityIdsForUser,
+  collectBookingsForUser,
+  MESSAGING_BOOKING_STATUSES,
+} from './messaging-access.tsx';
+
+function roleDisplayLabel(role: string): string {
+  const r = (role || '').toLowerCase();
+  if (r === 'tutor') return 'Tutor';
+  if (r === 'parent') return 'Parent / guardian';
+  if (r === 'student') return 'Student';
+  if (r === 'child') return 'Student';
+  return r ? r.charAt(0).toUpperCase() + r.slice(1) : 'User';
+}
+
+/** Best-effort display name from a booking row (KV shape often includes tutorName, etc.). */
+function nameFromBookingRow(raw: Record<string, unknown>, peerId: string): string | undefined {
+  const tid = (raw.tutorId ?? raw.tutor_id) as string | undefined;
+  if (tid === peerId) {
+    const n =
+      raw.tutorFullName ||
+      raw.tutorName ||
+      (raw.tutorFirstName && raw.tutorLastName
+        ? `${raw.tutorFirstName} ${raw.tutorLastName}`
+        : raw.tutorFirstName);
+    const s = n != null ? String(n).trim() : '';
+    if (s) return s;
+  }
+  const sid = (raw.studentId ?? raw.student_id) as string | undefined;
+  if (sid === peerId) {
+    const n =
+      raw.studentFullName ||
+      raw.studentName ||
+      (raw.studentFirstName && raw.studentLastName
+        ? `${raw.studentFirstName} ${raw.studentLastName}`
+        : raw.studentFirstName);
+    const s = n != null ? String(n).trim() : '';
+    if (s) return s;
+  }
+  const pid = (raw.parentId ?? raw.userId ?? raw.user_id) as string | undefined;
+  if (pid === peerId) {
+    const n =
+      raw.parentFullName ||
+      raw.parentName ||
+      (raw.parentFirstName && raw.parentLastName
+        ? `${raw.parentFirstName} ${raw.parentLastName}`
+        : raw.parentFirstName);
+    const s = n != null ? String(n).trim() : '';
+    if (s) return s;
+  }
+  return undefined;
+}
+
+async function peerNameFromActiveBookings(viewerId: string, peerId: string): Promise<string> {
+  const rows = await collectBookingsForUser(viewerId);
+  for (const raw of rows) {
+    const st = String((raw as Record<string, unknown>).status || '').toLowerCase();
+    if (!MESSAGING_BOOKING_STATUSES.has(st)) continue;
+    const hit = nameFromBookingRow(raw as Record<string, unknown>, peerId);
+    if (hit) return hit;
+  }
+  return '';
+}
 
 export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) => {
 
@@ -155,6 +219,9 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         } catch (e) {
           console.error('Error fetching shared with profile:', e);
         }
+        if (!sharedWithName.trim()) {
+          sharedWithName = await peerNameFromActiveBookings(userId, sharedWithId);
+        }
       }
 
       // Create document metadata
@@ -200,20 +267,31 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
   });
 
   // Helper function to get profile name
-  const getProfileName = async (userId: string): Promise<string> => {
+  const getProfileName = async (profileUserId: string): Promise<string> => {
     try {
-      const profile = await kv.get(`user:${userId}`) as any;
+      const profile = await kv.get(`user:${profileUserId}`) as any;
       if (profile) {
-        // Try different name formats
         if (profile.full_name) return profile.full_name;
         if (profile.firstName && profile.lastName) return `${profile.firstName} ${profile.lastName}`;
         if (profile.firstName) return profile.firstName;
-        if (profile.email) return profile.email.split('@')[0]; // fallback to email prefix
+        if (profile.email) return profile.email.split('@')[0];
       }
     } catch (e) {
       console.error('Error getting profile name:', e);
     }
-    return 'User'; // ultimate fallback
+    try {
+      const p = await db.getProfile(profileUserId);
+      if (p) {
+        if (p.full_name) return String(p.full_name);
+        if (p.fullName) return String(p.fullName);
+        if (p.firstName && p.lastName) return `${p.firstName} ${p.lastName}`;
+        if (p.firstName) return String(p.firstName);
+        if (p.email) return String(p.email).split('@')[0];
+      }
+    } catch {
+      /* Postgres optional */
+    }
+    return '';
   };
 
   // Get documents for a user
@@ -247,33 +325,59 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         userDocuments = userDocuments.filter((doc: any) => doc.relatedToId === relatedToId);
       }
 
-      // Enrich documents with profile names
+      // Enrich documents with profile names + recipient-facing attribution
       const enrichedDocuments = await Promise.all(userDocuments.map(async (doc: any) => {
         const enriched = { ...doc };
-        
-        // Add uploadedByName
+
         if (doc.uploadedBy) {
-          enriched.uploadedByName = await getProfileName(doc.uploadedBy);
+          const rawName = await getProfileName(doc.uploadedBy);
+          enriched.uploadedByName = rawName || 'User';
         }
-        
-        // Add sharedWithName
+
         if (doc.sharedWithId && doc.sharedWithId !== '') {
           if (String(doc.sharedWithType || '').toLowerCase() === 'child') {
             try {
               const ch = (await kv.get(`child:${doc.sharedWithId}`)) as Record<string, unknown> | null;
-              enriched.sharedWithName = ch
+              let sw = ch
                 ? (ch.firstName && ch.lastName
                     ? `${ch.firstName} ${ch.lastName}`
-                    : String(ch.firstName || ch.name || 'Student'))
-                : await getProfileName(doc.sharedWithId);
+                    : String(ch.firstName || ch.name || '').trim())
+                : '';
+              if (!sw) sw = await getProfileName(doc.sharedWithId);
+              enriched.sharedWithName = sw || '';
             } catch {
-              enriched.sharedWithName = await getProfileName(doc.sharedWithId);
+              enriched.sharedWithName = (await getProfileName(doc.sharedWithId)) || '';
             }
           } else {
-            enriched.sharedWithName = await getProfileName(doc.sharedWithId);
+            let sw = await getProfileName(doc.sharedWithId);
+            if (!sw) sw = await peerNameFromActiveBookings(userId, String(doc.sharedWithId));
+            enriched.sharedWithName = sw || '';
           }
         }
-        
+
+        const myIds = await bookingIdentityIdsForUser(userId);
+        const sharedWithStr = String(doc.sharedWithId || '').trim();
+        const uploadedByStr = String(doc.uploadedBy || '');
+        let imRecipient = !!sharedWithStr && myIds.some((id) => id === sharedWithStr);
+        if (
+          !imRecipient &&
+          userRole === 'parent' &&
+          childIds.length > 0 &&
+          sharedWithStr &&
+          childIds.includes(sharedWithStr)
+        ) {
+          imRecipient = true;
+        }
+        const imNotUploader = uploadedByStr !== userId;
+        if (imRecipient && imNotUploader) {
+          let src = await getProfileName(uploadedByStr);
+          if (!src) src = await peerNameFromActiveBookings(userId, uploadedByStr);
+          const rl = roleDisplayLabel(String(doc.uploadedByRole || ''));
+          enriched.shareSourceSummary = src
+            ? `Shared by ${src} (${rl})`
+            : `Shared with you (${rl})`;
+        }
+
         return enriched;
       }));
 

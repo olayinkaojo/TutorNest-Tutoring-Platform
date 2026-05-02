@@ -39,6 +39,8 @@ interface Document {
   sharedWithId?: string;
   sharedWithName?: string;
   sharedWithType?: string;
+  /** Set when the current viewer is the recipient (not the uploader). */
+  shareSourceSummary?: string;
   uploadedByRole?: string;
   createdAt: string;
   updatedAt: string;
@@ -347,8 +349,14 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
         resetUploadForm();
         loadDocuments();
       } else {
-        const error = await response.json();
-        toast.error(error.error || 'Failed to upload document');
+        let message = 'Failed to upload document';
+        try {
+          const err = await response.json();
+          message = err.error || message;
+        } catch {
+          /* non-JSON body */
+        }
+        toast.error(message);
       }
     } catch (error) {
       console.error('Error uploading document:', error);
@@ -477,8 +485,9 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
               </CardDescription>
             </div>
             <Button
+              type="button"
               onClick={() => setShowUploadDialog(true)}
-              className="text-white"
+              className="text-white shrink-0"
               style={{ backgroundColor: '#5d9827' }}
             >
               <Upload className="w-4 h-4 mr-2" />
@@ -563,18 +572,29 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
                             return isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
                           })()}
                         </span>
-                        {doc.sharedWithId && doc.sharedWithId !== '' && doc.sharedWithName && (
+                        {doc.sharedWithId && doc.sharedWithId !== '' && !!doc.sharedWithName?.trim() && (
                           <>
                             <span>•</span>
                             <span className="text-purple-600 font-medium">
-                              Shared with {doc.sharedWithName}
+                              Shared with {doc.sharedWithName.trim()}
                             </span>
                           </>
                         )}
-                        {doc.uploadedBy !== userId && doc.uploadedByName && (
+                        {doc.shareSourceSummary && (
                           <>
                             <span>•</span>
-                            <span className="text-blue-600">Received from {doc.uploadedByName}</span>
+                            <span className="text-blue-700 font-medium">{doc.shareSourceSummary}</span>
+                          </>
+                        )}
+                        {doc.uploadedBy !== userId && doc.uploadedByName && !doc.shareSourceSummary && (
+                          <>
+                            <span>•</span>
+                            <span className="text-blue-600">
+                              Received from {doc.uploadedByName}
+                              {doc.uploadedByRole
+                                ? ` (${doc.uploadedByRole.charAt(0).toUpperCase()}${doc.uploadedByRole.slice(1).toLowerCase()})`
+                                : ''}
+                            </span>
                           </>
                         )}
                       </div>
@@ -582,6 +602,7 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
                   </div>
                   <div className="flex items-center gap-2 ml-4">
                     <Button
+                      type="button"
                       variant="outline"
                       size="sm"
                       onClick={() => downloadDocument(doc)}
@@ -592,6 +613,7 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
                     {doc.uploadedBy === userId &&
                       String(doc.uploadedByRole || userRole).toLowerCase() === userRole && (
                         <Button
+                          type="button"
                           variant="ghost"
                           size="sm"
                           onClick={() => deleteDocument(doc.id)}
@@ -672,96 +694,97 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
               </Select>
             </div>
 
-            {(children.length > 0 ||
-              bookedTutors.length > 0 ||
-              bookedStudents.length > 0 ||
-              bookedParents.length > 0 ||
-              bookedParentsForTutor.length > 0) && (
-              <div>
-                <Label htmlFor="recipient">Who is this for?</Label>
-                <Select value={uploadRecipientId} onValueChange={setUploadRecipientId}>
-                  <SelectTrigger id="recipient">
-                    <SelectValue placeholder="Select recipient" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="self">Myself only (private)</SelectItem>
-                    {userRole === 'parent' && children.length > 0 && (
-                      <>
-                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                          Children
-                        </div>
-                        {children.map((child) => (
-                          <SelectItem key={child.id} value={`child:${child.id}`}>
-                            {child.name ||
-                              child.full_name ||
-                              (child.firstName ? `${child.firstName} ${child.lastName || ''}`.trim() : 'Child')}
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                    {(userRole === 'parent' || userRole === 'student') && bookedTutors.length > 0 && (
-                      <>
-                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                          Tutors
-                        </div>
-                        {bookedTutors.map((t) => (
-                          <SelectItem key={t.id} value={`tutor:${t.id}`}>
-                            {t.name}
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                    {userRole === 'student' && bookedParents.length > 0 && (
-                      <>
-                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                          Parent / guardian
-                        </div>
-                        {bookedParents.map((p) => (
-                          <SelectItem key={p.id} value={`parent:${p.id}`}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                    {userRole === 'tutor' && bookedStudents.length > 0 && (
-                      <>
-                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                          Students
-                        </div>
-                        {bookedStudents.map((s) => (
-                          <SelectItem key={s.id} value={`student:${s.id}`}>
-                            {s.name}
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                    {userRole === 'tutor' && bookedParentsForTutor.length > 0 && (
-                      <>
-                        <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
-                          Parents
-                        </div>
-                        {bookedParentsForTutor.map((p) => (
-                          <SelectItem key={p.id} value={`parent:${p.id}`}>
-                            {p.name}
-                          </SelectItem>
-                        ))}
-                      </>
-                    )}
-                  </SelectContent>
-                </Select>
-                <p className="text-xs text-gray-500 mt-1">
-                  {uploadRecipientId === 'self'
-                    ? 'Only you can see this document in this role.'
-                    : selectedRecipientName
-                      ? `${selectedRecipientName} can view and download it. Shares are audit-logged.`
-                      : 'Pick who should receive this file.'}
-                </p>
-              </div>
-            )}
+            <div>
+              <Label htmlFor="recipient">Who is this for?</Label>
+              <Select value={uploadRecipientId} onValueChange={setUploadRecipientId}>
+                <SelectTrigger id="recipient">
+                  <SelectValue placeholder="Select recipient" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="self">Myself only (private)</SelectItem>
+                  {userRole === 'parent' && children.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                        Children
+                      </div>
+                      {children.map((child) => (
+                        <SelectItem key={child.id} value={`child:${child.id}`}>
+                          {child.name ||
+                            child.full_name ||
+                            (child.firstName ? `${child.firstName} ${child.lastName || ''}`.trim() : 'Child')}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {(userRole === 'parent' || userRole === 'student') && bookedTutors.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                        Tutors
+                      </div>
+                      {bookedTutors.map((t) => (
+                        <SelectItem key={t.id} value={`tutor:${t.id}`}>
+                          {t.name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {userRole === 'student' && bookedTutors.length === 0 && (
+                    <div className="px-2 py-2 text-xs text-amber-800 bg-amber-50 rounded-md mx-1 my-1">
+                      No tutors found from active sessions. After you or your parent books a session with you listed as
+                      the student, tutors appear here for sharing.
+                    </div>
+                  )}
+                  {userRole === 'student' && bookedParents.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                        Parent / guardian
+                      </div>
+                      {bookedParents.map((p) => (
+                        <SelectItem key={p.id} value={`parent:${p.id}`}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {userRole === 'tutor' && bookedStudents.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                        Students
+                      </div>
+                      {bookedStudents.map((s) => (
+                        <SelectItem key={s.id} value={`student:${s.id}`}>
+                          {s.name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                  {userRole === 'tutor' && bookedParentsForTutor.length > 0 && (
+                    <>
+                      <div className="px-2 py-1 text-xs text-gray-400 font-semibold uppercase tracking-wide">
+                        Parents
+                      </div>
+                      {bookedParentsForTutor.map((p) => (
+                        <SelectItem key={p.id} value={`parent:${p.id}`}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </>
+                  )}
+                </SelectContent>
+              </Select>
+              <p className="text-xs text-gray-500 mt-1">
+                {uploadRecipientId === 'self'
+                  ? 'Only you can see this document in this role.'
+                  : selectedRecipientName
+                    ? `${selectedRecipientName} can view and download it. Shares are audit-logged.`
+                    : 'Pick who should receive this file.'}
+              </p>
+            </div>
           </div>
 
           <DialogFooter>
             <Button
+              type="button"
               variant="outline"
               onClick={() => {
                 setShowUploadDialog(false);
@@ -772,7 +795,8 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
               Cancel
             </Button>
             <Button
-              onClick={uploadDocument}
+              type="button"
+              onClick={() => void uploadDocument()}
               disabled={!uploadFile || !uploadTitle.trim() || uploading}
               className="text-white"
               style={{ backgroundColor: '#5d9827' }}

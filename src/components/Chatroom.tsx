@@ -129,6 +129,13 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
   }, [initialContactId, conversations, initialContactName, initialContactRole, userId, userRole]);
 
   useEffect(() => {
+    setSelectedConversation(null);
+    setMessages([]);
+    setSearchQuery('');
+    hasInitiatedRef.current = false;
+  }, [userRole]);
+
+  useEffect(() => {
     loadConversations();
     const id = window.setInterval(loadConversations, 30000);
     return () => window.clearInterval(id);

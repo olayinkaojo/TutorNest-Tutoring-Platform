@@ -134,7 +134,11 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
       const userConversations = allConversations.filter((conv: Record<string, unknown>) => {
         const parts = conv.participants as string[] | undefined;
         if (!parts?.includes(userId)) return false;
-        return conversationMatchesPersona(conv as { channel?: string }, persona);
+        return conversationMatchesPersona(
+          conv as { channel?: string; participantRoles?: Record<string, string> },
+          persona,
+          userId,
+        );
       });
 
       const allMessages = await kv.getByPrefix('conv-message:');

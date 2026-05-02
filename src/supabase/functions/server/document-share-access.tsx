@@ -2,9 +2,20 @@
  * Who may share documents with whom (booking + parent–child links).
  */
 import * as kv from './kv_store.tsx';
-import { collectBookingsForUser, MESSAGING_BOOKING_STATUSES } from './messaging-access.tsx';
+import {
+  bookingIdentityIdsForUser,
+  collectBookingsForUser,
+  MESSAGING_BOOKING_STATUSES,
+} from './messaging-access.tsx';
 
 export type ShareRecipientType = 'tutor' | 'parent' | 'student' | 'child';
+
+/** Role context for docs this user uploaded (dual parent/tutor accounts share one auth id). */
+function docUploaderPersona(doc: Record<string, unknown>): string {
+  const r = String(doc.uploadedByRole || '').toLowerCase();
+  if (r) return r;
+  return String(doc.relatedToType || '').toLowerCase();
+}
 
 function normBooking(b: Record<string, unknown>) {
   return {
@@ -43,9 +54,11 @@ export async function assertDocumentShareAllowed(
   const active = bookings.filter((raw) => MESSAGING_BOOKING_STATUSES.has(normBooking(raw as Record<string, unknown>).status));
 
   if (role === 'student') {
+    const studentIds = await bookingIdentityIdsForUser(uploaderId);
+    const studentIdSet = new Set(studentIds);
     for (const raw of active) {
       const b = normBooking(raw as Record<string, unknown>);
-      const studentMatches = b.studentId === uploaderId;
+      const studentMatches = !!(b.studentId && studentIdSet.has(b.studentId));
       if (!studentMatches) continue;
       if (swType === 'tutor' && b.tutorId === swId) return { ok: true };
       if (swType === 'parent' && b.parentId === swId) return { ok: true };
@@ -79,9 +92,12 @@ export async function assertDocumentShareAllowed(
 
   if (role === 'tutor') {
     if (swType === 'student') {
+      const recipientIds = await bookingIdentityIdsForUser(swId);
+      const recipientSet = new Set(recipientIds);
       for (const raw of active) {
         const b = normBooking(raw as Record<string, unknown>);
-        if (b.tutorId === uploaderId && b.studentId === swId) return { ok: true };
+        if (b.tutorId !== uploaderId || !b.studentId) continue;
+        if (b.studentId === swId || recipientSet.has(b.studentId)) return { ok: true };
       }
       return { ok: false, error: 'You can only share with students on your roster.' };
     }
@@ -105,12 +121,16 @@ export function parseChildIdsQuery(q: string | undefined): string[] {
 }
 
 export async function usersLinkedInActiveBookings(a: string, b: string): Promise<boolean> {
+  const setA = new Set(await bookingIdentityIdsForUser(a));
+  const setB = new Set(await bookingIdentityIdsForUser(b));
   const rows = await collectBookingsForUser(a);
   for (const raw of rows) {
     const bk = normBooking(raw as Record<string, unknown>);
     if (!MESSAGING_BOOKING_STATUSES.has(bk.status)) continue;
-    const parties = [bk.tutorId, bk.studentId, bk.parentId].filter(Boolean) as string[];
-    if (parties.includes(a) && parties.includes(b)) return true;
+    const parties = new Set([bk.tutorId, bk.studentId, bk.parentId].filter(Boolean) as string[]);
+    const touchesA = [...setA].some((id) => parties.has(id));
+    const touchesB = [...setB].some((id) => parties.has(id));
+    if (touchesA && touchesB) return true;
   }
   return false;
 }
@@ -132,13 +152,18 @@ export async function userCanAccessDocument(
   const sharedWithType = String(doc.sharedWithType || '').toLowerCase();
 
   if (role === 'student') {
-    if (uploadedBy === userId && uploadedByRole === 'student') return true;
-    if (sharedWithId === userId) return true;
+    if (uploadedBy === userId && docUploaderPersona(doc) === 'student') return true;
+    const studentIds = await bookingIdentityIdsForUser(userId);
+    const recipientMatch = sharedWithId && studentIds.includes(sharedWithId);
+    if (recipientMatch) {
+      return usersLinkedInActiveBookings(userId, uploadedBy);
+    }
     return false;
   }
 
   if (role === 'parent') {
-    if (uploadedBy === userId && uploadedByRole === 'parent') return true;
+    if (uploadedBy === userId && docUploaderPersona(doc) === 'parent') return true;
+    if (sharedWithId === userId && sharedWithType === 'tutor') return false;
     if (sharedWithId === userId && sharedWithType === 'parent') return true;
     if (sharedWithId && childIds.length > 0 && childIds.includes(sharedWithId)) {
       if (['child', 'student'].includes(sharedWithType)) return true;
@@ -158,8 +183,14 @@ export async function userCanAccessDocument(
   }
 
   if (role === 'tutor') {
-    if (uploadedBy === userId && uploadedByRole === 'tutor') return true;
+    if (uploadedBy === userId && docUploaderPersona(doc) === 'tutor') return true;
     if (sharedWithId === userId) {
+      if (sharedWithType === 'parent' || sharedWithType === 'student' || sharedWithType === 'child') {
+        return false;
+      }
+      const inboxAsTutor =
+        sharedWithType === 'tutor' || sharedWithType === '' || sharedWithType === 'user';
+      if (!inboxAsTutor) return false;
       if (uploadedByRole === 'parent' || uploadedByRole === 'student') {
         return usersLinkedInActiveBookings(userId, uploadedBy);
       }

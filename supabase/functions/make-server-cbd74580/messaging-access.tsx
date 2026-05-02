@@ -21,17 +21,32 @@ function normalizeBooking(raw: Record<string, unknown>) {
   };
 }
 
+/** DB + KV user ids to include (auth id plus dependent student’s linked child profile id). */
+export async function bookingIdentityIdsForUser(userId: string): Promise<string[]> {
+  const ids = new Set<string>([userId]);
+  try {
+    const prof = (await kv.get(`user:${userId}`)) as { linkedChildId?: string } | null;
+    if (prof?.linkedChildId && prof.linkedChildId !== userId) ids.add(prof.linkedChildId);
+  } catch {
+    /* non-fatal */
+  }
+  return [...ids];
+}
+
 /** Merge DB + KV bookings involving this user (deduped by id). */
 export async function collectBookingsForUser(userId: string): Promise<Record<string, unknown>[]> {
   const map = new Map<string, Record<string, unknown>>();
+  const entityIds = await bookingIdentityIdsForUser(userId);
 
-  try {
-    const rows = await db.getBookingsByUserId(userId);
-    for (const r of rows) {
-      map.set(r.id, r as unknown as Record<string, unknown>);
+  for (const uid of entityIds) {
+    try {
+      const rows = await db.getBookingsByUserId(uid);
+      for (const r of rows) {
+        map.set(r.id, r as unknown as Record<string, unknown>);
+      }
+    } catch {
+      /* DB optional in some environments */
     }
-  } catch {
-    /* DB optional in some environments */
   }
 
   try {
@@ -41,7 +56,8 @@ export async function collectBookingsForUser(userId: string): Promise<Record<str
       const tid = (b.tutorId ?? b.tutor_id) as string | undefined;
       const sid = (b.studentId ?? b.student_id) as string | undefined;
       const pid = (b.parentId ?? b.userId ?? b.user_id) as string | undefined;
-      if (tid === userId || sid === userId || pid === userId) {
+      const touches = entityIds.some((uid) => uid === tid || uid === sid || uid === pid);
+      if (touches) {
         const id = b.id as string;
         if (id && !map.has(id)) map.set(id, b);
       }
@@ -98,12 +114,29 @@ export function inferChannelFromRoles(
   return null;
 }
 
-export function conversationMatchesPersona(conv: { channel?: string }, persona: string): boolean {
-  if (!conv.channel) return true; // legacy: show everywhere so nothing is lost
-  const p = persona.toLowerCase();
+/**
+ * Whether a conversation belongs in the list for the current dashboard role.
+ * `userId` is used when `channel` is missing (legacy) — we match `participantRoles[userId]` to the persona.
+ */
+export function conversationMatchesPersona(
+  conv: { channel?: string; participantRoles?: Record<string, string> },
+  persona: string,
+  userId: string,
+): boolean {
+  const p = (persona || 'all').toLowerCase();
   if (p === 'all' || !p) return true;
-  if (p === 'parent') return conv.channel === 'parent-tutor';
-  if (p === 'tutor') return conv.channel === 'tutor-parent' || conv.channel === 'tutor-student';
-  if (p === 'student') return conv.channel === 'tutor-student';
-  return true;
+
+  const ch = conv.channel;
+  if (ch) {
+    if (p === 'parent') return ch === 'parent-tutor';
+    if (p === 'tutor') return ch === 'tutor-parent' || ch === 'tutor-student';
+    if (p === 'student') return ch === 'tutor-student';
+    return true;
+  }
+
+  const label = (conv.participantRoles?.[userId] || '').toLowerCase();
+  if (label === 'parent' && p === 'parent') return true;
+  if (label === 'tutor' && p === 'tutor') return true;
+  if (label === 'student' && p === 'student') return true;
+  return false;
 }
