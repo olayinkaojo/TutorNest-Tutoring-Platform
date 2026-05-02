@@ -361,8 +361,20 @@ export async function updatePayment(id: string, updates: {
   if (updates.bookingIds !== undefined) row.booking_ids = updates.bookingIds;
   if (updates.confirmedAt !== undefined) row.confirmed_at = updates.confirmedAt;
   if (updates.paymentExpiresAt !== undefined) row.payment_expires_at = updates.paymentExpiresAt;
+
   const { error } = await db().from('payments').update(row).eq('id', id);
-  if (error) throw new Error(error.message);
+
+  if (error) {
+    // Column not yet migrated — retry without it so the rest of the update succeeds
+    if (error.message?.includes('payment_expires_at') && row.payment_expires_at !== undefined) {
+      const { payment_expires_at: _dropped, ...rowWithout } = row;
+      const { error: e2 } = await db().from('payments').update(rowWithout).eq('id', id);
+      if (e2) throw new Error(e2.message);
+      console.warn('payment_expires_at not stored — run: ALTER TABLE payments ADD COLUMN payment_expires_at TIMESTAMPTZ');
+      return;
+    }
+    throw new Error(error.message);
+  }
 }
 
 // ─── Tutor Balance ────────────────────────────────────────────────────────────

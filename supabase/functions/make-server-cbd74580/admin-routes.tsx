@@ -2084,7 +2084,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       const usageKey = `resource_usage:${userId}`;
       const usage = (await kv.get(usageKey)) || { count: 0, resources: [] };
 
-      return c.json({ 
+      return c.json({
         freeResourcesUsed: usage.count || 0,
         resourcesAccessed: usage.resources || []
       });
@@ -2093,4 +2093,5 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       return c.json({ error: error.message || 'Internal server error' }, 500);
     }
   });
+
 }

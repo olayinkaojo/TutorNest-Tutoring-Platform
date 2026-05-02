@@ -7,7 +7,7 @@ import { Calendar } from './ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Label } from './ui/label';
 import { projectId } from '../utils/supabase/info';
-import { todayStringWAT } from '../utils/timezone';
+import { todayStringWAT, WAT_TIMEZONE } from '../utils/timezone';
 import { formatNaira } from '../utils/currency';
 import { BookSessionWithPayment } from './BookSessionWithPayment';
 import {
@@ -245,7 +245,7 @@ export function SessionBookingCalendar({
     setError('');
 
     try {
-      const dateStr = selectedDate.toISOString().split('T')[0];
+      const dateStr = selectedDate.toLocaleDateString('en-CA', { timeZone: WAT_TIMEZONE });
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutors/${selectedTutor}/availability?date=${dateStr}&studentId=${activeChildId}`,
         { headers: { Authorization: `Bearer ${session.access_token}` } }
@@ -909,7 +909,7 @@ export function SessionBookingCalendar({
                 mode="single"
                 selected={selectedDate}
                 onSelect={setSelectedDate}
-                disabled={(date) => date.toISOString().split('T')[0] < todayStringWAT()}
+                disabled={(date) => date.toLocaleDateString('en-CA', { timeZone: WAT_TIMEZONE }) < todayStringWAT()}
                 className="rounded-md border"
               />
             </CardContent>
@@ -1063,7 +1063,7 @@ export function SessionBookingCalendar({
           studentId={activeChildId}
           studentName={childName ?? ''}
           subject={activeSubject || undefined}
-          startDate={selectedDate.toISOString().split('T')[0]}
+          startDate={selectedDate.toLocaleDateString('en-CA', { timeZone: WAT_TIMEZONE })}
           startTime={selectedSlot}
           onSuccess={(sessionsCreated) => {
             setShowPaymentPlans(false);

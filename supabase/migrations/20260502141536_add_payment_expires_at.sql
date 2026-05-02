@@ -1,0 +1,1 @@
+ALTER TABLE payments ADD COLUMN IF NOT EXISTS payment_expires_at TIMESTAMPTZ;
