@@ -5,7 +5,7 @@ import * as kv from './kv_store.tsx';
 export function reportsNotificationsRoutes(app: Hono, getUserId: Function) {
   
 // TEST ROUTE - Verify notifications endpoint is accessible
-app.get('/notifications/test', async (c) => {
+app.get('/make-server-cbd74580/notifications/test', async (c) => {
   console.log('=== NOTIFICATIONS TEST ENDPOINT CALLED ===');
   return c.json({
     success: true,
@@ -15,7 +15,7 @@ app.get('/notifications/test', async (c) => {
 });
 
 // Submit post-session report
-app.post('/bookings/:bookingId/report', async (c) => {
+app.post('/make-server-cbd74580/bookings/:bookingId/report', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
@@ -113,7 +113,7 @@ app.post('/bookings/:bookingId/report', async (c) => {
 });
 
 // Get report for a booking
-app.get('/bookings/:bookingId/report', async (c) => {
+app.get('/make-server-cbd74580/bookings/:bookingId/report', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
@@ -131,7 +131,7 @@ app.get('/bookings/:bookingId/report', async (c) => {
 });
 
 // Mark report as viewed by student
-app.post('/reports/:reportId/mark-viewed', async (c) => {
+app.post('/make-server-cbd74580/reports/:reportId/mark-viewed', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
@@ -195,7 +195,7 @@ app.post('/reports/:reportId/mark-viewed', async (c) => {
 });
 
 // Rate a session (parent feedback)
-app.post('/bookings/:bookingId/rate-session', async (c) => {
+app.post('/make-server-cbd74580/bookings/:bookingId/rate-session', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
@@ -266,7 +266,7 @@ app.post('/bookings/:bookingId/rate-session', async (c) => {
 });
 
 // Get all notifications for a user
-app.get('/notifications/:userId', async (c) => {
+app.get('/make-server-cbd74580/notifications/:userId', async (c) => {
   console.log('=== NOTIFICATIONS ENDPOINT CALLED ===');
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
@@ -303,7 +303,7 @@ app.get('/notifications/:userId', async (c) => {
 });
 
 // Mark notification as read
-app.post('/notifications/:notificationId/read', async (c) => {
+app.post('/make-server-cbd74580/notifications/:notificationId/read', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
@@ -329,7 +329,7 @@ app.post('/notifications/:notificationId/read', async (c) => {
 });
 
 // Mark all notifications as read
-app.post('/notifications/:userId/read-all', async (c) => {
+app.post('/make-server-cbd74580/notifications/:userId/read-all', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
@@ -357,7 +357,7 @@ app.post('/notifications/:userId/read-all', async (c) => {
 });
 
 // Delete notification
-app.delete('/notifications/:notificationId', async (c) => {
+app.delete('/make-server-cbd74580/notifications/:notificationId', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
@@ -375,7 +375,7 @@ app.delete('/notifications/:notificationId', async (c) => {
 });
 
 // Create test notifications (for development/testing)
-app.post('/notifications/:userId/create-test', async (c) => {
+app.post('/make-server-cbd74580/notifications/:userId/create-test', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
@@ -433,7 +433,7 @@ app.post('/notifications/:userId/create-test', async (c) => {
 });
 
 // Get notification preferences
-app.get('/users/:userId/notification-preferences', async (c) => {
+app.get('/make-server-cbd74580/users/:userId/notification-preferences', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
@@ -451,7 +451,7 @@ app.get('/users/:userId/notification-preferences', async (c) => {
 });
 
 // Save notification preferences
-app.post('/users/:userId/notification-preferences', async (c) => {
+app.post('/make-server-cbd74580/users/:userId/notification-preferences', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
@@ -471,7 +471,7 @@ app.post('/users/:userId/notification-preferences', async (c) => {
 });
 
 // Get student progress data
-app.get('/students/:studentId/progress', async (c) => {
+app.get('/make-server-cbd74580/students/:studentId/progress', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
@@ -903,7 +903,7 @@ function generateRecommendations(stats: any, reports: any[]) {
 }
 
 // Notify tutor of student progress improvement
-app.post('/students/:studentId/notify-progress', async (c) => {
+app.post('/make-server-cbd74580/students/:studentId/notify-progress', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
