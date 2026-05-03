@@ -800,6 +800,12 @@ app.post('/make-server-cbd74580/signup', async (c) => {
             html: pendingTpl.html,
           });
           console.log('✅ Application received email sent to tutor:', email);
+
+          // Notify admin of new tutor application
+          const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'admin@tutornest.org';
+          const adminDash = `${appUrl}/admin/verifications`;
+          const adminTpl = emailTemplates.adminTutorApplicationAlert(name, email, adminDash);
+          await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch(() => {});
         } catch (emailErr: any) {
           console.warn('⚠️ Could not send application received email:', emailErr.message);
         }
@@ -1437,6 +1443,20 @@ app.post('/make-server-cbd74580/profile/complete', async (c) => {
         appeals: [],
       });
 
+      // Send profile-submitted confirmation to tutor + admin notification (non-fatal)
+      try {
+        const profileEmail = profile.email || updatedProfile.email;
+        const profileName = updatedProfile.fullName || updatedProfile.name || profile.name || 'Tutor';
+        const appBase = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+        if (profileEmail) {
+          const submittedTpl = emailTemplates.tutorProfileSubmitted(profileName, `${appBase}/dashboard`);
+          await sendEmail({ to: profileEmail, subject: submittedTpl.subject, html: submittedTpl.html }).catch(() => {});
+        }
+        const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'admin@tutornest.org';
+        const adminTpl = emailTemplates.adminTutorApplicationAlert(profileName, profileEmail || 'unknown', `${appBase}/admin/verifications`);
+        await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch(() => {});
+      } catch (_e) {}
+
       return c.json({ success: true, profile: updatedProfile });
     } else {
       // Handle parent/student profile (JSON only)
@@ -1593,139 +1613,16 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
     // Send outcome email to the tutor
     const tutorEmail = userProfile.email;
     const tutorName = userProfile.fullName || userProfile.full_name || userProfile.name || 'Tutor';
+    const _appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
     if (tutorEmail) {
       try {
         if (action === 'approve') {
-          await sendEmail({
-            to: tutorEmail,
-            subject: 'Congratulations — You\'re Approved to Tutor on TutorNest! 🎉',
-            html: `
-              <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
-                <!-- Header -->
-                <div style="background:linear-gradient(135deg,#5d9827 0%,#4a7a1f 100%);padding:40px 32px;text-align:center">
-                  <div style="width:64px;height:64px;background:rgba(255,255,255,0.2);border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center">
-                    <span style="font-size:32px">✅</span>
-                  </div>
-                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px">TutorNest</h1>
-                  <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:15px">You're officially a TutorNest Tutor!</p>
-                </div>
-
-                <!-- Body -->
-                <div style="padding:40px 32px">
-                  <h2 style="margin:0 0 16px;font-size:24px;font-weight:700;color:#111827">Welcome to the team, ${tutorName}! 🎉</h2>
-
-                  <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
-                    We're thrilled to let you know that your TutorNest tutor application has been <strong style="color:#5d9827">reviewed and approved</strong>. You can now access your full tutor dashboard and start accepting bookings from students.
-                  </p>
-
-                  <!-- Status badge -->
-                  <div style="background:#f0fdf4;border:2px solid #5d9827;border-radius:10px;padding:20px 24px;margin:0 0 28px;text-align:center">
-                    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#5d9827;text-transform:uppercase;letter-spacing:0.5px">Application Status</p>
-                    <p style="margin:0;font-size:22px;font-weight:700;color:#166534">✅ Approved & Active</p>
-                  </div>
-
-                  <p style="margin:0 0 16px;font-size:15px;color:#374151;font-weight:600">Here's what you can do right now:</p>
-
-                  <!-- Feature grid -->
-                  <table style="width:100%;border-collapse:collapse;margin:0 0 28px">
-                    <tr>
-                      <td style="padding:0 8px 16px 0;vertical-align:top;width:50%">
-                        <div style="background:#faf5ff;border-radius:8px;padding:16px">
-                          <p style="margin:0 0 6px;font-size:20px">📅</p>
-                          <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:14px">Connect Your Calendar</p>
-                          <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.4">Link your Google Calendar so bookings automatically appear and generate a Meet link.</p>
-                        </div>
-                      </td>
-                      <td style="padding:0 0 16px 8px;vertical-align:top;width:50%">
-                        <div style="background:#faf5ff;border-radius:8px;padding:16px">
-                          <p style="margin:0 0 6px;font-size:20px">💳</p>
-                          <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:14px">Set Up Payouts</p>
-                          <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.4">Add your bank details in the Payouts tab to receive your 80% session earnings.</p>
-                        </div>
-                      </td>
-                    </tr>
-                    <tr>
-                      <td style="padding:0 8px 0 0;vertical-align:top;width:50%">
-                        <div style="background:#faf5ff;border-radius:8px;padding:16px">
-                          <p style="margin:0 0 6px;font-size:20px">🎓</p>
-                          <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:14px">Start Accepting Students</p>
-                          <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.4">Parents can now find and book sessions with you. Your profile is live.</p>
-                        </div>
-                      </td>
-                      <td style="padding:0 0 0 8px;vertical-align:top;width:50%">
-                        <div style="background:#faf5ff;border-radius:8px;padding:16px">
-                          <p style="margin:0 0 6px;font-size:20px">📊</p>
-                          <p style="margin:0 0 4px;font-weight:600;color:#111827;font-size:14px">Track Your Earnings</p>
-                          <p style="margin:0;color:#6b7280;font-size:13px;line-height:1.4">Monitor sessions, earnings, and payout history from your dashboard.</p>
-                        </div>
-                      </td>
-                    </tr>
-                  </table>
-
-                  <!-- CTA Button -->
-                  <div style="text-align:center;margin:0 0 28px">
-                    <a href="${Deno.env.get('VITE_APP_URL') || 'https://tutornest.org'}" style="display:inline-block;background:#625d9c;color:#ffffff;text-decoration:none;font-weight:700;font-size:16px;padding:14px 36px;border-radius:10px">
-                      Go to My Dashboard →
-                    </a>
-                  </div>
-
-                  <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:16px 20px;margin:0 0 24px">
-                    <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5">
-                      <strong>Earnings reminder:</strong> You keep <strong>80%</strong> of every session fee. TutorNest retains a 20% platform fee that covers payment processing, support, and student matching.
-                    </p>
-                  </div>
-
-                  <p style="margin:0;font-size:15px;color:#374151;line-height:1.6">
-                    Welcome aboard — we're glad to have you. If you have any questions as you get started, simply reply to this email.
-                  </p>
-                </div>
-
-                <!-- Footer -->
-                <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:24px 32px;text-align:center">
-                  <p style="margin:0 0 8px;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} TutorNest. All rights reserved.</p>
-                  <p style="margin:0;font-size:13px;color:#9ca3af">This email was sent because your tutor application was approved.</p>
-                </div>
-              </div>
-            `,
-          });
+          const approveTpl = emailTemplates.tutorVerificationApproved(tutorName, `${_appUrl}/dashboard`);
+          await sendEmail({ to: tutorEmail, subject: approveTpl.subject, html: approveTpl.html, replyTo: 'support@tutornest.org' });
           console.log('✅ Approval email sent to tutor:', tutorEmail);
         } else if (action === 'reject') {
-          await sendEmail({
-            to: tutorEmail,
-            subject: 'Update on Your TutorNest Application',
-            html: `
-              <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
-                <div style="background:linear-gradient(135deg,#625d9c 0%,#4e4a7a 100%);padding:40px 32px;text-align:center">
-                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff">TutorNest</h1>
-                </div>
-                <div style="padding:40px 32px">
-                  <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#111827">Hi ${tutorName},</h2>
-                  <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
-                    Thank you for applying to TutorNest. After carefully reviewing your application, we're unable to approve your profile at this time.
-                  </p>
-                  ${rejectionReason ? `
-                  <div style="background:#fef2f2;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;padding:16px 20px;margin:0 0 24px">
-                    <p style="margin:0 0 4px;font-size:13px;font-weight:600;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px">Reason</p>
-                    <p style="margin:0;font-size:15px;color:#374151">${rejectionReason}</p>
-                  </div>` : ''}
-                  <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
-                    If you believe this decision was made in error, or if you'd like to address the concerns raised, you may submit an appeal through your TutorNest account. Our team will be happy to reconsider your application with any additional information you provide.
-                  </p>
-                  <div style="text-align:center;margin:0 0 28px">
-                    <a href="${Deno.env.get('VITE_APP_URL') || 'https://tutornest.org'}" style="display:inline-block;background:#625d9c;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 32px;border-radius:10px">
-                      Submit an Appeal
-                    </a>
-                  </div>
-                  <p style="margin:0;font-size:15px;color:#374151;line-height:1.6">
-                    We appreciate the time you invested in your application and wish you all the best.
-                  </p>
-                </div>
-                <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:24px 32px;text-align:center">
-                  <p style="margin:0;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} TutorNest. All rights reserved.</p>
-                </div>
-              </div>
-            `,
-          });
+          const rejectTpl = emailTemplates.tutorVerificationRejected(tutorName, rejectionReason || 'Please see the notes in your dashboard.', `${_appUrl}/dashboard`);
+          await sendEmail({ to: tutorEmail, subject: rejectTpl.subject, html: rejectTpl.html, replyTo: 'support@tutornest.org' });
           console.log('✅ Rejection email sent to tutor:', tutorEmail);
         }
       } catch (emailErr: any) {

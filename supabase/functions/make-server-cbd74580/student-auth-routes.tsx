@@ -336,18 +336,8 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
           options: { redirectTo: appUrl },
         });
         if (!linkError && linkData?.properties?.action_link) {
-          await sendEmail({
-            to: email,
-            subject: `Confirm your TutorNest account`,
-            html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
-              <h2 style="color:#625d9c">Almost there, ${firstName}!</h2>
-              <p>Please confirm your email address to activate your TutorNest student account.</p>
-              <p style="margin:24px 0">
-                <a href="${linkData.properties.action_link}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Confirm Email Address</a>
-              </p>
-              <p style="color:#666;font-size:14px">This link expires in 24 hours.</p>
-            </div>`,
-          });
+          const confirmTpl = emailTemplates.signupConfirmEmail(`${firstName} ${lastName}`, 'student', linkData.properties.action_link);
+          await sendEmail({ to: email, subject: confirmTpl.subject, html: confirmTpl.html });
           console.log('✅ Verification email sent to independent student:', email);
         } else {
           console.warn('⚠️ Could not generate verification link:', linkError?.message);
@@ -473,18 +463,9 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
           options: { redirectTo: appUrl2 },
         });
         if (!linkError2 && linkData2?.properties?.action_link) {
-          await sendEmail({
-            to: email,
-            subject: `Confirm your TutorNest account`,
-            html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
-              <h2 style="color:#625d9c">Almost there, ${firstName}!</h2>
-              <p>Please confirm your email address to activate your TutorNest account. Your parent/guardian will also receive an invitation to link their account to yours.</p>
-              <p style="margin:24px 0">
-                <a href="${linkData2.properties.action_link}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Confirm Email Address</a>
-              </p>
-              <p style="color:#666;font-size:14px">This link expires in 24 hours.</p>
-            </div>`,
-          });
+          const confirmTpl2 = emailTemplates.signupConfirmEmail(`${firstName} ${lastName}`, 'student', linkData2.properties.action_link);
+          await sendEmail({ to: email, subject: confirmTpl2.subject, html: confirmTpl2.html });
+          console.log('✅ Verification email sent to dependent student:', email);
         } else {
           console.warn('⚠️ Could not generate verification link for dependent student:', linkError2?.message);
         }
@@ -492,49 +473,18 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         console.warn('⚠️ Verification email failed (non-fatal):', emailErr.message);
       }
 
-      // Send email to parent with linking invitation
-      const parentLinkUrl = `${Deno.env.get('VITE_APP_URL') || 'https://tutornest.org'}/parent/link-student?token=${studentProfile.parentLinkToken}&studentId=${authData.user.id}`;
-      const parentInviteEmail = `
-        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-          <div style="background-color: #625d9c; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
-            <h1>Link Your Child's TutorNest Account</h1>
-          </div>
-          
-          <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px;">
-            <p>Hi there,</p>
-            
-            <p>${firstName} ${lastName} has created a TutorNest account and would like you to approve it.</p>
-            
-            <p>As their parent/guardian, you'll need to verify this account link to allow them to access TutorNest tutoring sessions.</p>
-            
-            <div style="text-align: center; margin: 30px 0;">
-              <a href="${parentLinkUrl}" style="display: inline-block; background-color: #625d9c; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
-                Link & Approve Account
-              </a>
-            </div>
-            
-            <p style="color: #666; font-size: 14px;">
-              Or copy this link:<br>
-              <span style="word-break: break-all; color: #0066cc;">${parentLinkUrl}</span>
-            </p>
-            
-            <p style="color: #999; font-size: 12px; margin-top: 20px;">
-              This link will expire in 7 days. If you didn't request this or don't recognize ${firstName} ${lastName}, you can safely ignore this email.
-            </p>
-          </div>
-        </div>
-      `;
-      
-      const parentEmailResult = await sendEmail({
-        to: parentEmail,
-        subject: `${firstName} ${lastName} wants to use TutorNest - Approve Account`,
-        html: parentInviteEmail,
-      });
-      
-      if (!parentEmailResult.success) {
-        console.warn('⚠️ Failed to send parent invitation email:', parentEmailResult.error);
-      } else {
-        console.log('✅ Parent invitation email sent to', parentEmail);
+      // Send world-class parent linking invitation email
+      const parentLinkUrl = `${appUrl2}/parent/link-student?token=${studentProfile.parentLinkToken}&studentId=${authData.user.id}`;
+      try {
+        const parentTpl = emailTemplates.parentLinkInvitation(firstName, lastName, parentLinkUrl);
+        const parentEmailResult = await sendEmail({ to: parentEmail, subject: parentTpl.subject, html: parentTpl.html });
+        if (!parentEmailResult.success) {
+          console.warn('⚠️ Failed to send parent invitation email:', parentEmailResult.error);
+        } else {
+          console.log('✅ Parent invitation email sent to', parentEmail);
+        }
+      } catch (emailErr: any) {
+        console.warn('⚠️ Parent invitation email failed (non-fatal):', emailErr.message);
       }
 
       return c.json({

@@ -487,28 +487,43 @@ export const emailTemplates = {
 
   // Welcome email for new users
   welcomeEmail: (name: string, role: string, dashboardLink: string) => ({
-    subject: "Welcome to TutorNest!",
+    subject: `Welcome to TutorNest — your account is ready`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Welcome to TutorNest! 🎓</h2>
-        <p>Hi ${name},</p>
-        <p>Your account has been created successfully as a <strong>${role}</strong>.</p>
-        
-        <div style="background-color: #d1ecf1; padding: 15px; border-radius: 5px; margin: 20px 0;">
-          <p><strong>What's next?</strong></p>
-          <ul>
-            <li>Complete your profile</li>
-            <li>Set your preferences</li>
-            <li>Start your learning journey!</li>
-          </ul>
-        </div>
-        
-        <p><a href="${dashboardLink}" style="display: inline-block; background-color: #625d9c; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px; margin: 20px 0;">Go to Dashboard</a></p>
-        
-        <p style="color: #666; font-size: 14px;">
-          If you need help, check out our FAQ or contact support.
-        </p>
-      </div>
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#22c55e;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">✓ &nbsp;Account Created Successfully</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${name},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              Welcome to TutorNest! Your account has been created as a <strong>${role}</strong>. You're all set to get started.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.8px;">What's next?</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">✅ &nbsp;Complete your profile with a photo and bio</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">✅ &nbsp;Set your preferences and availability</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">✅ &nbsp;Explore the platform and start your journey</td></tr>
+                </table>
+              </td></tr>
+            </table>
+            <div style="text-align:center;margin-bottom:24px;">
+              <a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">Go to Dashboard</a>
+            </div>
+            <p style="font-size:14px;color:#374151;">If you need help, reply to this email or visit our Help Centre.<br><strong>The TutorNest Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
     `,
   }),
 
@@ -676,38 +691,41 @@ export const emailTemplates = {
 
   // Email verification/confirmation for signup
   emailVerification: (name: string, confirmationLink: string) => ({
-    subject: "Confirm Your Email Address - TutorNest",
+    subject: `Confirm your email — TutorNest`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #625d9c; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
-          <h1>Email Verification</h1>
-        </div>
-        
-        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px;">
-          <p>Hi ${name},</p>
-          
-          <p>Thank you for signing up for <strong>TutorNest</strong>! We're excited to have you join our tutoring community.</p>
-          
-          <p>To complete your signup and activate your account, please verify your email address by clicking the button below:</p>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${confirmationLink}" style="display: inline-block; background-color: #625d9c; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
-              Verify Email Address
-            </a>
-          </div>
-          
-          <p style="color: #666; font-size: 14px;">
-            Or copy and paste this link in your browser:<br>
-            <span style="word-break: break-all; color: #0066cc;">${confirmationLink}</span>
-          </p>
-          
-          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999;">
-            <p>This link will expire in 24 hours.</p>
-            <p>If you didn't sign up for TutorNest, you can safely ignore this email.</p>
-            <p>© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
-          </div>
-        </div>
-      </div>
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#625d9c;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">&#10003; &nbsp;Please confirm your email address</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${name},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              Thank you for joining TutorNest! To activate your account and access all features, please confirm your email address.
+            </p>
+            <div style="text-align:center;margin:28px 0;">
+              <a href="${confirmationLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">Confirm Email Address</a>
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:20px;">
+              <tr><td style="padding:16px 20px;">
+                <p style="margin:0;font-size:13px;color:#6b7280;word-break:break-all;">
+                  Or paste this link in your browser:<br/>
+                  <span style="color:#4338ca;">${confirmationLink}</span>
+                </p>
+              </td></tr>
+            </table>
+            <p style="margin:0;font-size:13px;color:#9ca3af;">This link expires in 24 hours. If you did not create an account, you can safely ignore this email.</p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
     `,
   }),
 
@@ -1004,294 +1022,292 @@ export const emailTemplates = {
 
   // Account verification successful
   emailVerificationSuccess: (name: string, dashboardLink: string) => ({
-    subject: "Email Verified! Welcome to TutorNest",
+    subject: `Email verified — welcome to TutorNest!`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
-          <h1>✅ Email Verified!</h1>
-        </div>
-        
-        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px;">
-          <p>Hi ${name},</p>
-          
-          <p>Excellent! Your email has been verified and your TutorNest account is now active.</p>
-          
-          <p>You can now:</p>
-          <ul style="color: #333;">
-            <li>Access your personal dashboard</li>
-            <li>Browse tutors and book sessions</li>
-            <li>Participate in learning activities</li>
-            <li>Track your progress</li>
-          </ul>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${dashboardLink}" style="display: inline-block; background-color: #625d9c; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
-              Go to Dashboard
-            </a>
-          </div>
-          
-          <p style="color: #666; font-size: 14px;">
-            If you need any help getting started, check out our FAQ or contact our support team.
-          </p>
-          
-          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999;">
-            <p>Welcome to the TutorNest community!</p>
-            <p>© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
-          </div>
-        </div>
-      </div>
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#22c55e;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">✓ &nbsp;Email Verified — Account Active</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${name},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              Your email address has been confirmed and your TutorNest account is now fully active. You're all set!
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#166534;text-transform:uppercase;letter-spacing:0.8px;">You can now</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr><td style="padding:6px 0;font-size:14px;color:#374151;">🗂️ &nbsp;Access your personal dashboard</td></tr>
+                  <tr><td style="padding:6px 0;font-size:14px;color:#374151;">🔍 &nbsp;Browse verified tutors and book sessions</td></tr>
+                  <tr><td style="padding:6px 0;font-size:14px;color:#374151;">💬 &nbsp;Message tutors and track progress</td></tr>
+                  <tr><td style="padding:6px 0;font-size:14px;color:#374151;">🏆 &nbsp;Participate in learning activities and trivia</td></tr>
+                </table>
+              </td></tr>
+            </table>
+            <div style="text-align:center;margin-bottom:24px;">
+              <a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">Go to My Dashboard</a>
+            </div>
+            <p style="font-size:14px;color:#374151;">Welcome to the TutorNest community — we're delighted to have you!<br><strong>The TutorNest Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
     `,
   }),
 
   // Tutor verification approval
   tutorVerificationApproved: (tutorName: string, dashboardLink: string) => ({
-    subject: "🎉 Congratulations! Your TutorNest Verification is Approved",
+    subject: `Congratulations — your TutorNest tutor application is approved`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #625d9c 0%, #5d9827 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="margin: 0; font-size: 28px;">🎉 Welcome to TutorNest!</h1>
-          <p style="margin: 10px 0 0 0; font-size: 18px;">Your Verification is Approved</p>
-        </div>
-        
-        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
-          <p style="font-size: 16px; color: #333;">Hi ${tutorName},</p>
-          
-          <p style="font-size: 15px; color: #555; line-height: 1.6;">
-            Excellent news! Your application to become a tutor on TutorNest has been <strong>approved</strong> after careful review of your qualifications and credentials.
-          </p>
-          
-          <div style="background-color: #e8f5e9; border-left: 4px solid #5d9827; padding: 20px; margin: 25px 0; border-radius: 4px;">
-            <p style="margin: 0 0 15px 0; font-weight: bold; color: #2e7d32; font-size: 16px;">✅ You are now verified and can start tutoring!</p>
-            <p style="margin: 0; color: #555; font-size: 14px; line-height: 1.5;">
-              Your profile is now visible to students and parents who are looking for a tutor with your expertise. You can start accepting bookings immediately.
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#5d9827 0%,#16a34a 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#22c55e;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">✓ &nbsp;Tutor Application Approved</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${tutorName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              Congratulations! Your application to become a tutor on TutorNest has been approved. Your profile is now visible to students and parents — you can start accepting bookings immediately.
             </p>
-          </div>
-          
-          <p style="font-size: 15px; color: #555; margin-top: 25px; margin-bottom: 15px;"><strong>What's Next:</strong></p>
-          <ul style="color: #555; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 25px;">
-            <li>Complete your tutor profile with your bio, rates, and availability</li>
-            <li>Set up your payment methods in the dashboard</li>
-            <li>Start accepting bookings from students</li>
-            <li>Provide excellent sessions and build your rating</li>
-            <li>Earn competitive payments weekly</li>
-          </ul>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${dashboardLink}" style="display: inline-block; background: linear-gradient(135deg, #625d9c 0%, #5d9827 100%); color: white; padding: 14px 40px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
-              Go to Your Dashboard
-            </a>
-          </div>
-          
-          <div style="background-color: #fff3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 25px 0; border-radius: 4px;">
-            <p style="margin: 0; color: #856404; font-size: 14px; font-weight: bold;">💡 Pro Tip:</p>
-            <p style="margin: 5px 0 0 0; color: #856404; font-size: 13px;">
-              Complete your profile thoroughly and add a professional photo to attract more students!
-            </p>
-          </div>
-          
-          <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
-            If you have any questions or need assistance, feel free to reach out to our support team at support@tutornest.org or visit our Help Center.
-          </p>
-          
-          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
-            <p style="margin: 0 0 5px 0;">We're excited to have you as part of the TutorNest community!</p>
-            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
-          </div>
-        </div>
-      </div>
+            <!-- 2x2 Feature grid -->
+            <table width="100%" cellpadding="0" cellspacing="8" style="margin-bottom:24px;">
+              <tr>
+                <td width="50%" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:18px 16px;vertical-align:top;">
+                  <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#166534;">📅 Connect Calendar</p>
+                  <p style="margin:0;font-size:13px;color:#374151;line-height:1.5;">Sync your availability so parents can book the right slots.</p>
+                </td>
+                <td width="50%" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:18px 16px;vertical-align:top;">
+                  <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#166534;">💳 Set Up Payouts</p>
+                  <p style="margin:0;font-size:13px;color:#374151;line-height:1.5;">Add your bank account to receive earnings on schedule.</p>
+                </td>
+              </tr>
+              <tr>
+                <td width="50%" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:18px 16px;vertical-align:top;">
+                  <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#166534;">🎓 Accept Students</p>
+                  <p style="margin:0;font-size:13px;color:#374151;line-height:1.5;">Review incoming booking requests and confirm sessions.</p>
+                </td>
+                <td width="50%" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:18px 16px;vertical-align:top;">
+                  <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#166534;">📈 Track Earnings</p>
+                  <p style="margin:0;font-size:13px;color:#374151;line-height:1.5;">Monitor completed sessions, ratings, and payout history.</p>
+                </td>
+              </tr>
+            </table>
+            <div style="text-align:center;margin-bottom:24px;">
+              <a href="${dashboardLink}" style="display:inline-block;background:#5d9827;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">Go to My Dashboard</a>
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fefce8;border:1px solid #fef08a;border-radius:8px;margin-bottom:20px;">
+              <tr><td style="padding:16px 20px;">
+                <p style="margin:0;font-size:14px;color:#92400e;line-height:1.6;">
+                  💡 <strong>Earnings reminder:</strong> You keep <strong>80%</strong> of every session fee. Payouts are processed weekly directly to your bank account.
+                </p>
+              </td></tr>
+            </table>
+            <p style="font-size:14px;color:#374151;">We're excited to have you on TutorNest. Welcome to the team!<br><strong>The TutorNest Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
     `,
   }),
 
   // Tutor verification rejection
   tutorVerificationRejected: (tutorName: string, rejectionReason: string, dashboardLink: string) => ({
-    subject: "Application Review: Next Steps for Your TutorNest Verification",
+    subject: `Your TutorNest tutor application — decision update`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background-color: #f44336; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="margin: 0; font-size: 24px;">⏸️ Verification Status</h1>
-          <p style="margin: 10px 0 0 0; font-size: 16px;">We Need More Information</p>
-        </div>
-        
-        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
-          <p style="font-size: 16px; color: #333;">Hi ${tutorName},</p>
-          
-          <p style="font-size: 15px; color: #555; line-height: 1.6;">
-            Thank you for applying to become a tutor on TutorNest. We've carefully reviewed your application and qualifications.
-          </p>
-          
-          <div style="background-color: #ffebee; border-left: 4px solid #f44336; padding: 20px; margin: 25px 0; border-radius: 4px;">
-            <p style="margin: 0 0 10px 0; font-weight: bold; color: #c62828; font-size: 15px;">⚠️ Your Application Status</p>
-            <p style="margin: 0; color: #555; font-size: 14px; line-height: 1.5;">
-              We've decided not to approve your verification at this time. Below you'll find the specific reason(s).
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#ef4444;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">&#10005; &nbsp;Application Not Approved</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${tutorName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              Thank you for applying to TutorNest. After carefully reviewing your application and credentials, we are unable to approve your tutor profile at this time.
             </p>
-          </div>
-          
-          <p style="font-size: 15px; color: #555; margin: 25px 0 10px 0; font-weight: bold;">Reason for Decision:</p>
-          <div style="background-color: #fff9c4; border-left: 4px solid #fbc02d; padding: 15px; border-radius: 4px; margin-bottom: 20px;">
-            <p style="margin: 0; color: #333; font-size: 14px; line-height: 1.6;">
-              ${rejectionReason}
-            </p>
-          </div>
-          
-          <p style="font-size: 15px; color: #555; margin: 25px 0 15px 0; font-weight: bold;">What You Can Do:</p>
-          <ul style="color: #555; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 25px;">
-            <li><strong>Address the issues:</strong> Review the reason(s) above and gather any additional documentation or qualifications needed</li>
-            <li><strong>Resubmit your application:</strong> Once you've addressed the concerns, you can resubmit your verification</li>
-            <li><strong>Contact support:</strong> If you'd like clarification or have questions, our team is here to help</li>
-            <li><strong>Appeal:</strong> If you believe there's been a misunderstanding, you can submit an appeal</li>
-          </ul>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${dashboardLink}" style="display: inline-block; background-color: #625d9c; color: white; padding: 14px 40px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
-              Update Your Application
-            </a>
-          </div>
-          
-          <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 25px 0; border-radius: 4px;">
-            <p style="margin: 0; color: #0d47a1; font-size: 14px; font-weight: bold;">ℹ️ We Want You to Succeed</p>
-            <p style="margin: 5px 0 0 0; color: #0d47a1; font-size: 13px; line-height: 1.5;">
-              Becoming a tutor on TutorNest requires high standards to ensure quality education for our students. We believe in your potential and would love to see your application resubmitted.
-            </p>
-          </div>
-          
-          <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
-            Have questions? Contact our support team at support@tutornest.org and we'll be happy to guide you through the process.
-          </p>
-          
-          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
-            <p style="margin: 0 0 5px 0;">We look forward to reviewing your updated application!</p>
-            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
-          </div>
-        </div>
-      </div>
+            <!-- Rejection reason card -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef2f2;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;margin-bottom:24px;">
+              <tr><td style="padding:20px 20px 20px 24px;">
+                <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.8px;">Reason for Decision</p>
+                <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">${rejectionReason}</p>
+              </td></tr>
+            </table>
+            <!-- What you can do -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.8px;">What you can do</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">📋 &nbsp;<strong>Address the issues</strong> — review the reason above and gather any missing documents</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">🔄 &nbsp;<strong>Resubmit your application</strong> — once you've resolved the concerns, update and resubmit</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">💬 &nbsp;<strong>Contact support</strong> — email support@tutornest.org for clarification or guidance</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">⚖️ &nbsp;<strong>Appeal</strong> — if you believe this is in error, you can submit a formal appeal</td></tr>
+                </table>
+              </td></tr>
+            </table>
+            <div style="text-align:center;margin-bottom:24px;">
+              <a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">Update Your Application</a>
+            </div>
+            <!-- Info card -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:20px;">
+              <tr><td style="padding:16px 20px;">
+                <p style="margin:0 0 6px;font-size:14px;font-weight:700;color:#1d4ed8;">We Want You to Succeed</p>
+                <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
+                  TutorNest maintains high standards to protect students and families. This decision reflects our commitment to quality, not a judgment on your abilities. We'd love to see your updated application.
+                </p>
+              </td></tr>
+            </table>
+            <p style="font-size:14px;color:#374151;">If you have questions, reply to this email or contact support@tutornest.org.<br><strong>The TutorNest Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
     `,
   }),
 
   // Tutor verification pending (for new tutor signups or role additions)
   tutorVerificationPending: (tutorName: string, dashboardLink: string) => ({
-    subject: "Welcome to TutorNest! Your Verification is Under Review",
+    subject: `Your TutorNest tutor application is under review`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #625d9c 0%, #8b7cb8 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="margin: 0; font-size: 26px;">Welcome to TutorNest! 👋</h1>
-          <p style="margin: 10px 0 0 0; font-size: 16px;">Your Tutor Application is Under Review</p>
-        </div>
-        
-        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
-          <p style="font-size: 16px; color: #333;">Hi ${tutorName},</p>
-          
-          <p style="font-size: 15px; color: #555; line-height: 1.6;">
-            Excellent! We've received your tutor application and we're excited to have you join the TutorNest community. Our verification team is currently reviewing your qualifications and credentials.
-          </p>
-          
-          <div style="background-color: #f0f4ff; border-left: 4px solid #625d9c; padding: 20px; margin: 25px 0; border-radius: 4px;">
-            <p style="margin: 0 0 10px 0; font-weight: bold; color: #625d9c; font-size: 15px;">⏳ Verification Timeline</p>
-            <p style="margin: 0; color: #555; font-size: 14px; line-height: 1.5;">
-              We typically complete verification within <strong>2-5 business days</strong>. You'll receive an email as soon as your verification is complete.
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#f59e0b;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">⏳ &nbsp;Verification Under Review</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${tutorName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              Thank you for applying to become a tutor on TutorNest! We've received your application and our verification team is currently reviewing your qualifications and credentials.
             </p>
-          </div>
-          
-          <p style="font-size: 15px; color: #555; margin: 25px 0 15px 0; font-weight: bold;">While You Wait:</p>
-          <ul style="color: #555; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 25px;">
-            <li>Complete your tutor profile with bio, rates, and availability</li>
-            <li>Upload professional profile photo and credentials</li>
-            <li>Set up your payment methods</li>
-            <li>Explore our tutor resources and guidelines</li>
-            <li>Join the TutorNest tutor community</li>
-          </ul>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${dashboardLink}" style="display: inline-block; background: linear-gradient(135deg, #625d9c 0%, #8b7cb8 100%); color: white; padding: 14px 40px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
-              Go to Your Dashboard
-            </a>
-          </div>
-          
-          <div style="background-color: #fef3cd; border-left: 4px solid #ffc107; padding: 15px; margin: 25px 0; border-radius: 4px;">
-            <p style="margin: 0; color: #856404; font-size: 14px; font-weight: bold;">📋 Pro Tips:</p>
-            <ul style="margin: 5px 0 0 0; color: #856404; font-size: 13px; padding-left: 20px;">
-              <li>A complete profile increases verification speed</li>
-              <li>Professional photo helps build student trust</li>
-              <li>Clear teaching rates and availability are essential</li>
-            </ul>
-          </div>
-          
-          <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
-            Have questions about the verification process? Reply to this email or contact our support team at support@tutornest.org. We're here to help!
-          </p>
-          
-          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
-            <p style="margin: 0 0 5px 0;">We're excited to get you started! 🚀</p>
-            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
-          </div>
-        </div>
-      </div>
+            <!-- Timeline card -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fdf4ff;border-left:4px solid #625d9c;border-radius:0 8px 8px 0;margin-bottom:24px;">
+              <tr><td style="padding:20px 20px 20px 24px;">
+                <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#625d9c;text-transform:uppercase;letter-spacing:0.8px;">Verification Timeline</p>
+                <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">
+                  We aim to complete verification within <strong>2–5 business days</strong>. You'll receive a separate email as soon as a decision is made.
+                </p>
+              </td></tr>
+            </table>
+            <!-- While you wait checklist -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.8px;">While you wait</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">✅ &nbsp;Complete your profile — bio, subjects, and teaching experience</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">✅ &nbsp;Upload a professional profile photo</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">✅ &nbsp;Set your preferred hourly rates</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">✅ &nbsp;Connect your calendar and mark your availability</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">✅ &nbsp;Add your bank account for payouts</td></tr>
+                </table>
+              </td></tr>
+            </table>
+            <div style="text-align:center;margin-bottom:24px;">
+              <a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">Go to My Dashboard</a>
+            </div>
+            <!-- Tips box -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fefce8;border:1px solid #fef08a;border-radius:8px;margin-bottom:20px;">
+              <tr><td style="padding:16px 20px;">
+                <p style="margin:0;font-size:14px;color:#92400e;line-height:1.6;">
+                  💡 <strong>Tip:</strong> A fully completed profile leads to a faster review. Make sure all required documents and credentials are uploaded before your interview.
+                </p>
+              </td></tr>
+            </table>
+            <p style="font-size:14px;color:#374151;">Questions? Reply to this email or contact support@tutornest.org — we're happy to help.<br><strong>The TutorNest Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
     `,
   }),
 
   // Role addition congratulations (when parent becomes tutor or tutor becomes parent)
   roleAdditionCongratulations: (userName: string, newRole: string, dashboardLink: string) => ({
-    subject: `🎉 Welcome to Your New ${newRole === 'tutor' ? 'Tutor' : 'Parent'} Role!`,
+    subject: `Your new ${newRole === 'tutor' ? 'tutor' : newRole === 'parent' ? 'parent' : 'student'} role is ready — TutorNest`,
     html: `
-      <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <div style="background: linear-gradient(135deg, #5d9827 0%, #4CAF50 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="margin: 0; font-size: 28px;">🎉 Congratulations!</h1>
-          <p style="margin: 10px 0 0 0; font-size: 16px;">You're now a ${newRole}</p>
-        </div>
-        
-        <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 8px 8px;">
-          <p style="font-size: 16px; color: #333;">Hi ${userName},</p>
-          
-          <p style="font-size: 15px; color: #555; line-height: 1.6;">
-            Fantastic! You've successfully added the <strong>${newRole}</strong> role to your TutorNest account. You now have access to ${newRole === 'tutor' ? 'tutor dashboards, booking management, and earning opportunities' : 'parent dashboards, student management, and learning tools'}.
-          </p>
-          
-          <div style="background-color: #e8f5e9; border-left: 4px solid #5d9827; padding: 20px; margin: 25px 0; border-radius: 4px;">
-            <p style="margin: 0 0 10px 0; font-weight: bold; color: #2e7d32; font-size: 15px;">✅ What's New:</p>
-            <p style="margin: 0; color: #555; font-size: 14px; line-height: 1.5;">
-              ${newRole === 'tutor' 
-                ? 'You can now offer tutoring services, manage student bookings, and earn competitive payments. Your profile will be visible to students once verification is complete.' 
-                : 'You can now find and book tutors for your children, manage student profiles, and track learning progress.'}
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:${newRole === 'tutor' ? 'linear-gradient(135deg,#5d9827 0%,#16a34a 100%)' : 'linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%)'};padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#22c55e;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">✓ &nbsp;New Role Added — ${newRole.charAt(0).toUpperCase() + newRole.slice(1)}</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${userName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              You've successfully added the <strong>${newRole}</strong> role to your TutorNest account. You now have access to ${newRole === 'tutor' ? 'tutor dashboards, booking management, and earning opportunities' : newRole === 'parent' ? 'parent dashboards, student management, and learning tools' : 'your student dashboard, messages, and learning tools'}.
             </p>
-          </div>
-          
-          <p style="font-size: 15px; color: #555; margin: 25px 0 15px 0; font-weight: bold;">Getting Started:</p>
-          <ul style="color: #555; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 25px;">
-            ${newRole === 'tutor' ? `
-              <li>Complete your tutor profile with qualifications and experience</li>
-              <li>Set your teaching rates and availability</li>
-              <li>Wait for verification (typically 2-5 business days)</li>
-              <li>Start accepting bookings from students!</li>
-            ` : `
-              <li>Add your children to your parent account</li>
-              <li>Browse qualified tutors in your area</li>
-              <li>Book tutoring sessions that fit your schedule</li>
-              <li>Monitor your children's learning progress</li>
-            `}
-          </ul>
-          
-          <div style="text-align: center; margin: 30px 0;">
-            <a href="${dashboardLink}" style="display: inline-block; background: linear-gradient(135deg, #5d9827 0%, #4CAF50 100%); color: white; padding: 14px 40px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
-              Go to ${newRole === 'tutor' ? 'Tutor' : 'Parent'} Dashboard
-            </a>
-          </div>
-          
-          <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 25px 0; border-radius: 4px;">
-            <p style="margin: 0; color: #0d47a1; font-size: 14px; font-weight: bold;">ℹ️ Switch Between Roles</p>
-            <p style="margin: 5px 0 0 0; color: #0d47a1; font-size: 13px; line-height: 1.5;">
-              You can easily switch between your ${newRole === 'tutor' ? 'parent and tutor' : 'tutor and parent'} roles anytime from your dashboard. Simply use the role switcher in your account menu.
-            </p>
-          </div>
-          
-          <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
-            Have questions or need assistance? Our support team is always available at support@tutornest.org.
-          </p>
-          
-          <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
-            <p style="margin: 0 0 5px 0;">Welcome to your new TutorNest experience! 🚀</p>
-            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
-          </div>
-        </div>
-      </div>
+            <!-- Role-specific next steps -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.8px;">Getting started</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  ${newRole === 'tutor' ? `
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">📋 &nbsp;Complete your tutor profile with qualifications and experience</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">💰 &nbsp;Set your teaching rates and add your bank account</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">⏳ &nbsp;Await verification — typically 2–5 business days</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">🎓 &nbsp;Start accepting bookings from students</td></tr>
+                  ` : newRole === 'parent' ? `
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">👨‍👩‍👧 &nbsp;Add your children to your parent account</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">🔍 &nbsp;Browse verified tutors and filter by subject</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">📅 &nbsp;Book sessions that fit your family's schedule</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">📊 &nbsp;Monitor your children's learning progress</td></tr>
+                  ` : `
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">🗂️ &nbsp;Access your personal student dashboard</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">📚 &nbsp;View your upcoming tutoring sessions</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">💬 &nbsp;Message your tutor directly</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">🏆 &nbsp;Participate in trivia and learning challenges</td></tr>
+                  `}
+                </table>
+              </td></tr>
+            </table>
+            <div style="text-align:center;margin-bottom:24px;">
+              <a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">Go to Dashboard</a>
+            </div>
+            <!-- Role switching note -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:20px;">
+              <tr><td style="padding:16px 20px;">
+                <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
+                  💡 <strong>Switching roles:</strong> You can switch between your roles anytime using the role switcher in your account menu at the top of your dashboard.
+                </p>
+              </td></tr>
+            </table>
+            <p style="font-size:14px;color:#374151;">Need help? Reply to this email or contact support@tutornest.org.<br><strong>The TutorNest Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
     `,
   }),
 
@@ -1496,5 +1512,168 @@ export const emailTemplates = {
           <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()}</td></tr>
         </table>
       </td></tr></table></body></html>`,
+  }),
+
+  /** Parent link invitation — sent when a student lists a parent/guardian. */
+  parentLinkInvitation: (studentFirstName: string, studentLastName: string, linkUrl: string) => ({
+    subject: `${studentFirstName} ${studentLastName} wants to join TutorNest — approve their account`,
+    html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#0ea5e9;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">👤 &nbsp;Student Account Approval Required</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              <strong>${studentFirstName} ${studentLastName}</strong> has created a TutorNest student account and listed you as their parent or guardian. Your approval is required to activate their account.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f9ff;border:1px solid #bae6fd;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#0369a1;text-transform:uppercase;letter-spacing:0.8px;">What this means</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">📚 &nbsp;${studentFirstName} can access tutoring sessions and learning tools</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">👀 &nbsp;You'll be able to monitor their progress from your parent dashboard</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">📅 &nbsp;You can manage and approve their bookings</td></tr>
+                </table>
+              </td></tr>
+            </table>
+            <div style="text-align:center;margin:28px 0;">
+              <a href="${linkUrl}" style="display:inline-block;background:#22c55e;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">Approve &amp; Link Account</a>
+            </div>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:16px 20px;">
+                <p style="margin:0;font-size:13px;color:#6b7280;word-break:break-all;">
+                  Or paste this link in your browser:<br/>
+                  <span style="color:#4338ca;">${linkUrl}</span>
+                </p>
+              </td></tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#fef2f2;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;margin-bottom:20px;">
+              <tr><td style="padding:16px 20px 16px 24px;">
+                <p style="margin:0;font-size:14px;color:#dc2626;line-height:1.6;">
+                  <strong>Don't recognise ${studentFirstName}?</strong> Do NOT click the link above — you can safely ignore this email. This link expires in 7 days.
+                </p>
+              </td></tr>
+            </table>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
+    `,
+  }),
+
+  /** Sent to a tutor once they submit their full profile for review. */
+  tutorProfileSubmitted: (tutorName: string, dashboardLink: string) => ({
+    subject: `Profile received — we'll review it within 2–5 business days`,
+    html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#f59e0b;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">📋 &nbsp;Profile Under Review</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${tutorName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              We've received your full tutor profile and supporting documents. Our verification team will review everything and get back to you within <strong>2–5 business days</strong>.
+            </p>
+            <!-- What we're checking -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#1d4ed8;text-transform:uppercase;letter-spacing:0.8px;">What we're checking</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">🪪 &nbsp;Identity documents</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">🎓 &nbsp;Academic qualifications and certificates</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">🔒 &nbsp;DBS / background check documentation</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">📝 &nbsp;Teaching experience and references</td></tr>
+                </table>
+              </td></tr>
+            </table>
+            <!-- While you wait -->
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.8px;">While you wait</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">✅ &nbsp;Keep your dashboard accessible — you may be asked for more info</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">💰 &nbsp;Set your preferred hourly rate</td></tr>
+                  <tr><td style="padding:7px 0;font-size:14px;color:#374151;">📅 &nbsp;Link your calendar and mark your availability</td></tr>
+                </table>
+              </td></tr>
+            </table>
+            <div style="text-align:center;margin-bottom:24px;">
+              <a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">View Your Dashboard</a>
+            </div>
+            <p style="font-size:14px;color:#374151;">Questions? Reply to this email or contact <a href="mailto:support@tutornest.org" style="color:#625d9c;">support@tutornest.org</a>.<br><strong>The TutorNest Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
+    `,
+  }),
+
+  /** Internal alert sent to admin when a new tutor submits their application. */
+  adminTutorApplicationAlert: (tutorName: string, tutorEmail: string, adminDashboardLink: string) => ({
+    subject: `New tutor application — ${tutorName}`,
+    html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:24px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:28px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">TutorNest Admin</h1>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:13px;">Internal Notification</p>
+          </td></tr>
+          <tr><td style="background:#0ea5e9;padding:12px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">🔔 &nbsp;New Tutor Application</p>
+          </td></tr>
+          <tr><td style="padding:32px 40px;">
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">
+              A new tutor has submitted their application and is awaiting review.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.8px;">Application Details</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;width:130px;">👤 Name</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${tutorName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">✉️ Email</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${tutorEmail}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">📅 Submitted</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${new Date().toLocaleString('en-GB', { dateStyle: 'long', timeStyle: 'short' })}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">🔖 Status</td>
+                    <td style="padding:8px 0;font-size:14px;color:#f59e0b;font-weight:700;">Pending Review</td>
+                  </tr>
+                </table>
+              </td></tr>
+            </table>
+            <div style="text-align:center;margin-bottom:20px;">
+              <a href="${adminDashboardLink}" style="display:inline-block;background:#22c55e;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">Review Application</a>
+            </div>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
+    `,
   }),
 };
