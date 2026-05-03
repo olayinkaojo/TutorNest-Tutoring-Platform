@@ -46,8 +46,10 @@ import {
   PolarAngleAxis,
   PolarRadiusAxis
 } from 'recharts';
+import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Skeleton } from './ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
@@ -146,6 +148,7 @@ export function StudentDashboard({
   const [progressOverTime, setProgressOverTime] = useState<any[]>([]);
   const [activeTab, setActiveTab] = useState('performance');
   const [newReportsCount, setNewReportsCount] = useState(0);
+  const [soonSession, setSoonSession] = useState<any>(null);
   const [progressImprovement, setProgressImprovement] = useState<{ subject: string; improvement: number } | null>(null);
   const [lastReportCheck, setLastReportCheck] = useState<Date | null>(null);
   const academicStudentId = profile.linkedChildId || profile.id || profile.userId;
@@ -315,6 +318,15 @@ export function StudentDashboard({
       setUpcomingSessions(upcoming);
       setCompletedSessions(completed);
 
+      // Detect sessions starting within 60 minutes
+      const nowMs = Date.now();
+      const upcomingSoon = upcoming.find((s: any) => {
+        if (s.status !== 'confirmed' && s.status !== 'scheduled') return false;
+        const sessionDateTime = new Date(`${s.date || s.sessionDate}T${s.startTime || s.time || '00:00'}`).getTime();
+        return sessionDateTime > nowMs && sessionDateTime - nowMs <= 60 * 60 * 1000;
+      });
+      setSoonSession(upcomingSoon || null);
+
       setStats({
         totalSessions: allBookings.length,
         completedSessions: completed.length,
@@ -354,8 +366,13 @@ export function StudentDashboard({
       const timeProgress = processProgressOverTime(studentAssessments);
       setProgressOverTime(timeProgress);
 
-    } catch (err) {
+    } catch (err: any) {
       console.error('Error loading student data:', err);
+      if (err?.name === 'AbortError' || err?.name === 'TimeoutError') {
+        toast.error('Request timed out. Please check your connection and try again.');
+        return;
+      }
+      toast.error('Could not load your sessions. Please refresh.');
     } finally {
       setLoading(false);
     }
@@ -527,63 +544,100 @@ export function StudentDashboard({
         </div>
 
         {/* Quick Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-600 mb-1">Total Sessions</p>
-                  <h2 className="text-2xl">{stats.totalSessions}</h2>
-                </div>
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#625d9c20' }}>
-                  <BookOpen className="w-5 h-5" style={{ color: '#625d9c' }} />
-                </div>
+        {loading ? (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            {[...Array(4)].map((_, i) => (
+              <div key={i} className="bg-white rounded-lg p-4 border">
+                <Skeleton className="h-4 w-20 mb-2" />
+                <Skeleton className="h-8 w-16" />
               </div>
-            </CardContent>
-          </Card>
+            ))}
+          </div>
+        ) : (
+          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Total Sessions</p>
+                    <h2 className="text-2xl">{stats.totalSessions}</h2>
+                  </div>
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#625d9c20' }}>
+                    <BookOpen className="w-5 h-5" style={{ color: '#625d9c' }} />
+                  </div>
+                </div>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-600 mb-1">Completed</p>
-                  <h2 className="text-2xl">{stats.completedSessions}</h2>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Completed</p>
+                    <h2 className="text-2xl">{stats.completedSessions}</h2>
+                  </div>
+                  <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
+                    <CheckCircle className="w-5 h-5 text-green-600" />
+                  </div>
                 </div>
-                <div className="w-10 h-10 bg-green-100 rounded-lg flex items-center justify-center">
-                  <CheckCircle className="w-5 h-5 text-green-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-600 mb-1">Upcoming</p>
-                  <h2 className="text-2xl">{stats.upcomingSessions}</h2>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Upcoming</p>
+                    <h2 className="text-2xl">{stats.upcomingSessions}</h2>
+                  </div>
+                  <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
+                    <Calendar className="w-5 h-5 text-blue-600" />
+                  </div>
                 </div>
-                <div className="w-10 h-10 bg-blue-100 rounded-lg flex items-center justify-center">
-                  <Calendar className="w-5 h-5 text-blue-600" />
-                </div>
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
 
-          <Card>
-            <CardContent className="pt-6">
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-xs text-gray-600 mb-1">Avg. Performance</p>
-                  <h2 className="text-2xl">{stats.averageScore}%</h2>
+            <Card>
+              <CardContent className="pt-6">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <p className="text-xs text-gray-600 mb-1">Avg. Performance</p>
+                    <h2 className="text-2xl">{stats.averageScore}%</h2>
+                  </div>
+                  <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: getScoreColor(stats.averageScore) + '20' }}>
+                    <TrendingUp className="w-5 h-5" style={{ color: getScoreColor(stats.averageScore) }} />
+                  </div>
                 </div>
-                <div className="w-10 h-10 rounded-lg flex items-center justify-center" style={{ backgroundColor: getScoreColor(stats.averageScore) + '20' }}>
-                  <TrendingUp className="w-5 h-5" style={{ color: getScoreColor(stats.averageScore) }} />
-                </div>
+              </CardContent>
+            </Card>
+          </div>
+        )}
+
+        {/* Session starting-soon banner */}
+        {soonSession && (
+          <div className="mb-4 bg-purple-600 text-white px-4 py-3 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <span className="text-lg">🎓</span>
+              <div>
+                <p className="font-semibold text-sm">Your session is starting soon!</p>
+                <p className="text-xs text-purple-200">
+                  {soonSession.subject} with {soonSession.tutorName || 'your tutor'} —{' '}
+                  {new Date(`${soonSession.date || soonSession.sessionDate}T${soonSession.startTime || soonSession.time}`).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+                </p>
               </div>
-            </CardContent>
-          </Card>
-        </div>
+            </div>
+            {(soonSession.googleMeetLink || soonSession.meetLink) && (
+              <a
+                href={soonSession.googleMeetLink || soonSession.meetLink}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="bg-white text-purple-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-purple-50 transition-colors flex-shrink-0"
+              >
+                Join Now
+              </a>
+            )}
+          </div>
+        )}
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>
@@ -781,7 +835,13 @@ export function StudentDashboard({
                 <CardDescription>View and manage your sessions</CardDescription>
               </CardHeader>
               <CardContent>
-                {upcomingSessions.length > 0 || completedSessions.length > 0 ? (
+                {loading ? (
+                  <div className="space-y-3">
+                    {[...Array(3)].map((_, i) => (
+                      <Skeleton key={i} className="h-16 w-full rounded-lg" />
+                    ))}
+                  </div>
+                ) : upcomingSessions.length > 0 || completedSessions.length > 0 ? (
                   <div className="space-y-6">
                     {/* Upcoming Sessions */}
                     {upcomingSessions.length > 0 && (

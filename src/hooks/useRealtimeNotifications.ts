@@ -5,6 +5,7 @@
 
 import { useEffect, useRef, useCallback, useState } from 'react';
 import { notificationAPI, Notification } from '../utils/notification-api-client';
+import { getSupabaseClient } from '../utils/supabase/client';
 
 interface UseRealtimeNotificationsOptions {
   userId: string;
@@ -19,7 +20,7 @@ export function useRealtimeNotifications({
   userId,
   accessToken,
   enabled = true,
-  pollInterval = 10000, // 10 seconds (fallback polling)
+  pollInterval = 30000, // 30 seconds (fallback polling)
   onNotification,
   onError,
 }: UseRealtimeNotificationsOptions) {
@@ -58,7 +59,7 @@ export function useRealtimeNotifications({
   }, [userId, accessToken, enabled, onNotification, onError]);
 
   /**
-   * Setup polling for new notifications
+   * Setup Realtime subscription + fallback polling for new notifications
    */
   useEffect(() => {
     if (!enabled || !userId || !accessToken) {
@@ -68,10 +69,28 @@ export function useRealtimeNotifications({
     // Initial fetch
     checkForNewNotifications();
 
-    // Set up polling interval
+    // Supabase Realtime subscription
+    const supabase = getSupabaseClient();
+    const channel = supabase
+      .channel(`notifications:${userId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'notifications',
+        filter: `user_id=eq.${userId}`,
+      }, () => {
+        // Re-fetch when notifications change
+        checkForNewNotifications();
+      })
+      .subscribe();
+
+    // Fallback polling at 30 seconds (reduced from 10)
     pollTimeoutId.current = setInterval(checkForNewNotifications, pollInterval);
 
+    setIsConnected(true);
+
     return () => {
+      supabase.removeChannel(channel);
       if (pollTimeoutId.current) {
         clearInterval(pollTimeoutId.current);
       }
@@ -111,7 +130,7 @@ export function useRealtimeStudentReports(
     userId: studentId,
     accessToken,
     enabled,
-    pollInterval: 10000, // 10 seconds
+    pollInterval: 30000,
     onNotification: (notification) => {
       if (notification.type === 'report' || notification.type === 'report_available') {
         onReportSubmitted?.(
@@ -136,7 +155,7 @@ export function useRealtimeTutorProgress(
     userId: tutorId,
     accessToken,
     enabled,
-    pollInterval: 15000, // 15 seconds
+    pollInterval: 30000,
     onNotification: (notification) => {
       if (
         notification.type === 'system' &&
@@ -164,7 +183,7 @@ export function useRealtimeAdminAlerts(
     userId: adminId,
     accessToken,
     enabled,
-    pollInterval: 30000, // 30 seconds (admin alerts less frequent)
+    pollInterval: 30000,
     onNotification: (notification) => {
       if (
         notification.type === 'system' ||

@@ -1,4 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
+import { toast } from 'sonner';
+import { Skeleton } from './ui/skeleton';
 import { UpcomingLessonsCard } from './UpcomingLessonsCard';
 import { MultiSelectFilter, SelectedFilterBadges } from './MultiSelectFilter';
 import { StudentAssessmentForm } from './StudentAssessmentForm';
@@ -110,6 +112,8 @@ export function TutorDashboard({
   const [parentRoleSuccess, setParentRoleSuccess] = useState(false);
   const [showRoleCongrats, setShowRoleCongrats] = useState(false);
   const [showVerificationCongrats, setShowVerificationCongrats] = useState(false);
+
+  const [unreportedCount, setUnreportedCount] = useState(0);
 
   // Assessment form state
   const [showAssessmentForm, setShowAssessmentForm] = useState(false);
@@ -291,6 +295,7 @@ export function TutorDashboard({
           headers: {
             'Authorization': `Bearer ${accessToken}`,
           },
+          signal: AbortSignal.timeout(10000),
         }
       );
 
@@ -328,6 +333,9 @@ export function TutorDashboard({
           .sort((a: any, b: any) => new Date(b.date).getTime() - new Date(a.date).getTime());
         setLessonHistory(completedBookings);
 
+        const unreported = bookings.filter((b: any) => b.status === 'completed' && !b.reportSubmitted && !b.report).length;
+        setUnreportedCount(unreported);
+
         // Get unique students from confirmed or completed bookings
         const relevantBookings = bookings.filter((b: any) => 
           b.status === 'confirmed' || b.status === 'completed'
@@ -358,6 +366,7 @@ export function TutorDashboard({
                   headers: {
                     'Authorization': `Bearer ${accessToken}`,
                   },
+                  signal: AbortSignal.timeout(10000),
                 }
               );
               if (response.ok) {
@@ -400,6 +409,7 @@ export function TutorDashboard({
                   headers: {
                     'Authorization': `Bearer ${accessToken}`,
                   },
+                  signal: AbortSignal.timeout(10000),
                 }
               );
               if (response.ok) {
@@ -428,6 +438,7 @@ export function TutorDashboard({
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
+      toast.error('Could not load your sessions. Please refresh.');
     } finally {
       setLoading(false);
     }
@@ -442,6 +453,7 @@ export function TutorDashboard({
           headers: {
             'Authorization': `Bearer ${accessToken}`,
           },
+          signal: AbortSignal.timeout(10000),
         }
       );
 
@@ -450,10 +462,12 @@ export function TutorDashboard({
         setSubscriptionTier(data.tier || 'basic');
       } else {
         console.error('Failed to fetch subscription tier:', response.status, response.statusText);
+        toast.error('Something went wrong. Please try again.');
         setSubscriptionTier('basic'); // Set default on error
       }
     } catch (error) {
       console.error('Error fetching subscription tier:', error);
+      toast.error('Something went wrong. Please try again.');
       setSubscriptionTier('basic'); // Set default on error
     }
   };
@@ -571,6 +585,7 @@ export function TutorDashboard({
               createdVia: 'add_role_feature',
             },
           }),
+          signal: AbortSignal.timeout(10000),
         }
       );
 
@@ -598,6 +613,7 @@ export function TutorDashboard({
       }
     } catch (err) {
       console.error('Error adding parent role:', err);
+      toast.error('Something went wrong. Please try again.');
       setParentRoleError('An error occurred while adding the parent role');
     } finally {
       setIsAddingParentRole(false);
@@ -898,6 +914,22 @@ export function TutorDashboard({
           </Card>
         )}
 
+        {/* Unreported sessions banner */}
+        {unreportedCount > 0 && (
+          <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <span>📝</span>
+              <p className="text-sm text-amber-800">
+                You have <strong>{unreportedCount}</strong> completed session{unreportedCount > 1 ? 's' : ''} awaiting a report.
+              </p>
+            </div>
+            <Button size="sm" variant="outline" className="border-amber-300 text-amber-700 text-xs hover:bg-amber-50"
+              onClick={() => typeof onTabChange === 'function' && onTabChange('reports')}>
+              Write Reports
+            </Button>
+          </div>
+        )}
+
         {/* Stats with Date Filter */}
         <Card className="mb-8">
           <CardContent className="pt-6">
@@ -982,7 +1014,18 @@ export function TutorDashboard({
               </div>
             </div>
 
-            <TutorStatsSection stats={stats} setActiveTab={setActiveTab} />
+            {loading ? (
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                {[...Array(4)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-lg p-4 border">
+                    <Skeleton className="h-4 w-20 mb-2" />
+                    <Skeleton className="h-8 w-16" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <TutorStatsSection stats={stats} setActiveTab={setActiveTab} />
+            )}
           </CardContent>
         </Card>
 
@@ -1088,9 +1131,10 @@ export function TutorDashboard({
                 </CardHeader>
                 <CardContent>
                   {loading ? (
-                    <div className="text-center py-12 text-gray-500">
-                      <History className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                      <p>Loading history...</p>
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => (
+                        <Skeleton key={i} className="h-20 w-full rounded-lg" />
+                      ))}
                     </div>
                   ) : lessonHistory.length > 0 ? (
                     <div className="space-y-3">
@@ -1120,6 +1164,20 @@ export function TutorDashboard({
                             </div>
                             <div className="text-right flex flex-col items-end gap-2">
                               <p className="text-sm">{formatNaira(lesson.price || '0')}</p>
+                              {lesson.status === 'completed' && !lesson.reportSubmitted && (
+                                <Button
+                                  size="sm"
+                                  variant="outline"
+                                  className="text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
+                                  onClick={() => {
+                                    if (typeof onTabChange === 'function') {
+                                      onTabChange('reports');
+                                    }
+                                  }}
+                                >
+                                  Write Report
+                                </Button>
+                              )}
                               {!lesson.assessed && (
                                 <Button
                                   size="sm"
@@ -1162,9 +1220,10 @@ export function TutorDashboard({
                 </CardHeader>
                 <CardContent>
                   {loading ? (
-                    <div className="text-center py-12 text-gray-500">
-                      <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                      <p>Loading past students...</p>
+                    <div className="space-y-3">
+                      {[...Array(3)].map((_, i) => (
+                        <Skeleton key={i} className="h-20 w-full rounded-lg" />
+                      ))}
                     </div>
                   ) : pastStudents.length > 0 ? (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">

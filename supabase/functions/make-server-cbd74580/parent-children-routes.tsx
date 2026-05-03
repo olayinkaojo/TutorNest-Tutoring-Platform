@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
+import { sendEmail } from './email-service.tsx';
 
 const parentChildrenRoutes = new Hono();
 
@@ -104,6 +105,27 @@ parentChildrenRoutes.post('/add-child', async (c) => {
     }
 
     console.log(`Child profile created successfully for parent ${parentId}: ${childId}. Total children: ${existingChildren.length + 1}`);
+
+    // Send "child added" confirmation email to the parent (non-fatal)
+    try {
+      const parentProfile = await kv.get(`user:${parentId}`) as any;
+      const parentEmail = parentProfile?.email;
+      if (parentEmail) {
+        const childName = `${firstName} ${lastName}`.trim() || 'your child';
+        const parentName = parentProfile?.firstName || parentProfile?.name || 'there';
+        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+        const subject = `${childName} has been added to TutorNest`;
+        const html = `
+          <p>Hi ${parentName},</p>
+          <p>You've successfully added <strong>${childName}</strong> to your TutorNest account.</p>
+          <p>You can now <a href="${dashboardBase}/dashboard/parent">search for tutors</a> and book sessions for ${childName}.</p>
+          <p>The TutorNest Team</p>
+        `;
+        await sendEmail({ to: parentEmail, subject, html }).catch(e => console.warn('child added email:', e));
+      }
+    } catch (emailErr) {
+      console.warn('child added email (outer):', emailErr);
+    }
 
     return c.json({
       success: true,

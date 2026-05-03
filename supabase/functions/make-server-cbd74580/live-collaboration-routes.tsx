@@ -1,4 +1,4 @@
-import { Router } from 'npm:hono@4';
+import { Hono } from 'npm:hono@4';
 import {
   createCollaborationSession,
   startCollaboration,
@@ -16,7 +16,7 @@ import {
   getAnnotationStats,
 } from './live-collaboration-service.tsx';
 
-export const liveCollaborationRoutes = new Router();
+export const liveCollaborationRoutes = new Hono();
 
 // ========== COLLABORATION SESSION MANAGEMENT ==========
 

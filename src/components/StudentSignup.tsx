@@ -37,6 +37,7 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
   const [error, setError] = useState('');
   const [success, setSuccess] = useState(false);
   const [awaitingParentLink, setAwaitingParentLink] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   const calculateAge = (dob: string) => {
     const birthDate = new Date(dob);
@@ -504,18 +505,31 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
                       </Alert>
                     )}
 
+                    <div className="flex items-start gap-2 mb-4">
+                      <input
+                        type="checkbox"
+                        id="student-terms"
+                        checked={agreedToTerms}
+                        onChange={(e) => setAgreedToTerms(e.target.checked)}
+                        className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-purple-600"
+                      />
+                      <label htmlFor="student-terms" className="text-xs text-gray-600">
+                        I agree to the{' '}
+                        <a href="/terms" target="_blank" className="text-purple-600 underline hover:text-purple-800">Terms of Service</a>
+                        {' '}and{' '}
+                        <a href="/privacy" target="_blank" className="text-purple-600 underline hover:text-purple-800">Privacy Policy</a>
+                        .
+                      </label>
+                    </div>
+
                     <Button
                       type="submit"
-                      disabled={loading || !signupType}
+                      disabled={!agreedToTerms || loading || !signupType}
                       className="w-full text-white"
                       style={{ backgroundColor: '#625d9c' }}
                     >
                       {loading ? 'Creating Account...' : 'Create Student Account'}
                     </Button>
-
-                    <p className="text-xs text-center text-gray-600">
-                      By signing up, you agree to TutorNest's Terms of Service and Privacy Policy
-                    </p>
                   </>
                 )}
               </form>

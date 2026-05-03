@@ -24,6 +24,8 @@ import { Chatroom } from './Chatroom';
 import { DocumentManager } from './DocumentManager';
 import { ResourcesHub } from './ResourcesHub';
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { toast } from 'sonner';
+import { Skeleton } from './ui/skeleton';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
@@ -95,6 +97,7 @@ export function ParentDashboard({
   const [selectedMonths, setSelectedMonths] = useState<number[]>([new Date().getMonth() + 1]);
   const [showRoleCongrats, setShowRoleCongrats] = useState(false);
   const [preSelectedTutorId, setPreSelectedTutorId] = useState<string | undefined>(undefined);
+  const [soonSession, setSoonSession] = useState<any>(null);
 
   const validTabs = new Set([
     'overview',
@@ -215,7 +218,10 @@ export function ParentDashboard({
       const bookingsPromises = children.map(child =>
         fetch(
           `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings?studentId=${child.id}`,
-          { headers: { 'Authorization': `Bearer ${session.access_token}` } }
+          {
+            headers: { 'Authorization': `Bearer ${session.access_token}` },
+            signal: AbortSignal.timeout(10000),
+          }
         ).then(res => res.ok ? res.json() : { bookings: [] })
       );
 
@@ -235,6 +241,16 @@ export function ParentDashboard({
         };
       });
       setChildSessionCounts(counts);
+
+      // Detect a confirmed session starting within 60 minutes
+      const allBookingsFlat: any[] = allBookingsData.flatMap((d: any) => d.bookings || []);
+      const now = Date.now();
+      const soon = allBookingsFlat.find((b: any) => {
+        if (b.status !== 'confirmed') return false;
+        const sessionDateTime = new Date(`${b.date || b.sessionDate}T${b.startTime || b.time || '00:00'}`).getTime();
+        return sessionDateTime > now && sessionDateTime - now <= 60 * 60 * 1000;
+      });
+      setSoonSession(soon || null);
 
       // Stats scope: if a specific child is active, show only their numbers
       const relevantBookings = activeChildId
@@ -281,7 +297,7 @@ export function ParentDashboard({
 
   const loadChildren = async () => {
     if (!session?.access_token) return;
-    
+
     setLoadingChildren(true);
     try {
       const response = await fetch(
@@ -290,6 +306,7 @@ export function ParentDashboard({
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
           },
+          signal: AbortSignal.timeout(10000),
         }
       );
 
@@ -298,9 +315,15 @@ export function ParentDashboard({
         setChildren(data.children || []);
       } else {
         console.error('Error loading children:', data.error);
+        toast.error('Could not load your children profiles. Please refresh the page.');
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+        toast.error('Request timed out. Please check your connection.');
+        return;
+      }
       console.error('Error loading children:', error);
+      toast.error('Could not load your children profiles. Please refresh the page.');
     } finally {
       setLoadingChildren(false);
     }
@@ -308,7 +331,7 @@ export function ParentDashboard({
 
   const loadSubscription = async () => {
     if (!session?.access_token) return;
-    
+
     try {
       const response = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/subscription/${profile.id || profile.userId}`,
@@ -316,6 +339,7 @@ export function ParentDashboard({
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
           },
+          signal: AbortSignal.timeout(10000),
         }
       );
 
@@ -330,10 +354,17 @@ export function ParentDashboard({
       } else {
         // Error response, set defaults
         console.error('Error loading subscription:', response.status, response.statusText);
+        toast.error('Could not load subscription status.');
         setSubscriptionTier('basic');
       }
-    } catch (error) {
+    } catch (error: any) {
+      if (error.name === 'AbortError' || error.name === 'TimeoutError') {
+        toast.error('Request timed out. Please check your connection.');
+        setSubscriptionTier('basic');
+        return;
+      }
       console.error('Error loading subscription:', error);
+      toast.error('Could not load subscription status.');
       // Set defaults if error
       setSubscriptionTier('basic');
     }
@@ -574,6 +605,34 @@ export function ParentDashboard({
         </div>
       </header>
 
+      {/* Session starting soon — countdown banner */}
+      {soonSession && (
+        <div className="bg-purple-600 text-white px-4 py-3 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <span className="text-lg">🎓</span>
+            <div>
+              <p className="font-semibold text-sm">Session starting soon!</p>
+              <p className="text-xs text-purple-200">
+                {soonSession.subject} with {soonSession.tutorName || 'your tutor'} —{' '}
+                {new Date(
+                  `${soonSession.date || soonSession.sessionDate}T${soonSession.startTime || soonSession.time}`
+                ).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}
+              </p>
+            </div>
+          </div>
+          {(soonSession.googleMeetLink || soonSession.meetLink) && (
+            <a
+              href={soonSession.googleMeetLink || soonSession.meetLink}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="bg-white text-purple-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-purple-50 transition-colors flex-shrink-0"
+            >
+              Join Now
+            </a>
+          )}
+        </div>
+      )}
+
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 lg:py-8 pb-20 lg:pb-8">
         <div className="mb-4 lg:mb-8">
@@ -615,7 +674,15 @@ export function ParentDashboard({
         />
 
         {/* Child Profile Grid - click a card to switch the active child; stats above update to reflect selection */}
-        {!loadingChildren && children.length > 0 && (
+        {loadingChildren ? (
+          <div className="mb-6 space-y-3">
+            <Skeleton className="h-6 w-48 rounded" />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Skeleton className="h-24 w-full rounded-lg" />
+              <Skeleton className="h-24 w-full rounded-lg" />
+            </div>
+          </div>
+        ) : children.length > 0 ? (
           <div className="mb-6">
             <p className="text-sm text-gray-500 mb-3">
               Stats above reflect the <strong>selected child</strong>. Click a card to switch.
@@ -628,7 +695,7 @@ export function ParentDashboard({
               subscriptionTier={subscriptionTier}
             />
           </div>
-        )}
+        ) : null}
 
         {/* Become a Tutor Card - Prominent at top */}
         {session && canBecomeTutor && (
@@ -808,6 +875,26 @@ export function ParentDashboard({
                         </div>
                       </CardContent>
                     </Card>
+                  )}
+                  {/* Smart match prompt — shown when a child is selected */}
+                  {activeChildId && (
+                    <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg flex items-start gap-3">
+                      <span className="text-2xl">✨</span>
+                      <div className="flex-1">
+                        <p className="font-semibold text-purple-800 text-sm">Try AI-Powered Matching</p>
+                        <p className="text-purple-600 text-xs mt-0.5">Our algorithm analyses your child's learning needs to find the best tutor fit.</p>
+                      </div>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        className="border-purple-300 text-purple-700 hover:bg-purple-100 flex-shrink-0 text-xs"
+                        onClick={() => {
+                          toast.info('AI matching is available in the Smart Match tab above.');
+                        }}
+                      >
+                        Try Smart Match
+                      </Button>
+                    </div>
                   )}
                   <TutorSearch
                     session={session}

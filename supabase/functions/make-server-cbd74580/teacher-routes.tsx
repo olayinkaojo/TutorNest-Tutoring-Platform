@@ -1,4 +1,4 @@
-import { Hono, Router } from 'npm:hono@4';
+import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import {
   createTeacherProfile,
@@ -18,7 +18,7 @@ import {
   getStudentClasses,
 } from './teacher-profile-service.tsx';
 
-export const teacherRoutes = new Router();
+export const teacherRoutes = new Hono();
 
 // Teacher Profile Endpoints
 

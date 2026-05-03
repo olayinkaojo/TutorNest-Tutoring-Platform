@@ -1,4 +1,4 @@
-import { Router } from "https://deno.land/x/oak@v12.6.1/mod.ts";
+import { Hono } from 'npm:hono@4';
 import { getAllTopics, getTopic, getTopicLeaderboard, getTopicMastery, getRecommendedTopics } from "./topic-service.tsx";
 import {
   getUserLearningPaths,
@@ -15,12 +15,12 @@ import {
 } from "./subject-progress-service.tsx";
 import { getTopicAchievementProgress, checkTopicAchievements } from "./topic-achievement-service.tsx";
 
-export const topicRoutes = new Router();
+export const topicRoutes = new Hono();
 
 // GET /topics/all - All available topics with user's mastery
-topicRoutes.get("/all", async (ctx) => {
+topicRoutes.get("/all", async (c) => {
   try {
-    const userId = ctx.request.headers.get("x-user-id");
+    const userId = c.req.header("x-user-id");
     const topics = await getAllTopics();
 
     const topicsWithProgress = await Promise.all(
@@ -34,27 +34,24 @@ topicRoutes.get("/all", async (ctx) => {
       })
     );
 
-    ctx.response.body = {
+    return c.json({
       topics: topicsWithProgress,
       total: topicsWithProgress.length,
-    };
+    });
   } catch (error) {
-    ctx.response.status = 500;
-    ctx.response.body = { error: error.message };
+    return c.json({ error: error.message }, 500);
   }
 });
 
 // GET /topics/:topicId - Topic details with user progress
-topicRoutes.get("/:topicId", async (ctx) => {
+topicRoutes.get("/:topicId", async (c) => {
   try {
-    const userId = ctx.request.headers.get("x-user-id");
-    const topicId = ctx.params.topicId;
+    const userId = c.req.header("x-user-id");
+    const topicId = c.req.param("topicId");
 
     const topic = await getTopic(topicId);
     if (!topic) {
-      ctx.response.status = 404;
-      ctx.response.body = { error: "Topic not found" };
-      return;
+      return c.json({ error: "Topic not found" }, 404);
     }
 
     const progress = userId ? await getTopicProgress(userId, topicId) : null;
@@ -63,54 +60,48 @@ topicRoutes.get("/:topicId", async (ctx) => {
     const achievements = userId ? await getTopicAchievementProgress(userId, topicId) : [];
     const leaderboard = await getTopicLeaderboard(topicId, 10);
 
-    ctx.response.body = {
+    return c.json({
       topic,
       userProgress: progress,
       userStats: stats,
       completionPercentage: completion,
       achievements,
       leaderboard,
-    };
+    });
   } catch (error) {
-    ctx.response.status = 500;
-    ctx.response.body = { error: error.message };
+    return c.json({ error: error.message }, 500);
   }
 });
 
-// GET /topics/recommended - Get recommended topics for user
-topicRoutes.get("/recommended/topics", async (ctx) => {
+// GET /topics/recommended/topics - Get recommended topics for user
+topicRoutes.get("/recommended/topics", async (c) => {
   try {
-    const userId = ctx.request.headers.get("x-user-id");
+    const userId = c.req.header("x-user-id");
     if (!userId) {
-      ctx.response.status = 401;
-      ctx.response.body = { error: "Unauthorized" };
-      return;
+      return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const limit = parseInt(ctx.request.url.searchParams.get("limit") || "3");
+    const limit = parseInt(c.req.query("limit") || "3");
     const recommendedIds = await getRecommendedNextTopics(userId, limit);
 
     const topics = await Promise.all(recommendedIds.map((id) => getTopic(id)));
     const filtered = topics.filter((t) => t !== null);
 
-    ctx.response.body = {
+    return c.json({
       recommended: filtered,
       total: filtered.length,
-    };
+    });
   } catch (error) {
-    ctx.response.status = 500;
-    ctx.response.body = { error: error.message };
+    return c.json({ error: error.message }, 500);
   }
 });
 
-// GET /learning-paths - Get all user's learning paths
-topicRoutes.get("/learning-paths/all", async (ctx) => {
+// GET /learning-paths/all - Get all user's learning paths
+topicRoutes.get("/learning-paths/all", async (c) => {
   try {
-    const userId = ctx.request.headers.get("x-user-id");
+    const userId = c.req.header("x-user-id");
     if (!userId) {
-      ctx.response.status = 401;
-      ctx.response.body = { error: "Unauthorized" };
-      return;
+      return c.json({ error: "Unauthorized" }, 401);
     }
 
     const paths = await getUserLearningPaths(userId);
@@ -121,88 +112,75 @@ topicRoutes.get("/learning-paths/all", async (ctx) => {
       })
     );
 
-    ctx.response.body = {
+    return c.json({
       paths: pathsWithDetails,
       total: pathsWithDetails.length,
       active: pathsWithDetails.filter((p) => p.currentLevel < 4).length,
       completed: pathsWithDetails.filter((p) => p.currentLevel >= 4).length,
-    };
+    });
   } catch (error) {
-    ctx.response.status = 500;
-    ctx.response.body = { error: error.message };
+    return c.json({ error: error.message }, 500);
   }
 });
 
-// GET /learning-paths/:topicId - Get specific learning path
-topicRoutes.get("/learning-paths/:topicId/path", async (ctx) => {
+// GET /learning-paths/:topicId/path - Get specific learning path
+topicRoutes.get("/learning-paths/:topicId/path", async (c) => {
   try {
-    const userId = ctx.request.headers.get("x-user-id");
-    const topicId = ctx.params.topicId;
+    const userId = c.req.header("x-user-id");
+    const topicId = c.req.param("topicId");
 
     if (!userId) {
-      ctx.response.status = 401;
-      ctx.response.body = { error: "Unauthorized" };
-      return;
+      return c.json({ error: "Unauthorized" }, 401);
     }
 
     const path = await getLearningPath(userId, topicId);
     const topic = await getTopic(topicId);
 
     if (!path || !topic) {
-      ctx.response.status = 404;
-      ctx.response.body = { error: "Learning path not found" };
-      return;
+      return c.json({ error: "Learning path not found" }, 404);
     }
 
-    ctx.response.body = { path, topic };
+    return c.json({ path, topic });
   } catch (error) {
-    ctx.response.status = 500;
-    ctx.response.body = { error: error.message };
+    return c.json({ error: error.message }, 500);
   }
 });
 
 // POST /learning-paths/start - Start new learning path
-topicRoutes.post("/learning-paths/start", async (ctx) => {
+topicRoutes.post("/learning-paths/start", async (c) => {
   try {
-    const userId = ctx.request.headers.get("x-user-id");
+    const userId = c.req.header("x-user-id");
     if (!userId) {
-      ctx.response.status = 401;
-      ctx.response.body = { error: "Unauthorized" };
-      return;
+      return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const body = await ctx.request.body({ type: "json" }).value;
+    const body = await c.req.json();
     const { topicId } = body;
 
     const success = await startLearningPath(userId, topicId);
 
     if (!success) {
-      ctx.response.status = 400;
-      ctx.response.body = { error: "Failed to start learning path" };
-      return;
+      return c.json({ error: "Failed to start learning path" }, 400);
     }
 
     const path = await getLearningPath(userId, topicId);
-    ctx.response.body = { success: true, path };
+    return c.json({ success: true, path });
   } catch (error) {
-    ctx.response.status = 500;
-    ctx.response.body = { error: error.message };
+    return c.json({ error: error.message }, 500);
   }
 });
 
 // POST /topics/:topicId/complete-level - Complete topic level
-topicRoutes.post("/:topicId/complete-level", async (ctx) => {
+topicRoutes.post("/:topicId/complete-level", async (c) => {
   try {
-    const userId = ctx.request.headers.get("x-user-id");
-    const topicId = ctx.params.topicId;
+    const userId = c.req.header("x-user-id");
+    const topicId = c.req.param("topicId");
 
     if (!userId) {
-      ctx.response.status = 401;
-      ctx.response.body = { error: "Unauthorized" };
-      return;
+      return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const body = await ctx.request.body({ type: "json" }).value;
+    const body = await c.req.json();
     const { level, accuracy, answerTime } = body;
 
     const result = await completeLearningPathLevel(userId, topicId, level, accuracy, answerTime);
@@ -210,70 +188,57 @@ topicRoutes.post("/:topicId/complete-level", async (ctx) => {
     // Check for new achievements
     const newAchievements = await checkTopicAchievements(userId, topicId);
 
-    ctx.response.body = {
+    return c.json({
       ...result,
       newAchievements,
-    };
+    });
   } catch (error) {
-    ctx.response.status = 500;
-    ctx.response.body = { error: error.message };
+    return c.json({ error: error.message }, 500);
   }
 });
 
 // GET /topics/:topicId/leaderboard - Topic-specific leaderboard
-topicRoutes.get("/:topicId/leaderboard", async (ctx) => {
+topicRoutes.get("/:topicId/leaderboard", async (c) => {
   try {
-    const topicId = ctx.params.topicId;
-    const limit = parseInt(ctx.request.url.searchParams.get("limit") || "10");
+    const topicId = c.req.param("topicId");
+    const limit = parseInt(c.req.query("limit") || "10");
 
     const leaderboard = await getTopicLeaderboard(topicId, limit);
 
-    ctx.response.body = {
+    return c.json({
       topicId,
       leaderboard,
       total: leaderboard.length,
-    };
+    });
   } catch (error) {
-    ctx.response.status = 500;
-    ctx.response.body = { error: error.message };
+    return c.json({ error: error.message }, 500);
   }
 });
 
 // GET /progress/history - User's progress history
-topicRoutes.get("/progress/history", async (ctx) => {
+topicRoutes.get("/progress/history", async (c) => {
   try {
-    const userId = ctx.request.headers.get("x-user-id");
+    const userId = c.req.header("x-user-id");
     if (!userId) {
-      ctx.response.status = 401;
-      ctx.response.body = { error: "Unauthorized" };
-      return;
+      return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const topicId = ctx.request.url.searchParams.get("topicId");
-    const days = parseInt(ctx.request.url.searchParams.get("days") || "7");
+    const topicId = c.req.query("topicId");
+    const days = parseInt(c.req.query("days") || "7");
 
     if (!topicId) {
-      ctx.response.status = 400;
-      ctx.response.body = { error: "topicId required" };
-      return;
+      return c.json({ error: "topicId required" }, 400);
     }
 
     const history = await getProgressHistory(userId, topicId, days);
 
-    ctx.response.body = {
+    return c.json({
       topicId,
       days,
       snapshots: history,
       total: history.length,
-    };
+    });
   } catch (error) {
-    ctx.response.status = 500;
-    ctx.response.body = { error: error.message };
+    return c.json({ error: error.message }, 500);
   }
 });
-
-// Helper route to import from service
-async function getProgressHistory(userId: string, topicId: string, days: number): Promise<any[]> {
-  const { getProgressHistory: getHistory } = await import("./subject-progress-service.tsx");
-  return getHistory(userId, topicId, days);
-}

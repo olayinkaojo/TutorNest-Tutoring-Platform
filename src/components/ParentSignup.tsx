@@ -35,6 +35,7 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
   const [numberOfChildren, setNumberOfChildren] = useState('');
   const [childrenAges, setChildrenAges] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
 
   // Function removed: client-side email validation triggers CORS preflight that causes issues
   // Email availability is now checked during signup submission instead
@@ -335,11 +336,27 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
             </Card>
 
             <div className="mt-6">
+              <div className="flex items-start gap-2 mb-4">
+                <input
+                  type="checkbox"
+                  id="parent-terms"
+                  checked={agreedToTerms}
+                  onChange={(e) => setAgreedToTerms(e.target.checked)}
+                  className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-purple-600"
+                />
+                <label htmlFor="parent-terms" className="text-xs text-gray-600">
+                  I agree to the{' '}
+                  <a href="/terms" target="_blank" className="text-purple-600 underline hover:text-purple-800">Terms of Service</a>
+                  {' '}and{' '}
+                  <a href="/privacy" target="_blank" className="text-purple-600 underline hover:text-purple-800">Privacy Policy</a>
+                  .
+                </label>
+              </div>
               <Button
                 type="submit"
                 className="w-full text-white"
                 style={{ backgroundColor: '#625d9c' }}
-                disabled={loading}
+                disabled={!agreedToTerms || loading}
               >
                 {loading ? 'Creating Account...' : 'Create Parent Account'}
               </Button>

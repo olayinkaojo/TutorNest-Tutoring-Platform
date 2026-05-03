@@ -1,4 +1,4 @@
-import { Router } from 'npm:hono@4';
+import { Hono } from 'npm:hono@4';
 import {
   createQuestion,
   getQuestion,
@@ -24,7 +24,7 @@ import {
   getAssignmentStats,
 } from './assignment-service.tsx';
 
-export const teacherQuestionRoutes = new Router();
+export const teacherQuestionRoutes = new Hono();
 
 // ========== QUESTION ENDPOINTS ==========
 

@@ -207,6 +207,9 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   const [agreeBackgroundCheck, setAgreeBackgroundCheck] = useState(false);
   const [agreeTerms, setAgreeTerms] = useState(false);
 
+  // Final submission consent
+  const [agreedToTerms, setAgreedToTerms] = useState(false);
+
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -1438,15 +1441,33 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                   Next Step
                 </Button>
               ) : (
-                <Button
-                  type="button"
-                  onClick={handleSubmit}
-                  disabled={loading}
-                  className="text-white"
-                  style={{ backgroundColor: '#5d9827' }}
-                >
-                  {photoUploading ? 'Uploading Photo...' : loading ? 'Creating Account...' : 'Complete Registration'}
-                </Button>
+                <div>
+                  <div className="flex items-start gap-2 mb-4">
+                    <input
+                      type="checkbox"
+                      id="tutor-terms"
+                      checked={agreedToTerms}
+                      onChange={(e) => setAgreedToTerms(e.target.checked)}
+                      className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-purple-600"
+                    />
+                    <label htmlFor="tutor-terms" className="text-xs text-gray-600">
+                      I agree to the{' '}
+                      <a href="/terms" target="_blank" className="text-purple-600 underline hover:text-purple-800">Terms of Service</a>
+                      {' '}and{' '}
+                      <a href="/privacy" target="_blank" className="text-purple-600 underline hover:text-purple-800">Privacy Policy</a>
+                      . I understand my profile will be reviewed before I can accept bookings.
+                    </label>
+                  </div>
+                  <Button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={!agreedToTerms || loading}
+                    className="text-white"
+                    style={{ backgroundColor: '#5d9827' }}
+                  >
+                    {photoUploading ? 'Uploading Photo...' : loading ? 'Creating Account...' : 'Complete Registration'}
+                  </Button>
+                </div>
               )}
             </div>
           </div>

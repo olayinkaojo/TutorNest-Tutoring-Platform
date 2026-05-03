@@ -30,21 +30,21 @@ import assessmentsRoutes from './assessments-routes.tsx';
 import curriculumRoutes from './curriculum-routes.tsx';
 import triviaRoutes from './trivia-routes.tsx';
 // import extendedTriviaRoutes from './extended-trivia-routes.tsx'; // disabled: imports broken time-attack/multiplayer/daily-challenge services
-// import { achievementRoutes } from './achievement-routes.tsx'; // disabled: uses incompatible oak/deno-kv API
-// import { topicRoutes } from './topic-routes.tsx'; // disabled: uses incompatible oak/deno-kv API
-// import { teacherRoutes } // disabled: uses non-existent Hono Router from './teacher-routes.tsx';
-// import { teacherQuestionRoutes } // disabled: uses non-existent Hono Router from './teacher-question-routes.tsx';
-// import { analyticsRoutes } // disabled: uses non-existent Hono Router from './analytics-routes.tsx';
-// import { sessionAssignmentRoutes } // disabled: uses non-existent Hono Router from './session-assignment-routes.tsx';
-// import { liveCollaborationRoutes } // disabled: uses non-existent Hono Router from './live-collaboration-routes.tsx';
+import { achievementRoutes } from './achievement-routes.tsx';
+import { topicRoutes } from './topic-routes.tsx';
+import { teacherRoutes } from './teacher-routes.tsx';
+import { teacherQuestionRoutes } from './teacher-question-routes.tsx';
+import { analyticsRoutes } from './analytics-routes.tsx';
+import { sessionAssignmentRoutes } from './session-assignment-routes.tsx';
+import { liveCollaborationRoutes } from './live-collaboration-routes.tsx';
 import tutorSessionReportsRoutes from './tutor-session-reports-routes.tsx';
 import paymentRoutes from './payment-routes.tsx';
 import { upsertProfile, getProfile } from './db.tsx';
 import liveSessionRoutes from './live-session-routes.tsx';
 import payoutsComplete from './payouts-complete.tsx';
 import { tutorProfileRoutes } from './tutor-profile-routes.tsx';
-// import { videoRoutes } // disabled: uses non-existent Hono Router from './video-routes.tsx';
-// import { screenShareRoutes } // disabled: uses non-existent Hono Router from './screen-share-routes.tsx';
+import { videoRoutes } from './video-routes.tsx';
+import { screenShareRoutes } from './screen-share-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
 import paymentPlansRoutes from './payment-plans-routes.tsx';
 
@@ -430,25 +430,25 @@ app.route('/make-server-cbd74580/trivia', triviaRoutes);
 // app.route('/make-server-cbd74580/trivia-extended', extendedTriviaRoutes);
 
 // Register achievement routes (badges, leaderboards, stats)
-// app.route('/make-server-cbd74580/achievements', achievementRoutes);
+app.route('/make-server-cbd74580/achievements', achievementRoutes);
 
 // Register topic/learning paths routes
-// app.route('/make-server-cbd74580/topics', topicRoutes);
+app.route('/make-server-cbd74580/topics', topicRoutes);
 
 // Register teacher routes (profiles, classes, management)
-// app.route('/make-server-cbd74580/teacher', teacherRoutes);
+app.route('/make-server-cbd74580/teacher', teacherRoutes);
 
 // Register teacher question & assignment routes
-// app.route('/make-server-cbd74580/teacher', teacherQuestionRoutes);
+app.route('/make-server-cbd74580/teacher', teacherQuestionRoutes);
 
 // Register analytics routes
-// app.route('/make-server-cbd74580/analytics', analyticsRoutes);
+app.route('/make-server-cbd74580/analytics', analyticsRoutes);
 
 // Register session assignment (workflow) routes
-// app.route('/make-server-cbd74580', sessionAssignmentRoutes);
+app.route('/make-server-cbd74580', sessionAssignmentRoutes);
 
 // Register live collaboration (whiteboard) routes
-// app.route('/make-server-cbd74580', liveCollaborationRoutes);
+app.route('/make-server-cbd74580', liveCollaborationRoutes);
 
 // Register tutor session reports routes
 app.route('/make-server-cbd74580/tutor-session-reports', tutorSessionReportsRoutes);
@@ -469,10 +469,10 @@ app.route('/make-server-cbd74580/tutor/payouts', payoutsComplete);
 app.route('/make-server-cbd74580/invoices', invoiceRoutes);
 
 // Register video conference routes
-// app.route('/make-server-cbd74580', videoRoutes);
+app.route('/make-server-cbd74580', videoRoutes);
 
 // Register screen sharing routes
-// app.route('/make-server-cbd74580', screenShareRoutes);
+app.route('/make-server-cbd74580', screenShareRoutes);
 
 // TEST ROUTE - Direct subscription tiers endpoint
 app.get('/make-server-cbd74580/subscription-tiers-test', async (c) => {

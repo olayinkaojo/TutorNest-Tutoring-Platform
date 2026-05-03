@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
+import { sendEmail, emailTemplates } from './email-service.tsx';
 
 export const notificationsRoutes = (app: Hono, getUserId: Function) => {
 
@@ -396,6 +397,24 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
             );
             remindersCreated++;
           }
+          // 24h email — tutor
+          if (!tutorPrefs || tutorPrefs.email?.sessionReminder24h !== false) {
+            const tutorProfile = await kv.get(`user:${booking.tutorId}`) as any;
+            const tutorEmail = tutorProfile?.email;
+            if (tutorEmail) {
+              const roomLink = booking.googleMeetLink || booking.meetLink || '';
+              await sendEmail({
+                to: tutorEmail,
+                ...emailTemplates.sessionReminder(
+                  tutorProfile?.firstName || tutorProfile?.name || 'Tutor',
+                  booking.studentName || 'Student',
+                  booking.date,
+                  booking.startTime || '',
+                  roomLink
+                ),
+              }).catch(e => console.warn('24h reminder email (tutor):', e));
+            }
+          }
 
           if (!parentPrefs || parentPrefs.inApp.sessionReminder24h) {
             await createNotification(
@@ -408,6 +427,24 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
             );
             remindersCreated++;
           }
+          // 24h email — parent
+          if (!parentPrefs || parentPrefs.email?.sessionReminder24h !== false) {
+            const parentProfile = await kv.get(`user:${booking.parentId}`) as any;
+            const parentEmail = parentProfile?.email;
+            if (parentEmail) {
+              const roomLink = booking.googleMeetLink || booking.meetLink || '';
+              await sendEmail({
+                to: parentEmail,
+                ...emailTemplates.sessionReminder(
+                  parentProfile?.firstName || parentProfile?.name || 'Parent',
+                  booking.tutorName || 'Tutor',
+                  booking.date,
+                  booking.startTime || '',
+                  roomLink
+                ),
+              }).catch(e => console.warn('24h reminder email (parent):', e));
+            }
+          }
 
           if (booking.studentId && (!studentPrefs || studentPrefs.inApp.sessionReminder24h)) {
             await createNotification(
@@ -419,6 +456,24 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
               { bookingId: booking.id }
             );
             remindersCreated++;
+          }
+          // 24h email — student
+          if (booking.studentId && (!studentPrefs || studentPrefs.email?.sessionReminder24h !== false)) {
+            const studentProfile = await kv.get(`user:${booking.studentId}`) as any;
+            const studentEmail = studentProfile?.email;
+            if (studentEmail) {
+              const roomLink = booking.googleMeetLink || booking.meetLink || '';
+              await sendEmail({
+                to: studentEmail,
+                ...emailTemplates.sessionReminder(
+                  studentProfile?.firstName || studentProfile?.name || 'Student',
+                  booking.tutorName || 'Tutor',
+                  booking.date,
+                  booking.startTime || '',
+                  roomLink
+                ),
+              }).catch(e => console.warn('24h reminder email (student):', e));
+            }
           }
         }
 
@@ -439,6 +494,24 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
             );
             remindersCreated++;
           }
+          // 1h email — tutor
+          if (!tutorPrefs || tutorPrefs.email?.sessionReminder1h !== false) {
+            const tutorProfile = await kv.get(`user:${booking.tutorId}`) as any;
+            const tutorEmail = tutorProfile?.email;
+            if (tutorEmail) {
+              const roomLink = booking.googleMeetLink || booking.meetLink || '';
+              await sendEmail({
+                to: tutorEmail,
+                ...emailTemplates.sessionReminder(
+                  tutorProfile?.firstName || tutorProfile?.name || 'Tutor',
+                  booking.studentName || 'Student',
+                  booking.date,
+                  booking.startTime || '',
+                  roomLink
+                ),
+              }).catch(e => console.warn('1h reminder email (tutor):', e));
+            }
+          }
 
           if (!parentPrefs || parentPrefs.inApp.sessionReminder1h) {
             await createNotification(
@@ -451,6 +524,24 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
             );
             remindersCreated++;
           }
+          // 1h email — parent
+          if (!parentPrefs || parentPrefs.email?.sessionReminder1h !== false) {
+            const parentProfile = await kv.get(`user:${booking.parentId}`) as any;
+            const parentEmail = parentProfile?.email;
+            if (parentEmail) {
+              const roomLink = booking.googleMeetLink || booking.meetLink || '';
+              await sendEmail({
+                to: parentEmail,
+                ...emailTemplates.sessionReminder(
+                  parentProfile?.firstName || parentProfile?.name || 'Parent',
+                  booking.tutorName || 'Tutor',
+                  booking.date,
+                  booking.startTime || '',
+                  roomLink
+                ),
+              }).catch(e => console.warn('1h reminder email (parent):', e));
+            }
+          }
 
           if (booking.studentId && (!studentPrefs || studentPrefs.inApp.sessionReminder1h)) {
             await createNotification(
@@ -462,6 +553,24 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
               { bookingId: booking.id }
             );
             remindersCreated++;
+          }
+          // 1h email — student
+          if (booking.studentId && (!studentPrefs || studentPrefs.email?.sessionReminder1h !== false)) {
+            const studentProfile = await kv.get(`user:${booking.studentId}`) as any;
+            const studentEmail = studentProfile?.email;
+            if (studentEmail) {
+              const roomLink = booking.googleMeetLink || booking.meetLink || '';
+              await sendEmail({
+                to: studentEmail,
+                ...emailTemplates.sessionReminder(
+                  studentProfile?.firstName || studentProfile?.name || 'Student',
+                  booking.tutorName || 'Tutor',
+                  booking.date,
+                  booking.startTime || '',
+                  roomLink
+                ),
+              }).catch(e => console.warn('1h reminder email (student):', e));
+            }
           }
         }
       }

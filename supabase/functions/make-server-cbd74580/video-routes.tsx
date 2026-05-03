@@ -1,4 +1,4 @@
-import { Router } from 'npm:hono@4';
+import { Hono } from 'npm:hono@4';
 import {
   createVideoSession,
   startVideoSession,
@@ -18,7 +18,7 @@ import {
   estimateQualityFromBitrate,
 } from './video-session-service.tsx';
 
-export const videoRoutes = new Router();
+export const videoRoutes = new Hono();
 
 // ========== VIDEO SESSION MANAGEMENT ==========
 

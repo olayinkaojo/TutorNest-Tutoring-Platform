@@ -1,4 +1,4 @@
-import { Router } from 'npm:hono@4';
+import { Hono } from 'npm:hono@4';
 import {
   getClassAnalytics,
   getStudentAnalytics,
@@ -8,7 +8,7 @@ import {
   getStrugglingSudents,
 } from './class-analytics-service.tsx';
 
-export const analyticsRoutes = new Router();
+export const analyticsRoutes = new Hono();
 
 // ========== CLASS ANALYTICS ENDPOINTS ==========
 

@@ -1,4 +1,4 @@
-import { Router } from 'npm:hono@4';
+import { Hono } from 'npm:hono@4';
 import {
   startScreenShare,
   stopScreenShare,
@@ -15,7 +15,7 @@ import {
   getOptimalFrameRate,
 } from './screen-share-service.tsx';
 
-export const screenShareRoutes = new Router();
+export const screenShareRoutes = new Hono();
 
 // ========== SCREEN SHARE LIFECYCLE ==========
 

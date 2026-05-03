@@ -1,4 +1,4 @@
-import { Router } from 'npm:hono@4';
+import { Hono } from 'npm:hono@4';
 import {
   linkAssignmentToSession,
   unlinkAssignmentFromSession,
@@ -11,7 +11,7 @@ import {
   getSessionWorkflowSummary,
 } from './session-assignment-service.tsx';
 
-export const sessionAssignmentRoutes = new Router();
+export const sessionAssignmentRoutes = new Hono();
 
 // ========== ASSIGNMENT LINKING ==========
 
