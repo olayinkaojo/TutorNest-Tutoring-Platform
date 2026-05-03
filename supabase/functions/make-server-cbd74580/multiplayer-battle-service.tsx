@@ -1,9 +1,4 @@
-import { createClient } from "jsr:@supabase/supabase-js@2";
-
-const supabase = createClient(
-  Deno.env.get("SUPABASE_URL") || "",
-  Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") || ""
-);
+import * as kv from "./kv_store.tsx";
 
 interface BattleParticipant {
   userId: string;
@@ -27,51 +22,103 @@ interface BattleRound {
   question: BattleQuestion;
   player1Answer: { answer: number; timeMs: number; isCorrect: boolean } | null;
   player2Answer: { answer: number; timeMs: number; isCorrect: boolean } | null;
-  winner: string | null; // userId of winner or null if tie
+  winner: string | null;
   completedAt: number | null;
 }
 
 interface TriviaBattle {
   id: string;
   player1: BattleParticipant;
-  player2: BattleParticipant;
-  totalRounds: number; // Usually 5 questions
+  player2: BattleParticipant | null;
+  totalRounds: number;
   currentRound: number;
   rounds: BattleRound[];
   status: "pending" | "active" | "completed";
   createdAtMs: number;
   startedAtMs: number | null;
   completedAtMs: number | null;
-  winner: string | null; // userId
-  inviteCode: string | null; // For friend challenges
+  winner: string | null;
+  inviteCode: string | null;
 }
 
 interface BattleInvite {
   inviteCode: string;
   fromUserId: string;
-  toUserId: string | null; // null if public invite
+  toUserId: string | null;
   battleId: string;
   createdAtMs: number;
   expiresAtMs: number;
   status: "pending" | "accepted" | "rejected" | "expired";
 }
 
-// Generate random invite code (4 chars)
 function generateInviteCode(): string {
   return Math.random().toString(36).substring(2, 6).toUpperCase();
 }
 
-// Find or create a battle (auto-match or friend challenge)
+function battleKey(id: string): string {
+  return `battle:${id}`;
+}
+
+/** Load trivia rounds (correct indices stored server-side only). */
+export async function seedBattleRounds(
+  battle: TriviaBattle,
+  grade: string = "year_5"
+): Promise<void> {
+  const mod = await import("./comprehensive-trivia-data.tsx");
+  const bank = mod.COMPREHENSIVE_TRIVIA as Record<
+    string,
+    Record<string, unknown[]>
+  >;
+  const subjects = bank[grade] ?? bank["year_5"];
+  if (!subjects) {
+    battle.rounds = [];
+    return;
+  }
+  const flat = Object.values(subjects).flat() as Array<{
+    id: string;
+    question: string;
+    options: string[];
+    correctAnswer?: number;
+    correctAnswerIndex?: number;
+  }>;
+  const shuffled = [...flat].sort(() => Math.random() - 0.5);
+  const n = Math.min(battle.totalRounds, shuffled.length);
+  const picks = shuffled.slice(0, n);
+
+  battle.rounds = picks.map((q, i) => {
+    const correct =
+      typeof q.correctAnswer === "number"
+        ? q.correctAnswer
+        : typeof q.correctAnswerIndex === "number"
+          ? q.correctAnswerIndex
+          : 0;
+    return {
+      roundNumber: i,
+      question: {
+        questionId: q.id,
+        question: q.question,
+        options: Array.isArray(q.options) ? q.options : [],
+        correctAnswerIndex: correct,
+      },
+      player1Answer: null,
+      player2Answer: null,
+      winner: null,
+      completedAt: null,
+    };
+  });
+}
+
 export async function initiateNewBattle(
-  kv: Deno.KvStore,
   userId: string,
   userName: string,
   userLevel: number,
   battleMode: "random" | "friend_challenge" = "random",
-  targetUserId?: string
+  targetUserId?: string,
+  grade: string = "year_5"
 ): Promise<{
   success: boolean;
   battle?: TriviaBattle;
+  battleId?: string;
   waitingForOpponent?: boolean;
   inviteCode?: string;
   message: string;
@@ -79,10 +126,9 @@ export async function initiateNewBattle(
   const battleId = `battle_${userId}_${Date.now()}`;
 
   try {
-    // Check if user already has a pending battle
     const existingKey = `user_pending_battle:${userId}`;
-    const existing = await kv.get([existingKey]);
-    if (existing.value) {
+    const existing = await kv.get(existingKey);
+    if (existing != null) {
       return {
         success: false,
         message: "You already have an active battle. Complete it first!",
@@ -99,45 +145,59 @@ export async function initiateNewBattle(
       currentQuestion: 0,
     };
 
-    if (battleMode === "friend_challenge" && targetUserId) {
-      // Create invite for friend
+    if (battleMode === "friend_challenge") {
       const inviteCode = generateInviteCode();
+      const battle: TriviaBattle = {
+        id: battleId,
+        player1: participant,
+        player2: null,
+        totalRounds: 5,
+        currentRound: 0,
+        rounds: [],
+        status: "pending",
+        createdAtMs: Date.now(),
+        startedAtMs: null,
+        completedAtMs: null,
+        winner: null,
+        inviteCode,
+      };
+
       const invite: BattleInvite = {
         inviteCode,
         fromUserId: userId,
-        toUserId: targetUserId,
+        toUserId: targetUserId ?? null,
         battleId,
         createdAtMs: Date.now(),
-        expiresAtMs: Date.now() + 3600000, // 1 hour expiry
+        expiresAtMs: Date.now() + 3600000,
         status: "pending",
       };
 
-      await kv.set([`battle_invite:${inviteCode}`], invite, { expirationTtl: 3600 });
+      await kv.set(battleKey(battleId), battle);
+      await kv.set(`battle_invite:${inviteCode}`, invite);
+      await kv.set(existingKey, { battleId });
 
       return {
         success: true,
         waitingForOpponent: true,
         inviteCode,
+        battleId,
         message: `Invite sent! Share code ${inviteCode} with your friend.`,
       };
     }
 
-    // Random matchmaking
-    // Look for someone else waiting
     const waitingListKey = `battle_waiting_list:${userLevel}`;
-    const waitingEntry = await kv.get([waitingListKey]);
+    const waitingEntry = await kv.get(waitingListKey);
     let opponent: BattleParticipant | null = null;
 
-    if (waitingEntry.value) {
-      const waitingBattle = waitingEntry.value as {
+    if (waitingEntry != null) {
+      const waitingBattle = waitingEntry as {
         battleId: string;
         participant: BattleParticipant;
       };
 
-      // Check if it's not stale (older than 5 minutes)
-      const existingBattle = await kv.get([`battle:${waitingBattle.battleId}`]);
-      if (existingBattle.value) {
-        const battle = existingBattle.value as TriviaBattle;
+      const existingBattleRaw = await kv.get(battleKey(waitingBattle.battleId));
+      if (existingBattleRaw != null) {
+        const battle = existingBattleRaw as TriviaBattle;
         if (Date.now() - battle.createdAtMs < 300000) {
           opponent = waitingBattle.participant;
         }
@@ -145,11 +205,10 @@ export async function initiateNewBattle(
     }
 
     if (!opponent) {
-      // No opponent available, add to waiting list
       const battle: TriviaBattle = {
         id: battleId,
         player1: participant,
-        player2: null as any, // Will be populated when opponent joins
+        player2: null,
         totalRounds: 5,
         currentRound: 0,
         rounds: [],
@@ -161,47 +220,45 @@ export async function initiateNewBattle(
         inviteCode: null,
       };
 
-      await kv.set([`battle:${battleId}`], battle, { expirationTtl: 600 }); // 10 min TTL
-      await kv.set(
-        [waitingListKey],
-        { battleId, participant },
-        { expirationTtl: 600 }
-      );
-      await kv.set([existingKey], { battleId });
+      await kv.set(battleKey(battleId), battle);
+      await kv.set(waitingListKey, { battleId, participant });
+      await kv.set(existingKey, { battleId });
 
       return {
         success: true,
         waitingForOpponent: true,
+        battleId,
         message: "Searching for opponent...",
       };
     }
 
-    // Create battle with both players
-    const battle: TriviaBattle = {
-      id: battleId,
-      player1: participant,
-      player2: opponent,
-      totalRounds: 5,
-      currentRound: 0,
-      rounds: [],
-      status: "active",
-      createdAtMs: Date.now(),
-      startedAtMs: Date.now(),
-      completedAtMs: null,
-      winner: null,
-      inviteCode: null,
-    };
+    const openBattleId = (waitingEntry as { battleId: string; participant: BattleParticipant }).battleId;
+    const openRaw = await kv.get(battleKey(openBattleId));
+    if (openRaw == null) {
+      await kv.del(waitingListKey);
+      return {
+        success: false,
+        message: "Match expired — try again",
+      };
+    }
 
-    await kv.set([`battle:${battleId}`], battle, { expirationTtl: 1800 }); // 30 min
-    await kv.set([existingKey], { battleId });
-    await kv.set([`user_pending_battle:${opponent.userId}`], { battleId });
+    const openBattle = openRaw as TriviaBattle;
+    openBattle.player2 = participant;
+    openBattle.status = "active";
+    openBattle.startedAtMs = Date.now();
+    await seedBattleRounds(openBattle, grade);
 
-    // Remove from waiting list
-    await kv.delete([waitingListKey]);
+    await kv.set(battleKey(openBattleId), openBattle);
+    await kv.set(existingKey, { battleId: openBattleId });
+    await kv.set(`user_pending_battle:${openBattle.player1.userId}`, {
+      battleId: openBattleId,
+    });
+    await kv.del(waitingListKey);
 
     return {
       success: true,
-      battle,
+      battle: openBattle,
+      battleId: openBattleId,
       message: "Battle started!",
     };
   } catch (error) {
@@ -213,28 +270,26 @@ export async function initiateNewBattle(
   }
 }
 
-// Accept friend invite
 export async function acceptBattleInvite(
-  kv: Deno.KvStore,
   userId: string,
   userName: string,
-  userLevel: number,
   inviteCode: string
 ): Promise<{
   success: boolean;
   battle?: TriviaBattle;
+  battleId?: string;
   message: string;
 }> {
   try {
-    const inviteEntry = await kv.get([`battle_invite:${inviteCode}`]);
-    if (!inviteEntry.value) {
+    const inviteRaw = await kv.get(`battle_invite:${inviteCode}`);
+    if (inviteRaw == null) {
       return {
         success: false,
         message: "Invalid or expired invite code",
       };
     }
 
-    const invite = inviteEntry.value as BattleInvite;
+    const invite = inviteRaw as BattleInvite;
 
     if (invite.status !== "pending") {
       return {
@@ -245,29 +300,27 @@ export async function acceptBattleInvite(
 
     if (invite.expiresAtMs < Date.now()) {
       invite.status = "expired";
-      await kv.set([`battle_invite:${inviteCode}`], invite);
+      await kv.set(`battle_invite:${inviteCode}`, invite);
       return {
         success: false,
         message: "Invite has expired",
       };
     }
 
-    // Get the battle
-    const battleEntry = await kv.get([`battle:${invite.battleId}`]);
-    if (!battleEntry.value) {
+    const battleRaw = await kv.get(battleKey(invite.battleId));
+    if (battleRaw == null) {
       return {
         success: false,
         message: "Battle not found",
       };
     }
 
-    const battle = battleEntry.value as TriviaBattle;
+    const battle = battleRaw as TriviaBattle;
 
-    // Add as player2
     battle.player2 = {
       userId,
       userName,
-      userLevel,
+      userLevel: 1,
       score: 0,
       answeredQuestions: 0,
       averageSpeed: 0,
@@ -277,17 +330,17 @@ export async function acceptBattleInvite(
     battle.status = "active";
     battle.startedAtMs = Date.now();
 
-    // Update invite status
-    invite.status = "accepted";
-    await kv.set([`battle_invite:${inviteCode}`], invite);
+    await seedBattleRounds(battle, "year_5");
 
-    // Save battle
-    await kv.set([`battle:${battle.id}`], battle);
-    await kv.set([`user_pending_battle:${userId}`], { battleId: battle.id });
+    invite.status = "accepted";
+    await kv.set(`battle_invite:${inviteCode}`, invite);
+    await kv.set(battleKey(battle.id), battle);
+    await kv.set(`user_pending_battle:${userId}`, { battleId: battle.id });
 
     return {
       success: true,
       battle,
+      battleId: battle.id,
       message: "Battle started!",
     };
   } catch (error) {
@@ -299,24 +352,22 @@ export async function acceptBattleInvite(
   }
 }
 
-// Record answer in battle
 export async function recordBattleAnswer(
-  kv: Deno.KvStore,
   battleId: string,
   userId: string,
   questionIndex: number,
   answer: number,
-  timeMs: number,
-  isCorrect: boolean
+  timeMs: number
 ): Promise<{
   success: boolean;
   opponentAnswered: boolean;
   roundComplete: boolean;
+  battleComplete?: boolean;
   message: string;
 }> {
   try {
-    const battleEntry = await kv.get([`battle:${battleId}`]);
-    if (!battleEntry.value) {
+    const battleRaw = await kv.get(battleKey(battleId));
+    if (battleRaw == null) {
       return {
         success: false,
         opponentAnswered: false,
@@ -325,7 +376,7 @@ export async function recordBattleAnswer(
       };
     }
 
-    const battle = battleEntry.value as TriviaBattle;
+    const battle = battleRaw as TriviaBattle;
 
     if (battle.status !== "active") {
       return {
@@ -336,7 +387,15 @@ export async function recordBattleAnswer(
       };
     }
 
-    // Determine which player is answering
+    if (!battle.player2) {
+      return {
+        success: false,
+        opponentAnswered: false,
+        roundComplete: false,
+        message: "Waiting for opponent",
+      };
+    }
+
     const isPlayer1 = battle.player1.userId === userId;
     const isPlayer2 = battle.player2.userId === userId;
 
@@ -349,22 +408,48 @@ export async function recordBattleAnswer(
       };
     }
 
-    // Get or create current round
-    let currentRound = battle.rounds[battle.currentRound];
-    if (!currentRound) {
-      currentRound = {
-        roundNumber: battle.currentRound,
-        question: null as any,
-        player1Answer: null,
-        player2Answer: null,
-        winner: null,
-        completedAt: null,
+    if (questionIndex !== battle.currentRound) {
+      return {
+        success: false,
+        opponentAnswered: false,
+        roundComplete: false,
+        message: "Invalid round",
       };
-      battle.rounds.push(currentRound);
     }
 
-    // Record answer
-    const playerAnswer = { answer, timeMs, isCorrect };
+    const currentRound = battle.rounds[battle.currentRound];
+    if (!currentRound?.question) {
+      return {
+        success: false,
+        opponentAnswered: false,
+        roundComplete: false,
+        message: "Battle not ready",
+      };
+    }
+
+    if (isPlayer1 && currentRound.player1Answer !== null) {
+      return {
+        success: false,
+        opponentAnswered: currentRound.player2Answer !== null,
+        roundComplete: false,
+        message: "You already answered this round",
+      };
+    }
+    if (isPlayer2 && currentRound.player2Answer !== null) {
+      return {
+        success: false,
+        opponentAnswered: currentRound.player1Answer !== null,
+        roundComplete: false,
+        message: "You already answered this round",
+      };
+    }
+
+    const correctIdx = currentRound.question.correctAnswerIndex;
+    const serverIsCorrect =
+      typeof correctIdx === "number" &&
+      answer === correctIdx;
+
+    const playerAnswer = { answer, timeMs, isCorrect: serverIsCorrect };
 
     if (isPlayer1) {
       currentRound.player1Answer = playerAnswer;
@@ -374,64 +459,73 @@ export async function recordBattleAnswer(
       battle.player2.answeredQuestions += 1;
     }
 
-    // Check if round is complete (both players answered)
     const roundComplete =
       currentRound.player1Answer !== null && currentRound.player2Answer !== null;
 
     if (roundComplete) {
-      // Determine round winner
-      const p1Correct = currentRound.player1Answer.isCorrect;
-      const p2Correct = currentRound.player2Answer.isCorrect;
+      const p1 = currentRound.player1Answer!;
+      const p2 = currentRound.player2Answer!;
+
+      const p1Correct = p1.isCorrect;
+      const p2Correct = p2.isCorrect;
 
       if (p1Correct && !p2Correct) {
         currentRound.winner = battle.player1.userId;
         battle.player1.score += 1;
       } else if (!p1Correct && p2Correct) {
-        currentRound.winner = battle.player2.userId;
-        battle.player2.score += 1;
+        currentRound.winner = battle.player2!.userId;
+        battle.player2!.score += 1;
       } else if (p1Correct && p2Correct) {
-        // Both correct - faster wins
-        if (currentRound.player1Answer.timeMs < currentRound.player2Answer.timeMs) {
+        if (p1.timeMs < p2.timeMs) {
           currentRound.winner = battle.player1.userId;
           battle.player1.score += 1;
         } else {
-          currentRound.winner = battle.player2.userId;
-          battle.player2.score += 1;
+          currentRound.winner = battle.player2!.userId;
+          battle.player2!.score += 1;
         }
       }
-      // If both wrong or tie on time, no point awarded
 
       currentRound.completedAt = Date.now();
 
-      // Check if battle complete
+      let battleComplete = false;
       if (battle.currentRound >= battle.totalRounds - 1) {
         battle.status = "completed";
         battle.completedAtMs = Date.now();
+        battleComplete = true;
 
-        // Determine overall winner
-        if (battle.player1.score > battle.player2.score) {
+        if (battle.player1.score > battle.player2!.score) {
           battle.winner = battle.player1.userId;
-        } else if (battle.player2.score > battle.player1.score) {
-          battle.winner = battle.player2.userId;
+        } else if (battle.player2!.score > battle.player1.score) {
+          battle.winner = battle.player2!.userId;
         }
-        // If tie, winner = null
 
-        // Store battle result
-        await kv.set([`battle_result:${battleId}`], battle);
-        await kv.delete([`user_pending_battle:${battle.player1.userId}`]);
-        await kv.delete([`user_pending_battle:${battle.player2.userId}`]);
+        await kv.set(`battle_result:${battleId}`, battle);
+        await kv.del(`user_pending_battle:${battle.player1.userId}`);
+        await kv.del(`user_pending_battle:${battle.player2!.userId}`);
       } else {
-        // Advance to next round
         battle.currentRound += 1;
       }
+
+      await kv.set(battleKey(battleId), battle);
+
+      return {
+        success: true,
+        opponentAnswered: true,
+        roundComplete,
+        battleComplete,
+        message: battleComplete ? "Battle complete" : "Round complete",
+      };
     }
 
-    await kv.set([`battle:${battleId}`], battle, { expirationTtl: 1800 });
+    await kv.set(battleKey(battleId), battle);
 
     return {
       success: true,
-      opponentAnswered: isPlayer1 ? currentRound.player2Answer !== null : currentRound.player1Answer !== null,
+      opponentAnswered: isPlayer1
+        ? currentRound.player2Answer !== null
+        : currentRound.player1Answer !== null,
       roundComplete,
+      battleComplete: false,
       message: roundComplete ? "Round complete" : "Waiting for opponent",
     };
   } catch (error) {
@@ -445,22 +539,17 @@ export async function recordBattleAnswer(
   }
 }
 
-// Get battle status (for real-time updates)
-export async function getBattleStatus(
-  kv: Deno.KvStore,
-  battleId: string
-): Promise<TriviaBattle | null> {
+export async function getBattleStatus(battleId: string): Promise<TriviaBattle | null> {
   try {
-    const entry = await kv.get([`battle:${battleId}`]);
-    return (entry.value as TriviaBattle) || null;
+    const raw = await kv.get(battleKey(battleId));
+    return (raw as TriviaBattle) || null;
   } catch (error) {
     console.error("Error getting battle status:", error);
     return null;
   }
 }
 
-// Get battle leaderboard (weekly)
-export async function getWeeklyBattleLeaderboard(kv: Deno.KvStore): Promise<
+export async function getWeeklyBattleLeaderboard(): Promise<
   Array<{
     rank: number;
     userId: string;
@@ -471,28 +560,22 @@ export async function getWeeklyBattleLeaderboard(kv: Deno.KvStore): Promise<
     rating: number;
   }>
 > {
-  // This would aggregate battle results for the week
   return [];
 }
 
-// Get user's battle stats
-export async function getUserBattleStats(
-  kv: Deno.KvStore,
-  userId: string
-): Promise<{
+export async function getUserBattleStats(_userId: string): Promise<{
   totalBattles: number;
   wins: number;
   losses: number;
   winRate: number;
   rating: number;
 }> {
-  // This would query all completed battles for user
   return {
     totalBattles: 0,
     wins: 0,
     losses: 0,
     winRate: 0,
-    rating: 1000, // Elo-like rating
+    rating: 1000,
   };
 }
 

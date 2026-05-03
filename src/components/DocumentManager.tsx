@@ -135,7 +135,8 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
     setSelectedRecipientName(hit?.name || '');
   }, [uploadRecipientId, children, bookedTutors, bookedStudents, bookedParents, bookedParentsForTutor]);
 
-  const ACTIVE = new Set(['confirmed', 'completed', 'scheduled']);
+  /** Align with student dashboard: pending/upcoming sessions count as “active” for sharing & contacts */
+  const ACTIVE = new Set(['confirmed', 'completed', 'scheduled', 'pending']);
 
   const loadBookedTutors = async () => {
     try {

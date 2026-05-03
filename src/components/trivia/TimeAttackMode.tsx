@@ -103,7 +103,7 @@ export function TimeAttackMode() {
         {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ questionId: question.id, answerIndex, timeSpentMs, isCorrect: answerIndex === 0 })
+          body: JSON.stringify({ questionId: question.id, answerIndex, timeSpentMs })
         }
       );
 

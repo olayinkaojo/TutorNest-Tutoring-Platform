@@ -82,7 +82,7 @@ export function DailyChallenge() {
       const response = await fetch(`${BASE}/trivia-extended/daily-challenge/submit`, {
         method: 'POST',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ isCorrect: selectedAnswer === (challenge?.options.length ?? 0) - 1 })
+        body: JSON.stringify({ answerIndex: selectedAnswer })
       });
 
       if (!response.ok) throw new Error('Failed to submit answer');

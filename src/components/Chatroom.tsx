@@ -47,7 +47,7 @@ interface Conversation {
   updatedAt: string;
 }
 
-const ACTIVE_BOOKING = new Set(['confirmed', 'completed', 'scheduled']);
+const ACTIVE_BOOKING = new Set(['confirmed', 'completed', 'scheduled', 'pending']);
 
 /** Must match Edge `messaging-access` channel names */
 function messagingChannelForContact(

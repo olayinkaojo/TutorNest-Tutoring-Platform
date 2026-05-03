@@ -4,7 +4,12 @@
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 
-export const MESSAGING_BOOKING_STATUSES = new Set(['confirmed', 'completed', 'scheduled']);
+export const MESSAGING_BOOKING_STATUSES = new Set([
+  'confirmed',
+  'completed',
+  'scheduled',
+  'pending',
+]);
 
 export type MessagingChannel = 'parent-tutor' | 'tutor-parent' | 'tutor-student';
 
@@ -24,9 +29,21 @@ function normalizeBooking(raw: Record<string, unknown>) {
 /** DB + KV user ids to include (auth id plus dependent student’s linked child profile id). */
 export async function bookingIdentityIdsForUser(userId: string): Promise<string[]> {
   const ids = new Set<string>([userId]);
+  const addLinked = (raw: Record<string, unknown> | null | undefined) => {
+    if (!raw) return;
+    const link =
+      (raw.linkedChildId as string | undefined) ||
+      (raw.linked_child_id as string | undefined);
+    if (link && link !== userId) ids.add(link);
+  };
   try {
-    const prof = (await kv.get(`user:${userId}`)) as { linkedChildId?: string } | null;
-    if (prof?.linkedChildId && prof.linkedChildId !== userId) ids.add(prof.linkedChildId);
+    addLinked((await kv.get(`user:${userId}`)) as Record<string, unknown> | null);
+  } catch {
+    /* non-fatal */
+  }
+  try {
+    const dbp = await db.getProfile(userId);
+    addLinked(dbp as Record<string, unknown> | null);
   } catch {
     /* non-fatal */
   }

@@ -1,17 +1,14 @@
-import { Hono } from 'npm:hono@4';
+/**
+ * Extended trivia API under /trivia-extended: daily challenge + time attack (Postgres kv_store).
+ */
+import { Hono } from "npm:hono@4";
 import { createClient } from "jsr:@supabase/supabase-js@2";
-import * as db from "./db.tsx";
 import * as kv from "./kv_store.tsx";
 import * as dailyChallengeService from "./daily-challenge-service.tsx";
 import * as timeAttackService from "./time-attack-service.tsx";
-import * as multiplayerBattleService from "./multiplayer-battle-service.tsx";
-import { COMPREHENSIVE_TRIVIA } from "./comprehensive-trivia-data.tsx";
 
 const app = new Hono();
 
-// ==================== DAILY CHALLENGES ====================
-
-// Get today's daily challenge
 app.get("/daily-challenge", async (c) => {
   try {
     const challenge = await dailyChallengeService.getDailyChallenge();
@@ -57,7 +54,6 @@ app.get("/daily-challenge", async (c) => {
   }
 });
 
-// Submit daily challenge answer
 app.post("/daily-challenge/submit", async (c) => {
   try {
     const accessToken = c.req.header("Authorization")?.split(" ")[1];
@@ -79,10 +75,10 @@ app.post("/daily-challenge/submit", async (c) => {
     }
 
     const body = await c.req.json();
-    const todayChallenge = await dailyChallengeService.getDailyChallenge();
+    const challenge = await dailyChallengeService.getDailyChallenge();
     const isCorrect =
       typeof body.answerIndex === "number"
-        ? body.answerIndex === todayChallenge.correctAnswer
+        ? body.answerIndex === challenge.correctAnswer
         : Boolean(body.isCorrect);
 
     const result = await dailyChallengeService.recordDailyCompletion(
@@ -93,10 +89,6 @@ app.post("/daily-challenge/submit", async (c) => {
     if (!result.success) {
       return c.json({ ...result }, 200);
     }
-
-    // Award XP to user
-    // TODO: Integrate with gamification/user stats system
-    // await updateUserXP(userData.user.id, result.xpReward.totalXp);
 
     return c.json({
       success: true,
@@ -110,7 +102,6 @@ app.post("/daily-challenge/submit", async (c) => {
   }
 });
 
-// Get user's streak info
 app.get("/daily-challenge/streak", async (c) => {
   try {
     const accessToken = c.req.header("Authorization")?.split(" ")[1];
@@ -142,7 +133,6 @@ app.get("/daily-challenge/streak", async (c) => {
   }
 });
 
-// Use streak freeze
 app.post("/daily-challenge/use-freeze", async (c) => {
   try {
     const accessToken = c.req.header("Authorization")?.split(" ")[1];
@@ -174,9 +164,8 @@ app.post("/daily-challenge/use-freeze", async (c) => {
   }
 });
 
-// ==================== TIME ATTACK MODE ====================
+// ─── Time Attack (matches TimeAttackMode.tsx) ─────────────────────────────
 
-// Initialize time attack session
 app.post("/time-attack/start", async (c) => {
   try {
     const accessToken = c.req.header("Authorization")?.split(" ")[1];
@@ -197,33 +186,49 @@ app.post("/time-attack/start", async (c) => {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const kvStore = await kv.getKVStore();
-    const session = await timeAttackService.initializeTimeAttackSession(
-      kvStore,
-      userData.user.id
-    );
-
-    // Fetch 10 random questions
     const grade = c.req.query("grade") || "year_5";
-    const allQuestions =
-      COMPREHENSIVE_TRIVIA[grade as keyof typeof COMPREHENSIVE_TRIVIA];
-
+    const mod = await import("./comprehensive-trivia-data.tsx");
+    const COMPREHENSIVE_TRIVIA = mod.COMPREHENSIVE_TRIVIA as Record<
+      string,
+      Record<string, unknown[]>
+    >;
+    const allQuestions = COMPREHENSIVE_TRIVIA[grade];
     if (!allQuestions) {
       return c.json({ error: "Grade not found" }, 404);
     }
 
-    // Collect all questions from all subjects
-    const allQuestionsFlattened = Object.values(allQuestions).flat();
-    const shuffled = [...allQuestionsFlattened].sort(
-      () => Math.random() - 0.5
-    );
+    const allQuestionsFlattened = Object.values(allQuestions).flat() as Array<{
+      id: string;
+      question: string;
+      options: string[];
+      correctAnswer?: number;
+      correctAnswerIndex?: number;
+    }>;
+
+    const shuffled = [...allQuestionsFlattened].sort(() => Math.random() - 0.5);
     const selectedQuestions = shuffled.slice(0, 10);
+
+    const session = await timeAttackService.initializeTimeAttackSession(
+      userData.user.id
+    );
+
+    const meta: Record<string, number> = {};
+    for (const q of selectedQuestions) {
+      const idx =
+        typeof q.correctAnswer === "number"
+          ? q.correctAnswer
+          : typeof q.correctAnswerIndex === "number"
+            ? q.correctAnswerIndex
+            : 0;
+      meta[q.id] = idx;
+    }
+    await kv.set(`time_attack_meta:${session.id}`, meta);
 
     return c.json({
       sessionId: session.id,
       durationSeconds: 300,
       totalQuestions: 10,
-      questions: selectedQuestions.map((q: any) => ({
+      questions: selectedQuestions.map((q) => ({
         id: q.id,
         question: q.question,
         options: q.options,
@@ -235,7 +240,6 @@ app.post("/time-attack/start", async (c) => {
   }
 });
 
-// Record time attack answer
 app.post("/time-attack/:sessionId/answer", async (c) => {
   try {
     const accessToken = c.req.header("Authorization")?.split(" ")[1];
@@ -243,25 +247,54 @@ app.post("/time-attack/:sessionId/answer", async (c) => {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const sessionId = c.req.param("sessionId");
-    const { questionId, answerIndex, timeSpentMs, isCorrect } = await c.req.json();
-
-    const kvStore = await kv.getKVStore();
-    const result = await timeAttackService.recordTimeAttackAnswer(
-      kvStore,
-      sessionId,
-      questionId,
-      { questionId, selectedAnswerIndex: answerIndex, timeSpentMs, isCorrect }
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
 
-    return c.json(result);
+    const { data: userData, error: userError } = await supabase.auth.getUser(
+      accessToken
+    );
+
+    if (userError || !userData?.user) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const sessionId = c.req.param("sessionId");
+    const body = await c.req.json();
+    const questionId = String(body.questionId ?? "");
+    const answerIndex = Number(body.answerIndex);
+    const timeSpentMs = Number(body.timeSpentMs);
+
+    const session = await timeAttackService.getTimeAttackSession(sessionId);
+    if (!session || session.userId !== userData.user.id) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
+    const meta = (await kv.get(`time_attack_meta:${sessionId}`)) as Record<
+      string,
+      number
+    > | null;
+    const correctIdx = meta && questionId ? meta[questionId] : undefined;
+    const isCorrect =
+      typeof correctIdx === "number" &&
+      !Number.isNaN(answerIndex) &&
+      answerIndex === correctIdx;
+
+    const result = await timeAttackService.recordTimeAttackAnswer(sessionId, {
+      questionId,
+      selectedAnswerIndex: answerIndex,
+      timeSpentMs,
+      isCorrect,
+    });
+
+    return c.json({ ...result, isCorrect });
   } catch (error) {
     console.error("Error recording time attack answer:", error);
     return c.json({ error: "Failed to record answer" }, 500);
   }
 });
 
-// Complete time attack session
 app.post("/time-attack/:sessionId/complete", async (c) => {
   try {
     const accessToken = c.req.header("Authorization")?.split(" ")[1];
@@ -269,12 +302,31 @@ app.post("/time-attack/:sessionId/complete", async (c) => {
       return c.json({ error: "Unauthorized" }, 401);
     }
 
-    const sessionId = c.req.param("sessionId");
-    const kvStore = await kv.getKVStore();
-    const result = await timeAttackService.completeTimeAttackSession(
-      kvStore,
-      sessionId
+    const supabase = createClient(
+      Deno.env.get("SUPABASE_URL") ?? "",
+      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
     );
+
+    const { data: userData, error: userError } = await supabase.auth.getUser(
+      accessToken
+    );
+
+    if (userError || !userData?.user) {
+      return c.json({ error: "Unauthorized" }, 401);
+    }
+
+    const sessionId = c.req.param("sessionId");
+    const session = await timeAttackService.getTimeAttackSession(sessionId);
+    if (!session || session.userId !== userData.user.id) {
+      return c.json({ error: "Forbidden" }, 403);
+    }
+
+    const result = await timeAttackService.completeTimeAttackSession(sessionId);
+    try {
+      await kv.del(`time_attack_meta:${sessionId}`);
+    } catch {
+      /* non-fatal */
+    }
 
     return c.json(result);
   } catch (error) {
@@ -283,170 +335,12 @@ app.post("/time-attack/:sessionId/complete", async (c) => {
   }
 });
 
-// Get time attack leaderboard (weekly)
 app.get("/time-attack/leaderboard/weekly", async (c) => {
   try {
-    const kvStore = await kv.getKVStore();
-    const leaderboard = await timeAttackService.getWeeklyTimeAttackLeaderboard(kvStore);
-
+    const leaderboard = await timeAttackService.getWeeklyTimeAttackLeaderboard();
     return c.json({ leaderboard });
   } catch (error) {
     console.error("Error fetching time attack leaderboard:", error);
-    return c.json({ error: "Failed to fetch leaderboard" }, 500);
-  }
-});
-
-// ==================== MULTIPLAYER BATTLES ====================
-
-// Initiate new battle
-app.post("/battle/start", async (c) => {
-  try {
-    const accessToken = c.req.header("Authorization")?.split(" ")[1];
-    if (!accessToken) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    const { data: userData, error: userError } = await supabase.auth.getUser(
-      accessToken
-    );
-
-    if (userError || !userData?.user) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-
-    const { battleMode = "random", targetUserId } = await c.req.json();
-    const kvStore = await kv.getKVStore();
-
-    // Get user profile for name and level
-    const { data: profile } = await supabase
-      .from("user_profiles")
-      .select("full_name")
-      .eq("id", userData.user.id)
-      .single();
-
-    const result = await multiplayerBattleService.initiateNewBattle(
-      kvStore,
-      userData.user.id,
-      profile?.full_name || "Student",
-      1, // Default level
-      battleMode as "random" | "friend_challenge",
-      targetUserId
-    );
-
-    return c.json(result);
-  } catch (error) {
-    console.error("Error starting battle:", error);
-    return c.json({ error: "Failed to start battle" }, 500);
-  }
-});
-
-// Accept battle invite
-app.post("/battle/accept/:inviteCode", async (c) => {
-  try {
-    const accessToken = c.req.header("Authorization")?.split(" ")[1];
-    if (!accessToken) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    const { data: userData, error: userError } = await supabase.auth.getUser(
-      accessToken
-    );
-
-    if (userError || !userData?.user) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-
-    const inviteCode = c.req.param("inviteCode");
-    const profile = await db.getProfile(userData.user.id);
-
-    const result = await multiplayerBattleService.acceptBattleInvite(
-      userData.user.id,
-      profile?.fullName || profile?.full_name || profile?.name || "Student",
-      inviteCode
-    );
-
-    return c.json(result);
-  } catch (error) {
-    console.error("Error accepting battle invite:", error);
-    return c.json({ error: "Failed to accept invite" }, 500);
-  }
-});
-
-// Record battle answer
-app.post("/battle/:battleId/answer", async (c) => {
-  try {
-    const accessToken = c.req.header("Authorization")?.split(" ")[1];
-    if (!accessToken) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-
-    const supabase = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? ""
-    );
-
-    const { data: userData, error: userError } = await supabase.auth.getUser(
-      accessToken
-    );
-
-    if (userError || !userData?.user) {
-      return c.json({ error: "Unauthorized" }, 401);
-    }
-
-    const battleId = c.req.param("battleId");
-    const { questionIndex, answerIndex, timeMs } = await c.req.json();
-
-    const result = await multiplayerBattleService.recordBattleAnswer(
-      battleId,
-      userData.user.id,
-      questionIndex,
-      answerIndex,
-      timeMs
-    );
-
-    return c.json(result);
-  } catch (error) {
-    console.error("Error recording battle answer:", error);
-    return c.json({ error: "Failed to record answer" }, 500);
-  }
-});
-
-// Get battle status
-app.get("/battle/:battleId", async (c) => {
-  try {
-    const battleId = c.req.param("battleId");
-    const battle = await multiplayerBattleService.getBattleStatus(battleId);
-
-    if (!battle) {
-      return c.json({ error: "Battle not found" }, 404);
-    }
-
-    return c.json({ battle });
-  } catch (error) {
-    console.error("Error fetching battle status:", error);
-    return c.json({ error: "Failed to fetch battle status" }, 500);
-  }
-});
-
-// Get battle leaderboard (weekly)
-app.get("/battle/leaderboard/weekly", async (c) => {
-  try {
-    const kvStore = await kv.getKVStore();
-    const leaderboard = await multiplayerBattleService.getWeeklyBattleLeaderboard(kvStore);
-
-    return c.json({ leaderboard });
-  } catch (error) {
-    console.error("Error fetching battle leaderboard:", error);
     return c.json({ error: "Failed to fetch leaderboard" }, 500);
   }
 });

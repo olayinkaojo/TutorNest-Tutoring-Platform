@@ -2,6 +2,7 @@ import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
+import { collectBookingsForUser } from './messaging-access.tsx';
 
 const app = new Hono();
 
@@ -53,17 +54,41 @@ app.get('/bookings', async (c) => {
     const { data: { user } } = await supabase.auth.getUser(accessToken);
     if (!user) return c.json({ error: 'Unauthorized' }, 401);
 
+    /** Normalize DB/KV rows so enrichment always sees camelCase ids. */
+    const normalizeBookingPayload = (b: Record<string, unknown>) => ({
+      ...b,
+      id: b.id as string,
+      tutorId: (b.tutorId ?? b.tutor_id) as string | undefined,
+      studentId: (b.studentId ?? b.student_id) as string | undefined,
+      userId: (b.userId ?? b.user_id) as string | undefined,
+      date: b.date as string | undefined,
+      startTime: (b.startTime ?? b.start_time) as string | undefined,
+      endTime: (b.endTime ?? b.end_time) as string | undefined,
+      duration: b.duration as number | undefined,
+      subject: b.subject as string | undefined,
+      status: b.status as string | undefined,
+      paymentStatus: (b.paymentStatus ?? b.payment_status) as string | undefined,
+      meetLink: (b.meetLink ?? b.meet_link) as string | undefined,
+      paymentId: (b.paymentId ?? b.payment_id) as string | undefined,
+      planType: (b.planType ?? b.plan_type) as string | undefined,
+      sessionNumber: (b.sessionNumber ?? b.session_number) as number | undefined,
+      totalSessions: (b.totalSessions ?? b.total_sessions) as number | undefined,
+    });
+
     // Fetch bookings based on role context (role-specific filtering)
-    let rawBookings;
+    let rawBookings: ReturnType<typeof normalizeBookingPayload>[];
     if (c.req.query('tutorId')) {
-      // Get bookings where user is the TUTOR (teaching sessions)
-      rawBookings = await db.getBookingsByTutorId(c.req.query('tutorId')!);
+      rawBookings = (await db.getBookingsByTutorId(c.req.query('tutorId')!)).map((row) =>
+        normalizeBookingPayload(row as unknown as Record<string, unknown>)
+      );
     } else if (c.req.query('studentId')) {
-      // Get bookings where user is the STUDENT (attending sessions)
-      rawBookings = await db.getBookingsByStudentId(c.req.query('studentId')!);
+      rawBookings = (await db.getBookingsByStudentId(c.req.query('studentId')!)).map((row) =>
+        normalizeBookingPayload(row as unknown as Record<string, unknown>)
+      );
     } else {
-      // Default: Get all bookings involving the authenticated user (all roles)
-      rawBookings = await db.getBookingsByUserId(user.id);
+      // Default + `?persona=`: include auth user AND linked child profile (bookings often use child id as student_id)
+      const merged = await collectBookingsForUser(user.id);
+      rawBookings = merged.map((row) => normalizeBookingPayload(row));
     }
 
     // Enrich each booking with tutor/student display names and meet link.
@@ -72,7 +97,11 @@ app.get('/bookings', async (c) => {
     //   2. KV user:${id}      — covers tutor/parent profiles stored only in KV
     //   3. KV child:${id}     — covers child profiles (never in the DB, added via AddChildDialog)
     const profileIds = [
-      ...new Set(rawBookings.flatMap((b) => [b.tutorId, b.studentId, b.userId].filter(Boolean))),
+      ...new Set(
+        rawBookings.flatMap((b) =>
+          [b.tutorId, b.studentId, b.userId].filter((x): x is string => typeof x === 'string' && x.length > 0)
+        ),
+      ),
     ];
     const profileMap: Record<string, any> = {};
     if (profileIds.length > 0) {
@@ -100,9 +129,9 @@ app.get('/bookings', async (c) => {
       fallback;
 
     const bookings = rawBookings.map((b) => {
-      const tutor   = profileMap[b.tutorId]   ?? {};
-      const student = profileMap[b.studentId] ?? {};
-      const parent  = profileMap[b.userId]    ?? {};
+      const tutor   = (b.tutorId && profileMap[b.tutorId])     || {};
+      const student = (b.studentId && profileMap[b.studentId]) || {};
+      const parent  = (b.userId && profileMap[b.userId])       || {};
 
       return {
         ...b,

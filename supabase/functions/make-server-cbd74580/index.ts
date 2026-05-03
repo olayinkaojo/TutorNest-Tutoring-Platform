@@ -29,7 +29,8 @@ import roleManagementRoutes from './role-management-routes.tsx';
 import assessmentsRoutes from './assessments-routes.tsx';
 import curriculumRoutes from './curriculum-routes.tsx';
 import triviaRoutes from './trivia-routes.tsx';
-// import extendedTriviaRoutes from './extended-trivia-routes.tsx'; // disabled: imports broken time-attack/multiplayer/daily-challenge services
+import dailyExtendedRoutes from './daily-extended-routes.tsx';
+import battleRoutes from './battle-routes.tsx';
 import { achievementRoutes } from './achievement-routes.tsx';
 import { topicRoutes } from './topic-routes.tsx';
 import { teacherRoutes } from './teacher-routes.tsx';
@@ -426,8 +427,9 @@ app.route('/make-server-cbd74580/curriculum', curriculumRoutes);
 // Register trivia routes
 app.route('/make-server-cbd74580/trivia', triviaRoutes);
 
-// Register extended trivia routes (daily challenges, time attack, battles)
-// app.route('/make-server-cbd74580/trivia-extended', extendedTriviaRoutes);
+// Register trivia-extended (daily challenge + time attack) and /battle/* (arena)
+app.route('/make-server-cbd74580/trivia-extended', dailyExtendedRoutes);
+app.route('/make-server-cbd74580', battleRoutes);
 
 // Register achievement routes (badges, leaderboards, stats)
 app.route('/make-server-cbd74580/achievements', achievementRoutes);
