@@ -1,18 +1,19 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, type ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Badge } from './ui/badge';
-import { 
-  TrendingUp, 
-  TrendingDown, 
-  Users, 
-  DollarSign, 
+import { Button } from './ui/button';
+import { Alert, AlertDescription } from './ui/alert';
+import {
+  Users,
+  DollarSign,
   BookOpen,
-  Clock,
+  Activity,
   Star,
-  Activity
+  AlertCircle,
+  RefreshCw,
 } from 'lucide-react';
-import { projectId } from '../utils/supabase/info';
 import { formatNaira } from '../utils/currency';
+import adminAPI, { AdminAPIError } from '../utils/admin-api-client';
 import {
   LineChart,
   Line,
@@ -26,47 +27,114 @@ import {
   CartesianGrid,
   Tooltip,
   Legend,
-  ResponsiveContainer
+  ResponsiveContainer,
 } from 'recharts';
 
 interface AdminAnalyticsProps {
-  session: any;
+  session: { access_token: string } | null;
 }
 
+type AnalyticsStats = {
+  totalUsers: number;
+  totalTutors: number;
+  totalParents: number;
+  totalStudents: number;
+  verifiedTutors: number;
+  pendingVerifications: number;
+  totalBookings: number;
+  completedSessions: number;
+  totalRevenue: number;
+  platformFees: number;
+  averageRating: number | null;
+  activeUsers: number;
+  sessionCompletionRate: number;
+};
+
+const emptyStats: AnalyticsStats = {
+  totalUsers: 0,
+  totalTutors: 0,
+  totalParents: 0,
+  totalStudents: 0,
+  verifiedTutors: 0,
+  pendingVerifications: 0,
+  totalBookings: 0,
+  completedSessions: 0,
+  totalRevenue: 0,
+  platformFees: 0,
+  averageRating: null,
+  activeUsers: 0,
+  sessionCompletionRate: 0,
+};
+
 export function AdminAnalytics({ session }: AdminAnalyticsProps) {
-  const [analytics, setAnalytics] = useState<any>(null);
+  const [analytics, setAnalytics] = useState<{
+    stats: AnalyticsStats;
+    revenueData: { month: string; revenue: number; fees: number }[];
+    userGrowthData: { month: string; tutors: number; parents: number; students: number }[];
+    subjectDistribution: { name: string; value: number; color: string }[];
+  } | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    loadAnalytics();
-  }, []);
-
-  const loadAnalytics = async () => {
+  const loadAnalytics = useCallback(async () => {
+    const token = session?.access_token;
+    if (!token) {
+      setLoading(false);
+      setError('Not signed in.');
+      return;
+    }
+    setError(null);
+    setLoading(true);
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/analytics`,
-        {
-          headers: {
-            Authorization: `Bearer ${session.access_token}`,
-          },
-        }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        setAnalytics(data);
-      }
+      const data = await adminAPI.getAnalytics(token);
+      const s = data.stats as Record<string, unknown>;
+      setAnalytics({
+        stats: {
+          totalUsers: Number(s.totalUsers) || 0,
+          totalTutors: Number(s.totalTutors) || 0,
+          totalParents: Number(s.totalParents) || 0,
+          totalStudents: Number(s.totalStudents) || 0,
+          verifiedTutors: Number(s.verifiedTutors) || 0,
+          pendingVerifications: Number(s.pendingVerifications) || 0,
+          totalBookings: Number(s.totalBookings) || 0,
+          completedSessions: Number(s.completedSessions) || 0,
+          totalRevenue: Number(s.totalRevenue) || 0,
+          platformFees: Number(s.platformFees) || 0,
+          averageRating:
+            s.averageRating === null || s.averageRating === undefined
+              ? null
+              : Number(s.averageRating),
+          activeUsers: Number(s.activeUsers) || 0,
+          sessionCompletionRate: Number(s.sessionCompletionRate) || 0,
+        },
+        revenueData: data.revenueData ?? [],
+        userGrowthData: data.userGrowthData ?? [],
+        subjectDistribution: data.subjectDistribution ?? [],
+      });
     } catch (err) {
+      const msg =
+        err instanceof AdminAPIError
+          ? err.status === 403
+            ? 'You do not have permission to view analytics.'
+            : err.message
+          : err instanceof Error
+            ? err.message
+            : 'Could not load analytics.';
+      setError(msg);
       console.error('Error loading analytics:', err);
     } finally {
       setLoading(false);
     }
-  };
+  }, [session?.access_token]);
 
-  if (loading) {
+  useEffect(() => {
+    void loadAnalytics();
+  }, [loadAnalytics]);
+
+  if (loading && !analytics) {
     return (
       <div className="text-center py-12">
-        <div 
+        <div
           className="w-8 h-8 border-4 border-t-transparent rounded-full animate-spin mx-auto"
           style={{ borderColor: '#625d9c', borderTopColor: 'transparent' }}
         />
@@ -75,69 +143,36 @@ export function AdminAnalytics({ session }: AdminAnalyticsProps) {
     );
   }
 
-  const stats = analytics?.stats || {
-    totalUsers: 0,
-    totalTutors: 0,
-    totalParents: 0,
-    totalStudents: 0,
-    verifiedTutors: 0,
-    pendingVerifications: 0,
-    totalBookings: 0,
-    completedSessions: 0,
-    totalRevenue: 0,
-    platformFees: 0,
-    averageRating: 0,
-    activeUsers: 0
-  };
+  const stats = analytics?.stats ?? emptyStats;
+  const revenueData = analytics?.revenueData ?? [];
+  const userGrowthData = analytics?.userGrowthData ?? [];
+  const subjectDistribution = analytics?.subjectDistribution ?? [];
 
-  const revenueData = analytics?.revenueData || [
-    { month: 'Jan', revenue: 2400, fees: 240 },
-    { month: 'Feb', revenue: 1398, fees: 139.8 },
-    { month: 'Mar', revenue: 9800, fees: 980 },
-    { month: 'Apr', revenue: 3908, fees: 390.8 },
-    { month: 'May', revenue: 4800, fees: 480 },
-    { month: 'Jun', revenue: 3800, fees: 380 },
-  ];
+  const hasRevenueChart = revenueData.some((r) => r.revenue > 0 || r.fees > 0);
+  const hasGrowthChart = userGrowthData.some(
+    (r) => r.tutors > 0 || r.parents > 0 || r.students > 0
+  );
+  const hasSubjectPie = subjectDistribution.length > 0;
 
-  const userGrowthData = analytics?.userGrowthData || [
-    { month: 'Jan', tutors: 12, parents: 45, students: 67 },
-    { month: 'Feb', tutors: 18, parents: 62, students: 89 },
-    { month: 'Mar', tutors: 25, parents: 78, students: 112 },
-    { month: 'Apr', tutors: 33, parents: 95, students: 145 },
-    { month: 'May', tutors: 42, parents: 118, students: 178 },
-    { month: 'Jun', tutors: 51, parents: 142, students: 215 },
-  ];
-
-  const subjectDistribution = analytics?.subjectDistribution || [
-    { name: 'Mathematics', value: 35, color: '#625d9c' },
-    { name: 'English', value: 28, color: '#5d9827' },
-    { name: 'Science', value: 20, color: '#3b82f6' },
-    { name: 'Languages', value: 10, color: '#f59e0b' },
-    { name: 'Other', value: 7, color: '#8b5cf6' },
-  ];
-
-  const MetricCard = ({ title, value, change, icon: Icon, trend, color }: any) => (
+  const MetricCard = ({
+    title,
+    value,
+    icon: Icon,
+    color,
+  }: {
+    title: string;
+    value: ReactNode;
+    icon: typeof Users;
+    color: string;
+  }) => (
     <Card>
       <CardContent className="pt-6">
         <div className="flex items-start justify-between">
           <div className="flex-1">
             <p className="text-sm text-gray-600 mb-1">{title}</p>
             <h2 className="mb-2">{value}</h2>
-            {change && (
-              <div className="flex items-center gap-1">
-                {trend === 'up' ? (
-                  <TrendingUp className="w-4 h-4 text-green-600" />
-                ) : (
-                  <TrendingDown className="w-4 h-4 text-red-600" />
-                )}
-                <span className={`text-sm ${trend === 'up' ? 'text-green-600' : 'text-red-600'}`}>
-                  {change}
-                </span>
-                <span className="text-sm text-gray-500">vs last month</span>
-              </div>
-            )}
           </div>
-          <div 
+          <div
             className="w-12 h-12 rounded-xl flex items-center justify-center"
             style={{ backgroundColor: `${color}20` }}
           >
@@ -150,37 +185,40 @@ export function AdminAnalytics({ session }: AdminAnalyticsProps) {
 
   return (
     <div className="space-y-6">
+      {error && (
+        <Alert variant="destructive" className="border-red-200 bg-red-50">
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="flex flex-wrap items-center justify-between gap-2">
+            <span>{error}</span>
+            <Button type="button" variant="outline" size="sm" onClick={() => void loadAnalytics()}>
+              <RefreshCw className="w-4 h-4 mr-1" />
+              Retry
+            </Button>
+          </AlertDescription>
+        </Alert>
+      )}
+
+      <div className="flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          size="sm"
+          disabled={loading}
+          onClick={() => void loadAnalytics()}
+        >
+          <RefreshCw className={`w-4 h-4 mr-1 ${loading ? 'animate-spin' : ''}`} />
+          Refresh
+        </Button>
+      </div>
+
       {/* Key Metrics */}
       <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-4">
+        <MetricCard title="Total Users" value={stats.totalUsers} icon={Users} color="#625d9c" />
+        <MetricCard title="Verified Tutors" value={stats.verifiedTutors} icon={Star} color="#5d9827" />
+        <MetricCard title="Total Bookings" value={stats.totalBookings} icon={BookOpen} color="#3b82f6" />
         <MetricCard
-          title="Total Users"
-          value={stats.totalUsers}
-          change="+12.5%"
-          trend="up"
-          icon={Users}
-          color="#625d9c"
-        />
-        <MetricCard
-          title="Verified Tutors"
-          value={stats.verifiedTutors}
-          change="+8.2%"
-          trend="up"
-          icon={Star}
-          color="#5d9827"
-        />
-        <MetricCard
-          title="Total Bookings"
-          value={stats.totalBookings}
-          change="+15.3%"
-          trend="up"
-          icon={BookOpen}
-          color="#3b82f6"
-        />
-        <MetricCard
-          title="Platform Revenue"
+          title="Platform Fees (est.)"
           value={formatNaira(stats.platformFees, false)}
-          change="+22.1%"
-          trend="up"
           icon={DollarSign}
           color="#10b981"
         />
@@ -204,176 +242,175 @@ export function AdminAnalytics({ session }: AdminAnalyticsProps) {
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-600">Active Users (24h)</p>
+              <p className="text-sm text-gray-600">Active users (24h)</p>
               <Activity className="w-5 h-5 text-green-600" />
             </div>
             <h2>{stats.activeUsers}</h2>
-            <p className="text-sm text-gray-500 mt-1">Currently online or active</p>
+            <p className="text-sm text-gray-500 mt-1">Profiles with activity in the last 24 hours</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-600">Average Rating</p>
+              <p className="text-sm text-gray-600">Average tutor rating</p>
               <Star className="w-5 h-5 text-yellow-500 fill-yellow-500" />
             </div>
-            <h2>{stats.averageRating || '4.8'}</h2>
-            <p className="text-sm text-gray-500 mt-1">Across all tutors</p>
+            <h2>{stats.averageRating != null ? stats.averageRating : '—'}</h2>
+            <p className="text-sm text-gray-500 mt-1">
+              {stats.averageRating != null ? 'Across tutors with ratings' : 'No ratings yet'}
+            </p>
           </CardContent>
         </Card>
       </div>
 
       {/* Charts */}
       <div className="grid lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>Revenue & Platform Fees</CardTitle>
-            <CardDescription>Monthly revenue breakdown (Last 6 months)</CardDescription>
+            <CardTitle>Revenue & platform fees</CardTitle>
+            <CardDescription>Last 6 months from recorded payments (KV)</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <BarChart data={revenueData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Bar dataKey="revenue" fill="#625d9c" name="Total Revenue" />
-                <Bar dataKey="fees" fill="#5d9827" name="Platform Fees" />
-              </BarChart>
-            </ResponsiveContainer>
+            {hasRevenueChart ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <BarChart data={revenueData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="revenue" fill="#625d9c" name="Total revenue" />
+                  <Bar dataKey="fees" fill="#5d9827" name="Platform fees (20%)" />
+                </BarChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-gray-500 text-sm">
+                No payment activity in the last six months.
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* User Growth Chart */}
         <Card>
           <CardHeader>
-            <CardTitle>User Growth Trends</CardTitle>
-            <CardDescription>New user registrations by role</CardDescription>
+            <CardTitle>New registrations by month</CardTitle>
+            <CardDescription>Users created in each month (by role)</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <LineChart data={userGrowthData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="month" />
-                <YAxis />
-                <Tooltip />
-                <Legend />
-                <Line type="monotone" dataKey="tutors" stroke="#625d9c" name="Tutors" strokeWidth={2} />
-                <Line type="monotone" dataKey="parents" stroke="#5d9827" name="Parents" strokeWidth={2} />
-                <Line type="monotone" dataKey="students" stroke="#3b82f6" name="Students" strokeWidth={2} />
-              </LineChart>
-            </ResponsiveContainer>
+            {hasGrowthChart ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={userGrowthData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis dataKey="month" />
+                  <YAxis />
+                  <Tooltip />
+                  <Legend />
+                  <Line type="monotone" dataKey="tutors" stroke="#625d9c" name="Tutors" strokeWidth={2} />
+                  <Line type="monotone" dataKey="parents" stroke="#5d9827" name="Parents" strokeWidth={2} />
+                  <Line type="monotone" dataKey="students" stroke="#3b82f6" name="Students" strokeWidth={2} />
+                </LineChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-gray-500 text-sm">
+                No user sign-ups recorded in the last six months.
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Subject Distribution */}
         <Card>
           <CardHeader>
-            <CardTitle>Subject Distribution</CardTitle>
-            <CardDescription>Booking distribution by subject</CardDescription>
+            <CardTitle>Subject distribution</CardTitle>
+            <CardDescription>Bookings by subject (top 8)</CardDescription>
           </CardHeader>
           <CardContent>
-            <ResponsiveContainer width="100%" height={300}>
-              <PieChart>
-                <Pie
-                  data={subjectDistribution}
-                  cx="50%"
-                  cy="50%"
-                  labelLine={false}
-                  label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
-                  outerRadius={100}
-                  fill="#8884d8"
-                  dataKey="value"
-                >
-                  {subjectDistribution.map((entry: any, index: number) => (
-                    <Cell key={`cell-${index}`} fill={entry.color} />
-                  ))}
-                </Pie>
-                <Tooltip />
-              </PieChart>
-            </ResponsiveContainer>
+            {hasSubjectPie ? (
+              <ResponsiveContainer width="100%" height={300}>
+                <PieChart>
+                  <Pie
+                    data={subjectDistribution}
+                    cx="50%"
+                    cy="50%"
+                    labelLine={false}
+                    label={({ name, percent }) => `${name} ${(percent * 100).toFixed(0)}%`}
+                    outerRadius={100}
+                    fill="#8884d8"
+                    dataKey="value"
+                  >
+                    {subjectDistribution.map((entry, index) => (
+                      <Cell key={`cell-${entry.name}-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip />
+                </PieChart>
+              </ResponsiveContainer>
+            ) : (
+              <div className="h-[300px] flex items-center justify-center text-gray-500 text-sm">
+                No bookings with subjects yet.
+              </div>
+            )}
           </CardContent>
         </Card>
 
-        {/* Performance Metrics */}
         <Card>
           <CardHeader>
-            <CardTitle>Platform Performance</CardTitle>
-            <CardDescription>Key operational metrics</CardDescription>
+            <CardTitle>Operational snapshot</CardTitle>
+            <CardDescription>Derived from booking outcomes</CardDescription>
           </CardHeader>
           <CardContent>
             <div className="space-y-4">
               <div>
                 <div className="flex justify-between mb-2">
-                  <span className="text-sm">Session Completion Rate</span>
-                  <span className="text-sm">94%</span>
+                  <span className="text-sm">Session completion rate</span>
+                  <span className="text-sm tabular-nums">{stats.sessionCompletionRate}%</span>
                 </div>
                 <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-green-600 h-2 rounded-full" style={{ width: '94%' }}></div>
+                  <div
+                    className="bg-green-600 h-2 rounded-full transition-all"
+                    style={{
+                      width: `${Math.min(100, Math.max(0, stats.sessionCompletionRate))}%`,
+                    }}
+                  />
                 </div>
+                <p className="text-xs text-muted-foreground mt-1">
+                  Completed sessions ÷ total bookings
+                </p>
               </div>
 
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm">Tutor Response Rate</span>
-                  <span className="text-sm">88%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="h-2 rounded-full" style={{ backgroundColor: '#625d9c', width: '88%' }}></div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm">Parent Satisfaction</span>
-                  <span className="text-sm">92%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="h-2 rounded-full" style={{ backgroundColor: '#5d9827', width: '92%' }}></div>
-                </div>
-              </div>
-
-              <div>
-                <div className="flex justify-between mb-2">
-                  <span className="text-sm">Platform Uptime</span>
-                  <span className="text-sm">99.9%</span>
-                </div>
-                <div className="w-full bg-gray-200 rounded-full h-2">
-                  <div className="bg-blue-600 h-2 rounded-full" style={{ width: '99.9%' }}></div>
-                </div>
-              </div>
+              <p className="text-xs text-muted-foreground pt-2 border-t">
+                Response rates and satisfaction scores require dedicated tracking; use Session Reports and
+                disputes for qualitative signals.
+              </p>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Quick Stats Grid */}
+      {/* User breakdown */}
       <Card>
         <CardHeader>
-          <CardTitle>User Breakdown</CardTitle>
-          <CardDescription>Current user distribution across roles</CardDescription>
+          <CardTitle>User breakdown</CardTitle>
+          <CardDescription>Current user counts by role (KV profiles)</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="grid md:grid-cols-3 gap-6">
             <div className="text-center p-4 bg-purple-50 rounded-lg">
               <Users className="w-8 h-8 mx-auto mb-2" style={{ color: '#625d9c' }} />
               <h3 className="mb-1">{stats.totalTutors}</h3>
-              <p className="text-sm text-gray-600">Total Tutors</p>
+              <p className="text-sm text-gray-600">Total tutors</p>
               <p className="text-xs text-gray-500 mt-1">{stats.verifiedTutors} verified</p>
             </div>
             <div className="text-center p-4 bg-green-50 rounded-lg">
               <Users className="w-8 h-8 mx-auto mb-2" style={{ color: '#5d9827' }} />
               <h3 className="mb-1">{stats.totalParents}</h3>
-              <p className="text-sm text-gray-600">Total Parents</p>
+              <p className="text-sm text-gray-600">Total parents</p>
               <p className="text-xs text-gray-500 mt-1">Active accounts</p>
             </div>
             <div className="text-center p-4 bg-blue-50 rounded-lg">
               <Users className="w-8 h-8 mx-auto mb-2 text-blue-600" />
               <h3 className="mb-1">{stats.totalStudents}</h3>
-              <p className="text-sm text-gray-600">Total Students</p>
+              <p className="text-sm text-gray-600">Total students</p>
               <p className="text-xs text-gray-500 mt-1">Student profiles</p>
             </div>
           </div>

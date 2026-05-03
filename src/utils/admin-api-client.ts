@@ -142,6 +142,16 @@ const adminAPI = {
     return response;
   },
 
+  /** KV-backed analytics summary + last 6 months revenue / signups / subject mix */
+  async getAnalytics(accessToken: string) {
+    return makeRequest<{
+      stats: Record<string, unknown>;
+      revenueData?: { month: string; revenue: number; fees: number }[];
+      userGrowthData?: { month: string; tutors: number; parents: number; students: number }[];
+      subjectDistribution?: { name: string; value: number; color: string }[];
+    }>(`/admin/analytics`, accessToken, { skipCache: true });
+  },
+
   /**
    * Get all students across platform
    */

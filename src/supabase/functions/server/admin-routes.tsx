@@ -61,6 +61,35 @@ function calculateAge(dateOfBirth: string): number {
   return age;
 }
 
+/** Last `count` calendar months as stable keys + short labels (oldest → newest). */
+function rollingMonthSlots(count: number): { key: string; label: string }[] {
+  const out: { key: string; label: string }[] = [];
+  const now = new Date();
+  for (let i = count - 1; i >= 0; i--) {
+    const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+    const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+    const label = d.toLocaleDateString('en-US', { month: 'short' });
+    out.push({ key, label });
+  }
+  return out;
+}
+
+function paymentMonthKey(p: any): string | null {
+  const s = p.paidAt || p.paid_at || p.createdAt || p.created_at || p.updatedAt || p.updated_at;
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+function userCreatedMonthKey(u: any): string | null {
+  const s = u.createdAt || u.created_at;
+  if (!s) return null;
+  const d = new Date(s);
+  return Number.isNaN(d.getTime()) ? null : `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+}
+
+const SUBJECT_PIE_COLORS = ['#625d9c', '#5d9827', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e'];
+
 export function adminRoutes(app: Hono, getUserId: (token: string | null) => Promise<string | null>) {
   
   // Admin Dashboard Overview Stats
@@ -496,7 +525,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
     }
   });
 
-  // Admin Analytics
+  // Admin Analytics (admin role only; charts from KV bookings/payments/users)
   app.get('/make-server-cbd74580/admin/analytics', async (c) => {
     try {
       const accessToken = c.req.header('Authorization')?.split(' ')[1];
@@ -506,7 +535,8 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      // Get all users
+      if (!await isAdminUser(userId)) return c.json({ error: 'Forbidden' }, 403);
+
       const allUsers = await kv.getByPrefix('user:');
       const allBookings = await kv.getByPrefix('booking:');
       const allPayments = await kv.getByPrefix('payment:');
@@ -517,21 +547,85 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       const totalStudents = allUsers.filter((u: any) => u.role === 'student').length;
       const verifiedTutors = allUsers.filter((u: any) => u.role === 'tutor' && u.verificationStatus === 'verified').length;
       const pendingVerifications = allUsers.filter((u: any) => u.role === 'tutor' && u.verificationStatus === 'pending').length;
-      
+
       const totalBookings = allBookings.length;
       const completedSessions = allBookings.filter((b: any) => b.status === 'completed').length;
-      
+
       const totalRevenue = allPayments.reduce((sum: number, p: any) => sum + (parseFloat(p.amount) || 0), 0);
-      const platformFees = totalRevenue * 0.20; // 20% platform fee
+      const platformFees = totalRevenue * 0.20;
 
-      // Active users in last 24 hours (simplified)
-      const activeUsers = Math.floor(totalUsers * 0.15);
+      const dayAgo = Date.now() - 24 * 60 * 60 * 1000;
+      const activeUsers = allUsers.filter((u: any) => {
+        const t = u.lastLogin || u.last_login || u.lastSignIn || u.last_seen || u.updatedAt;
+        if (!t) return false;
+        const ms = new Date(t).getTime();
+        return !Number.isNaN(ms) && ms > dayAgo;
+      }).length;
 
-      // Average rating
-      const tutorsWithRatings = allUsers.filter((u: any) => u.role === 'tutor' && u.rating);
-      const averageRating = tutorsWithRatings.length > 0
-        ? (tutorsWithRatings.reduce((sum: number, t: any) => sum + parseFloat(t.rating || 0), 0) / tutorsWithRatings.length).toFixed(1)
-        : '4.8';
+      const tutorsWithRatings = allUsers.filter((u: any) => u.role === 'tutor' && u.rating != null && u.rating !== '');
+      const averageRating =
+        tutorsWithRatings.length > 0
+          ? Math.round(
+              (tutorsWithRatings.reduce((sum: number, t: any) => sum + parseFloat(String(t.rating || 0)), 0) /
+                tutorsWithRatings.length) *
+                10
+            ) / 10
+          : null;
+
+      const sessionCompletionRate =
+        totalBookings > 0 ? Math.round((completedSessions / totalBookings) * 1000) / 10 : 0;
+
+      const slots = rollingMonthSlots(6);
+      const slotKeys = new Set(slots.map((s) => s.key));
+
+      const revenueByKey = new Map<string, { revenue: number; fees: number }>();
+      for (const { key } of slots) {
+        revenueByKey.set(key, { revenue: 0, fees: 0 });
+      }
+      for (const p of allPayments) {
+        const mk = paymentMonthKey(p);
+        if (!mk || !slotKeys.has(mk)) continue;
+        const amt = parseFloat(p.amount) || 0;
+        const cur = revenueByKey.get(mk)!;
+        cur.revenue += amt;
+        cur.fees += amt * 0.2;
+      }
+      const revenueData = slots.map(({ key, label }) => {
+        const v = revenueByKey.get(key) ?? { revenue: 0, fees: 0 };
+        return { month: label, revenue: Math.round(v.revenue), fees: Math.round(v.fees) };
+      });
+
+      const growthByKey = new Map<string, { tutors: number; parents: number; students: number }>();
+      for (const { key } of slots) {
+        growthByKey.set(key, { tutors: 0, parents: 0, students: 0 });
+      }
+      for (const u of allUsers) {
+        const mk = userCreatedMonthKey(u);
+        if (!mk || !slotKeys.has(mk)) continue;
+        const g = growthByKey.get(mk)!;
+        if (u.role === 'tutor') g.tutors += 1;
+        else if (u.role === 'parent') g.parents += 1;
+        else if (u.role === 'student') g.students += 1;
+      }
+      const userGrowthData = slots.map(({ key, label }) => {
+        const g = growthByKey.get(key) ?? { tutors: 0, parents: 0, students: 0 };
+        return { month: label, tutors: g.tutors, parents: g.parents, students: g.students };
+      });
+
+      const subjectCounts = new Map<string, number>();
+      for (const b of allBookings) {
+        const raw = (b.subject || b.topic || 'General') as string;
+        const name = String(raw).trim() || 'General';
+        subjectCounts.set(name, (subjectCounts.get(name) ?? 0) + 1);
+      }
+      const subjectDistribution = [...subjectCounts.entries()]
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([name, value], i) => ({
+          name,
+          value,
+          color: SUBJECT_PIE_COLORS[i % SUBJECT_PIE_COLORS.length],
+        }));
 
       return c.json({
         stats: {
@@ -546,8 +640,12 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
           totalRevenue: Math.round(totalRevenue),
           platformFees: Math.round(platformFees),
           averageRating,
-          activeUsers
-        }
+          activeUsers,
+          sessionCompletionRate,
+        },
+        revenueData,
+        userGrowthData,
+        subjectDistribution,
       });
     } catch (error: any) {
       console.error('Error fetching admin analytics:', error);
