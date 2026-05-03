@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 
 const payoutRoutes = new Hono();
@@ -37,11 +38,10 @@ payoutRoutes.get('/tutor/:tutorId/summary', async (c) => {
     }
 
     // Get all completed bookings for this tutor
-    const allBookings = await kv.getByPrefix('booking:');
-    const completedBookings = allBookings.filter((b: any) => 
-      b.tutorId === tutorId && 
+    const allBookings = await db.getBookingsByTutorId(tutorId);
+    const completedBookings = allBookings.filter((b: any) =>
       b.status === 'completed' &&
-      b.paidAt
+      (b.paymentStatus === 'paid' || b.paymentStatus === 'confirmed')
     );
 
     // Calculate earnings
@@ -98,13 +98,12 @@ payoutRoutes.get('/tutor/:tutorId/breakdown', async (c) => {
     }
 
     // Get all completed bookings
-    const allBookings = await kv.getByPrefix('booking:');
-    const completedBookings = allBookings.filter((b: any) => 
-      b.tutorId === tutorId && 
+    const allBookings = await db.getBookingsByTutorId(tutorId);
+    const completedBookings = allBookings.filter((b: any) =>
       b.status === 'completed' &&
-      b.paidAt
-    ).sort((a: any, b: any) => 
-      new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime()
+      (b.paymentStatus === 'paid' || b.paymentStatus === 'confirmed')
+    ).sort((a: any, b: any) =>
+      new Date(b.date).getTime() - new Date(a.date).getTime()
     );
 
     // Build detailed breakdown
@@ -115,7 +114,7 @@ payoutRoutes.get('/tutor/:tutorId/breakdown', async (c) => {
 
       return {
         bookingId: booking.id,
-        sessionDate: booking.sessionDate,
+        sessionDate: booking.date,
         studentName: booking.studentName || 'Unknown',
         subject: booking.subject,
         duration: booking.duration,
@@ -159,11 +158,10 @@ payoutRoutes.post('/tutor/:tutorId/request', async (c) => {
     }
 
     // Get tutor's pending payout amount
-    const allBookings = await kv.getByPrefix('booking:');
-    const pendingBookings = allBookings.filter((b: any) => 
-      b.tutorId === tutorId && 
+    const allBookings = await db.getBookingsByTutorId(tutorId);
+    const pendingBookings = allBookings.filter((b: any) =>
       b.status === 'completed' &&
-      b.paidAt &&
+      (b.paymentStatus === 'paid' || b.paymentStatus === 'confirmed') &&
       (!b.payoutStatus || b.payoutStatus === 'pending')
     );
 

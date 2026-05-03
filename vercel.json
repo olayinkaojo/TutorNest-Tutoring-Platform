@@ -2,6 +2,17 @@
   "buildCommand": "npm run build",
   "outputDirectory": "build",
   "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/$1" },
     { "source": "/(.*)", "destination": "/index.html" }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/send-reminders",
+      "schedule": "0 7 * * *"
+    },
+    {
+      "path": "/api/cron/send-reminders",
+      "schedule": "0 12 * * *"
+    }
   ]
 }

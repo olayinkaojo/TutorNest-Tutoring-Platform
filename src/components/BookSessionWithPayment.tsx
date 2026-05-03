@@ -296,6 +296,13 @@ export function BookSessionWithPayment({
           </Alert>
         )}
 
+        {/* Value-prop banner */}
+        <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg text-center">
+          <p className="text-sm text-purple-800">
+            <strong>Save with a session bundle.</strong> Multi-session plans include priority scheduling and a dedicated tutor relationship.
+          </p>
+        </div>
+
         {/* Plans grid */}
         <div className="grid md:grid-cols-3 gap-4 mt-1">
           {PLANS.map((plan, index) => {
@@ -327,7 +334,12 @@ export function BookSessionWithPayment({
                 )}
 
                     <CardHeader className="pb-2.5">
-                  <CardTitle className="text-lg">{plan.name}</CardTitle>
+                  <CardTitle className="text-lg flex items-center gap-2">
+                    {plan.name}
+                    {plan.planType === 'trial' && (
+                      <span className="text-[10px] font-normal text-gray-500 border border-gray-300 rounded px-1.5 py-0.5 leading-none">One-off lesson</span>
+                    )}
+                  </CardTitle>
                     <CardDescription className="text-xs min-h-0 sm:min-h-[2.5rem]">{plan.description}</CardDescription>
                 </CardHeader>
 
