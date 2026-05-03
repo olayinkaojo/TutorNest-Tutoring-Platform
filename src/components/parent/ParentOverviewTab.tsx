@@ -4,6 +4,7 @@ import { Button } from '../ui/button';
 import { StudentLoginManager } from '../StudentLoginManager';
 import { PendingLinkRequests } from '../PendingLinkRequests';
 import { UpcomingLessonsCard } from '../UpcomingLessonsCard';
+import { ParentGettingStartedCard } from './ParentGettingStartedCard';
 
 const GRADE_MAP: Record<string, string> = {
   nursery_1: 'Nursery 1 (Pre-Primary)',   nursery_2: 'Nursery 2 (Pre-Primary)',
@@ -37,6 +38,11 @@ interface Session {
 }
 
 interface ParentOverviewTabProps {
+  parentUserId?: string;
+  lessonsScheduled?: number;
+  completedLessons?: number;
+  onFindTutors?: () => void;
+  onOpenPayments?: () => void;
   children: Child[];
   loadingChildren: boolean;
   session: Session | null;
@@ -48,11 +54,35 @@ interface ParentOverviewTabProps {
 }
 
 export function ParentOverviewTab({
-  children, loadingChildren, session, activeChildId,
-  setShowAddChildDialog, handleEditChild, loadChildren, onViewBookings,
+  parentUserId,
+  lessonsScheduled = 0,
+  completedLessons = 0,
+  onFindTutors,
+  onOpenPayments,
+  children,
+  loadingChildren,
+  session,
+  activeChildId,
+  setShowAddChildDialog,
+  handleEditChild,
+  loadChildren,
+  onViewBookings,
 }: ParentOverviewTabProps) {
   return (
     <>
+      {parentUserId && onFindTutors && onOpenPayments && (
+        <ParentGettingStartedCard
+          userId={parentUserId}
+          childrenCount={children.length}
+          lessonsScheduled={lessonsScheduled}
+          completedLessons={completedLessons}
+          onAddChild={() => setShowAddChildDialog(true)}
+          onFindTutors={onFindTutors}
+          onBookings={onViewBookings}
+          onPayments={onOpenPayments}
+        />
+      )}
+
       <Card className="mb-8">
         <CardHeader>
           <CardTitle>Your Children</CardTitle>

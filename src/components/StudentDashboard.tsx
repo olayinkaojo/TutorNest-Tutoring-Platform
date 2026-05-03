@@ -23,12 +23,13 @@ import LearningPathProgress from './learning/LearningPathProgress';
 import SubjectLeaderboard from './learning/SubjectLeaderboard';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { getSupabaseClient } from '../utils/supabase/client';
+import { edgeFunctionUrl, edgeFunctionHeaders } from '../utils/supabase-edge-fetch';
 import { NotificationCenter } from './NotificationCenter';
 import { MobileNavigation } from './MobileNavigation';
 import { StudentAssessmentsList } from './StudentAssessmentsList';
 import TutorNestLogo from './TutorNestLogo';
 import studentAPI, { StudentAPIError } from '../utils/student-api-client';
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import {
   LineChart,
   Line,
@@ -53,6 +54,7 @@ import { Skeleton } from './ui/skeleton';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
+import { StudentGettingStartedCard } from './student/StudentGettingStartedCard';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import {
   BookOpen,
@@ -193,6 +195,38 @@ export function StudentDashboard({
       loadStudentData();
     }
   }, [session]);
+
+  /** Keep checklist fields (subjects, goals, grade) in sync after parent edits or profile API updates */
+  const mergeProfileFromServer = useCallback(async () => {
+    const token = session?.access_token;
+    if (!token) return;
+    try {
+      const res = await fetch(edgeFunctionUrl('profile'), {
+        headers: edgeFunctionHeaders(token),
+        signal: AbortSignal.timeout(10_000),
+      });
+      if (!res.ok) return;
+      const data = await res.json();
+      const next = data?.profile as Partial<UserProfile> | undefined;
+      if (!next || typeof next !== 'object') return;
+      setProfile((prev) => ({ ...prev, ...next }));
+    } catch {
+      /* non-fatal */
+    }
+  }, [session?.access_token]);
+
+  useEffect(() => {
+    setProfile((prev) => ({ ...prev, ...initialProfile }));
+  }, [initialProfile]);
+
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState !== 'visible' || !session?.access_token) return;
+      void mergeProfileFromServer();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [session?.access_token, mergeProfileFromServer]);
 
   // Monitor for progress improvements and notify tutors
   useEffect(() => {
@@ -396,6 +430,7 @@ export function StudentDashboard({
       toast.error('Could not load your sessions. Please refresh.');
     } finally {
       setLoading(false);
+      void mergeProfileFromServer();
     }
   };
 
@@ -659,6 +694,17 @@ export function StudentDashboard({
             )}
           </div>
         )}
+
+        {/* Learning checklist: one placement for all tabs (mobile nav defaults away from Performance) */}
+        <StudentGettingStartedCard
+          userId={String(profile.linkedChildId || profile.id || profile.userId || '')}
+          profile={profile}
+          completedSessions={stats.completedSessions}
+          upcomingSessions={stats.upcomingSessions}
+          onOpenSessions={() => setActiveTab('sessions')}
+          onOpenCurriculum={() => setActiveTab('curriculum')}
+          onOpenReports={() => setActiveTab('reports')}
+        />
 
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab}>

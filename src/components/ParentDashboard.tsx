@@ -822,6 +822,11 @@ export function ParentDashboard({
           <TabsContent value="overview">
             <ErrorBoundary tabName="Overview">
               <ParentOverviewTab
+                parentUserId={profile.id || profile.userId || ''}
+                lessonsScheduled={stats.lessonsScheduled}
+                completedLessons={stats.completedLessons}
+                onFindTutors={() => setActiveTab('find-tutors')}
+                onOpenPayments={() => setActiveTab('payments')}
                 children={children}
                 loadingChildren={loadingChildren}
                 session={session}

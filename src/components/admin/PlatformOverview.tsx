@@ -1,8 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
 import { Progress } from '../ui/progress';
+import { Skeleton } from '../ui/skeleton';
 import {
   Users,
   GraduationCap,
@@ -14,24 +15,48 @@ import {
   TrendingUp,
   TrendingDown,
   Activity,
-  Server,
-  Database,
   AlertTriangle,
   DollarSign,
   Calendar,
   BookOpen,
   BarChart3,
   Zap,
-  Globe,
-  Lock,
-  FileCheck
+  FileCheck,
+  RefreshCw,
+  Download,
+  Target,
+  Percent,
 } from 'lucide-react';
 import { projectId } from '../../utils/supabase/info';
-import { edgeFunctionHeaders, edgeFunctionUrl } from '../../utils/supabase-edge-fetch';
+import { edgeFetch } from '../../utils/supabase-edge-fetch';
+import { formatNaira } from '../../utils/currency';
+import {
+  ComposedChart,
+  Bar,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+  ResponsiveContainer,
+} from 'recharts';
 
 interface PlatformOverviewProps {
   session: any;
   onTabChange?: (tab: string) => void;
+}
+
+interface OverviewMeta {
+  generatedAt: string;
+  currency: string;
+  coverage: { profiles: number; bookings: number; payments: number };
+}
+
+interface DayTrend {
+  date: string;
+  bookings: number;
+  revenue: number;
 }
 
 interface PlatformStats {
@@ -71,25 +96,119 @@ interface PlatformStats {
   system: {
     serverStatus: 'healthy' | 'degraded' | 'down';
     databaseStatus: 'healthy' | 'degraded' | 'down';
-    uptime: number;
-    responseTime: number;
+    uptime: number | null;
+    responseTime: number | null;
+    computeTimeMs?: number;
   };
+  trends?: { last7Days: DayTrend[] };
+  insights?: {
+    bookingConfirmRate: number | null;
+    tutorVerificationRate: number | null;
+  };
+}
+
+interface ActivityRow {
+  id: string;
+  type: string;
+  description: string;
+  timestamp: string;
+  user?: string;
+}
+
+function pctBar(value: number, max: number): number {
+  if (max <= 0 || !Number.isFinite(value)) return 0;
+  return Math.min(100, Math.round((value / max) * 100));
+}
+
+function downloadCsv(filename: string, rows: string[][]) {
+  const body = rows.map((row) => row.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+  const blob = new Blob([body], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function buildExportRows(stats: PlatformStats, meta: OverviewMeta | null): string[][] {
+  const rows: string[][] = [
+    ['TutorNest — platform overview'],
+    ['Exported', new Date().toISOString()],
+    ['API snapshot', meta?.generatedAt || ''],
+    ['Currency', meta?.currency || 'NGN'],
+    [],
+    ['Coverage', 'Count'],
+    ['Profiles', String(meta?.coverage.profiles ?? stats.users.total)],
+    ['Bookings', String(meta?.coverage.bookings ?? stats.sessions.total)],
+    ['Payments', String(meta?.coverage.payments ?? '')],
+    [],
+    ['Users', 'Value'],
+    ['Total', String(stats.users.total)],
+    ['Parents', String(stats.users.parents)],
+    ['Students', String(stats.users.students)],
+    ['Tutors', String(stats.users.tutors)],
+    ['Admins', String(stats.users.admins)],
+    ['New this month', String(stats.users.newThisMonth)],
+    ['Active today', String(stats.users.activeToday)],
+    [],
+    ['Sessions', 'Value'],
+    ['Total', String(stats.sessions.total)],
+    ['This month', String(stats.sessions.thisMonth)],
+    ['Today', String(stats.sessions.today)],
+    ['Completed', String(stats.sessions.completed)],
+    ['Upcoming', String(stats.sessions.upcoming)],
+    ['Cancelled', String(stats.sessions.cancelled)],
+    [],
+    ['Revenue (NGN)', 'Value'],
+    ['Total', String(stats.revenue.total)],
+    ['This month', String(stats.revenue.thisMonth)],
+    ['Last month', String(stats.revenue.lastMonth)],
+    ['Growth %', String(stats.revenue.growthPercent)],
+    [],
+    ['Insights', 'Value'],
+    ['Booking confirm %', stats.insights?.bookingConfirmRate != null ? String(stats.insights.bookingConfirmRate) : ''],
+    ['Tutor verified %', stats.insights?.tutorVerificationRate != null ? String(stats.insights.tutorVerificationRate) : ''],
+  ];
+  const trend = stats.trends?.last7Days;
+  if (trend?.length) {
+    rows.push([], ['Last 7 days', 'Bookings', 'Revenue NGN']);
+    trend.forEach((d) => rows.push([d.date, String(d.bookings), String(d.revenue)]));
+  }
+  return rows;
+}
+
+function OverviewSkeleton() {
+  return (
+    <div className="space-y-6" aria-busy="true" aria-label="Loading platform overview">
+      <Skeleton className="h-36 w-full rounded-xl" />
+      <div className="grid md:grid-cols-3 gap-6">
+        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
+        <Skeleton className="h-64 rounded-xl" />
+      </div>
+      <div className="grid md:grid-cols-2 gap-6">
+        <Skeleton className="h-72 rounded-xl" />
+        <Skeleton className="h-72 rounded-xl" />
+      </div>
+    </div>
+  );
 }
 
 export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps) {
   const [stats, setStats] = useState<PlatformStats | null>(null);
-  const [loading, setLoading] = useState(true);
-  const [recentActivity, setRecentActivity] = useState<any[]>([]);
+  const [meta, setMeta] = useState<OverviewMeta | null>(null);
+  const [overviewLoading, setOverviewLoading] = useState(true);
+  const [activityLoading, setActivityLoading] = useState(true);
+  const [recentActivity, setRecentActivity] = useState<ActivityRow[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [refreshing, setRefreshing] = useState(false);
+  const statsRef = useRef<PlatformStats | null>(null);
+  statsRef.current = stats;
 
-  useEffect(() => {
-    if (session?.access_token) {
-      fetchPlatformStats();
-      fetchRecentActivity();
-    }
-  }, [session]);
-
-  const fetchPlatformStats = async () => {
+  const fetchPlatformStats = useCallback(async (opts?: { forceInitialLoadUi?: boolean }) => {
+    const firstLoad = opts?.forceInitialLoadUi ?? !statsRef.current;
+    if (firstLoad) setOverviewLoading(true);
     try {
       setError(null);
       if (!projectId?.trim()) {
@@ -98,8 +217,8 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
         );
         return;
       }
-      const response = await fetch(edgeFunctionUrl('/admin/platform-overview'), {
-        headers: edgeFunctionHeaders(session.access_token),
+      const response = await edgeFetch('/admin/platform-overview', session.access_token, undefined, {
+        retries: 2,
       });
 
       if (response.ok) {
@@ -108,7 +227,7 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
           setError('Empty response from the overview API. Try again in a moment.');
           return;
         }
-        let data: { stats?: PlatformStats; error?: string };
+        let data: { stats?: PlatformStats; meta?: OverviewMeta; error?: string };
         try {
           data = JSON.parse(raw);
         } catch {
@@ -121,6 +240,7 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
           return;
         }
         setStats(data.stats);
+        setMeta(data.meta ?? null);
       } else if (response.status === 401 || response.status === 403) {
         console.error('Admin access denied:', response.status);
         setError('Admin access required. Please ensure your account has admin privileges.');
@@ -131,78 +251,116 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
         console.error('Failed to fetch platform stats:', response.status);
         setError(`Failed to load statistics (HTTP ${response.status})`);
       }
-    } catch (error: any) {
-      console.error('Error fetching platform stats:', error);
+    } catch (err: unknown) {
+      console.error('Error fetching platform stats:', err);
+      const errorObj = err as { message?: string; name?: string };
       const isNetwork =
-        error?.message === 'Failed to fetch' ||
-        error?.name === 'TypeError' ||
-        String(error?.message || '').includes('Load failed');
+        errorObj?.message === 'Failed to fetch' ||
+        errorObj?.name === 'TypeError' ||
+        String(errorObj?.message || '').includes('Load failed');
       setError(
         isNetwork
           ? 'Could not reach the server API. Confirm VITE_SUPABASE_PROJECT_ID and VITE_SUPABASE_ANON_KEY are set in Vercel, deploy the Edge Function `make-server-cbd74580`, and check your network or firewall.'
-          : `Something went wrong: ${error?.message || 'unknown error'}`
+          : `Something went wrong: ${errorObj?.message || 'unknown error'}`
       );
     } finally {
-      setLoading(false);
+      if (firstLoad) setOverviewLoading(false);
     }
-  };
+  }, [session?.access_token]);
 
-  const fetchRecentActivity = async () => {
-    try {
-      const response = await fetch(edgeFunctionUrl('/admin/recent-activity?limit=5'), {
-        headers: edgeFunctionHeaders(session.access_token),
-      });
+  const fetchRecentActivity = useCallback(
+    async (silent: boolean) => {
+      if (!silent) setActivityLoading(true);
+      try {
+        const response = await edgeFetch('/admin/recent-activity?limit=12', session.access_token, undefined, {
+          retries: 2,
+        });
 
-      if (response.ok) {
-        const raw = await response.text();
-        if (!raw.trim()) return;
-        try {
-          const data = JSON.parse(raw);
-          setRecentActivity(data.activity || []);
-        } catch {
-          /* ignore malformed activity payload */
+        if (response.ok) {
+          const raw = await response.text();
+          if (!raw.trim()) {
+            setRecentActivity([]);
+            return;
+          }
+          try {
+            const data = JSON.parse(raw) as { activity?: ActivityRow[] };
+            const list = data.activity || [];
+            setRecentActivity(
+              list.map((a, i) => ({
+                ...a,
+                id: a.id || `row-${i}-${a.timestamp}-${a.type}`,
+              }))
+            );
+          } catch {
+            /* ignore malformed activity payload */
+          }
         }
+      } catch (e) {
+        console.error('Error fetching recent activity:', e);
+      } finally {
+        if (!silent) setActivityLoading(false);
       }
-    } catch (error) {
-      console.error('Error fetching recent activity:', error);
-    }
+    },
+    [session?.access_token]
+  );
+
+  useEffect(() => {
+    if (!session?.access_token) return;
+    setOverviewLoading(true);
+    setActivityLoading(true);
+    setError(null);
+    void (async () => {
+      await fetchPlatformStats();
+      await fetchRecentActivity(false);
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- intentional mount load
+  }, [session?.access_token]);
+
+  const handleRefresh = async () => {
+    if (!session?.access_token) return;
+    setRefreshing(true);
+    setError(null);
+    await Promise.all([fetchPlatformStats(), fetchRecentActivity(true)]);
+    setRefreshing(false);
   };
 
-  if (loading) {
-    return (
-      <div className="flex items-center justify-center py-12">
-        <div className="text-center">
-          <Activity className="w-12 h-12 animate-spin mx-auto mb-4 text-purple-600" />
-          <p className="text-gray-500">Loading platform overview...</p>
-        </div>
-      </div>
-    );
+  const handleExport = () => {
+    if (!stats) return;
+    const name = `tutornest-platform-overview-${new Date().toISOString().slice(0, 10)}.csv`;
+    downloadCsv(name, buildExportRows(stats, meta));
+  };
+
+  const handleRetry = () => {
+    setStats(null);
+    setMeta(null);
+    statsRef.current = null;
+    setOverviewLoading(true);
+    setActivityLoading(true);
+    setError(null);
+    void (async () => {
+      await fetchPlatformStats({ forceInitialLoadUi: true });
+      await fetchRecentActivity(false);
+    })();
+  };
+
+  if (overviewLoading && !stats) {
+    return <OverviewSkeleton />;
   }
 
   if (error || !stats) {
     return (
       <Card className="border-orange-200 bg-orange-50">
         <CardContent className="py-12 text-center">
-          <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-orange-600" />
-          <p className="text-orange-800 font-medium mb-2">
-            {error || 'Unable to load platform statistics'}
-          </p>
+          <AlertTriangle className="w-12 h-12 mx-auto mb-4 text-orange-600" aria-hidden />
+          <p className="text-orange-800 font-medium mb-2">{error || 'Unable to load platform statistics'}</p>
           <p className="text-sm text-orange-700 mb-4">
             {error?.includes('404')
               ? 'The dashboard endpoint needs to be deployed. Contact your administrator or run `supabase functions deploy make-server-cbd74580`.'
               : error?.includes('VITE_SUPABASE_PROJECT_ID') || error?.includes('Could not reach')
-              ? 'Rebuild the app after changing env vars. For local dev, restart Vite so VITE_* variables are picked up.'
-              : 'Please check your connection and try again.'}
+                ? 'Rebuild the app after changing env vars. For local dev, restart Vite so VITE_* variables are picked up.'
+                : 'Please check your connection and try again.'}
           </p>
-          <Button 
-            variant="outline" 
-            onClick={() => {
-              setLoading(true);
-              setError(null);
-              fetchPlatformStats();
-            }}
-            className="mt-2"
-          >
+          <Button variant="outline" onClick={handleRetry} className="mt-2">
             Retry
           </Button>
         </CardContent>
@@ -210,333 +368,511 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
     );
   }
 
+  const tutorDenom = Math.max(stats.users.tutors, 1);
+  const snapshotLabel = meta?.generatedAt
+    ? new Date(meta.generatedAt).toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+    : null;
+
+  const chartData = stats.trends?.last7Days ?? [];
+
   const getStatusColor = (status: string) => {
     switch (status) {
-      case 'healthy': return 'bg-green-500';
-      case 'degraded': return 'bg-yellow-500';
-      case 'down': return 'bg-red-500';
-      default: return 'bg-gray-500';
+      case 'healthy':
+        return 'bg-emerald-500';
+      case 'degraded':
+        return 'bg-amber-500';
+      case 'down':
+        return 'bg-red-500';
+      default:
+        return 'bg-gray-500';
     }
   };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
       case 'healthy':
-        return <Badge className="bg-green-100 text-green-800">Operational</Badge>;
+        return <Badge className="bg-emerald-100 text-emerald-900 border-emerald-200">Operational</Badge>;
       case 'degraded':
-        return <Badge className="bg-yellow-100 text-yellow-800">Degraded</Badge>;
+        return <Badge className="bg-amber-100 text-amber-900 border-amber-200">Degraded</Badge>;
       case 'down':
-        return <Badge className="bg-red-100 text-red-800">Down</Badge>;
+        return <Badge className="bg-red-100 text-red-900 border-red-200">Down</Badge>;
       default:
-        return <Badge>Unknown</Badge>;
+        return <Badge variant="outline">Unknown</Badge>;
     }
   };
 
   return (
-    <div className="space-y-6">
-      {/* System Health Status */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <Activity className="w-5 h-5 text-green-600" />
-            System Health
+    <div className="space-y-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+        <div>
+          <h2 className="text-2xl font-semibold tracking-tight text-foreground">Executive overview</h2>
+          <p className="text-sm text-muted-foreground mt-1 max-w-2xl">
+            Cross-role snapshot from merged storage (legacy KV + database). Use refresh before decisions that depend
+            on live counts.
+          </p>
+          {snapshotLabel && (
+            <p className="text-xs text-muted-foreground mt-2" role="status">
+              Snapshot time: {snapshotLabel}
+              {meta?.coverage ? (
+                <span className="ml-2">
+                  · {meta.coverage.bookings} bookings · {meta.coverage.payments} payments scanned
+                </span>
+              ) : null}
+            </p>
+          )}
+        </div>
+        <div className="flex flex-wrap items-center gap-2 shrink-0">
+          <Button
+            type="button"
+            variant="outline"
+            size="sm"
+            onClick={() => void handleRefresh()}
+            disabled={refreshing || overviewLoading}
+            className="gap-2"
+          >
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} aria-hidden />
+            Refresh
+          </Button>
+          <Button type="button" variant="default" size="sm" onClick={handleExport} className="gap-2 bg-slate-900">
+            <Download className="h-4 w-4" aria-hidden />
+            Export CSV
+          </Button>
+        </div>
+      </div>
+
+      <Card className="border-slate-200/80 shadow-sm">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Activity className="w-5 h-5 text-emerald-600" aria-hidden />
+            Service status
           </CardTitle>
+          <CardDescription>Edge function reachability and snapshot performance (not global uptime SLA).</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-4 gap-4">
+          <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
             <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${getStatusColor(stats.system.serverStatus)} animate-pulse`} />
+              <div
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${getStatusColor(stats.system.serverStatus)}`}
+                aria-hidden
+              />
               <div>
-                <p className="text-sm text-gray-600">Server</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">API</p>
                 {getStatusBadge(stats.system.serverStatus)}
               </div>
             </div>
             <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${getStatusColor(stats.system.databaseStatus)} animate-pulse`} />
+              <div
+                className={`h-2.5 w-2.5 shrink-0 rounded-full ${getStatusColor(stats.system.databaseStatus)}`}
+                aria-hidden
+              />
               <div>
-                <p className="text-sm text-gray-600">Database</p>
+                <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Data path</p>
                 {getStatusBadge(stats.system.databaseStatus)}
               </div>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Uptime</p>
-              <p className="text-lg font-semibold">{stats.system.uptime}%</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Uptime % (legacy)</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {stats.system.uptime != null ? `${stats.system.uptime}%` : '—'}
+              </p>
             </div>
             <div>
-              <p className="text-sm text-gray-600">Response Time</p>
-              <p className="text-lg font-semibold">{stats.system.responseTime}ms</p>
+              <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">Snapshot compute</p>
+              <p className="text-lg font-semibold tabular-nums">
+                {stats.system.computeTimeMs != null ? `${stats.system.computeTimeMs} ms` : '—'}
+              </p>
+              {stats.system.responseTime != null && (
+                <p className="text-xs text-muted-foreground mt-0.5">RTT not measured here</p>
+              )}
             </div>
           </div>
         </CardContent>
       </Card>
 
-      {/* User Metrics */}
-      <div className="grid md:grid-cols-3 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Users className="w-5 h-5 text-purple-600" />
-              Total Users
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4">
-              <div className="text-3xl font-bold mb-1">{stats.users.total.toLocaleString()}</div>
-              <div className="flex items-center gap-1 text-sm text-green-600">
-                <TrendingUp className="w-4 h-4" />
-                <span>+{stats.users.newThisMonth} this month</span>
-              </div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 flex items-center gap-2">
-                  <Baby className="w-4 h-4" /> Parents
-                </span>
-                <span className="font-semibold">{stats.users.parents}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 flex items-center gap-2">
-                  <BookOpen className="w-4 h-4" /> Students
-                </span>
-                <span className="font-semibold">{stats.users.students}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4" /> Tutors
-                </span>
-                <span className="font-semibold">{stats.users.tutors}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 flex items-center gap-2">
-                  <Shield className="w-4 h-4" /> Admins
-                </span>
-                <span className="font-semibold">{stats.users.admins}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+      {(stats.insights?.bookingConfirmRate != null || stats.insights?.tutorVerificationRate != null) && (
+        <div className="grid gap-4 sm:grid-cols-2">
+          {stats.insights.bookingConfirmRate != null && (
+            <Card className="border-slate-200/80 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Target className="h-4 w-4 text-violet-600" aria-hidden />
+                  Booking confirmation mix
+                </CardTitle>
+                <CardDescription>Confirmed ÷ (pending + confirmed)</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold tabular-nums tracking-tight">{stats.insights.bookingConfirmRate}%</p>
+              </CardContent>
+            </Card>
+          )}
+          {stats.insights.tutorVerificationRate != null && (
+            <Card className="border-slate-200/80 shadow-sm">
+              <CardHeader className="pb-2">
+                <CardTitle className="text-sm font-medium flex items-center gap-2">
+                  <Percent className="h-4 w-4 text-emerald-600" aria-hidden />
+                  Tutors verified
+                </CardTitle>
+                <CardDescription>Verified tutor profiles ÷ all tutor accounts</CardDescription>
+              </CardHeader>
+              <CardContent>
+                <p className="text-3xl font-bold tabular-nums tracking-tight">{stats.insights.tutorVerificationRate}%</p>
+              </CardContent>
+            </Card>
+          )}
+        </div>
+      )}
 
-        <Card>
+      {chartData.length > 0 && (
+        <Card className="border-slate-200/80 shadow-sm">
           <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              Sessions
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <BarChart3 className="w-5 h-5 text-violet-600" aria-hidden />
+              Last 7 days
             </CardTitle>
+            <CardDescription>Daily bookings and recorded payment totals (local calendar days).</CardDescription>
           </CardHeader>
-          <CardContent>
-            <div className="mb-4">
-              <div className="text-3xl font-bold mb-1">{stats.sessions.total.toLocaleString()}</div>
-              <div className="text-sm text-gray-600">All time</div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">This Month</span>
-                <span className="font-semibold">{stats.sessions.thisMonth}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 flex items-center gap-2">
-                  <CheckCircle className="w-4 h-4 text-green-600" /> Completed
-                </span>
-                <span className="font-semibold">{stats.sessions.completed}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-blue-600" /> Upcoming
-                </span>
-                <span className="font-semibold">{stats.sessions.upcoming}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600 flex items-center gap-2">
-                  <XCircle className="w-4 h-4 text-red-600" /> Cancelled
-                </span>
-                <span className="font-semibold">{stats.sessions.cancelled}</span>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-lg">
-              <DollarSign className="w-5 h-5 text-green-600" />
-              Revenue
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="mb-4">
-              <div className="text-3xl font-bold mb-1">₦{stats.revenue.total.toLocaleString()}</div>
-              <div className="text-sm text-gray-600">Total revenue</div>
-            </div>
-            <div className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">This Month</span>
-                <span className="font-semibold">₦{stats.revenue.thisMonth.toLocaleString()}</span>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <span className="text-gray-600">Last Month</span>
-                <span className="font-semibold">₦{stats.revenue.lastMonth.toLocaleString()}</span>
-              </div>
-              <div className="pt-2 border-t">
-                <div className="flex items-center justify-between text-sm">
-                  <span className="text-gray-600">Growth</span>
-                  <span className={`font-semibold flex items-center gap-1 ${
-                    stats.revenue.growthPercent >= 0 ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {stats.revenue.growthPercent >= 0 ? (
-                      <TrendingUp className="w-4 h-4" />
-                    ) : (
-                      <TrendingDown className="w-4 h-4" />
-                    )}
-                    {Math.abs(stats.revenue.growthPercent)}%
-                  </span>
-                </div>
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Verification & Bookings */}
-      <div className="grid md:grid-cols-2 gap-6">
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <FileCheck className="w-5 h-5 text-purple-600" />
-              Tutor Verification Status
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">Pending Review</span>
-                  <Badge className="bg-yellow-100 text-yellow-800">{stats.verification.pending}</Badge>
-                </div>
-                <Progress value={(stats.verification.pending / stats.users.tutors) * 100} className="h-2" />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">Verified</span>
-                  <Badge className="bg-green-100 text-green-800">{stats.verification.verified}</Badge>
-                </div>
-                <Progress value={(stats.verification.verified / stats.users.tutors) * 100} className="h-2 bg-green-100" />
-              </div>
-              <div>
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-sm text-gray-600">Rejected</span>
-                  <Badge className="bg-red-100 text-red-800">{stats.verification.rejected}</Badge>
-                </div>
-                <Progress value={(stats.verification.rejected / stats.users.tutors) * 100} className="h-2 bg-red-100" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Calendar className="w-5 h-5 text-blue-600" />
-              Booking Overview
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              <div className="flex items-center justify-between p-4 bg-yellow-50 rounded-lg">
-                <div>
-                  <p className="text-sm text-gray-600">Pending Bookings</p>
-                  <p className="text-2xl font-bold text-yellow-700">{stats.bookings.pending}</p>
-                </div>
-                <Clock className="w-8 h-8 text-yellow-600" />
-              </div>
-              <div className="flex items-center justify-between p-4 bg-green-50 rounded-lg">
-                <div>
-                  <p className="text-sm text-gray-600">Confirmed Bookings</p>
-                  <p className="text-2xl font-bold text-green-700">{stats.bookings.confirmed}</p>
-                </div>
-                <CheckCircle className="w-8 h-8 text-green-600" />
-              </div>
-              <div className="flex items-center justify-between p-4 bg-blue-50 rounded-lg">
-                <div>
-                  <p className="text-sm text-gray-600">Total Bookings</p>
-                  <p className="text-2xl font-bold text-blue-700">{stats.bookings.total}</p>
-                </div>
-                <BarChart3 className="w-8 h-8 text-blue-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Recent Activity */}
-      {recentActivity.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2">
-              <Zap className="w-5 h-5 text-amber-600" />
-              Recent Activity
-            </CardTitle>
-            <CardDescription>Latest platform events</CardDescription>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-3">
-              {recentActivity.map((activity, index) => (
-                <div
-                  key={index}
-                  className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
-                >
-                  <div className="w-2 h-2 rounded-full bg-blue-500 mt-2" />
-                  <div className="flex-1">
-                    <p className="text-sm font-medium">{activity.description}</p>
-                    <p className="text-xs text-gray-500">{activity.timestamp}</p>
-                  </div>
-                  <Badge variant="outline" className="text-xs">
-                    {activity.type}
-                  </Badge>
-                </div>
-              ))}
-            </div>
+          <CardContent className="h-[260px] w-full min-h-[220px]">
+            <ResponsiveContainer width="100%" height="100%">
+              <ComposedChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+                <CartesianGrid strokeDasharray="3 3" className="stroke-muted/40" vertical={false} />
+                <XAxis
+                  dataKey="date"
+                  tick={{ fontSize: 11 }}
+                  tickFormatter={(v) => String(v).slice(5)}
+                  stroke="currentColor"
+                  className="text-muted-foreground"
+                />
+                <YAxis
+                  yAxisId="left"
+                  tick={{ fontSize: 11 }}
+                  allowDecimals={false}
+                  stroke="currentColor"
+                  className="text-muted-foreground"
+                />
+                <YAxis
+                  yAxisId="right"
+                  orientation="right"
+                  tick={{ fontSize: 10 }}
+                  tickFormatter={(v) => (v >= 1_000_000 ? `${(v / 1_000_000).toFixed(1)}M` : v >= 1000 ? `${(v / 1000).toFixed(0)}k` : `${v}`)}
+                  stroke="currentColor"
+                  className="text-muted-foreground"
+                />
+                <Tooltip
+                  contentStyle={{ borderRadius: 8 }}
+                  formatter={(value: number, name) =>
+                    name === 'revenue' ? formatNaira(value, false) : value
+                  }
+                />
+                <Legend />
+                <Bar yAxisId="left" dataKey="bookings" fill="#625d9c" radius={[4, 4, 0, 0]} name="Bookings" />
+                <Line
+                  yAxisId="right"
+                  type="monotone"
+                  dataKey="revenue"
+                  stroke="#15803d"
+                  strokeWidth={2}
+                  dot={{ r: 3 }}
+                  name="Revenue (₦)"
+                />
+              </ComposedChart>
+            </ResponsiveContainer>
           </CardContent>
         </Card>
       )}
 
-      {/* Quick Actions */}
-      <Card>
+      <div className="grid gap-6 md:grid-cols-3">
+        <Card className="border-slate-200/80 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+              <Users className="w-5 h-5 text-violet-600" aria-hidden />
+              Users
+            </CardTitle>
+            <CardDescription>Role distribution</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4">
+              <div className="text-3xl font-bold tabular-nums tracking-tight">{stats.users.total.toLocaleString()}</div>
+              <div className="mt-1 flex items-center gap-1 text-sm text-emerald-700">
+                <TrendingUp className="w-4 h-4 shrink-0" aria-hidden />
+                <span>+{stats.users.newThisMonth.toLocaleString()} new this month</span>
+              </div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                Active today: <span className="font-medium text-foreground">{stats.users.activeToday.toLocaleString()}</span>
+              </p>
+            </div>
+            <dl className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <dt className="text-muted-foreground flex items-center gap-2">
+                  <Baby className="w-4 h-4 shrink-0" aria-hidden />
+                  Parents
+                </dt>
+                <dd className="font-semibold tabular-nums">{stats.users.parents.toLocaleString()}</dd>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <dt className="text-muted-foreground flex items-center gap-2">
+                  <BookOpen className="w-4 h-4 shrink-0" aria-hidden />
+                  Students
+                </dt>
+                <dd className="font-semibold tabular-nums">{stats.users.students.toLocaleString()}</dd>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <dt className="text-muted-foreground flex items-center gap-2">
+                  <GraduationCap className="w-4 h-4 shrink-0" aria-hidden />
+                  Tutors
+                </dt>
+                <dd className="font-semibold tabular-nums">{stats.users.tutors.toLocaleString()}</dd>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <dt className="text-muted-foreground flex items-center gap-2">
+                  <Shield className="w-4 h-4 shrink-0" aria-hidden />
+                  Admins
+                </dt>
+                <dd className="font-semibold tabular-nums">{stats.users.admins.toLocaleString()}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200/80 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+              <Calendar className="w-5 h-5 text-sky-600" aria-hidden />
+              Sessions
+            </CardTitle>
+            <CardDescription>Bookings lifecycle</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4">
+              <div className="text-3xl font-bold tabular-nums tracking-tight">{stats.sessions.total.toLocaleString()}</div>
+              <p className="text-sm text-muted-foreground">All time</p>
+            </div>
+            <dl className="space-y-2">
+              <div className="flex items-center justify-between text-sm">
+                <dt className="text-muted-foreground">This month</dt>
+                <dd className="font-semibold tabular-nums">{stats.sessions.thisMonth.toLocaleString()}</dd>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <dt className="text-muted-foreground flex items-center gap-2">
+                  <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" aria-hidden />
+                  Completed
+                </dt>
+                <dd className="font-semibold tabular-nums">{stats.sessions.completed.toLocaleString()}</dd>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <dt className="text-muted-foreground flex items-center gap-2">
+                  <Clock className="w-4 h-4 text-sky-600 shrink-0" aria-hidden />
+                  Upcoming
+                </dt>
+                <dd className="font-semibold tabular-nums">{stats.sessions.upcoming.toLocaleString()}</dd>
+              </div>
+              <div className="flex items-center justify-between text-sm">
+                <dt className="text-muted-foreground flex items-center gap-2">
+                  <XCircle className="w-4 h-4 text-red-600 shrink-0" aria-hidden />
+                  Cancelled
+                </dt>
+                <dd className="font-semibold tabular-nums">{stats.sessions.cancelled.toLocaleString()}</dd>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200/80 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-lg font-semibold">
+              <DollarSign className="w-5 h-5 text-emerald-600" aria-hidden />
+              Revenue
+            </CardTitle>
+            <CardDescription>Recorded payments (NGN)</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <div className="mb-4">
+              <div className="text-2xl sm:text-3xl font-bold tabular-nums tracking-tight leading-tight">
+                {formatNaira(stats.revenue.total, false)}
+              </div>
+              <p className="text-sm text-muted-foreground">Total recorded</p>
+            </div>
+            <dl className="space-y-2">
+              <div className="flex items-center justify-between text-sm gap-2">
+                <dt className="text-muted-foreground shrink-0">This month</dt>
+                <dd className="font-semibold tabular-nums text-right">{formatNaira(stats.revenue.thisMonth, false)}</dd>
+              </div>
+              <div className="flex items-center justify-between text-sm gap-2">
+                <dt className="text-muted-foreground shrink-0">Last month</dt>
+                <dd className="font-semibold tabular-nums text-right">{formatNaira(stats.revenue.lastMonth, false)}</dd>
+              </div>
+              <div className="border-t pt-2 mt-2">
+                <div className="flex items-center justify-between text-sm">
+                  <dt className="text-muted-foreground">MoM growth</dt>
+                  <dd
+                    className={`font-semibold flex items-center gap-1 tabular-nums ${
+                      stats.revenue.growthPercent >= 0 ? 'text-emerald-700' : 'text-red-700'
+                    }`}
+                  >
+                    {stats.revenue.growthPercent >= 0 ? (
+                      <TrendingUp className="w-4 h-4 shrink-0" aria-hidden />
+                    ) : (
+                      <TrendingDown className="w-4 h-4 shrink-0" aria-hidden />
+                    )}
+                    {Math.abs(stats.revenue.growthPercent)}%
+                  </dd>
+                </div>
+              </div>
+            </dl>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 md:grid-cols-2">
+        <Card className="border-slate-200/80 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <FileCheck className="w-5 h-5 text-violet-600" aria-hidden />
+              Tutor verification
+            </CardTitle>
+            <CardDescription>Queue vs verified tutors</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div>
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Pending review</span>
+                <Badge className="bg-amber-100 text-amber-900 border-amber-200">{stats.verification.pending}</Badge>
+              </div>
+              <Progress value={pctBar(stats.verification.pending, tutorDenom)} className="h-2" />
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Verified</span>
+                <Badge className="bg-emerald-100 text-emerald-900 border-emerald-200">{stats.verification.verified}</Badge>
+              </div>
+              <Progress value={pctBar(stats.verification.verified, tutorDenom)} className="h-2 bg-muted [&>div]:bg-emerald-600" />
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between text-sm">
+                <span className="text-muted-foreground">Rejected</span>
+                <Badge className="bg-red-100 text-red-900 border-red-200">{stats.verification.rejected}</Badge>
+              </div>
+              <Progress value={pctBar(stats.verification.rejected, tutorDenom)} className="h-2 bg-muted [&>div]:bg-red-500" />
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card className="border-slate-200/80 shadow-sm">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
+              <Calendar className="w-5 h-5 text-sky-600" aria-hidden />
+              Bookings
+            </CardTitle>
+            <CardDescription>Operational funnel</CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center justify-between rounded-lg border border-amber-100 bg-amber-50/80 p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Pending</p>
+                <p className="text-2xl font-bold tabular-nums text-amber-900">{stats.bookings.pending}</p>
+              </div>
+              <Clock className="h-8 w-8 text-amber-600 shrink-0" aria-hidden />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-emerald-100 bg-emerald-50/80 p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Confirmed</p>
+                <p className="text-2xl font-bold tabular-nums text-emerald-900">{stats.bookings.confirmed}</p>
+              </div>
+              <CheckCircle className="h-8 w-8 text-emerald-600 shrink-0" aria-hidden />
+            </div>
+            <div className="flex items-center justify-between rounded-lg border border-sky-100 bg-sky-50/80 p-4">
+              <div>
+                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-2xl font-bold tabular-nums text-sky-900">{stats.bookings.total}</p>
+              </div>
+              <BarChart3 className="h-8 w-8 text-sky-600 shrink-0" aria-hidden />
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <Card className="border-slate-200/80 shadow-sm">
         <CardHeader>
-          <CardTitle>Quick Actions</CardTitle>
-          <CardDescription>Navigate to key admin features</CardDescription>
+          <CardTitle className="flex items-center gap-2 text-base font-semibold">
+            <Zap className="w-5 h-5 text-amber-600" aria-hidden />
+            Recent activity
+          </CardTitle>
+          <CardDescription>Audit trail and derived signals (admin-only).</CardDescription>
         </CardHeader>
         <CardContent>
-          <div className="grid md:grid-cols-4 gap-4">
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 flex-col gap-2 hover:bg-purple-50 hover:border-purple-300 transition-colors"
+          {activityLoading ? (
+            <div className="space-y-3" aria-busy="true" aria-label="Loading activity">
+              {[1, 2, 3, 4].map((i) => (
+                <Skeleton key={i} className="h-14 w-full rounded-lg" />
+              ))}
+            </div>
+          ) : recentActivity.length === 0 ? (
+            <p className="text-sm text-muted-foreground py-6 text-center">No recent activity in the audit log yet.</p>
+          ) : (
+            <ul className="divide-y divide-border rounded-lg border">
+              {recentActivity.map((activity) => (
+                <li
+                  key={activity.id}
+                  className="flex items-start gap-3 p-3 transition-colors hover:bg-muted/40 first:rounded-t-lg last:rounded-b-lg"
+                >
+                  <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-sky-500" aria-hidden />
+                  <div className="min-w-0 flex-1">
+                    <p className="text-sm font-medium leading-snug">{activity.description}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{activity.timestamp}</p>
+                  </div>
+                  <Badge variant="outline" className="shrink-0 text-xs capitalize">
+                    {activity.type.replace(/_/g, ' ')}
+                  </Badge>
+                </li>
+              ))}
+            </ul>
+          )}
+        </CardContent>
+      </Card>
+
+      <Card className="border-slate-200/80 shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-base font-semibold">Shortcuts</CardTitle>
+          <CardDescription>Jump to operational consoles</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto flex-col gap-2 py-4 transition-colors hover:border-violet-300 hover:bg-violet-50/60"
               onClick={() => onTabChange?.('users')}
             >
-              <Users className="w-5 h-5" />
-              <span className="text-sm">Manage Users</span>
+              <Users className="h-5 w-5" aria-hidden />
+              <span className="text-sm">Users</span>
             </Button>
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 flex-col gap-2 hover:bg-blue-50 hover:border-blue-300 transition-colors"
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto flex-col gap-2 py-4 transition-colors hover:border-violet-300 hover:bg-violet-50/60"
               onClick={() => onTabChange?.('verification')}
             >
-              <FileCheck className="w-5 h-5" />
-              <span className="text-sm">Review Verifications</span>
+              <FileCheck className="h-5 w-5" aria-hidden />
+              <span className="text-sm">Verifications</span>
             </Button>
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 flex-col gap-2 hover:bg-red-50 hover:border-red-300 transition-colors"
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto flex-col gap-2 py-4 transition-colors hover:border-red-200 hover:bg-red-50/60"
               onClick={() => onTabChange?.('alerts')}
             >
-              <AlertTriangle className="w-5 h-5" />
-              <span className="text-sm">View Alerts</span>
+              <AlertTriangle className="h-5 w-5" aria-hidden />
+              <span className="text-sm">Alerts</span>
             </Button>
-            <Button 
-              variant="outline" 
-              className="h-auto py-4 flex-col gap-2 hover:bg-green-50 hover:border-green-300 transition-colors"
+            <Button
+              type="button"
+              variant="outline"
+              className="h-auto flex-col gap-2 py-4 transition-colors hover:border-slate-400 hover:bg-slate-50/80"
               onClick={() => onTabChange?.('analytics')}
             >
-              <BarChart3 className="w-5 h-5" />
+              <BarChart3 className="h-5 w-5" aria-hidden />
               <span className="text-sm">Analytics</span>
             </Button>
           </div>

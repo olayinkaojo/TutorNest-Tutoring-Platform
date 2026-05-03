@@ -1,4 +1,19 @@
-import { Users, Calendar, BookOpen, TrendingUp, ArrowRight, Star, MessageSquare, Clock, CheckCircle, Zap, Award } from 'lucide-react';
+import {
+  Users,
+  Calendar,
+  BookOpen,
+  TrendingUp,
+  ArrowRight,
+  Star,
+  MessageSquare,
+  Clock,
+  CheckCircle,
+  Zap,
+  Award,
+  Shield,
+  Mail,
+  ClipboardCheck,
+} from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Button } from '../ui/button';
 import { Badge } from '../ui/badge';
@@ -161,6 +176,61 @@ export function TutorOverviewTab({
         <div className="absolute -top-8 -right-8 w-40 h-40 rounded-full bg-white/5 pointer-events-none" />
         <div className="absolute -bottom-10 -right-4 w-28 h-28 rounded-full bg-white/5 pointer-events-none" />
       </div>
+
+      {/* Pending verification — industry-standard expectations */}
+      {isPending && (
+        <Card className="border-amber-200/90 bg-gradient-to-br from-amber-50/90 to-white shadow-sm overflow-hidden">
+          <CardHeader className="pb-2">
+            <div className="flex items-start gap-3">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-amber-100 text-amber-800">
+                <Shield className="h-5 w-5" aria-hidden />
+              </div>
+              <div className="min-w-0 flex-1">
+                <CardTitle className="text-lg text-gray-900">Your profile is being verified</CardTitle>
+                <CardDescription className="text-gray-600 mt-1">
+                  TutorNest reviews every educator before they appear in search and can accept bookings. Most reviews finish
+                  within <strong>24–48 hours</strong> on working days.
+                </CardDescription>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="pt-0 space-y-4">
+            <ul className="grid gap-3 sm:grid-cols-2 text-sm text-gray-700">
+              <li className="flex gap-2 rounded-lg border border-amber-100 bg-white/80 p-3">
+                <Mail className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" aria-hidden />
+                <span>
+                  <strong className="text-gray-900">Confirm your email</strong>
+                  <span className="block text-gray-600 text-xs mt-0.5">Use the link from your inbox (check spam) so we can reach you about verification.</span>
+                </span>
+              </li>
+              <li className="flex gap-2 rounded-lg border border-amber-100 bg-white/80 p-3">
+                <ClipboardCheck className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" aria-hidden />
+                <span>
+                  <strong className="text-gray-900">Documents</strong>
+                  <span className="block text-gray-600 text-xs mt-0.5">We may ask for ID or certificates — respond promptly to avoid delays.</span>
+                </span>
+              </li>
+              <li className="flex gap-2 rounded-lg border border-amber-100 bg-white/80 p-3 sm:col-span-2">
+                <Clock className="h-4 w-4 text-amber-700 shrink-0 mt-0.5" aria-hidden />
+                <span>
+                  <strong className="text-gray-900">While you wait</strong>
+                  <span className="block text-gray-600 text-xs mt-0.5">
+                    Fill availability and polish your bio — verified tutors with complete profiles get more bookings.
+                  </span>
+                </span>
+              </li>
+            </ul>
+            <div className="flex flex-wrap gap-2">
+              <Button size="sm" variant="default" className="bg-[#625d9c] hover:bg-[#524d8a]" onClick={onViewProfile}>
+                Review tutor profile
+              </Button>
+              <Button size="sm" variant="outline" onClick={onViewAvailability}>
+                Set availability
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
 
       {/* Quick Stats */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

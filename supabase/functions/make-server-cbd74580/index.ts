@@ -51,6 +51,17 @@ import paymentPlansRoutes from './payment-plans-routes.tsx';
 
 const app = new Hono();
 
+/** Comma-separated list in `ALLOWED_ORIGINS`. When unset, uses `*`. Unlisted browser origins receive the first allowlisted value so the browser CORS check fails. */
+function resolveAllowOrigin(req: Request): string {
+  const list =
+    Deno.env.get('ALLOWED_ORIGINS')?.split(',').map((s) => s.trim()).filter(Boolean) ?? [];
+  if (list.length === 0) return '*';
+  const origin = req.headers.get('Origin') ?? '';
+  if (!origin) return '*';
+  if (list.includes(origin)) return origin;
+  return list[0] ?? '*';
+}
+
 /**
  * Browsers send OPTIONS before cross-origin GET with `Authorization` + `apikey`.
  * This must return CORS headers or the real request never runs ("Failed to fetch").
@@ -58,7 +69,7 @@ const app = new Hono();
  */
 app.use('*', async (c, next) => {
   if (c.req.method === 'OPTIONS') {
-    c.header('Access-Control-Allow-Origin', '*');
+    c.header('Access-Control-Allow-Origin', resolveAllowOrigin(c.req.raw));
     c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
     c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-client-info, apikey');
     c.header('Access-Control-Max-Age', '86400');
@@ -87,11 +98,30 @@ app.use('*', async (c, next) => {
 // Add CORS headers to all non-OPTIONS responses (OPTIONS handled above)
 app.use('*', async (c, next) => {
   await next();
-  c.header('Access-Control-Allow-Origin', '*');
+  c.header('Access-Control-Allow-Origin', resolveAllowOrigin(c.req.raw));
   c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
   c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-client-info, apikey');
 });
 app.use('*', logger());
+
+app.use('*', async (c, next) => {
+  const requestId = crypto.randomUUID();
+  const started = Date.now();
+  await next();
+  c.header('X-Request-Id', requestId);
+  const path = new URL(c.req.url).pathname;
+  console.log(
+    JSON.stringify({
+      level: 'info',
+      msg: 'request',
+      requestId,
+      method: c.req.method,
+      path,
+      status: c.res.status,
+      durationMs: Date.now() - started,
+    }),
+  );
+});
 
 // Initialize Supabase client with service role (for admin operations)
 const getSupabaseClient = () => {
@@ -131,6 +161,15 @@ const getUserId = async (accessToken: string | null): Promise<string | null> => 
     return null;
   }
 };
+
+app.get(`${ROUTE_PREFIX}/health`, (c) =>
+  c.json({
+    ok: true,
+    service: 'make-server-cbd74580',
+    version: Deno.env.get('DEPLOY_SHA') ?? Deno.env.get('GIT_SHA') ?? 'dev',
+    time: new Date().toISOString(),
+  }),
+);
 
 // Helper function to get fresh Google Calendar access token
 async function getGoogleAccessToken(userId: string): Promise<string | null> {
@@ -3712,14 +3751,6 @@ app.get('/make-server-cbd74580/admin/sessions/reports/:reportId/export', async (
     console.error('Error exporting logs:', error);
     return c.json({ error: error.message || 'Internal server error' }, 500);
   }
-});
-
-// ============================================
-// HEALTH CHECK
-// ============================================
-
-app.get('/make-server-cbd74580/health', (c) => {
-  return c.json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
 // Test email endpoint — sends a verification email to the authenticated user

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { AuthBackground } from './AuthBackground';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
@@ -9,8 +9,60 @@ import { Textarea } from './ui/textarea';
 import { Alert, AlertDescription } from './ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { CheckCircle, AlertCircle, User, BookOpen, Award, Shield } from 'lucide-react';
+import { Progress } from './ui/progress';
+import { CheckCircle, AlertCircle, User, BookOpen, Award, Shield, RotateCcw } from 'lucide-react';
 import TutorNestLogo from './TutorNestLogo';
+import {
+  TUTOR_ONBOARDING_DRAFT_KEY,
+  passwordStrength,
+  MIN_PASSWORD_STRENGTH_SCORE,
+} from '../utils/onboarding-helpers';
+
+type TutorOnboardingDraft = {
+  v: 1;
+  savedAt: number;
+  step: number;
+  email: string;
+  fullName: string;
+  phone: string;
+  location: string;
+  headline: string;
+  educationLevel: string;
+  institution: string;
+  bio: string;
+  experienceYears: string;
+  qualifications: string;
+  teachingStyle: string;
+  selectedSubjects: string[];
+  otherSubject: string;
+  selectedAgeGroups: string[];
+  selectedClasses: string[];
+  teachingFormat: string;
+  groupSize: string;
+  travelRadius: string;
+  maxStudents: string;
+  selectedExamBoards: string[];
+  selectedLearningDifficulties: string[];
+  otherLearningDifficulty: string;
+  selectedMethodologies: string[];
+  otherMethodology: string;
+  selectedLanguages: string[];
+  otherLanguage: string;
+  dbsChecked: boolean;
+  hasInsurance: boolean;
+  agreeBackgroundCheck: boolean;
+  agreeTerms: boolean;
+  agreedToTerms: boolean;
+};
+
+function draftHasProgress(d: Partial<TutorOnboardingDraft>): boolean {
+  if ((d.step ?? 1) > 1) return true;
+  if (String(d.fullName || '').trim().length > 1) return true;
+  if (String(d.email || '').trim().length > 3) return true;
+  if (String(d.bio || '').trim().length > 15) return true;
+  if ((d.selectedSubjects?.length ?? 0) > 0) return true;
+  return false;
+}
 
 const supabase = getSupabaseClient();
 
@@ -210,6 +262,181 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   // Final submission consent
   const [agreedToTerms, setAgreedToTerms] = useState(false);
 
+  const [draftBanner, setDraftBanner] = useState<{ show: boolean; savedAt: number | null }>({
+    show: false,
+    savedAt: null,
+  });
+  const draftBannerDismissed = useRef(false);
+
+  const clearOnboardingDraft = useCallback(() => {
+    try {
+      localStorage.removeItem(TUTOR_ONBOARDING_DRAFT_KEY);
+    } catch {
+      /* ignore quota */
+    }
+    setDraftBanner({ show: false, savedAt: null });
+  }, []);
+
+  const applyDraft = useCallback((d: TutorOnboardingDraft) => {
+    setStep(Math.min(5, Math.max(1, d.step)));
+    setEmail(d.email ?? '');
+    setFullName(d.fullName ?? '');
+    setPhone(d.phone ?? '');
+    setLocation(d.location ?? '');
+    setHeadline(d.headline ?? '');
+    setEducationLevel(d.educationLevel ?? '');
+    setInstitution(d.institution ?? '');
+    setBio(d.bio ?? '');
+    setExperienceYears(d.experienceYears ?? '');
+    setQualifications(d.qualifications ?? '');
+    setTeachingStyle(d.teachingStyle ?? '');
+    setSelectedSubjects(d.selectedSubjects ?? []);
+    setOtherSubject(d.otherSubject ?? '');
+    setSelectedAgeGroups(d.selectedAgeGroups ?? []);
+    setSelectedClasses(d.selectedClasses ?? []);
+    setTeachingFormat(d.teachingFormat || 'Both Online & In-Person');
+    setGroupSize(d.groupSize || 'Both Individual & Groups');
+    setTravelRadius(d.travelRadius ?? '');
+    setMaxStudents(d.maxStudents ?? '');
+    setSelectedExamBoards(d.selectedExamBoards ?? []);
+    setSelectedLearningDifficulties(d.selectedLearningDifficulties ?? []);
+    setOtherLearningDifficulty(d.otherLearningDifficulty ?? '');
+    setSelectedMethodologies(d.selectedMethodologies ?? []);
+    setOtherMethodology(d.otherMethodology ?? '');
+    setSelectedLanguages(d.selectedLanguages ?? []);
+    setOtherLanguage(d.otherLanguage ?? '');
+    setDbsChecked(!!d.dbsChecked);
+    setHasInsurance(!!d.hasInsurance);
+    setAgreeBackgroundCheck(!!d.agreeBackgroundCheck);
+    setAgreeTerms(!!d.agreeTerms);
+    setAgreedToTerms(!!d.agreedToTerms);
+  }, []);
+
+  const buildDraft = useCallback((): TutorOnboardingDraft => {
+    return {
+      v: 1,
+      savedAt: Date.now(),
+      step,
+      email,
+      fullName,
+      phone,
+      location,
+      headline,
+      educationLevel,
+      institution,
+      bio,
+      experienceYears,
+      qualifications,
+      teachingStyle,
+      selectedSubjects,
+      otherSubject,
+      selectedAgeGroups,
+      selectedClasses,
+      teachingFormat,
+      groupSize,
+      travelRadius,
+      maxStudents,
+      selectedExamBoards,
+      selectedLearningDifficulties,
+      otherLearningDifficulty,
+      selectedMethodologies,
+      otherMethodology,
+      selectedLanguages,
+      otherLanguage,
+      dbsChecked,
+      hasInsurance,
+      agreeBackgroundCheck,
+      agreeTerms,
+      agreedToTerms,
+    };
+  }, [
+    step,
+    email,
+    fullName,
+    phone,
+    location,
+    headline,
+    educationLevel,
+    institution,
+    bio,
+    experienceYears,
+    qualifications,
+    teachingStyle,
+    selectedSubjects,
+    otherSubject,
+    selectedAgeGroups,
+    selectedClasses,
+    teachingFormat,
+    groupSize,
+    travelRadius,
+    maxStudents,
+    selectedExamBoards,
+    selectedLearningDifficulties,
+    otherLearningDifficulty,
+    selectedMethodologies,
+    otherMethodology,
+    selectedLanguages,
+    otherLanguage,
+    dbsChecked,
+    hasInsurance,
+    agreeBackgroundCheck,
+    agreeTerms,
+    agreedToTerms,
+  ]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (session?.user || draftBannerDismissed.current) return;
+    try {
+      const raw = localStorage.getItem(TUTOR_ONBOARDING_DRAFT_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as TutorOnboardingDraft;
+      if (parsed.v !== 1 || !parsed.savedAt) return;
+      if (!draftHasProgress(parsed)) {
+        localStorage.removeItem(TUTOR_ONBOARDING_DRAFT_KEY);
+        return;
+      }
+      setDraftBanner({ show: true, savedAt: parsed.savedAt });
+    } catch {
+      /* ignore corrupt draft */
+    }
+  }, [session?.user]);
+
+  useEffect(() => {
+    if (isExistingUser || emailConfirmationSent) return;
+    const t = window.setTimeout(() => {
+      try {
+        const draft = buildDraft();
+        if (!draftHasProgress(draft)) {
+          localStorage.removeItem(TUTOR_ONBOARDING_DRAFT_KEY);
+          return;
+        }
+        localStorage.setItem(TUTOR_ONBOARDING_DRAFT_KEY, JSON.stringify(draft));
+      } catch {
+        /* quota */
+      }
+    }, 900);
+    return () => window.clearTimeout(t);
+  }, [buildDraft, isExistingUser, emailConfirmationSent]);
+
+  const resumeDraft = useCallback(() => {
+    try {
+      const raw = localStorage.getItem(TUTOR_ONBOARDING_DRAFT_KEY);
+      if (!raw) return;
+      applyDraft(JSON.parse(raw) as TutorOnboardingDraft);
+      draftBannerDismissed.current = true;
+      setDraftBanner({ show: false, savedAt: null });
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    } catch {
+      /* ignore */
+    }
+  }, [applyDraft]);
+
+  const discardDraft = useCallback(() => {
+    draftBannerDismissed.current = true;
+    clearOnboardingDraft();
+  }, [clearOnboardingDraft]);
+
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -341,8 +568,13 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
       setError('Please enter a valid email address');
       return false;
     }
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters long');
+    if (password.length < 8) {
+      setError('Use at least 8 characters for your password (best practice: mix letters, numbers, and symbols).');
+      return false;
+    }
+    const { score: pwScore } = passwordStrength(password);
+    if (pwScore < MIN_PASSWORD_STRENGTH_SCORE) {
+      setError('Please choose a stronger password: add upper & lower case, a number, or a symbol.');
       return false;
     }
     if (password !== confirmPassword) {
@@ -380,6 +612,10 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
     setError('');
     
     if (step === 1 && !validateStep1()) return;
+    if (step === 1 && !isExistingUser && emailExists) {
+      setError('This email is already registered. Sign in or use a different email.');
+      return;
+    }
     if (step === 2 && !validateStep2()) return;
     if (step === 3 && !validateStep3()) return;
     
@@ -398,6 +634,10 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
     setSuccess('');
 
     if (!validateStep5()) return;
+    if (!agreedToTerms) {
+      setError('Please confirm you accept the Terms of Service and Privacy Policy to continue.');
+      return;
+    }
 
     setLoading(true);
 
@@ -515,6 +755,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
           }
         }
 
+        clearOnboardingDraft();
         // Email confirmation required — show the "check your email" screen
         setEmailConfirmationSent(true);
         return;
@@ -617,6 +858,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
       }
 
       console.log('✅ Tutor profile updated successfully!');
+      clearOnboardingDraft();
 
       if (!isExistingUser) {
         setSuccess('Account created successfully! Welcome to TutorNest!');
@@ -649,38 +891,46 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
     }
   };
 
+  const stepLabels = ['Account', 'Professional', 'Preferences', 'Expertise', 'Verify'];
   const renderStepIndicator = () => (
-    <div className="mb-8">
-      <div className="flex items-center justify-between">
+    <div className="mb-8" aria-label="Onboarding progress">
+      <div className="flex items-center justify-between gap-2 mb-3">
+        <p className="text-sm font-medium text-gray-900">
+          Step {step} of 5 — {stepLabels[step - 1]}
+        </p>
+        <span className="text-xs text-muted-foreground tabular-nums">{Math.round((step / 5) * 100)}%</span>
+      </div>
+      <Progress value={(step / 5) * 100} className="h-2 mb-6 bg-gray-100" />
+      <div className="flex items-center justify-between overflow-x-auto pb-1">
         {[1, 2, 3, 4, 5].map((s) => (
-          <div key={s} className="flex items-center">
+          <div key={s} className="flex items-center shrink-0">
             <div
-              className={`w-10 h-10 rounded-full flex items-center justify-center transition-all ${
+              className={`w-9 h-9 sm:w-10 sm:h-10 rounded-full flex items-center justify-center text-sm font-semibold transition-all ${
                 s === step
-                  ? 'bg-[#625d9c] text-white'
+                  ? 'bg-[#625d9c] text-white ring-2 ring-[#625d9c]/30 ring-offset-2'
                   : s < step
-                  ? 'bg-[#5d9827] text-white'
-                  : 'bg-gray-200 text-gray-400'
+                    ? 'bg-[#5d9827] text-white'
+                    : 'bg-gray-200 text-gray-500'
               }`}
+              aria-current={s === step ? 'step' : undefined}
             >
-              {s < step ? <CheckCircle className="w-5 h-5" /> : s}
+              {s < step ? <CheckCircle className="w-5 h-5" aria-hidden /> : s}
             </div>
             {s < 5 && (
               <div
-                className={`h-1 w-12 sm:w-20 mx-1 ${
-                  s < step ? 'bg-[#5d9827]' : 'bg-gray-200'
-                }`}
+                className={`h-0.5 w-8 sm:w-16 mx-0.5 sm:mx-1 ${s < step ? 'bg-[#5d9827]' : 'bg-gray-200'}`}
+                aria-hidden
               />
             )}
           </div>
         ))}
       </div>
-      <div className="flex justify-between mt-2 text-xs text-gray-600">
-        <span>Account</span>
-        <span>Professional</span>
-        <span>Preferences</span>
-        <span>Expertise</span>
-        <span>Verify</span>
+      <div className="flex justify-between mt-2 text-[10px] sm:text-xs text-gray-600 gap-1">
+        {stepLabels.map((label) => (
+          <span key={label} className="truncate max-w-[4.5rem] sm:max-w-none text-center">
+            {label}
+          </span>
+        ))}
       </div>
     </div>
   );
@@ -688,6 +938,31 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   return (
     <AuthBackground className="py-8 px-4">
       <div className="max-w-4xl mx-auto">
+        {draftBanner.show && !isExistingUser && !emailConfirmationSent && (
+          <Alert className="mb-6 border-violet-200 bg-violet-50">
+            <RotateCcw className="h-4 w-4 text-violet-700" aria-hidden />
+            <AlertDescription className="text-violet-950">
+              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-sm">
+                  You have a{' '}
+                  <strong>saved application</strong>
+                  {draftBanner.savedAt ? (
+                    <> from {new Date(draftBanner.savedAt).toLocaleString()}</>
+                  ) : null}
+                  . Continue where you left off?
+                </p>
+                <div className="flex flex-wrap gap-2 shrink-0">
+                  <Button type="button" size="sm" className="bg-[#625d9c]" onClick={resumeDraft}>
+                    Resume application
+                  </Button>
+                  <Button type="button" size="sm" variant="outline" onClick={discardDraft}>
+                    Start fresh
+                  </Button>
+                </div>
+              </div>
+            </AlertDescription>
+          </Alert>
+        )}
         {/* Logo */}
         <div className="flex justify-center mb-6">
           <TutorNestLogo />
@@ -700,17 +975,38 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                 <CheckCircle className="w-8 h-8 text-green-600" />
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">Application Submitted!</h2>
-            <p className="text-gray-600 mb-6">
-              Your tutor application for <strong>{email}</strong> has been received.
-              You can sign in now — your account will be reviewed within 24–48 hours.
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">Application submitted</h2>
+            <p className="text-gray-600 mb-4">
+              We&apos;ve received your tutor application for <strong>{email}</strong>. Next steps:
             </p>
+            <ul className="text-left text-sm text-gray-700 mb-6 space-y-2 list-none border rounded-xl p-4 bg-gray-50/80">
+              <li className="flex gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" aria-hidden />
+                <span>
+                  <strong>Confirm your email</strong> — click the link Supabase sends so we know this inbox is yours.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" aria-hidden />
+                <span>
+                  <strong>Verification queue</strong> — our team typically reviews profiles within <strong>24–48 hours</strong>{' '}
+                  (business days). You may be asked for ID or qualification documents.
+                </span>
+              </li>
+              <li className="flex gap-2">
+                <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" aria-hidden />
+                <span>
+                  <strong>Sign in anytime</strong> — use your tutor dashboard to refine your profile while you wait.
+                </span>
+              </li>
+            </ul>
             <button
+              type="button"
               onClick={onBackToSignIn}
               className="w-full py-3 px-6 rounded-xl text-white font-semibold"
               style={{ backgroundColor: '#625d9c' }}
             >
-              Sign In Now
+              Continue to sign in
             </button>
           </div>
         ) : (
@@ -725,8 +1021,8 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
 
           {/* Messages */}
           {error && (
-            <Alert className="mb-6 bg-red-50 border-red-200">
-              <AlertCircle className="h-4 w-4 text-red-600" />
+            <Alert className="mb-6 bg-red-50 border-red-200 text-red-900">
+              <AlertCircle className="h-4 w-4 text-red-600" aria-hidden />
               <AlertDescription className="text-red-800">{error}</AlertDescription>
             </Alert>
           )}
@@ -865,9 +1161,37 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                         type="password"
                         value={password}
                         onChange={(e) => setPassword(e.target.value)}
-                        placeholder="At least 6 characters"
+                        placeholder="At least 8 characters"
                         required
+                        autoComplete="new-password"
+                        aria-invalid={
+                          password.length > 0 &&
+                          passwordStrength(password).score < MIN_PASSWORD_STRENGTH_SCORE
+                        }
+                        aria-describedby="password-hint"
                       />
+                      <p id="password-hint" className="text-xs text-muted-foreground mt-1">
+                        Use 8+ characters with mixed case, numbers, or symbols. Passwords are never stored in your browser draft.
+                      </p>
+                      {password.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <div className="flex justify-between text-xs">
+                            <span className="text-muted-foreground">Password strength</span>
+                            <span
+                              className={
+                                passwordStrength(password).score <= 1
+                                  ? 'text-red-600'
+                                  : passwordStrength(password).score < MIN_PASSWORD_STRENGTH_SCORE
+                                    ? 'text-amber-600'
+                                    : 'text-emerald-700'
+                              }
+                            >
+                              {passwordStrength(password).label}
+                            </span>
+                          </div>
+                          <Progress value={passwordStrength(password).bar} className="h-1.5" />
+                        </div>
+                      )}
                     </div>
 
                     <div>
@@ -879,6 +1203,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                         onChange={(e) => setConfirmPassword(e.target.value)}
                         placeholder="Confirm your password"
                         required
+                        autoComplete="new-password"
                       />
                     </div>
                   </>
@@ -1417,58 +1742,58 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
             </Card>
           )}
 
-          {/* Navigation Buttons */}
-          <div className="flex justify-between mt-8">
-            {step > 1 && (
-              <Button
-                type="button"
-                variant="outline"
-                onClick={handlePreviousStep}
-                disabled={loading}
-              >
-                Previous
-              </Button>
-            )}
-            
-            <div className="ml-auto">
-              {step < 5 ? (
-                <Button
-                  type="button"
-                  onClick={handleNextStep}
-                  className="text-white"
-                  style={{ backgroundColor: '#625d9c' }}
-                >
-                  Next Step
+          {/* Navigation — sticky on small screens so primary action is always reachable */}
+          <div className="sticky bottom-0 z-30 mt-8 -mx-2 border-t border-gray-200/80 bg-white/95 px-2 py-4 backdrop-blur-md supports-[padding:max(0px)]:pb-[max(1rem,env(safe-area-inset-bottom))] sm:static sm:z-0 sm:mx-0 sm:border-0 sm:bg-transparent sm:px-0 sm:py-0 sm:backdrop-blur-none">
+            <div className="flex justify-between gap-3">
+              {step > 1 && (
+                <Button type="button" variant="outline" onClick={handlePreviousStep} disabled={loading}>
+                  Back
                 </Button>
-              ) : (
-                <div>
-                  <div className="flex items-start gap-2 mb-4">
-                    <input
-                      type="checkbox"
-                      id="tutor-terms"
-                      checked={agreedToTerms}
-                      onChange={(e) => setAgreedToTerms(e.target.checked)}
-                      className="mt-0.5 h-4 w-4 rounded border-gray-300 accent-purple-600"
-                    />
-                    <label htmlFor="tutor-terms" className="text-xs text-gray-600">
-                      I agree to the{' '}
-                      <a href="/terms" target="_blank" className="text-purple-600 underline hover:text-purple-800">Terms of Service</a>
-                      {' '}and{' '}
-                      <a href="/privacy" target="_blank" className="text-purple-600 underline hover:text-purple-800">Privacy Policy</a>
-                      . I understand my profile will be reviewed before I can accept bookings.
-                    </label>
-                  </div>
+              )}
+              <div className={`ml-auto flex flex-col items-stretch gap-3 ${step === 1 ? 'w-full sm:w-auto' : ''}`}>
+                {step < 5 ? (
                   <Button
                     type="button"
-                    onClick={handleSubmit}
-                    disabled={!agreedToTerms || loading}
-                    className="text-white"
-                    style={{ backgroundColor: '#5d9827' }}
+                    onClick={handleNextStep}
+                    className="text-white min-h-[44px]"
+                    style={{ backgroundColor: '#625d9c' }}
                   >
-                    {photoUploading ? 'Uploading Photo...' : loading ? 'Creating Account...' : 'Complete Registration'}
+                    Continue
                   </Button>
-                </div>
-              )}
+                ) : (
+                  <div className="space-y-4">
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        id="tutor-terms"
+                        checked={agreedToTerms}
+                        onChange={(e) => setAgreedToTerms(e.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 accent-purple-600"
+                      />
+                      <label htmlFor="tutor-terms" className="text-xs text-gray-600 leading-relaxed">
+                        I agree to the{' '}
+                        <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-purple-600 underline hover:text-purple-800">
+                          Terms of Service
+                        </a>{' '}
+                        and{' '}
+                        <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-purple-600 underline hover:text-purple-800">
+                          Privacy Policy
+                        </a>
+                        . I understand my profile must be approved before I can accept paid bookings.
+                      </label>
+                    </div>
+                    <Button
+                      type="button"
+                      onClick={handleSubmit}
+                      disabled={!agreedToTerms || loading || photoUploading}
+                      className="text-white w-full sm:w-auto min-h-[48px]"
+                      style={{ backgroundColor: '#5d9827' }}
+                    >
+                      {photoUploading ? 'Uploading photo…' : loading ? 'Submitting…' : 'Submit application'}
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
           </div>
 

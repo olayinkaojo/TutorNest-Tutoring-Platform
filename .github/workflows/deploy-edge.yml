@@ -1,0 +1,57 @@
+# Deploys `make-server-cbd74580` and syncs secrets used by the function (CORS + /health version).
+#
+# Enable after configuring GitHub:
+#   Repository variable: SUPABASE_EDGE_DEPLOY = true
+#   Repository secrets:  SUPABASE_ACCESS_TOKEN, SUPABASE_PROJECT_REF (project ref from Dashboard → Settings → General)
+# Optional:
+#   Repository variable: ALLOWED_ORIGINS = https://yourapp.com,https://www.yourapp.com,http://localhost:5173
+#   (comma-separated; include localhost if you hit production Edge from Vite dev)
+
+name: Deploy Edge function
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main, master]
+    paths:
+      - 'supabase/functions/**'
+      - '.github/workflows/deploy-edge.yml'
+
+concurrency:
+  group: supabase-edge-deploy
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.event_name == 'workflow_dispatch' || vars.SUPABASE_EDGE_DEPLOY == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Set DEPLOY_SHA for /health
+        run: >
+          supabase secrets set
+          "DEPLOY_SHA=${{ github.sha }}"
+          --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+      - name: Sync ALLOWED_ORIGINS (optional)
+        if: vars.ALLOWED_ORIGINS != ''
+        env:
+          ALLOWED_ORIGINS: ${{ vars.ALLOWED_ORIGINS }}
+        run: >
+          supabase secrets set
+          "ALLOWED_ORIGINS=${ALLOWED_ORIGINS}"
+          --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+
+      - name: Deploy make-server-cbd74580
+        run: >
+          supabase functions deploy make-server-cbd74580
+          --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"

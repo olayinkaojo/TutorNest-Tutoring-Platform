@@ -162,6 +162,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
 
   // Platform Overview - Comprehensive Stats
   app.get('/make-server-cbd74580/admin/platform-overview', async (c) => {
+    const startedAt = Date.now();
     try {
       const accessToken = c.req.header('Authorization')?.split(' ')[1];
       const userId = await getUserId(accessToken ?? null);
@@ -272,15 +273,55 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         v.status === 'rejected'
       ).length;
 
-      // System health (simplified)
+      const actionableBookings = pendingBookings + confirmedBookings;
+      const bookingConfirmRate = actionableBookings > 0
+        ? Math.round((confirmedBookings / actionableBookings) * 1000) / 10
+        : null;
+      const tutorVerificationRate = tutors > 0
+        ? Math.round((verifiedTutors / tutors) * 1000) / 10
+        : null;
+
+      const last7Days: { date: string; bookings: number; revenue: number }[] = [];
+      for (let i = 6; i >= 0; i--) {
+        const d = new Date(now.getFullYear(), now.getMonth(), now.getDate() - i);
+        const dayStart = new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
+        const dayEnd = dayStart + 86400000;
+        const bookingsDay = allBookings.filter((b: any) => {
+          const t = b.createdAt
+            ? new Date(b.createdAt).getTime()
+            : (b.date ? new Date(b.date).getTime() : NaN);
+          return !Number.isNaN(t) && t >= dayStart && t < dayEnd;
+        }).length;
+        const rev = allPayments.filter((p: any) => {
+          const t = p.createdAt ? new Date(p.createdAt).getTime() : NaN;
+          return !Number.isNaN(t) && t >= dayStart && t < dayEnd;
+        }).reduce((s: number, p: any) => s + (parseFloat(p.amount) || 0), 0);
+        last7Days.push({
+          date: d.toISOString().slice(0, 10),
+          bookings: bookingsDay,
+          revenue: Math.round(rev),
+        });
+      }
+
+      const computeTimeMs = Date.now() - startedAt;
       const systemHealth = {
         serverStatus: 'healthy' as const,
         databaseStatus: 'healthy' as const,
-        uptime: 99.9,
-        responseTime: Math.floor(Math.random() * 50) + 20 // Mock response time 20-70ms
+        uptime: null as number | null,
+        responseTime: null as number | null,
+        computeTimeMs,
       };
 
       return c.json({
+        meta: {
+          generatedAt: new Date().toISOString(),
+          currency: 'NGN',
+          coverage: {
+            profiles: totalUsers,
+            bookings: totalSessions,
+            payments: allPayments.length,
+          },
+        },
         stats: {
           users: {
             total: totalUsers,
@@ -289,7 +330,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
             tutors,
             admins,
             newThisMonth,
-            activeToday: activeToday || Math.floor(totalUsers * 0.1) // Fallback to 10% if no data
+            activeToday,
           },
           sessions: {
             total: totalSessions,
@@ -315,7 +356,12 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
             verified: verifiedTutors,
             rejected: rejectedVerifications
           },
-          system: systemHealth
+          system: systemHealth,
+          trends: { last7Days },
+          insights: {
+            bookingConfirmRate,
+            tutorVerificationRate,
+          },
         }
       });
     } catch (error: any) {
@@ -334,7 +380,12 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const limit = parseInt(c.req.query('limit') || '10');
+      if (!await isAdminUser(userId)) {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
+
+      const rawLimit = parseInt(c.req.query('limit') || '10', 10);
+      const limit = Math.min(Math.max(Number.isFinite(rawLimit) ? rawLimit : 10, 1), 50);
 
       // Get recent audit logs
       const allAudits = await kv.getByPrefix('audit:');
@@ -342,7 +393,8 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         .sort((a: any, b: any) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
         .slice(0, limit);
 
-      const activity = sortedAudits.map((audit: any) => ({
+      const activity = sortedAudits.map((audit: any, i: number) => ({
+        id: (audit as any).id || `audit:${audit.timestamp}:${i}`,
         type: audit.action || 'activity',
         description: audit.description || 'Activity occurred',
         timestamp: formatTimestamp(audit.timestamp),
@@ -366,6 +418,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
 
         recentUsers.forEach((user: any) => {
           activity.push({
+            id: `derived:user:${user.id || user.email}:${user.createdAt}`,
             type: 'user_signup',
             description: `New ${user.role} registered: ${user.name || user.email}`,
             timestamp: formatTimestamp(user.createdAt),
@@ -375,6 +428,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
 
         recentBookings.forEach((booking: any) => {
           activity.push({
+            id: `derived:booking:${booking.id || booking.createdAt}`,
             type: 'booking',
             description: `New booking created for ${booking.subject || 'session'}`,
             timestamp: formatTimestamp(booking.createdAt),

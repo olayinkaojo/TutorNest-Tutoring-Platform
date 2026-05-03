@@ -31,9 +31,98 @@ function getTodayDate(): string {
   return new Date().toISOString().split("T")[0];
 }
 
+/** Stable hash for picking the same question index all day for a given topic */
+function hashSeed(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) {
+    h = Math.imul(31, h) + s.charCodeAt(i);
+    h |= 0;
+  }
+  return Math.abs(h);
+}
+
+/** COMPREHENSIVE_TRIVIA subject keys per daily topic id */
+const TOPIC_SUBJECTS: Record<string, string[]> = {
+  math: ["Mathematics"],
+  english: ["English"],
+  science: ["Sciences"],
+  history: ["History"],
+  art: ["Art"],
+  music: ["Music"],
+  pe: ["Physical Education"],
+};
+
+async function pickQuestionFromBank(
+  topicId: string,
+  topicLabel: string,
+  today: string
+): Promise<{
+  questionId: string;
+  questionLine: string;
+  options: string[];
+  correctAnswer: number;
+  difficulty?: string;
+} | null> {
+  const mod = await import("./comprehensive-trivia-data.tsx");
+  const bank = mod.COMPREHENSIVE_TRIVIA as Record<
+    string,
+    Record<string, unknown[]>
+  >;
+
+  const subjects = TOPIC_SUBJECTS[topicId] ?? ["Mathematics"];
+  const gradesToTry = [
+    "year_5",
+    "year_6",
+    "year_7",
+    "year_8",
+    "year_4",
+    "year_3",
+    "year_2",
+    "year_1",
+  ];
+
+  for (const grade of gradesToTry) {
+    const yearBlock = bank[grade];
+    if (!yearBlock) continue;
+
+    for (const subject of subjects) {
+      const pool = yearBlock[subject];
+      if (!Array.isArray(pool) || pool.length === 0) continue;
+
+      const idx = hashSeed(`${today}:${topicId}:${grade}:${subject}`) %
+        pool.length;
+      const raw = pool[idx] as {
+        id: string;
+        question: string;
+        options: string[];
+        correctAnswer?: number;
+        correctAnswerIndex?: number;
+        difficulty?: string;
+      };
+
+      const correct =
+        typeof raw.correctAnswer === "number"
+          ? raw.correctAnswer
+          : typeof raw.correctAnswerIndex === "number"
+            ? raw.correctAnswerIndex
+            : 0;
+
+      return {
+        questionId: raw.id,
+        questionLine: `Today's Challenge (${topicLabel}): ${raw.question}`,
+        options: Array.isArray(raw.options) ? raw.options : [],
+        correctAnswer: correct,
+        difficulty: raw.difficulty,
+      };
+    }
+  }
+
+  return null;
+}
+
 export async function generateDailyChallenge(): Promise<DailyChallenge> {
   const today = getTodayDate();
-  const cacheKey = `daily_challenge:${today}`;
+  const cacheKey = `daily_challenge:v3:${today}`;
 
   try {
     const existing = await kv.get(cacheKey);
@@ -51,20 +140,51 @@ export async function generateDailyChallenge(): Promise<DailyChallenge> {
       { id: "pe", name: "Physical Education", difficulty: "easy" },
     ];
 
-    const dayOfWeek = new Date(today).getDay();
+    const dayOfWeek = new Date(`${today}T12:00:00Z`).getUTCDay();
     const selectedTopic = topics[dayOfWeek % topics.length];
 
-    const challenge: DailyChallenge = {
-      id: `daily_${today}`,
-      date: today,
-      topicId: selectedTopic.id,
-      questionId: `daily_${today}_q1`,
-      question: `Today's Challenge (${selectedTopic.name}): What is the capital of France?`,
-      options: ["London", "Paris", "Berlin", "Madrid"],
-      correctAnswer: 1,
-      difficulty: selectedTopic.difficulty as "easy" | "medium" | "hard",
-      baseXpReward: 200,
-    };
+    const picked = await pickQuestionFromBank(
+      selectedTopic.id,
+      selectedTopic.name,
+      today
+    );
+
+    let difficultyRank = selectedTopic.difficulty as
+      | "easy"
+      | "medium"
+      | "hard";
+    if (
+      picked?.difficulty === "easy" ||
+      picked?.difficulty === "medium" ||
+      picked?.difficulty === "hard"
+    ) {
+      difficultyRank = picked.difficulty;
+    }
+
+    const challenge: DailyChallenge = picked && picked.options.length > 0
+      ? {
+        id: `daily_${today}`,
+        date: today,
+        topicId: selectedTopic.id,
+        questionId: picked.questionId,
+        question: picked.questionLine,
+        options: picked.options,
+        correctAnswer: picked.correctAnswer,
+        difficulty: difficultyRank,
+        baseXpReward: 200,
+      }
+      : {
+        id: `daily_${today}`,
+        date: today,
+        topicId: selectedTopic.id,
+        questionId: `daily_${today}_fallback`,
+        question:
+          `Today's Challenge (${selectedTopic.name}): Which number comes after 4?`,
+        options: ["3", "5", "6", "7"],
+        correctAnswer: 1,
+        difficulty: difficultyRank,
+        baseXpReward: 200,
+      };
 
     await kv.set(cacheKey, challenge);
     return challenge;
