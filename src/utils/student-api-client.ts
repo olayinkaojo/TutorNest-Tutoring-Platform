@@ -35,9 +35,13 @@ interface RequestOptions {
   method?: 'GET' | 'POST' | 'PUT' | 'DELETE' | 'PATCH';
   headers?: Record<string, string>;
   body?: unknown;
+  /** Override default TIMEOUT_MS for this request */
   timeout?: number;
   skipCache?: boolean;
 }
+
+/** Optional per-call timeout (e.g. 10_000 to match dashboard fetch patterns) */
+export type StudentRequestOpts = { timeout?: number };
 
 /**
  * Make an authenticated API request
@@ -136,7 +140,8 @@ export const studentAPI = {
   async getStudentBookings(
     accessToken: string,
     studentId: string,
-    filter?: { status?: string }
+    filter?: { status?: string },
+    opts?: StudentRequestOpts
   ) {
     if (!studentId || typeof studentId !== 'string') {
       throw new StudentAPIError('INVALID_INPUT', 'Student ID is required', 400);
@@ -149,7 +154,7 @@ export const studentAPI = {
     const response = await makeRequest<any>(
       `/bookings?${queryParams.toString()}`,
       accessToken,
-      { skipCache: false }
+      { skipCache: false, ...(opts?.timeout != null ? { timeout: opts.timeout } : {}) }
     );
 
     return response.bookings || [];
@@ -161,7 +166,8 @@ export const studentAPI = {
   async getStudentAssessments(
     accessToken: string,
     studentId: string,
-    limit: number = 10
+    limit: number = 10,
+    opts?: StudentRequestOpts
   ) {
     if (!studentId || typeof studentId !== 'string') {
       throw new StudentAPIError('INVALID_INPUT', 'Student ID is required', 400);
@@ -170,7 +176,7 @@ export const studentAPI = {
     const response = await makeRequest<any>(
       `/assessments/student/${studentId}?limit=${Math.min(limit, 100)}`,
       accessToken,
-      { skipCache: false }
+      { skipCache: false, ...(opts?.timeout != null ? { timeout: opts.timeout } : {}) }
     );
 
     return response.assessments || [];
@@ -316,7 +322,8 @@ export const studentAPI = {
    */
   async getReportsForBookings(
     accessToken: string,
-    bookingIds: string[]
+    bookingIds: string[],
+    opts?: StudentRequestOpts
   ) {
     if (!Array.isArray(bookingIds) || bookingIds.length === 0) {
       throw new StudentAPIError('INVALID_INPUT', 'Booking IDs array required', 400);
@@ -325,7 +332,7 @@ export const studentAPI = {
     const response = await makeRequest<any>(
       `/bookings/${bookingIds.join(',')}/reports`,
       accessToken,
-      { skipCache: true }
+      { skipCache: true, ...(opts?.timeout != null ? { timeout: opts.timeout } : {}) }
     );
 
     return {

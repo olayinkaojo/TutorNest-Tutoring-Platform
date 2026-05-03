@@ -27,7 +27,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { MobileNavigation } from './MobileNavigation';
 import { StudentAssessmentsList } from './StudentAssessmentsList';
 import TutorNestLogo from './TutorNestLogo';
-import studentAPI from '../utils/student-api-client';
+import studentAPI, { StudentAPIError } from '../utils/student-api-client';
 import { useState, useEffect, useRef } from 'react';
 import {
   LineChart,
@@ -266,15 +266,22 @@ export function StudentDashboard({
     const checkForNewReports = async () => {
       try {
         // Get all completed bookings (which should have reports)
-        const allBookings = await studentAPI.getStudentBookings(session.access_token, academicStudentId);
+        const allBookings = await studentAPI.getStudentBookings(
+          session.access_token,
+          academicStudentId,
+          undefined,
+          { timeout: 10_000 }
+        );
         const completedBookings = allBookings.filter((b: any) => b.status === 'completed');
 
         // Get reports for completed bookings
         if (completedBookings.length > 0) {
-          const reports = await studentAPI.getReportsForBookings(
+          const reportPayload = await studentAPI.getReportsForBookings(
             session.access_token,
-            completedBookings.map((b: any) => b.id)
+            completedBookings.map((b: any) => b.id),
+            { timeout: 10_000 }
           );
+          const reports = reportPayload.reports || [];
 
           // Count unviewed reports
           const unviewedReports = reports.filter((r: any) => 
@@ -306,8 +313,13 @@ export function StudentDashboard({
     try {
       const studentId = academicStudentId;
 
-      // Load bookings using studentAPI
-      const allBookings = await studentAPI.getStudentBookings(session.access_token, studentId);
+      // Load bookings using studentAPI (10s cap aligns with other dashboards)
+      const allBookings = await studentAPI.getStudentBookings(
+        session.access_token,
+        studentId,
+        undefined,
+        { timeout: 10_000 }
+      );
       
       const now = new Date();
       const upcoming = allBookings.filter((b: any) =>
@@ -335,7 +347,12 @@ export function StudentDashboard({
       });
 
       // Load assessments using studentAPI
-      const studentAssessments = await studentAPI.getStudentAssessments(session.access_token, studentId);
+      const studentAssessments = await studentAPI.getStudentAssessments(
+        session.access_token,
+        studentId,
+        10,
+        { timeout: 10_000 }
+      );
       setAssessments(studentAssessments);
 
       // Calculate average score
@@ -366,9 +383,13 @@ export function StudentDashboard({
       const timeProgress = processProgressOverTime(studentAssessments);
       setProgressOverTime(timeProgress);
 
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error('Error loading student data:', err);
-      if (err?.name === 'AbortError' || err?.name === 'TimeoutError') {
+      const isTimeout =
+        (err instanceof StudentAPIError && err.code === 'TIMEOUT') ||
+        (err as Error)?.name === 'AbortError' ||
+        (err as Error)?.name === 'TimeoutError';
+      if (isTimeout) {
         toast.error('Request timed out. Please check your connection and try again.');
         return;
       }
