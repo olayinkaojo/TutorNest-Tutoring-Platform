@@ -317,8 +317,8 @@ contentLibraryRoutes(app, getUserId);
 // Register progress analytics routes
 progressAnalyticsRoutes(app, getUserId);
 
-// Register notifications routes - DISABLED: Using unified notifications in reports-notifications-routes.tsx instead
-// notificationsRoutes(app, getUserId);
+// Register notifications routes (includes schedule-reminders + DB-backed notifications/:userId)
+notificationsRoutes(app, getUserId);
 
 // Register messaging routes
 messagingRoutes(app, getUserId);
