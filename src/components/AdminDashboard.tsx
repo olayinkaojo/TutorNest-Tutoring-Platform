@@ -43,6 +43,7 @@ import { PlatformOverview } from './admin/PlatformOverview';
 import { SystemAlertsPanel } from './SystemAlertsPanel';
 import { ChildProfileManagement } from './admin/ChildProfileManagement';
 import { AdminMetricsWidget } from './AdminMetricsWidget';
+import { AuditLogViewer } from './admin/AuditLogViewer';
 import adminAPI from '../utils/admin-api-client';
 
 interface UserProfile {
@@ -101,6 +102,7 @@ export function AdminDashboard({
     'childprofiles',
     'curriculum',
     'resources',
+    'auditlog',
   ]);
 
   useEffect(() => {
@@ -396,6 +398,7 @@ export function AdminDashboard({
             <TabsTrigger value="childprofiles">Child Profiles</TabsTrigger>
             <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
+            <TabsTrigger value="auditlog">Audit Log</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -410,6 +413,32 @@ export function AdminDashboard({
 
               {/* Platform Overview with Key Metrics */}
               {session && <PlatformOverview session={session} onTabChange={setActiveTab} />}
+
+              {/* KV → Postgres migration (one-time, safe to re-run) */}
+              {session && (
+                <Card>
+                  <CardHeader>
+                    <CardTitle className="text-base">Data Migration</CardTitle>
+                    <CardDescription>Migrate legacy KV store data to Postgres (one-time operation, safe to re-run)</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    <Button
+                      variant="outline"
+                      onClick={async () => {
+                        if (!window.confirm('Run KV → Postgres migration? This may take a few seconds.')) return;
+                        const res = await fetch(
+                          `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/migrate-kv-to-postgres`,
+                          { method: 'POST', headers: { Authorization: `Bearer ${session.access_token}` } },
+                        );
+                        const data = await res.json();
+                        alert(JSON.stringify(data, null, 2));
+                      }}
+                    >
+                      Run KV → Postgres Migration
+                    </Button>
+                  </CardContent>
+                </Card>
+              )}
 
             </div>
           </TabsContent>
@@ -494,9 +523,15 @@ export function AdminDashboard({
 
           <TabsContent value="resources">
             {session && (
-              <ResourcesUploader 
+              <ResourcesUploader
                 accessToken={session.access_token}
               />
+            )}
+          </TabsContent>
+
+          <TabsContent value="auditlog">
+            {session && (
+              <AuditLogViewer accessToken={session.access_token} />
             )}
           </TabsContent>
 

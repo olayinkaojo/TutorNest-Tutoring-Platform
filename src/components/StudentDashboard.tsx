@@ -56,6 +56,7 @@ import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { StudentGettingStartedCard } from './student/StudentGettingStartedCard';
 import { Avatar, AvatarFallback } from './ui/avatar';
+import { AvatarUpload } from './AvatarUpload';
 import {
   BookOpen,
   Clock,
@@ -581,7 +582,12 @@ export function StudentDashboard({
                 Student Account
               </Badge>
 
-              <span className="text-sm text-gray-600">Welcome, {studentName}</span>
+              <AvatarUpload
+                session={session}
+                photoUrl={profile.photoUrl}
+                name={studentName}
+              />
+              <span className="text-sm text-gray-600">Welcome, {studentName.split(' ')[0]}</span>
 
               <Button variant="ghost" size="sm" onClick={onSignOut}>
                 <LogOut className="w-4 h-4 mr-2" />

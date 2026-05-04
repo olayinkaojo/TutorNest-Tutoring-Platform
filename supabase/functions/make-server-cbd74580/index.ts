@@ -52,6 +52,7 @@ import signupRoutes from './signup-routes.tsx';
 import { tutorSearchRoutes } from './tutor-search-routes.tsx';
 import { invitationRoutes } from './invitation-routes.tsx';
 import migrationRoutes from './migration-routes.tsx';
+import profileAvatarRoutes from './profile-avatar-routes.tsx';
 
 const app = new Hono();
 
@@ -526,6 +527,9 @@ app.route('/make-server-cbd74580', invitationRoutes);
 
 // Register migration routes (admin-only KV → Postgres migration)
 app.route('/make-server-cbd74580', migrationRoutes);
+
+// Register profile avatar upload route
+app.route('/make-server-cbd74580', profileAvatarRoutes);
 
 // TEST ROUTE - Direct subscription tiers endpoint
 app.get('/make-server-cbd74580/subscription-tiers-test', async (c) => {

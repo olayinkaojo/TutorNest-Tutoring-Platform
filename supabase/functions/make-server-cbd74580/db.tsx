@@ -820,3 +820,54 @@ export async function updateTriviaSubscription(
 
   if (error) throw new Error(error.message);
 }
+
+// ─── Admin Audit Log ──────────────────────────────────────────────────────────
+
+export async function createAdminAuditLog(entry: {
+  actorId: string;
+  actorEmail?: string;
+  action: string;
+  targetType?: string;
+  targetId?: string;
+  details?: Record<string, unknown>;
+}): Promise<void> {
+  const { error } = await db()
+    .from('admin_audit_log')
+    .insert({
+      actor_id: entry.actorId,
+      actor_email: entry.actorEmail ?? null,
+      action: entry.action,
+      target_type: entry.targetType ?? null,
+      target_id: entry.targetId ?? null,
+      details: entry.details ?? {},
+    });
+  if (error) console.error('Admin audit log write failed:', error.message);
+}
+
+export async function getAdminAuditLog(limit = 200): Promise<{
+  id: string;
+  actorId: string;
+  actorEmail: string | null;
+  action: string;
+  targetType: string | null;
+  targetId: string | null;
+  details: Record<string, unknown>;
+  createdAt: string;
+}[]> {
+  const { data, error } = await db()
+    .from('admin_audit_log')
+    .select('*')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    actorId: row.actor_id,
+    actorEmail: row.actor_email,
+    action: row.action,
+    targetType: row.target_type,
+    targetId: row.target_id,
+    details: row.details ?? {},
+    createdAt: row.created_at,
+  }));
+}

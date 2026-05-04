@@ -44,6 +44,7 @@ import { SubscriptionsPage } from './SubscriptionsPage';
 import { PaymentMethodManager } from './PaymentMethodManager';
 import { ParentPaymentsDashboard } from './ParentPaymentsDashboard';
 import { ParentAnalyticsDashboard } from './ParentAnalyticsDashboard';
+import { AvatarUpload } from './AvatarUpload';
 
 interface UserProfile {
   id: string;
@@ -588,6 +589,11 @@ export function ParentDashboard({
                 userName={profile.full_name || profile.name || 'User'}
               />
             )}
+            <AvatarUpload
+              session={session}
+              photoUrl={profile.photoUrl}
+              name={profile.full_name || profile.name || 'Parent'}
+            />
             <span className="text-sm text-gray-600">
               Welcome, {(profile.full_name || profile.name || 'Parent').split(' ')[0]}
             </span>

@@ -60,6 +60,7 @@ import { Chatroom } from './Chatroom';
 import { DocumentManager } from './DocumentManager';
 import tutorAPI from '../utils/tutor-api-client';
 import { parseWAT, bookingDateLabel, formatRawTimeWAT, WAT_TIMEZONE } from '../utils/timezone';
+import { AvatarUpload } from './AvatarUpload';
 
 interface UserProfile {
   id: string;
@@ -699,7 +700,12 @@ export function TutorDashboard({
                 userName={profile.full_name || profile.firstName || profile.name || 'User'}
               />
             )}
-            <span className="text-sm text-gray-600">Welcome, {profile.full_name || profile.firstName || profile.name || 'Tutor'}</span>
+            <AvatarUpload
+              session={session}
+              photoUrl={profile.photoUrl}
+              name={profile.full_name || profile.firstName || profile.name || 'Tutor'}
+            />
+            <span className="text-sm text-gray-600">Welcome, {(profile.full_name || profile.firstName || profile.name || 'Tutor').split(' ')[0]}</span>
             {verificationInfo && (
               <Badge variant={verificationInfo.badgeVariant}>
                 {verificationInfo.badge}

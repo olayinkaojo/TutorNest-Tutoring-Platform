@@ -786,6 +786,14 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         metadata: { status, reason }
       });
 
+      db.createAdminAuditLog({
+        actorId: adminId,
+        action: `user_status_changed_to_${status}`,
+        targetType: 'user',
+        targetId: targetUserId,
+        details: { status, reason },
+      }).catch(() => {});
+
       return c.json({ success: true, message: `User ${status}` });
     } catch (error: any) {
       console.error('Error updating user status:', error);
@@ -1964,6 +1972,14 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         metadata: { action, rejectionReason }
       });
 
+      db.createAdminAuditLog({
+        actorId: adminId,
+        action: action === 'approve' ? 'tutor_verified' : 'tutor_rejected',
+        targetType: 'tutor',
+        targetId: tutorId,
+        details: action === 'reject' ? { rejectionReason } : {},
+      }).catch(() => {});
+
       // Send email notification (non-blocking — don't fail the request on email errors)
       try {
         if (action === 'approve' && tutor.email) {
@@ -2248,6 +2264,18 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
     } catch (error: any) {
       console.error('Error fetching usage stats:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
+  app.get('/make-server-cbd74580/admin/audit-log', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const adminId = await getUserId(accessToken ?? null);
+      if (!adminId) return c.json({ error: 'Unauthorized' }, 401);
+      const logs = await db.getAdminAuditLog(200);
+      return c.json({ logs });
+    } catch (err: any) {
+      return c.json({ error: err.message || 'Internal server error' }, 500);
     }
   });
 
