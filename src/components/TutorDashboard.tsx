@@ -739,7 +739,17 @@ export function TutorDashboard({
 
         <div className="mb-4 lg:mb-8">
           <div className="flex items-center justify-between gap-4 mb-2">
-            <h1 className="text-2xl lg:text-3xl">Tutor Dashboard</h1>
+            <div className="flex items-center gap-3">
+              {/* Avatar — only visible on mobile (desktop uses the header) */}
+              <div className="lg:hidden">
+                <AvatarUpload
+                  session={session}
+                  photoUrl={profile.photoUrl}
+                  name={profile.full_name || profile.firstName || profile.name || 'Tutor'}
+                />
+              </div>
+              <h1 className="text-2xl lg:text-3xl">Tutor Dashboard</h1>
+            </div>
             {/* Bookshop and Resources Buttons - Mobile/Tablet */}
             <div className="lg:hidden flex gap-2">
               <Button
@@ -1072,6 +1082,24 @@ export function TutorDashboard({
           <TabsContent value="profile">
             {session && (
               <div className="space-y-6">
+                {/* Profile photo — always visible, click to change */}
+                <Card>
+                  <CardContent className="pt-6">
+                    <div className="flex items-center gap-4">
+                      <AvatarUpload
+                        session={session}
+                        photoUrl={profile.photoUrl}
+                        name={profile.full_name || profile.firstName || profile.name || 'Tutor'}
+                        size="lg"
+                      />
+                      <div>
+                        <p className="font-semibold text-gray-800">{profile.full_name || profile.firstName || profile.name || 'Tutor'}</p>
+                        <p className="text-sm text-gray-500 mt-0.5">Click your avatar to upload a new profile photo</p>
+                        <p className="text-xs text-gray-400 mt-0.5">Max 2MB · JPG, PNG, WebP</p>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
                 <TutorProfileEditor
                   session={session}
                   tutorId={profile.id || profile.userId}

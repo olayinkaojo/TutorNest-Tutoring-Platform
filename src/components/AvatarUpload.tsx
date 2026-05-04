@@ -6,7 +6,7 @@ interface AvatarUploadProps {
   session: any;
   photoUrl?: string;
   name: string;
-  size?: 'sm' | 'md';
+  size?: 'sm' | 'md' | 'lg';
 }
 
 export function AvatarUpload({ session, photoUrl: initialPhotoUrl, name, size = 'sm' }: AvatarUploadProps) {
@@ -48,8 +48,8 @@ export function AvatarUpload({ session, photoUrl: initialPhotoUrl, name, size = 
     }
   };
 
-  const sz = size === 'sm' ? 'w-8 h-8' : 'w-10 h-10';
-  const fs = size === 'sm' ? '10px' : '12px';
+  const sz = size === 'lg' ? 'w-20 h-20' : size === 'md' ? 'w-10 h-10' : 'w-8 h-8';
+  const fs = size === 'lg' ? '22px' : size === 'md' ? '12px' : '10px';
 
   return (
     <button
