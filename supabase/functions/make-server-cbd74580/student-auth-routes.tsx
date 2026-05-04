@@ -328,7 +328,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       // Send verification email via Resend
-      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
       try {
         const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
           type: 'magiclink',
@@ -455,7 +455,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       });
 
       // Send verification email to student
-      const appUrl2 = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+      const appUrl2 = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
       try {
         const { data: linkData2, error: linkError2 } = await supabase.auth.admin.generateLink({
           type: 'magiclink',

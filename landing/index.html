@@ -1,0 +1,782 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>TutorNest — Find Your Perfect Tutor</title>
+  <meta name="description" content="TutorNest connects students with qualified, vetted tutors across all subjects. AI-powered matching, flexible booking, and progress tracking — all in one place.">
+
+  <meta property="og:title" content="TutorNest — Find Your Perfect Tutor">
+  <meta property="og:description" content="AI-powered tutor matching for every student. Verified tutors, flexible scheduling, progress tracking.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://tutornest.org">
+  <meta property="og:image" content="https://app.tutornest.org/og-image.svg">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:image" content="https://app.tutornest.org/og-image.svg">
+  <meta name="theme-color" content="#625d9c">
+
+  <link rel="icon" type="image/svg+xml" href="https://app.tutornest.org/favicon.svg">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --purple: #625d9c;
+      --purple-dark: #4a4580;
+      --purple-light: #f0effe;
+      --purple-mid: #e8e5fb;
+      --text: #1a1a2e;
+      --muted: #6b7280;
+      --border: #e5e7eb;
+      --white: #ffffff;
+    }
+
+    html { scroll-behavior: smooth; }
+
+    body {
+      font-family: 'Inter', system-ui, sans-serif;
+      color: var(--text);
+      background: var(--white);
+      line-height: 1.6;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    /* ── NAV ── */
+    nav {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      background: rgba(255,255,255,0.95);
+      backdrop-filter: blur(8px);
+      border-bottom: 1px solid var(--border);
+      padding: 0 24px;
+    }
+    .nav-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+      height: 64px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-weight: 700;
+      font-size: 20px;
+      color: var(--purple);
+    }
+    .logo-icon {
+      width: 36px;
+      height: 36px;
+      background: var(--purple);
+      border-radius: 8px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 13px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .nav-links {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-ghost {
+      padding: 8px 16px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--muted);
+      transition: color 0.15s, background 0.15s;
+      cursor: pointer;
+      border: none;
+      background: none;
+    }
+    .btn-ghost:hover { color: var(--text); background: var(--purple-light); }
+    .btn-primary {
+      padding: 9px 20px;
+      border-radius: 8px;
+      font-size: 14px;
+      font-weight: 600;
+      background: var(--purple);
+      color: white;
+      border: none;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-primary:hover { background: var(--purple-dark); transform: translateY(-1px); }
+    .btn-primary:active { transform: translateY(0); }
+    .btn-large {
+      padding: 14px 32px;
+      font-size: 16px;
+      border-radius: 10px;
+    }
+    .btn-outline {
+      padding: 13px 28px;
+      font-size: 16px;
+      border-radius: 10px;
+      background: white;
+      color: var(--purple);
+      border: 2px solid var(--purple);
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s, transform 0.1s;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .btn-outline:hover { background: var(--purple-light); transform: translateY(-1px); }
+
+    /* ── HERO ── */
+    .hero {
+      background: linear-gradient(135deg, #f8f7ff 0%, #ede9ff 40%, #f0f7ff 100%);
+      padding: 80px 24px 96px;
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .hero::before {
+      content: '';
+      position: absolute;
+      top: -100px;
+      right: -100px;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(98,93,156,0.12) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .hero::after {
+      content: '';
+      position: absolute;
+      bottom: -80px;
+      left: -80px;
+      width: 300px;
+      height: 300px;
+      background: radial-gradient(circle, rgba(98,93,156,0.08) 0%, transparent 70%);
+      border-radius: 50%;
+    }
+    .hero-inner {
+      max-width: 760px;
+      margin: 0 auto;
+      position: relative;
+      z-index: 1;
+    }
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--purple-mid);
+      color: var(--purple);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 6px 14px;
+      border-radius: 100px;
+      margin-bottom: 24px;
+    }
+    h1 {
+      font-size: clamp(36px, 6vw, 60px);
+      font-weight: 800;
+      line-height: 1.15;
+      letter-spacing: -0.02em;
+      color: var(--text);
+      margin-bottom: 20px;
+    }
+    h1 span { color: var(--purple); }
+    .hero-sub {
+      font-size: clamp(16px, 2.5vw, 19px);
+      color: var(--muted);
+      max-width: 560px;
+      margin: 0 auto 36px;
+    }
+    .hero-ctas {
+      display: flex;
+      gap: 14px;
+      justify-content: center;
+      flex-wrap: wrap;
+    }
+    .trust-row {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 24px;
+      margin-top: 48px;
+      flex-wrap: wrap;
+    }
+    .trust-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 500;
+    }
+    .trust-item .dot {
+      width: 18px;
+      height: 18px;
+      background: var(--purple);
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 10px;
+      flex-shrink: 0;
+    }
+
+    /* ── SECTIONS ── */
+    section { padding: 80px 24px; }
+    .section-inner { max-width: 1100px; margin: 0 auto; }
+    .section-label {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--purple);
+      margin-bottom: 10px;
+    }
+    .section-title {
+      font-size: clamp(26px, 4vw, 38px);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 14px;
+      line-height: 1.2;
+    }
+    .section-sub {
+      font-size: 17px;
+      color: var(--muted);
+      max-width: 540px;
+      margin-bottom: 52px;
+    }
+
+    /* ── STATS ── */
+    .stats-band {
+      background: var(--purple);
+      padding: 48px 24px;
+    }
+    .stats-grid {
+      max-width: 900px;
+      margin: 0 auto;
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+      gap: 40px;
+      text-align: center;
+    }
+    .stat-num {
+      font-size: 44px;
+      font-weight: 800;
+      color: white;
+      line-height: 1;
+      margin-bottom: 6px;
+    }
+    .stat-label {
+      font-size: 14px;
+      color: rgba(255,255,255,0.75);
+      font-weight: 500;
+    }
+
+    /* ── FEATURES ── */
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+      gap: 24px;
+    }
+    .feature-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+      transition: box-shadow 0.2s, transform 0.2s;
+    }
+    .feature-card:hover { box-shadow: 0 8px 24px rgba(98,93,156,0.12); transform: translateY(-3px); }
+    .feature-icon {
+      width: 48px;
+      height: 48px;
+      background: var(--purple-light);
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 22px;
+      margin-bottom: 16px;
+    }
+    .feature-title {
+      font-size: 17px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .feature-desc {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    /* ── HOW IT WORKS ── */
+    .how-bg { background: var(--purple-light); }
+    .steps-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+      gap: 32px;
+      counter-reset: steps;
+    }
+    .step {
+      display: flex;
+      flex-direction: column;
+      align-items: flex-start;
+      gap: 12px;
+    }
+    .step-num {
+      width: 44px;
+      height: 44px;
+      background: var(--purple);
+      color: white;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .step-title {
+      font-size: 17px;
+      font-weight: 700;
+    }
+    .step-desc {
+      font-size: 14px;
+      color: var(--muted);
+      line-height: 1.65;
+    }
+
+    /* ── SUBJECTS ── */
+    .subjects-wrap {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+    }
+    .subject-chip {
+      background: white;
+      border: 1.5px solid var(--border);
+      border-radius: 100px;
+      padding: 7px 16px;
+      font-size: 14px;
+      font-weight: 500;
+      color: var(--text);
+      transition: border-color 0.15s, background 0.15s, color 0.15s;
+      cursor: default;
+    }
+    .subject-chip:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-light); }
+
+    /* ── TESTIMONIALS ── */
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 24px;
+    }
+    .testimonial-card {
+      background: white;
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 28px;
+    }
+    .stars { color: #f59e0b; font-size: 15px; margin-bottom: 14px; }
+    .testimonial-text {
+      font-size: 15px;
+      color: var(--text);
+      line-height: 1.7;
+      margin-bottom: 20px;
+      font-style: italic;
+    }
+    .testimonial-author {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .author-avatar {
+      width: 40px;
+      height: 40px;
+      border-radius: 50%;
+      background: var(--purple);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-weight: 700;
+      font-size: 14px;
+      flex-shrink: 0;
+    }
+    .author-name { font-weight: 600; font-size: 14px; }
+    .author-role { font-size: 12px; color: var(--muted); }
+
+    /* ── CTA BAND ── */
+    .cta-band {
+      background: linear-gradient(135deg, var(--purple) 0%, #8b85c9 100%);
+      padding: 80px 24px;
+      text-align: center;
+    }
+    .cta-band h2 {
+      font-size: clamp(28px, 4vw, 44px);
+      font-weight: 800;
+      color: white;
+      margin-bottom: 16px;
+      letter-spacing: -0.02em;
+    }
+    .cta-band p {
+      font-size: 18px;
+      color: rgba(255,255,255,0.85);
+      margin-bottom: 36px;
+    }
+    .btn-white {
+      padding: 14px 32px;
+      font-size: 16px;
+      border-radius: 10px;
+      background: white;
+      color: var(--purple);
+      border: none;
+      font-weight: 700;
+      cursor: pointer;
+      transition: transform 0.15s, box-shadow 0.15s;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+    }
+    .btn-white:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+
+    /* ── FOOTER ── */
+    footer {
+      background: #1a1a2e;
+      color: rgba(255,255,255,0.6);
+      padding: 48px 24px 32px;
+    }
+    .footer-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+    .footer-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 40px;
+      flex-wrap: wrap;
+      margin-bottom: 40px;
+    }
+    .footer-brand { max-width: 280px; }
+    .footer-logo {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: white;
+      font-weight: 700;
+      font-size: 18px;
+      margin-bottom: 12px;
+    }
+    .footer-tagline { font-size: 14px; line-height: 1.6; }
+    .footer-links-col h4 {
+      color: white;
+      font-size: 13px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      margin-bottom: 14px;
+    }
+    .footer-links-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
+    .footer-links-col a {
+      font-size: 14px;
+      color: rgba(255,255,255,0.55);
+      transition: color 0.15s;
+    }
+    .footer-links-col a:hover { color: white; }
+    .footer-bottom {
+      border-top: 1px solid rgba(255,255,255,0.08);
+      padding-top: 24px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+      gap: 12px;
+      font-size: 13px;
+    }
+
+    /* ── RESPONSIVE ── */
+    @media (max-width: 640px) {
+      section { padding: 60px 16px; }
+      .hero { padding: 64px 16px 72px; }
+      .hero-ctas { flex-direction: column; align-items: center; }
+      .btn-large, .btn-outline { width: 100%; max-width: 320px; justify-content: center; }
+      .trust-row { gap: 16px; }
+      nav { padding: 0 16px; }
+      .nav-links .btn-ghost { display: none; }
+      .footer-top { flex-direction: column; }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- NAV -->
+  <nav>
+    <div class="nav-inner">
+      <a href="/" class="logo">
+        <div class="logo-icon">TN</div>
+        TutorNest
+      </a>
+      <div class="nav-links">
+        <a href="#features" class="btn-ghost">Features</a>
+        <a href="#how-it-works" class="btn-ghost">How it works</a>
+        <a href="https://app.tutornest.org" class="btn-ghost">Sign in</a>
+        <a href="https://app.tutornest.org" class="btn-primary">Get Started →</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- HERO -->
+  <section class="hero">
+    <div class="hero-inner">
+      <div class="badge">
+        ✦ AI-Powered Tutor Matching
+      </div>
+      <h1>Find the <span>perfect tutor</span><br>for your child</h1>
+      <p class="hero-sub">
+        TutorNest connects students with verified, qualified tutors across every subject. Smart matching, flexible scheduling, and real progress — all in one place.
+      </p>
+      <div class="hero-ctas">
+        <a href="https://app.tutornest.org" class="btn-primary btn-large">Start for free →</a>
+        <a href="#how-it-works" class="btn-outline">See how it works</a>
+      </div>
+      <div class="trust-row">
+        <div class="trust-item"><div class="dot">✓</div> Verified tutors</div>
+        <div class="trust-item"><div class="dot">✓</div> AI-powered matching</div>
+        <div class="trust-item"><div class="dot">✓</div> Safe payments</div>
+        <div class="trust-item"><div class="dot">✓</div> Progress tracking</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <div class="stats-band">
+    <div class="stats-grid">
+      <div>
+        <div class="stat-num">500+</div>
+        <div class="stat-label">Verified tutors</div>
+      </div>
+      <div>
+        <div class="stat-num">20+</div>
+        <div class="stat-label">Subjects covered</div>
+      </div>
+      <div>
+        <div class="stat-num">98%</div>
+        <div class="stat-label">Parent satisfaction</div>
+      </div>
+      <div>
+        <div class="stat-num">24h</div>
+        <div class="stat-label">Average match time</div>
+      </div>
+    </div>
+  </div>
+
+  <!-- FEATURES -->
+  <section id="features">
+    <div class="section-inner">
+      <div class="section-label">Why TutorNest</div>
+      <h2 class="section-title">Everything you need, in one place</h2>
+      <p class="section-sub">From finding the right tutor to tracking your child's progress, TutorNest handles it all.</p>
+      <div class="features-grid">
+        <div class="feature-card">
+          <div class="feature-icon">🎯</div>
+          <div class="feature-title">Smart Matching</div>
+          <div class="feature-desc">Our AI analyses your child's learning style, subjects, schedule, and goals to surface the tutors most likely to make a real difference.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">✅</div>
+          <div class="feature-title">Verified Tutors</div>
+          <div class="feature-desc">Every tutor is identity-checked, qualification-verified, and reviewed before they appear on the platform. You can trust who you hire.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📅</div>
+          <div class="feature-title">Easy Booking</div>
+          <div class="feature-desc">Book sessions that fit your family's schedule. Reschedule or cancel with ease — no awkward phone calls required.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">📈</div>
+          <div class="feature-title">Progress Reports</div>
+          <div class="feature-desc">Tutors file session reports after every lesson. You'll always know what was covered, what needs more work, and how your child is improving.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">🔒</div>
+          <div class="feature-title">Secure Payments</div>
+          <div class="feature-desc">Pay safely through the platform. Payments are held in escrow and released after each confirmed session — full protection for parents and tutors.</div>
+        </div>
+        <div class="feature-card">
+          <div class="feature-icon">💬</div>
+          <div class="feature-title">Direct Messaging</div>
+          <div class="feature-desc">Communicate with tutors directly before and between sessions. Ask questions, share resources, and stay connected in one inbox.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how-it-works" class="how-bg">
+    <div class="section-inner">
+      <div class="section-label">Getting started</div>
+      <h2 class="section-title">Up and running in minutes</h2>
+      <p class="section-sub">No lengthy forms, no waiting. From sign-up to first session in just a few steps.</p>
+      <div class="steps-grid">
+        <div class="step">
+          <div class="step-num">1</div>
+          <div class="step-title">Create a profile</div>
+          <div class="step-desc">Sign up as a parent and add your child's subjects, grade level, learning goals, and availability. Takes about two minutes.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">2</div>
+          <div class="step-title">Get matched</div>
+          <div class="step-desc">Our Smart Match engine scores every verified tutor against your child's profile and surfaces the best fits — ranked and explained.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">3</div>
+          <div class="step-title">Book a session</div>
+          <div class="step-desc">Choose a tutor, pick a time slot, and pay securely. Your tutor receives a confirmation instantly and you're on the calendar.</div>
+        </div>
+        <div class="step">
+          <div class="step-num">4</div>
+          <div class="step-title">Track progress</div>
+          <div class="step-desc">After every session, read the tutor's report, see what's improving, and adjust goals. Results you can actually measure.</div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SUBJECTS -->
+  <section>
+    <div class="section-inner">
+      <div class="section-label">Subjects</div>
+      <h2 class="section-title">Every subject. Every level.</h2>
+      <p class="section-sub" style="margin-bottom: 32px;">From primary school basics to A-level exam prep, we have specialists ready.</p>
+      <div class="subjects-wrap">
+        <div class="subject-chip">Mathematics</div>
+        <div class="subject-chip">English Language</div>
+        <div class="subject-chip">Physics</div>
+        <div class="subject-chip">Chemistry</div>
+        <div class="subject-chip">Biology</div>
+        <div class="subject-chip">Further Mathematics</div>
+        <div class="subject-chip">Literature in English</div>
+        <div class="subject-chip">Economics</div>
+        <div class="subject-chip">Computer Science</div>
+        <div class="subject-chip">French</div>
+        <div class="subject-chip">Government</div>
+        <div class="subject-chip">History</div>
+        <div class="subject-chip">Geography</div>
+        <div class="subject-chip">Accounting</div>
+        <div class="subject-chip">Commerce</div>
+        <div class="subject-chip">Agricultural Science</div>
+        <div class="subject-chip">Technical Drawing</div>
+        <div class="subject-chip">Music</div>
+        <div class="subject-chip">Civic Education</div>
+        <div class="subject-chip">+ many more</div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TESTIMONIALS -->
+  <section style="background: var(--purple-light);">
+    <div class="section-inner">
+      <div class="section-label">What parents say</div>
+      <h2 class="section-title">Families that found their match</h2>
+      <p class="section-sub">Real results from real families on TutorNest.</p>
+      <div class="testimonials-grid">
+        <div class="testimonial-card">
+          <div class="stars">★★★★★</div>
+          <p class="testimonial-text">"The Smart Match feature is genuinely impressive. It suggested a tutor I wouldn't have picked myself, and my daughter's maths grade jumped a full grade within two terms."</p>
+          <div class="testimonial-author">
+            <div class="author-avatar">AO</div>
+            <div>
+              <div class="author-name">Adaeze O.</div>
+              <div class="author-role">Parent · Lagos</div>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial-card">
+          <div class="stars">★★★★★</div>
+          <p class="testimonial-text">"I love that I get a report after every session. I finally feel like I know what's happening in my son's lessons, not just a vague 'it went well'."</p>
+          <div class="testimonial-author">
+            <div class="author-avatar">FK</div>
+            <div>
+              <div class="author-name">Funmi K.</div>
+              <div class="author-role">Parent · Abuja</div>
+            </div>
+          </div>
+        </div>
+        <div class="testimonial-card">
+          <div class="stars">★★★★★</div>
+          <p class="testimonial-text">"The verification process gave me real confidence. I know the tutors on this platform have been properly checked. That peace of mind is worth everything."</p>
+          <div class="testimonial-author">
+            <div class="author-avatar">EI</div>
+            <div>
+              <div class="author-name">Emmanuel I.</div>
+              <div class="author-role">Parent · Port Harcourt</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA BAND -->
+  <div class="cta-band">
+    <h2>Ready to find your child's perfect tutor?</h2>
+    <p>Join thousands of families who have already found their match.</p>
+    <a href="https://app.tutornest.org" class="btn-white">
+      Get started for free →
+    </a>
+  </div>
+
+  <!-- FOOTER -->
+  <footer>
+    <div class="footer-inner">
+      <div class="footer-top">
+        <div class="footer-brand">
+          <div class="footer-logo">
+            <div class="logo-icon">TN</div>
+            TutorNest
+          </div>
+          <p class="footer-tagline">Connecting students with the right tutors, powered by smart matching and built on trust.</p>
+        </div>
+        <div class="footer-links-col">
+          <h4>Platform</h4>
+          <ul>
+            <li><a href="https://app.tutornest.org">Sign up free</a></li>
+            <li><a href="https://app.tutornest.org">Find a tutor</a></li>
+            <li><a href="https://app.tutornest.org">Become a tutor</a></li>
+            <li><a href="https://app.tutornest.org">How it works</a></li>
+          </ul>
+        </div>
+        <div class="footer-links-col">
+          <h4>Support</h4>
+          <ul>
+            <li><a href="mailto:support@tutornest.org">Contact us</a></li>
+            <li><a href="https://app.tutornest.org">Help centre</a></li>
+            <li><a href="https://app.tutornest.org">Privacy policy</a></li>
+            <li><a href="https://app.tutornest.org">Terms of service</a></li>
+          </ul>
+        </div>
+      </div>
+      <div class="footer-bottom">
+        <span>&copy; TutorNest 2025. All rights reserved.</span>
+        <span>Made with care in Nigeria 🇳🇬</span>
+      </div>
+    </div>
+  </footer>
+
+</body>
+</html>

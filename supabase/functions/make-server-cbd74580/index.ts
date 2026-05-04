@@ -1240,7 +1240,7 @@ app.post('/make-server-cbd74580/profile/complete', async (c) => {
       try {
         const profileEmail = profile.email || updatedProfile.email;
         const profileName = updatedProfile.fullName || updatedProfile.name || profile.name || 'Tutor';
-        const appBase = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+        const appBase = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
         if (profileEmail) {
           const submittedTpl = emailTemplates.tutorProfileSubmitted(profileName, `${appBase}/dashboard`);
           await sendEmail({ to: profileEmail, subject: submittedTpl.subject, html: submittedTpl.html }).catch(() => {});
@@ -1406,7 +1406,7 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
     // Send outcome email to the tutor
     const tutorEmail = userProfile.email;
     const tutorName = userProfile.fullName || userProfile.full_name || userProfile.name || 'Tutor';
-    const _appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+    const _appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
     if (tutorEmail) {
       try {
         if (action === 'approve') {
@@ -2035,7 +2035,7 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
 
     try {
       const dashboardBase =
-        Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+        Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
       const parentName = resolveDisplayName(parentProfile, 'Parent');
       const studentName = resolveDisplayName(studentRecord, 'Student');
       const tutorName = resolveDisplayName(tutorProfile, 'Tutor');

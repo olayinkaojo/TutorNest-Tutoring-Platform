@@ -130,7 +130,7 @@ signupRoutes.post('/signup', async (c) => {
     }
 
     // Step 2: Generate verification link and send confirmation email via Resend
-    const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+    const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
     try {
       const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
         type: 'magiclink',

@@ -134,7 +134,7 @@ app.post('/add-role', async (c) => {
       const emailData = emailTemplates.roleAdditionCongratulations(
         userProfile.fullName || userProfile.name || 'User',
         newRole,
-        `https://tutornest.org/dashboard`
+        `https://app.tutornest.org/dashboard`
       );
       await sendEmail({
         to: userProfile.email,
@@ -148,7 +148,7 @@ app.post('/add-role', async (c) => {
     if (newRole === 'tutor' && userProfile?.email) {
       const verificationEmailData = emailTemplates.tutorVerificationPending(
         userProfile.fullName || userProfile.name || 'Tutor',
-        `https://tutornest.org/tutor-dashboard`
+        `https://app.tutornest.org/tutor-dashboard`
       );
       await sendEmail({
         to: userProfile.email,

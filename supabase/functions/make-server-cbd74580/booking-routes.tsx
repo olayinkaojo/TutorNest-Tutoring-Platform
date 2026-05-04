@@ -362,7 +362,7 @@ app.post('/bookings', async (c) => {
     const timeOnly = String(startTime).replace(/\s*WAT\s*$/i, '').trim();
     const subject = notes || 'Tutoring Session'; // Use notes as subject if provided
     const dashboardBase =
-      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
     const dashboardLink = `${dashboardBase}/dashboard`;
     const meet = meetLink || 'https://meet.google.com/new';
 
@@ -748,7 +748,7 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
 
     const finalRecord = { ...booking, ...(updated || {}) };
     const dashboardBase =
-      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
     const dashboardLink = `${dashboardBase}/dashboard`;
     const meetLink =
       (finalRecord as any).googleMeetLink ||

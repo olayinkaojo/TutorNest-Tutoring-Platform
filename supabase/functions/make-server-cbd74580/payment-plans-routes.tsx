@@ -102,7 +102,7 @@ async function initializeFlutterwavePayment(
       meta: metadata,
       customizations: {
         title: 'TutorNest',
-        logo: 'https://tutornest.org/logo.png',
+        logo: 'https://app.tutornest.org/logo.png',
       },
     }),
   });

@@ -175,7 +175,7 @@ export function BookSessionWithPayment({
           customizations: {
             title: 'TutorNest',
             description: `${plan.name}${subject ? ' — ' + subject : ''}`,
-            logo: 'https://tutornest.org/logo.png',
+            logo: 'https://app.tutornest.org/logo.png',
           },
           callback: (response: { status: string; tx_ref: string; transaction_id: number }) => {
             if (response.status === 'successful' || response.status === 'completed') {

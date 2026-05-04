@@ -1986,7 +1986,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
           console.log(`Sending approval email to ${tutor.email}`);
           const emailData = emailTemplates.tutorVerificationApproved(
             tutor.fullName || tutor.full_name || tutor.name || 'Tutor',
-            `https://tutornest.org/tutor-dashboard`
+            `https://app.tutornest.org/tutor-dashboard`
           );
           await sendEmail({
             to: tutor.email,
@@ -2000,7 +2000,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
           const emailData = emailTemplates.tutorVerificationRejected(
             tutor.fullName || tutor.full_name || tutor.name || 'Tutor',
             rejectionReason,
-            `https://tutornest.org/tutor-dashboard`
+            `https://app.tutornest.org/tutor-dashboard`
           );
           await sendEmail({
             to: tutor.email,

@@ -465,7 +465,7 @@ export const emailTemplates = {
                   <tr><td style="padding:16px 24px;">
                     <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
                       💡 <strong>What's next?</strong> You can book another session anytime from your dashboard.
-                      <a href="https://tutornest.org/dashboard" style="color:#1d4ed8;font-weight:600;">Visit Dashboard →</a>
+                      <a href="https://app.tutornest.org/dashboard" style="color:#1d4ed8;font-weight:600;">Visit Dashboard →</a>
                     </p>
                   </td></tr>
                 </table>
@@ -566,7 +566,7 @@ export const emailTemplates = {
               <tr><td style="padding:16px 24px;">
                 <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
                   💡 <strong>Tip:</strong> Track all your earnings, session history, and upcoming payouts from your tutor dashboard.
-                  <a href="https://tutornest.org/dashboard" style="color:#1d4ed8;font-weight:600;"> Visit Dashboard →</a>
+                  <a href="https://app.tutornest.org/dashboard" style="color:#1d4ed8;font-weight:600;"> Visit Dashboard →</a>
                 </p>
               </td></tr>
             </table>

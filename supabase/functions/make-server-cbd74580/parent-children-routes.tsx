@@ -113,7 +113,7 @@ parentChildrenRoutes.post('/add-child', async (c) => {
       if (parentEmail) {
         const childName = `${firstName} ${lastName}`.trim() || 'your child';
         const parentName = parentProfile?.firstName || parentProfile?.name || 'there';
-        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
         const subject = `${childName} has been added to TutorNest`;
         const html = `
           <p>Hi ${parentName},</p>
