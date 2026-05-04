@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { getProfile, getProfilesByRole } from './db.tsx';
 
 const app = new Hono();
 
@@ -201,19 +202,43 @@ app.get('/match/student/:studentId', async (c) => {
     }
 
     const studentId = c.req.param('studentId');
-    const student = await kv.get(`child:${studentId}`) as any;
+
+    // Try KV first (enhanced child profiles), then fall back to DB profile
+    let student: any = await kv.get(`child:${studentId}`);
+    if (!student) {
+      const dbProfile = await getProfile(studentId).catch(() => null);
+      if (dbProfile) {
+        student = {
+          id: studentId,
+          firstName: dbProfile.firstName || dbProfile.fullName?.split(' ')[0] || '',
+          lastName: dbProfile.lastName || dbProfile.fullName?.split(' ').slice(1).join(' ') || '',
+          subjects: dbProfile.subjects || [],
+          gradeLevel: dbProfile.gradeLevel || dbProfile.grade || '',
+          ...dbProfile,
+        };
+      }
+    }
 
     if (!student) {
       return c.json({ error: 'Student not found' }, 404);
     }
 
-    // Get all verified tutors
-    const allUsers = await kv.getByPrefix('user:');
-    const tutors = allUsers.filter((u: any) => 
-      u.role === 'tutor' && 
-      u.verificationStatus === 'verified' &&
-      u.matchingEnabled
+    // Get all verified tutors from KV; supplement with DB profiles
+    const allKvUsers = await kv.getByPrefix('user:');
+    const kvTutors = allKvUsers.filter((u: any) =>
+      u.role === 'tutor' && u.verificationStatus === 'verified'
     );
+
+    // Also pull from DB in case tutors are stored there but not in KV
+    const dbTutors = await getProfilesByRole('tutor').catch(() => [] as any[]);
+    const dbVerifiedTutors = dbTutors.filter((u: any) =>
+      u.verificationStatus === 'verified' || u.verificationStatus === 'approved'
+    );
+
+    // Merge: DB tutors not already in KV set
+    const kvIds = new Set(kvTutors.map((u: any) => u.userId || u.id));
+    const extraDbTutors = dbVerifiedTutors.filter((u: any) => !kvIds.has(u.id));
+    const tutors = [...kvTutors, ...extraDbTutors];
 
     // Calculate match scores for each tutor
     const matches = tutors.map((tutor: any) => {

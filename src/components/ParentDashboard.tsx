@@ -45,6 +45,7 @@ import { PaymentMethodManager } from './PaymentMethodManager';
 import { ParentPaymentsDashboard } from './ParentPaymentsDashboard';
 import { ParentAnalyticsDashboard } from './ParentAnalyticsDashboard';
 import { AvatarUpload } from './AvatarUpload';
+import { SmartTutorMatches } from './SmartTutorMatches';
 
 interface UserProfile {
   id: string;
@@ -80,6 +81,7 @@ export function ParentDashboard({
   const [session, setSession] = useState<any>(null);
   const [showAddChildDialog, setShowAddChildDialog] = useState(false);
   const [showEditChildDialog, setShowEditChildDialog] = useState(false);
+  const [showSmartMatch, setShowSmartMatch] = useState(false);
   const [children, setChildren] = useState<any[]>([]);
   const [loadingChildren, setLoadingChildren] = useState(true);
   // Live session counts per child — stored separately so calculateStats doesn't mutate `children`
@@ -887,39 +889,55 @@ export function ParentDashboard({
                       </CardContent>
                     </Card>
                   )}
-                  {/* Smart match prompt — shown when a child is selected */}
+                  {/* Smart match / search toggle banner */}
                   {activeChildId && (
                     <div className="mb-4 p-4 bg-gradient-to-r from-purple-50 to-indigo-50 border border-purple-200 rounded-lg flex items-start gap-3">
                       <span className="text-2xl">✨</span>
                       <div className="flex-1">
-                        <p className="font-semibold text-purple-800 text-sm">Try AI-Powered Matching</p>
-                        <p className="text-purple-600 text-xs mt-0.5">Our algorithm analyses your child's learning needs to find the best tutor fit.</p>
+                        <p className="font-semibold text-purple-800 text-sm">
+                          {showSmartMatch ? 'AI Smart Match Results' : 'Try AI-Powered Matching'}
+                        </p>
+                        <p className="text-purple-600 text-xs mt-0.5">
+                          {showSmartMatch
+                            ? 'Tutors ranked by compatibility with your child\'s learning profile.'
+                            : 'Our algorithm analyses your child\'s learning needs to find the best tutor fit.'}
+                        </p>
                       </div>
                       <Button
                         size="sm"
                         variant="outline"
                         className="border-purple-300 text-purple-700 hover:bg-purple-100 flex-shrink-0 text-xs"
-                        onClick={() => {
-                          toast.info('AI matching is available in the Smart Match tab above.');
-                        }}
+                        onClick={() => setShowSmartMatch((prev: boolean) => !prev)}
                       >
-                        Try Smart Match
+                        {showSmartMatch ? 'Back to Search' : 'Try Smart Match'}
                       </Button>
                     </div>
                   )}
-                  <TutorSearch
-                    session={session}
-                    activeChildId={activeChildId}
-                    onStartConversation={(tutorId, tutorName) => {
-                      setInitialMessageTutor({ id: tutorId, name: tutorName });
-                      setActiveTab('messages');
-                    }}
-                    onBookSession={(tutor) => {
-                      setPreSelectedTutorId(tutor.userId || tutor.id);
-                      setBookingsSubTab('book-session');
-                      setActiveTab('bookings');
-                    }}
-                  />
+                  {showSmartMatch && activeChildId && session ? (
+                    <SmartTutorMatches
+                      session={session}
+                      studentId={activeChildId}
+                      studentName={activeChild ? `${activeChild.firstName} ${activeChild.lastName}` : undefined}
+                      onSelectTutor={(tutorId) => {
+                        setInitialMessageTutor({ id: tutorId, name: '' });
+                        setActiveTab('messages');
+                      }}
+                    />
+                  ) : (
+                    <TutorSearch
+                      session={session}
+                      activeChildId={activeChildId}
+                      onStartConversation={(tutorId, tutorName) => {
+                        setInitialMessageTutor({ id: tutorId, name: tutorName });
+                        setActiveTab('messages');
+                      }}
+                      onBookSession={(tutor) => {
+                        setPreSelectedTutorId(tutor.userId || tutor.id);
+                        setBookingsSubTab('book-session');
+                        setActiveTab('bookings');
+                      }}
+                    />
+                  )}
                 </div>
               ) : (
                 <Card>
