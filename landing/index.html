@@ -10,10 +10,10 @@
   <meta property="og:image" content="https://app.tutornest.org/og-image.png">
   <meta property="og:url" content="https://tutornest.org">
   <meta name="twitter:card" content="summary_large_image">
-  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23625d9c'/><text x='16' y='22' font-size='14' font-weight='700' font-family='Inter,sans-serif' fill='white' text-anchor='middle'>TN</text></svg>">
+  <link rel="icon" type="image/png" href="logo.png">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Playfair+Display:wght@600&display=swap" rel="stylesheet">
 
   <style>
     /* ─── Reset & Variables ─────────────────────────────────── */
@@ -179,23 +179,17 @@
       flex-shrink: 0;
     }
     .logo-mark {
-      width: 36px;
-      height: 36px;
-      background: var(--purple);
-      border-radius: 9px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
+      height: 38px;
+      width: auto;
+      display: block;
+      object-fit: contain;
     }
     .logo-text {
-      font-size: 17px;
-      font-weight: 800;
-      color: var(--gray-900);
-      letter-spacing: -0.3px;
+      font-family: 'Playfair Display', 'Mansfield', Georgia, serif;
+      font-size: 20px;
+      font-weight: 600;
+      color: var(--purple);
+      letter-spacing: 0.02em;
     }
     .nav-links {
       display: flex;
@@ -1228,18 +1222,19 @@
       margin-bottom: 16px;
     }
     .footer-logo-mark {
-      width: 36px;
       height: 36px;
-      background: var(--purple);
-      border-radius: 9px;
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: #fff;
-      font-size: 13px;
-      font-weight: 800;
+      width: auto;
+      display: block;
+      object-fit: contain;
+      opacity: 0.9;
     }
-    .footer-logo-text { font-size: 17px; font-weight: 800; color: #fff; }
+    .footer-logo-text {
+      font-family: 'Playfair Display', 'Mansfield', Georgia, serif;
+      font-size: 20px;
+      font-weight: 600;
+      color: #fff;
+      letter-spacing: 0.02em;
+    }
     .footer-tagline { font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
     .footer-contact { font-size: 13px; color: var(--gray-500); }
     .footer-contact a { color: var(--purple-mid); transition: color 0.15s; }
@@ -1362,7 +1357,7 @@
   <nav class="navbar" id="navbar">
     <div class="nav-inner">
       <a href="/" class="nav-logo" aria-label="TutorNest home">
-        <div class="logo-mark">TN</div>
+        <img src="logo.png" alt="" class="logo-mark" aria-hidden="true">
         <span class="logo-text">TutorNest</span>
       </a>
       <ul class="nav-links" role="list">
@@ -1937,7 +1932,7 @@
     <div class="footer-inner">
       <div class="footer-brand">
         <div class="footer-logo">
-          <div class="footer-logo-mark" aria-hidden="true">TN</div>
+          <img src="logo.png" alt="" class="footer-logo-mark" aria-hidden="true">
           <span class="footer-logo-text">TutorNest</span>
         </div>
         <p class="footer-tagline">
