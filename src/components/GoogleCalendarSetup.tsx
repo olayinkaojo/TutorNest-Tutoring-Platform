@@ -34,8 +34,9 @@ export function GoogleCalendarSetup({ session, onConnectionChange }: GoogleCalen
 
     if (code && state) {
       handleOAuthCallback(code);
-      // Strip the OAuth params from the URL without a full navigation
-      navigate(location.pathname, { replace: true });
+      // Do NOT navigate here — it flips isGoogleOAuthCallback to false and
+      // unmounts this component before the exchange-token fetch completes.
+      // URL stripping is handled inside handleOAuthCallback after success.
     }
   }, [location.search]);
 
@@ -88,7 +89,11 @@ export function GoogleCalendarSetup({ session, onConnectionChange }: GoogleCalen
         setSuccess('Google Calendar connected successfully!');
         setConnected(true);
         setConnectedAt(new Date().toISOString());
-        onConnectionChange?.(true);
+        if (onConnectionChange) {
+          onConnectionChange(true); // caller handles navigation (e.g. AuthenticatedAppRoutes)
+        } else {
+          navigate(location.pathname, { replace: true }); // strip code from URL in-place
+        }
       } else {
         setError(data.error || 'Failed to connect Google Calendar');
       }
