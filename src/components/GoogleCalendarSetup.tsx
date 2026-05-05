@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Alert, AlertDescription } from './ui/alert';
@@ -89,17 +90,22 @@ export function GoogleCalendarSetup({ session, onConnectionChange }: GoogleCalen
         setSuccess('Google Calendar connected successfully!');
         setConnected(true);
         setConnectedAt(new Date().toISOString());
+        toast.success('Google Calendar connected! Your sessions will now sync automatically.');
         if (onConnectionChange) {
           onConnectionChange(true); // caller handles navigation (e.g. AuthenticatedAppRoutes)
         } else {
           navigate(location.pathname, { replace: true }); // strip code from URL in-place
         }
       } else {
-        setError(data.error || 'Failed to connect Google Calendar');
+        const msg = data.error || 'Failed to connect Google Calendar';
+        setError(msg);
+        toast.error(msg);
       }
     } catch (err: any) {
       console.error('Error exchanging token:', err);
-      setError('An error occurred while connecting to Google Calendar');
+      const msg = 'An error occurred while connecting to Google Calendar';
+      setError(msg);
+      toast.error(msg);
     } finally {
       setLoading(false);
     }

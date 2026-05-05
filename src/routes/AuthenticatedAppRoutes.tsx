@@ -127,8 +127,8 @@ export function AuthenticatedAppRoutes({
               onConnectionChange={(connected) => {
                 if (connected) {
                   setTimeout(() => {
-                    navigateTo(`/dashboard/${profile.role}`, { replace: true });
-                  }, 2000);
+                    navigateTo(`/dashboard/${profile.role}/profile`, { replace: true });
+                  }, 1500);
                 }
               }}
             />
