@@ -3,780 +3,2100 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TutorNest — Find Your Perfect Tutor</title>
-  <meta name="description" content="TutorNest connects students with qualified, vetted tutors across all subjects. AI-powered matching, flexible booking, and progress tracking — all in one place.">
-
-  <meta property="og:title" content="TutorNest — Find Your Perfect Tutor">
-  <meta property="og:description" content="AI-powered tutor matching for every student. Verified tutors, flexible scheduling, progress tracking.">
-  <meta property="og:type" content="website">
+  <title>TutorNest — Find Your Perfect Tutor in Nigeria</title>
+  <meta name="description" content="TutorNest connects Nigerian families with verified, qualified tutors using AI-powered smart matching. Book sessions, track progress, and pay securely — all in one place.">
+  <meta property="og:title" content="TutorNest — Your Child's Perfect Tutor, Matched by AI">
+  <meta property="og:description" content="AI-powered tutor matching for Nigerian families. Verified tutors, secure booking, real progress tracking.">
+  <meta property="og:image" content="https://app.tutornest.org/og-image.png">
   <meta property="og:url" content="https://tutornest.org">
-  <meta property="og:image" content="https://app.tutornest.org/og-image.svg">
-  <meta property="og:image:width" content="1200">
-  <meta property="og:image:height" content="630">
   <meta name="twitter:card" content="summary_large_image">
-  <meta name="twitter:image" content="https://app.tutornest.org/og-image.svg">
-  <meta name="theme-color" content="#625d9c">
-
-  <link rel="icon" type="image/svg+xml" href="https://app.tutornest.org/favicon.svg">
+  <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' rx='8' fill='%23625d9c'/><text x='16' y='22' font-size='14' font-weight='700' font-family='Inter,sans-serif' fill='white' text-anchor='middle'>TN</text></svg>">
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
 
   <style>
+    /* ─── Reset & Variables ─────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body {
+      font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+      color: #111827;
+      background: #ffffff;
+      -webkit-font-smoothing: antialiased;
+      overflow-x: hidden;
+    }
+    img { max-width: 100%; display: block; }
+    a { text-decoration: none; color: inherit; }
+    ul { list-style: none; }
+    button { cursor: pointer; border: none; background: none; font-family: inherit; }
 
     :root {
       --purple: #625d9c;
-      --purple-dark: #4a4580;
       --purple-light: #f0effe;
-      --purple-mid: #e8e5fb;
-      --text: #1a1a2e;
-      --muted: #6b7280;
-      --border: #e5e7eb;
+      --purple-mid: #8b85c9;
+      --purple-dark: #4a4580;
+      --purple-deeper: #3d3870;
       --white: #ffffff;
+      --gray-50: #f9fafb;
+      --gray-100: #f3f4f6;
+      --gray-200: #e5e7eb;
+      --gray-300: #d1d5db;
+      --gray-400: #9ca3af;
+      --gray-500: #6b7280;
+      --gray-600: #4b5563;
+      --gray-700: #374151;
+      --gray-900: #111827;
+      --green: #16a34a;
+      --green-light: #dcfce7;
+      --red: #dc2626;
+      --red-light: #fee2e2;
+      --shadow-sm: 0 4px 16px rgba(98,93,156,0.10);
+      --shadow-md: 0 8px 32px rgba(98,93,156,0.18);
+      --shadow-lg: 0 16px 48px rgba(98,93,156,0.22);
+      --radius-card: 16px;
+      --radius-btn: 10px;
+      --radius-chip: 8px;
+      --radius-pill: 100px;
     }
 
-    html { scroll-behavior: smooth; }
+    /* ─── Typography ─────────────────────────────────────────── */
+    h1 { font-size: clamp(38px, 6vw, 60px); font-weight: 800; line-height: 1.1; letter-spacing: -0.02em; }
+    h2 { font-size: clamp(26px, 4vw, 38px); font-weight: 800; line-height: 1.2; letter-spacing: -0.02em; }
+    h3 { font-size: clamp(18px, 2.5vw, 22px); font-weight: 700; line-height: 1.35; }
+    p { line-height: 1.7; color: var(--gray-600); }
+    .caption { font-size: 13px; color: var(--gray-500); }
+    .text-purple { color: var(--purple); }
+    .text-white { color: #fff; }
+    .text-center { text-align: center; }
 
-    body {
-      font-family: 'Inter', system-ui, sans-serif;
-      color: var(--text);
-      background: var(--white);
-      line-height: 1.6;
-    }
-
-    a { color: inherit; text-decoration: none; }
-
-    /* ── NAV ── */
-    nav {
-      position: sticky;
-      top: 0;
-      z-index: 100;
-      background: rgba(255,255,255,0.95);
-      backdrop-filter: blur(8px);
-      border-bottom: 1px solid var(--border);
+    /* ─── Layout Utilities ───────────────────────────────────── */
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
       padding: 0 24px;
     }
-    .nav-inner {
-      max-width: 1100px;
+    .section {
+      padding: 96px 0;
+    }
+    .section-label {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      background: var(--purple-light);
+      color: var(--purple);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: var(--radius-pill);
+      margin-bottom: 16px;
+      letter-spacing: 0.01em;
+    }
+    .section-header {
+      max-width: 600px;
+    }
+    .section-header.centered {
+      max-width: 640px;
       margin: 0 auto;
-      height: 64px;
+      text-align: center;
+    }
+    .section-header h2 { margin-bottom: 12px; }
+    .section-header p { font-size: 17px; }
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 48px; align-items: center; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+    .grid-6 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+
+    /* ─── Buttons ─────────────────────────────────────────────── */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 14px 28px;
+      border-radius: var(--radius-btn);
+      font-size: 15px;
+      font-weight: 600;
+      transition: all 0.2s ease;
+      position: relative;
+    }
+    .btn:active { transform: translateY(0) !important; }
+    .btn-primary {
+      background: var(--purple);
+      color: #fff;
+      box-shadow: 0 4px 12px rgba(98,93,156,0.30);
+    }
+    .btn-primary:hover { background: var(--purple-dark); transform: translateY(-2px); box-shadow: 0 6px 20px rgba(98,93,156,0.38); }
+    .btn-ghost {
+      background: transparent;
+      color: var(--purple);
+      border: 1.5px solid var(--purple);
+    }
+    .btn-ghost:hover { background: var(--purple-light); transform: translateY(-2px); }
+    .btn-ghost-white {
+      background: transparent;
+      color: #fff;
+      border: 1.5px solid rgba(255,255,255,0.5);
+    }
+    .btn-ghost-white:hover { background: rgba(255,255,255,0.1); transform: translateY(-2px); }
+    .btn-white {
+      background: #fff;
+      color: var(--purple);
+      box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+    }
+    .btn-white:hover { background: var(--purple-light); transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.15); }
+    .btn-lg { padding: 16px 36px; font-size: 16px; }
+    .btn-sm { padding: 9px 20px; font-size: 14px; border-radius: 8px; }
+
+    /* ─── Navbar ─────────────────────────────────────────────── */
+    .navbar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      padding: 0;
+      transition: all 0.3s ease;
+    }
+    .navbar.scrolled {
+      background: rgba(255,255,255,0.92);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      box-shadow: 0 1px 24px rgba(98,93,156,0.10);
+    }
+    .nav-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      height: 68px;
       display: flex;
       align-items: center;
-      justify-content: space-between;
+      gap: 40px;
     }
-    .logo {
+    .nav-logo {
       display: flex;
       align-items: center;
       gap: 10px;
-      font-weight: 700;
-      font-size: 20px;
-      color: var(--purple);
+      flex-shrink: 0;
     }
-    .logo-icon {
+    .logo-mark {
       width: 36px;
       height: 36px;
       background: var(--purple);
-      border-radius: 8px;
+      border-radius: 9px;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: white;
+      color: #fff;
       font-size: 13px;
       font-weight: 800;
-      flex-shrink: 0;
+      letter-spacing: -0.5px;
+    }
+    .logo-text {
+      font-size: 17px;
+      font-weight: 800;
+      color: var(--gray-900);
+      letter-spacing: -0.3px;
     }
     .nav-links {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 4px;
+      margin: 0 auto;
     }
-    .btn-ghost {
-      padding: 8px 16px;
+    .nav-links a {
+      padding: 7px 14px;
       border-radius: 8px;
       font-size: 14px;
       font-weight: 500;
-      color: var(--muted);
-      transition: color 0.15s, background 0.15s;
-      cursor: pointer;
-      border: none;
-      background: none;
+      color: var(--gray-600);
+      transition: all 0.15s;
     }
-    .btn-ghost:hover { color: var(--text); background: var(--purple-light); }
-    .btn-primary {
-      padding: 9px 20px;
-      border-radius: 8px;
-      font-size: 14px;
-      font-weight: 600;
-      background: var(--purple);
-      color: white;
-      border: none;
-      cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
-      display: inline-flex;
+    .nav-links a:hover { color: var(--purple); background: var(--purple-light); }
+    .nav-actions {
+      display: flex;
       align-items: center;
-      gap: 6px;
+      gap: 10px;
+      flex-shrink: 0;
     }
-    .btn-primary:hover { background: var(--purple-dark); transform: translateY(-1px); }
-    .btn-primary:active { transform: translateY(0); }
-    .btn-large {
-      padding: 14px 32px;
-      font-size: 16px;
-      border-radius: 10px;
-    }
-    .btn-outline {
-      padding: 13px 28px;
-      font-size: 16px;
-      border-radius: 10px;
-      background: white;
-      color: var(--purple);
-      border: 2px solid var(--purple);
-      font-weight: 600;
-      cursor: pointer;
-      transition: background 0.15s, transform 0.1s;
-      display: inline-flex;
+    .hamburger {
+      display: none;
+      flex-direction: column;
+      justify-content: center;
       align-items: center;
-      gap: 6px;
+      gap: 5px;
+      width: 40px;
+      height: 40px;
+      margin-left: auto;
     }
-    .btn-outline:hover { background: var(--purple-light); transform: translateY(-1px); }
-
-    /* ── HERO ── */
-    .hero {
-      background: linear-gradient(135deg, #f8f7ff 0%, #ede9ff 40%, #f0f7ff 100%);
-      padding: 80px 24px 96px;
+    .hamburger span {
+      display: block;
+      width: 22px;
+      height: 2px;
+      background: var(--gray-700);
+      border-radius: 2px;
+      transition: all 0.25s;
+    }
+    .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+    .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    .mobile-menu {
+      display: none;
+      background: rgba(255,255,255,0.97);
+      backdrop-filter: blur(16px);
+      border-top: 1px solid var(--gray-100);
+      padding: 16px 24px 24px;
+      max-height: 0;
+      overflow: hidden;
+      transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1);
+    }
+    .mobile-menu.open { max-height: 400px; }
+    .mobile-menu ul { display: flex; flex-direction: column; gap: 2px; margin-bottom: 20px; }
+    .mobile-menu ul a {
+      display: block;
+      padding: 11px 12px;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 500;
+      color: var(--gray-700);
+      transition: all 0.15s;
+    }
+    .mobile-menu ul a:hover { background: var(--purple-light); color: var(--purple); }
+    .mobile-menu-actions { display: flex; flex-direction: column; gap: 10px; }
+    .mobile-menu-actions a { text-align: center; }
+    .btn-outline-mobile {
+      display: block;
+      padding: 12px 20px;
+      border: 1.5px solid var(--gray-200);
+      border-radius: var(--radius-btn);
+      font-size: 15px;
+      font-weight: 600;
+      color: var(--gray-700);
       text-align: center;
+      transition: all 0.15s;
+    }
+    .btn-outline-mobile:hover { border-color: var(--purple); color: var(--purple); }
+    .btn-fill-mobile {
+      display: block;
+      padding: 13px 20px;
+      background: var(--purple);
+      border-radius: var(--radius-btn);
+      font-size: 15px;
+      font-weight: 600;
+      color: #fff;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .btn-fill-mobile:hover { background: var(--purple-dark); }
+
+    /* ─── Hero ───────────────────────────────────────────────── */
+    .hero {
+      padding: 144px 0 80px;
       position: relative;
+      background: linear-gradient(145deg, #f8f7ff 0%, #ffffff 45%, #f0effe 100%);
       overflow: hidden;
     }
     .hero::before {
       content: '';
       position: absolute;
-      top: -100px;
-      right: -100px;
-      width: 400px;
-      height: 400px;
-      background: radial-gradient(circle, rgba(98,93,156,0.12) 0%, transparent 70%);
-      border-radius: 50%;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(98,93,156,0.07) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
     }
     .hero::after {
       content: '';
       position: absolute;
-      bottom: -80px;
-      left: -80px;
-      width: 300px;
-      height: 300px;
-      background: radial-gradient(circle, rgba(98,93,156,0.08) 0%, transparent 70%);
+      top: -200px;
+      right: -200px;
+      width: 600px;
+      height: 600px;
+      background: radial-gradient(circle, rgba(98,93,156,0.10) 0%, transparent 70%);
       border-radius: 50%;
+      pointer-events: none;
     }
     .hero-inner {
-      max-width: 760px;
-      margin: 0 auto;
       position: relative;
       z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
     }
-    .badge {
+    .hero-content {}
+    .hero-badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      background: var(--purple-mid);
+      gap: 7px;
+      background: var(--purple-light);
+      border: 1px solid rgba(98,93,156,0.20);
       color: var(--purple);
       font-size: 13px;
       font-weight: 600;
       padding: 6px 14px;
-      border-radius: 100px;
+      border-radius: var(--radius-pill);
       margin-bottom: 24px;
     }
-    h1 {
-      font-size: clamp(36px, 6vw, 60px);
-      font-weight: 800;
-      line-height: 1.15;
-      letter-spacing: -0.02em;
-      color: var(--text);
-      margin-bottom: 20px;
+    .hero-badge-dot {
+      width: 7px;
+      height: 7px;
+      background: var(--green);
+      border-radius: 50%;
+      animation: pulse-dot 2s infinite;
     }
-    h1 span { color: var(--purple); }
+    @keyframes pulse-dot {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.3); }
+    }
+    .hero h1 {
+      margin-bottom: 20px;
+      color: var(--gray-900);
+    }
+    .hero h1 em {
+      font-style: normal;
+      color: var(--purple);
+      position: relative;
+    }
     .hero-sub {
-      font-size: clamp(16px, 2.5vw, 19px);
-      color: var(--muted);
-      max-width: 560px;
-      margin: 0 auto 36px;
+      font-size: 18px;
+      color: var(--gray-600);
+      line-height: 1.7;
+      margin-bottom: 36px;
+      max-width: 480px;
     }
     .hero-ctas {
       display: flex;
-      gap: 14px;
-      justify-content: center;
+      align-items: center;
+      gap: 12px;
+      margin-bottom: 32px;
       flex-wrap: wrap;
     }
-    .trust-row {
+    .hero-proof {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .avatar-stack {
+      display: flex;
+      align-items: center;
+    }
+    .avatar-stack .av {
+      width: 36px;
+      height: 36px;
+      border-radius: 50%;
+      border: 2.5px solid #fff;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 24px;
-      margin-top: 48px;
-      flex-wrap: wrap;
+      font-size: 12px;
+      font-weight: 700;
+      color: #fff;
+      margin-left: -10px;
     }
-    .trust-item {
-      display: flex;
-      align-items: center;
-      gap: 7px;
-      font-size: 13px;
-      color: var(--muted);
+    .avatar-stack .av:first-child { margin-left: 0; }
+    .av-1 { background: #7c6db5; }
+    .av-2 { background: #e07b5a; }
+    .av-3 { background: #4a9e6b; }
+    .av-4 { background: #c06ba3; }
+    .hero-proof-text {
+      font-size: 14px;
       font-weight: 500;
+      color: var(--gray-600);
     }
-    .trust-item .dot {
+    .hero-proof-text strong { color: var(--gray-900); font-weight: 700; }
+
+    /* Hero Card Mockup */
+    .hero-visual {
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: flex-end;
+      gap: 16px;
+    }
+    .match-card {
+      background: #fff;
+      border-radius: 20px;
+      box-shadow: var(--shadow-lg);
+      padding: 24px;
+      width: 100%;
+      max-width: 360px;
+      position: relative;
+      animation: float-card 5s ease-in-out infinite;
+    }
+    @keyframes float-card {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-10px); }
+    }
+    .match-card-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 20px;
+    }
+    .match-card-title { font-size: 13px; font-weight: 600; color: var(--gray-500); text-transform: uppercase; letter-spacing: 0.06em; }
+    .match-badge {
+      background: var(--green-light);
+      color: var(--green);
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+    }
+    .tutor-row {
+      display: flex;
+      align-items: center;
+      gap: 14px;
+      margin-bottom: 20px;
+    }
+    .tutor-av {
+      width: 52px;
+      height: 52px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #7c6db5, #9b8fd4);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      font-size: 17px;
+      font-weight: 800;
+      flex-shrink: 0;
+    }
+    .tutor-info {}
+    .tutor-name { font-size: 16px; font-weight: 700; color: var(--gray-900); margin-bottom: 3px; }
+    .tutor-sub { font-size: 13px; color: var(--gray-500); }
+    .tutor-rating { display: flex; align-items: center; gap: 4px; margin-top: 4px; }
+    .stars { color: #f59e0b; font-size: 12px; }
+    .rating-text { font-size: 12px; color: var(--gray-500); }
+    .score-section { margin-bottom: 20px; }
+    .score-label { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .score-label span { font-size: 13px; font-weight: 600; color: var(--gray-700); }
+    .score-pct { font-size: 15px; font-weight: 800; color: var(--purple); }
+    .score-bar { background: var(--gray-100); border-radius: var(--radius-pill); height: 8px; overflow: hidden; }
+    .score-fill {
+      height: 100%;
+      background: linear-gradient(90deg, var(--purple), var(--purple-mid));
+      border-radius: var(--radius-pill);
+      width: 94%;
+      position: relative;
+    }
+    .score-fill::after {
+      content: '';
+      position: absolute;
+      top: 0;
+      right: 0;
+      bottom: 0;
+      width: 40px;
+      background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4));
+      animation: shimmer 2.5s infinite;
+    }
+    @keyframes shimmer {
+      0% { transform: translateX(-40px); }
+      100% { transform: translateX(80px); }
+    }
+    .match-criteria-mini { margin-bottom: 20px; display: flex; flex-direction: column; gap: 8px; }
+    .crit-row {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      font-size: 13px;
+      color: var(--gray-600);
+    }
+    .crit-check {
       width: 18px;
       height: 18px;
-      background: var(--purple);
+      background: var(--green-light);
       border-radius: 50%;
       display: flex;
       align-items: center;
       justify-content: center;
-      color: white;
+      color: var(--green);
       font-size: 10px;
+      font-weight: 800;
       flex-shrink: 0;
     }
-
-    /* ── SECTIONS ── */
-    section { padding: 80px 24px; }
-    .section-inner { max-width: 1100px; margin: 0 auto; }
-    .section-label {
-      font-size: 13px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--purple);
-      margin-bottom: 10px;
-    }
-    .section-title {
-      font-size: clamp(26px, 4vw, 38px);
-      font-weight: 800;
-      letter-spacing: -0.02em;
-      margin-bottom: 14px;
-      line-height: 1.2;
-    }
-    .section-sub {
-      font-size: 17px;
-      color: var(--muted);
-      max-width: 540px;
-      margin-bottom: 52px;
-    }
-
-    /* ── STATS ── */
-    .stats-band {
+    .card-book-btn {
+      display: block;
+      width: 100%;
+      padding: 12px;
       background: var(--purple);
-      padding: 48px 24px;
-    }
-    .stats-grid {
-      max-width: 900px;
-      margin: 0 auto;
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-      gap: 40px;
+      color: #fff;
+      border-radius: var(--radius-btn);
       text-align: center;
-    }
-    .stat-num {
-      font-size: 44px;
-      font-weight: 800;
-      color: white;
-      line-height: 1;
-      margin-bottom: 6px;
-    }
-    .stat-label {
       font-size: 14px;
-      color: rgba(255,255,255,0.75);
-      font-weight: 500;
+      font-weight: 600;
+      transition: all 0.2s;
     }
-
-    /* ── FEATURES ── */
-    .features-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
-      gap: 24px;
+    .card-book-btn:hover { background: var(--purple-dark); }
+    .float-notif {
+      background: #fff;
+      border-radius: 14px;
+      padding: 12px 16px;
+      box-shadow: var(--shadow-md);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      position: absolute;
+      bottom: -20px;
+      left: -40px;
+      white-space: nowrap;
+      animation: float-notif 5s 2.5s ease-in-out infinite;
     }
-    .feature-card {
-      background: white;
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
-      transition: box-shadow 0.2s, transform 0.2s;
+    @keyframes float-notif {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
     }
-    .feature-card:hover { box-shadow: 0 8px 24px rgba(98,93,156,0.12); transform: translateY(-3px); }
-    .feature-icon {
-      width: 48px;
-      height: 48px;
+    .notif-icon {
+      width: 36px;
+      height: 36px;
       background: var(--purple-light);
-      border-radius: 12px;
+      border-radius: 10px;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 22px;
-      margin-bottom: 16px;
+      font-size: 18px;
+      flex-shrink: 0;
     }
-    .feature-title {
-      font-size: 17px;
-      font-weight: 700;
-      margin-bottom: 8px;
+    .notif-text {}
+    .notif-title { font-size: 13px; font-weight: 700; color: var(--gray-900); }
+    .notif-sub { font-size: 11px; color: var(--gray-500); }
+    .float-match-count {
+      background: var(--purple);
+      color: #fff;
+      border-radius: 14px;
+      padding: 10px 16px;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      position: absolute;
+      top: -16px;
+      right: -20px;
+      box-shadow: 0 4px 16px rgba(98,93,156,0.35);
+      animation: float-count 5s 1s ease-in-out infinite;
     }
-    .feature-desc {
-      font-size: 14px;
-      color: var(--muted);
-      line-height: 1.65;
+    @keyframes float-count {
+      0%, 100% { transform: translateY(0); }
+      50% { transform: translateY(-7px); }
     }
 
-    /* ── HOW IT WORKS ── */
-    .how-bg { background: var(--purple-light); }
-    .steps-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    /* ─── Trust Bar ───────────────────────────────────────────── */
+    .trust-bar {
+      background: var(--gray-50);
+      border-top: 1px solid var(--gray-100);
+      border-bottom: 1px solid var(--gray-100);
+      padding: 28px 0;
+    }
+    .trust-inner {
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+      display: flex;
+      align-items: center;
       gap: 32px;
-      counter-reset: steps;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .trust-label {
+      font-size: 13px;
+      font-weight: 500;
+      color: var(--gray-500);
+      white-space: nowrap;
+    }
+    .trust-divider {
+      width: 1px;
+      height: 20px;
+      background: var(--gray-200);
+    }
+    .trust-pills {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    .trust-pill {
+      background: #fff;
+      border: 1.5px solid var(--gray-200);
+      border-radius: var(--radius-pill);
+      padding: 7px 18px;
+      font-size: 13px;
+      font-weight: 600;
+      color: var(--gray-600);
+      transition: all 0.2s;
+    }
+    .trust-pill:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-light); }
+
+    /* ─── Problem / Solution ─────────────────────────────────── */
+    .problem-solution {
+      padding: 96px 0;
+      position: relative;
+    }
+    .problem-solution::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(to bottom, #fff 0%, var(--gray-50) 100%);
+      clip-path: polygon(0 0, 100% 60px, 100% 100%, 0 100%);
+      z-index: 0;
+    }
+    .ps-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    .ps-cols {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 64px;
+      align-items: start;
+    }
+    .ps-col-header { margin-bottom: 32px; }
+    .ps-col-header h3 { font-size: 20px; font-weight: 700; }
+    .ps-list { display: flex; flex-direction: column; gap: 16px; }
+    .ps-item {
+      display: flex;
+      align-items: flex-start;
+      gap: 14px;
+      padding: 18px 20px;
+      border-radius: 14px;
+      transition: all 0.2s;
+    }
+    .ps-item:hover { transform: translateX(4px); }
+    .ps-item-problem { background: #fff5f5; border: 1px solid #fecaca; }
+    .ps-item-solution { background: #f0fdf4; border: 1px solid #bbf7d0; }
+    .ps-icon { font-size: 20px; flex-shrink: 0; margin-top: 1px; }
+    .ps-text {}
+    .ps-text strong { display: block; font-size: 15px; font-weight: 700; margin-bottom: 4px; }
+    .ps-text-problem strong { color: var(--red); }
+    .ps-text-solution strong { color: var(--green); }
+    .ps-text p { font-size: 13px; line-height: 1.6; color: var(--gray-600); margin: 0; }
+
+    /* ─── Features ────────────────────────────────────────────── */
+    .features { padding: 96px 0; background: #fff; }
+    .features-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 56px;
+    }
+    .feature-card {
+      background: var(--gray-50);
+      border: 1.5px solid var(--gray-100);
+      border-radius: var(--radius-card);
+      padding: 28px;
+      transition: all 0.25s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .feature-card::before {
+      content: '';
+      position: absolute;
+      left: 0;
+      top: 0;
+      bottom: 0;
+      width: 3px;
+      background: var(--purple);
+      border-radius: 3px;
+      transform: scaleY(0);
+      transition: transform 0.25s ease;
+      transform-origin: bottom;
+    }
+    .feature-card:hover {
+      box-shadow: var(--shadow-md);
+      transform: translateY(-4px);
+      background: #fff;
+      border-color: rgba(98,93,156,0.15);
+    }
+    .feature-card:hover::before { transform: scaleY(1); }
+    .feature-emoji {
+      font-size: 32px;
+      margin-bottom: 16px;
+      display: block;
+    }
+    .feature-card h3 { font-size: 17px; margin-bottom: 10px; }
+    .feature-card p { font-size: 14px; line-height: 1.65; margin: 0; }
+
+    /* ─── How It Works ────────────────────────────────────────── */
+    .how-it-works {
+      padding: 96px 0;
+      background: var(--gray-50);
+      position: relative;
+      overflow: hidden;
+    }
+    .how-it-works::before {
+      content: '';
+      position: absolute;
+      top: -80px;
+      left: -80px;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(98,93,156,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .steps-row {
+      display: grid;
+      grid-template-columns: repeat(4, 1fr);
+      gap: 0;
+      margin-top: 56px;
+      position: relative;
+    }
+    .steps-row::before {
+      content: '';
+      position: absolute;
+      top: 36px;
+      left: calc(12.5% + 20px);
+      right: calc(12.5% + 20px);
+      height: 2px;
+      background: repeating-linear-gradient(90deg, var(--purple) 0, var(--purple) 8px, transparent 8px, transparent 18px);
+      opacity: 0.3;
     }
     .step {
       display: flex;
       flex-direction: column;
-      align-items: flex-start;
-      gap: 12px;
-    }
-    .step-num {
-      width: 44px;
-      height: 44px;
-      background: var(--purple);
-      color: white;
-      border-radius: 12px;
-      display: flex;
       align-items: center;
-      justify-content: center;
-      font-size: 18px;
-      font-weight: 800;
-      flex-shrink: 0;
-    }
-    .step-title {
-      font-size: 17px;
-      font-weight: 700;
-    }
-    .step-desc {
-      font-size: 14px;
-      color: var(--muted);
-      line-height: 1.65;
-    }
-
-    /* ── SUBJECTS ── */
-    .subjects-wrap {
-      display: flex;
-      flex-wrap: wrap;
-      gap: 10px;
-    }
-    .subject-chip {
-      background: white;
-      border: 1.5px solid var(--border);
-      border-radius: 100px;
-      padding: 7px 16px;
-      font-size: 14px;
-      font-weight: 500;
-      color: var(--text);
-      transition: border-color 0.15s, background 0.15s, color 0.15s;
-      cursor: default;
-    }
-    .subject-chip:hover { border-color: var(--purple); color: var(--purple); background: var(--purple-light); }
-
-    /* ── TESTIMONIALS ── */
-    .testimonials-grid {
-      display: grid;
-      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-      gap: 24px;
-    }
-    .testimonial-card {
-      background: white;
-      border: 1px solid var(--border);
-      border-radius: 16px;
-      padding: 28px;
-    }
-    .stars { color: #f59e0b; font-size: 15px; margin-bottom: 14px; }
-    .testimonial-text {
-      font-size: 15px;
-      color: var(--text);
-      line-height: 1.7;
-      margin-bottom: 20px;
-      font-style: italic;
-    }
-    .testimonial-author {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
-    .author-avatar {
-      width: 40px;
-      height: 40px;
-      border-radius: 50%;
-      background: var(--purple);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      color: white;
-      font-weight: 700;
-      font-size: 14px;
-      flex-shrink: 0;
-    }
-    .author-name { font-weight: 600; font-size: 14px; }
-    .author-role { font-size: 12px; color: var(--muted); }
-
-    /* ── CTA BAND ── */
-    .cta-band {
-      background: linear-gradient(135deg, var(--purple) 0%, #8b85c9 100%);
-      padding: 80px 24px;
       text-align: center;
+      padding: 0 20px;
     }
-    .cta-band h2 {
-      font-size: clamp(28px, 4vw, 44px);
+    .step-num-wrap {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--purple), var(--purple-mid));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin-bottom: 24px;
+      position: relative;
+      z-index: 1;
+      box-shadow: 0 8px 24px rgba(98,93,156,0.25);
+    }
+    .step-icon { font-size: 28px; }
+    .step-num {
+      position: absolute;
+      top: -6px;
+      right: -6px;
+      width: 24px;
+      height: 24px;
+      background: #fff;
+      border: 2px solid var(--purple);
+      border-radius: 50%;
+      font-size: 11px;
       font-weight: 800;
-      color: white;
-      margin-bottom: 16px;
-      letter-spacing: -0.02em;
-    }
-    .cta-band p {
-      font-size: 18px;
-      color: rgba(255,255,255,0.85);
-      margin-bottom: 36px;
-    }
-    .btn-white {
-      padding: 14px 32px;
-      font-size: 16px;
-      border-radius: 10px;
-      background: white;
       color: var(--purple);
-      border: none;
-      font-weight: 700;
-      cursor: pointer;
-      transition: transform 0.15s, box-shadow 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .step h3 { font-size: 16px; margin-bottom: 10px; }
+    .step p { font-size: 14px; line-height: 1.6; margin: 0; }
+
+    /* ─── Smart Match Showcase ────────────────────────────────── */
+    .smart-match {
+      padding: 96px 0;
+      background: linear-gradient(135deg, var(--purple) 0%, var(--purple-dark) 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .smart-match::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+    }
+    .smart-match::after {
+      content: '';
+      position: absolute;
+      bottom: -100px;
+      right: -100px;
+      width: 400px;
+      height: 400px;
+      background: radial-gradient(circle, rgba(255,255,255,0.07) 0%, transparent 70%);
+      border-radius: 50%;
+      pointer-events: none;
+    }
+    .sm-inner {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    .sm-copy {}
+    .sm-label {
       display: inline-flex;
       align-items: center;
-      gap: 8px;
+      gap: 6px;
+      background: rgba(255,255,255,0.15);
+      color: rgba(255,255,255,0.9);
+      font-size: 13px;
+      font-weight: 600;
+      padding: 5px 14px;
+      border-radius: var(--radius-pill);
+      margin-bottom: 20px;
     }
-    .btn-white:hover { transform: translateY(-2px); box-shadow: 0 8px 24px rgba(0,0,0,0.2); }
+    .sm-copy h2 { color: #fff; margin-bottom: 16px; }
+    .sm-copy p { color: rgba(255,255,255,0.8); font-size: 17px; margin-bottom: 32px; }
+    .sm-stats {
+      display: flex;
+      gap: 32px;
+    }
+    .sm-stat {}
+    .sm-stat-num { font-size: 32px; font-weight: 800; color: #fff; line-height: 1; }
+    .sm-stat-label { font-size: 13px; color: rgba(255,255,255,0.65); margin-top: 4px; }
+    .sm-card-wrap {
+      display: flex;
+      justify-content: center;
+    }
+    .ai-card {
+      background: #fff;
+      border-radius: 20px;
+      padding: 28px;
+      width: 340px;
+      box-shadow: 0 24px 64px rgba(0,0,0,0.25);
+    }
+    .ai-card-top {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 24px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--gray-100);
+    }
+    .ai-card-title { font-size: 14px; font-weight: 700; color: var(--gray-900); }
+    .ai-card-sub { font-size: 12px; color: var(--gray-500); margin-top: 2px; }
+    .ai-spinner {
+      width: 36px;
+      height: 36px;
+      border: 3px solid var(--purple-light);
+      border-top-color: var(--purple);
+      border-radius: 50%;
+    }
+    .ai-spinner.done {
+      border: 3px solid var(--green-light);
+      border-top-color: var(--green);
+      animation: none;
+    }
+    .ai-crit-list { display: flex; flex-direction: column; gap: 12px; margin-bottom: 24px; }
+    .ai-crit {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 10px 14px;
+      background: var(--gray-50);
+      border-radius: 10px;
+      border: 1.5px solid transparent;
+      opacity: 0;
+      transform: translateX(-8px);
+      transition: all 0.4s ease;
+    }
+    .ai-crit.revealed {
+      opacity: 1;
+      transform: translateX(0);
+      border-color: var(--green-light);
+      background: #f0fdf4;
+    }
+    .ai-crit-icon {
+      width: 28px;
+      height: 28px;
+      border-radius: 50%;
+      background: var(--gray-200);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 13px;
+      flex-shrink: 0;
+      transition: all 0.3s;
+    }
+    .ai-crit.revealed .ai-crit-icon {
+      background: var(--green-light);
+    }
+    .ai-crit-text {}
+    .ai-crit-name { font-size: 13px; font-weight: 600; color: var(--gray-700); }
+    .ai-crit-value { font-size: 12px; color: var(--gray-500); }
+    .ai-crit.revealed .ai-crit-value { color: var(--green); font-weight: 500; }
+    .ai-score-reveal {
+      background: linear-gradient(135deg, var(--purple-light), #e8e5ff);
+      border-radius: 14px;
+      padding: 20px;
+      text-align: center;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: all 0.5s ease;
+      border: 1.5px solid rgba(98,93,156,0.20);
+    }
+    .ai-score-reveal.revealed { opacity: 1; transform: translateY(0); }
+    .ai-score-num {
+      font-size: 48px;
+      font-weight: 900;
+      color: var(--purple);
+      line-height: 1;
+      display: block;
+    }
+    .ai-score-label { font-size: 13px; font-weight: 600; color: var(--purple-dark); margin-top: 4px; }
+    .ai-score-sub { font-size: 12px; color: var(--gray-500); margin-top: 6px; }
 
-    /* ── FOOTER ── */
-    footer {
-      background: #1a1a2e;
-      color: rgba(255,255,255,0.6);
-      padding: 48px 24px 32px;
+    /* ─── For Tutors ──────────────────────────────────────────── */
+    .for-tutors {
+      padding: 96px 0;
+      background: linear-gradient(135deg, var(--purple-deeper) 0%, var(--purple-dark) 100%);
+      position: relative;
+      overflow: hidden;
+    }
+    .for-tutors::before {
+      content: '';
+      position: absolute;
+      top: -150px;
+      left: -150px;
+      width: 500px;
+      height: 500px;
+      background: radial-gradient(circle, rgba(255,255,255,0.06) 0%, transparent 70%);
+      pointer-events: none;
+    }
+    .ft-inner {
+      position: relative;
+      z-index: 1;
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 80px;
+      align-items: center;
+      max-width: 1200px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    .ft-copy h2 { color: #fff; margin-bottom: 14px; }
+    .ft-copy > p { color: rgba(255,255,255,0.75); font-size: 17px; margin-bottom: 36px; }
+    .ft-copy .btn { margin-top: 8px; }
+    .ft-benefits { display: flex; flex-direction: column; gap: 20px; }
+    .ft-benefit {
+      display: flex;
+      align-items: flex-start;
+      gap: 16px;
+      padding: 20px 22px;
+      background: rgba(255,255,255,0.07);
+      border: 1px solid rgba(255,255,255,0.12);
+      border-radius: 14px;
+      transition: all 0.25s;
+    }
+    .ft-benefit:hover {
+      background: rgba(255,255,255,0.12);
+      transform: translateX(4px);
+    }
+    .ft-benefit-icon {
+      font-size: 24px;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+    .ft-benefit h4 { font-size: 15px; font-weight: 700; color: #fff; margin-bottom: 4px; }
+    .ft-benefit p { font-size: 13px; color: rgba(255,255,255,0.65); line-height: 1.6; margin: 0; }
+
+    /* ─── Testimonials ────────────────────────────────────────── */
+    .testimonials {
+      padding: 96px 0;
+      background: var(--gray-50);
+    }
+    .testimonials-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 24px;
+      margin-top: 56px;
+    }
+    .testi-card {
+      background: #fff;
+      border-radius: var(--radius-card);
+      padding: 28px;
+      border: 1.5px solid var(--gray-100);
+      display: flex;
+      flex-direction: column;
+      transition: all 0.25s;
+    }
+    .testi-card:hover { box-shadow: var(--shadow-md); transform: translateY(-4px); }
+    .testi-stars { color: #f59e0b; font-size: 16px; margin-bottom: 16px; letter-spacing: 2px; }
+    .testi-quote {
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--gray-700);
+      font-style: italic;
+      flex: 1;
+      margin-bottom: 24px;
+    }
+    .testi-footer { display: flex; align-items: center; gap: 12px; }
+    .testi-av {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 14px;
+      font-weight: 800;
+      color: #fff;
+      flex-shrink: 0;
+    }
+    .tav-1 { background: linear-gradient(135deg, #7c6db5, #9b8fd4); }
+    .tav-2 { background: linear-gradient(135deg, #e07b5a, #f0a080); }
+    .tav-3 { background: linear-gradient(135deg, #4a9e6b, #6bc990); }
+    .testi-info {}
+    .testi-name { font-size: 14px; font-weight: 700; color: var(--gray-900); }
+    .testi-loc { font-size: 12px; color: var(--gray-500); }
+    .testi-tag {
+      margin-left: auto;
+      background: var(--purple-light);
+      color: var(--purple);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      border-radius: var(--radius-pill);
+    }
+
+    /* ─── Pricing ─────────────────────────────────────────────── */
+    .pricing {
+      padding: 96px 0;
+      background: #fff;
+    }
+    .pricing-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 24px;
+      margin-top: 56px;
+      max-width: 800px;
+      margin-left: auto;
+      margin-right: auto;
+    }
+    .price-card {
+      border-radius: var(--radius-card);
+      padding: 36px 32px;
+      border: 2px solid var(--gray-100);
+      transition: all 0.25s;
+      position: relative;
+    }
+    .price-card:hover { box-shadow: var(--shadow-md); transform: translateY(-4px); }
+    .price-card-families { background: var(--purple-light); border-color: rgba(98,93,156,0.20); }
+    .price-card-tutors { background: var(--gray-50); }
+    .price-icon { font-size: 36px; margin-bottom: 16px; }
+    .price-card h3 { font-size: 20px; margin-bottom: 8px; }
+    .price-headline { font-size: 14px; font-weight: 700; color: var(--purple); margin-bottom: 20px; }
+    .price-list { display: flex; flex-direction: column; gap: 10px; }
+    .price-item {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-size: 14px;
+      color: var(--gray-700);
+    }
+    .price-check { color: var(--green); font-size: 16px; flex-shrink: 0; }
+    .price-note {
+      margin-top: 24px;
+      padding-top: 20px;
+      border-top: 1px solid rgba(98,93,156,0.10);
+      font-size: 12px;
+      color: var(--gray-500);
+      font-style: italic;
+    }
+
+    /* ─── FAQ ─────────────────────────────────────────────────── */
+    .faq {
+      padding: 96px 0;
+      background: var(--gray-50);
+    }
+    .faq-list {
+      max-width: 720px;
+      margin: 56px auto 0;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+    }
+    details.faq-item {
+      background: #fff;
+      border: 1.5px solid var(--gray-100);
+      border-radius: var(--radius-card);
+      overflow: hidden;
+      transition: all 0.25s;
+    }
+    details.faq-item:hover { border-color: rgba(98,93,156,0.25); }
+    details.faq-item[open] {
+      border-color: rgba(98,93,156,0.25);
+      box-shadow: var(--shadow-sm);
+    }
+    summary.faq-q {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 20px 24px;
+      font-size: 16px;
+      font-weight: 600;
+      color: var(--gray-900);
+      cursor: pointer;
+      user-select: none;
+      list-style: none;
+      transition: color 0.2s;
+    }
+    summary.faq-q::-webkit-details-marker { display: none; }
+    summary.faq-q::after {
+      content: '+';
+      font-size: 22px;
+      font-weight: 400;
+      color: var(--purple);
+      flex-shrink: 0;
+      line-height: 1;
+      transition: transform 0.25s;
+    }
+    details[open] summary.faq-q::after {
+      transform: rotate(45deg);
+    }
+    details[open] summary.faq-q { color: var(--purple); }
+    .faq-a {
+      padding: 0 24px 22px;
+      font-size: 15px;
+      line-height: 1.75;
+      color: var(--gray-600);
+      border-top: 1px solid var(--gray-100);
+      padding-top: 16px;
+    }
+
+    /* ─── Final CTA ───────────────────────────────────────────── */
+    .cta-band {
+      padding: 96px 0;
+      background: linear-gradient(135deg, var(--purple) 0%, #8b85c9 100%);
+      text-align: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .cta-band::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.06) 1px, transparent 1px);
+      background-size: 28px 28px;
+      pointer-events: none;
+    }
+    .cta-band-inner {
+      position: relative;
+      z-index: 1;
+      max-width: 600px;
+      margin: 0 auto;
+      padding: 0 24px;
+    }
+    .cta-band h2 { color: #fff; margin-bottom: 16px; font-size: clamp(30px, 4vw, 44px); }
+    .cta-band p { color: rgba(255,255,255,0.8); font-size: 17px; margin-bottom: 40px; }
+    .cta-band-btns {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+    }
+    .cta-proof {
+      margin-top: 28px;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      gap: 10px;
+    }
+    .cta-proof-text { font-size: 13px; color: rgba(255,255,255,0.7); }
+
+    /* ─── Footer ──────────────────────────────────────────────── */
+    .footer {
+      background: var(--gray-900);
+      color: var(--gray-400);
+      padding: 64px 0 0;
     }
     .footer-inner {
-      max-width: 1100px;
+      max-width: 1200px;
       margin: 0 auto;
+      padding: 0 24px;
+      display: grid;
+      grid-template-columns: 1.4fr 1fr 1fr 1fr;
+      gap: 48px;
+      margin-bottom: 64px;
     }
-    .footer-top {
-      display: flex;
-      justify-content: space-between;
-      align-items: flex-start;
-      gap: 40px;
-      flex-wrap: wrap;
-      margin-bottom: 40px;
-    }
-    .footer-brand { max-width: 280px; }
+    .footer-brand {}
     .footer-logo {
       display: flex;
       align-items: center;
       gap: 10px;
-      color: white;
-      font-weight: 700;
-      font-size: 18px;
-      margin-bottom: 12px;
+      margin-bottom: 16px;
     }
-    .footer-tagline { font-size: 14px; line-height: 1.6; }
-    .footer-links-col h4 {
-      color: white;
+    .footer-logo-mark {
+      width: 36px;
+      height: 36px;
+      background: var(--purple);
+      border-radius: 9px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
       font-size: 13px;
-      font-weight: 600;
+      font-weight: 800;
+    }
+    .footer-logo-text { font-size: 17px; font-weight: 800; color: #fff; }
+    .footer-tagline { font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+    .footer-contact { font-size: 13px; color: var(--gray-500); }
+    .footer-contact a { color: var(--purple-mid); transition: color 0.15s; }
+    .footer-contact a:hover { color: #fff; }
+    .footer-col-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: #fff;
       text-transform: uppercase;
       letter-spacing: 0.06em;
-      margin-bottom: 14px;
+      margin-bottom: 18px;
     }
-    .footer-links-col ul { list-style: none; display: flex; flex-direction: column; gap: 10px; }
-    .footer-links-col a {
+    .footer-links { display: flex; flex-direction: column; gap: 10px; }
+    .footer-links a {
       font-size: 14px;
-      color: rgba(255,255,255,0.55);
+      color: var(--gray-400);
       transition: color 0.15s;
     }
-    .footer-links-col a:hover { color: white; }
+    .footer-links a:hover { color: #fff; }
     .footer-bottom {
-      border-top: 1px solid rgba(255,255,255,0.08);
-      padding-top: 24px;
+      border-top: 1px solid rgba(255,255,255,0.07);
+      padding: 24px;
       display: flex;
-      justify-content: space-between;
       align-items: center;
+      justify-content: space-between;
       flex-wrap: wrap;
       gap: 12px;
-      font-size: 13px;
+      max-width: 1200px;
+      margin: 0 auto;
+    }
+    .footer-bottom p { font-size: 13px; color: var(--gray-500); margin: 0; }
+
+    /* ─── Responsive ──────────────────────────────────────────── */
+    @media (max-width: 1024px) {
+      .hero-inner { grid-template-columns: 1fr; gap: 48px; }
+      .hero-visual { align-items: center; }
+      .float-notif { left: 50%; transform: translateX(-50%); bottom: -24px; animation: none; }
+      .float-match-count { top: -12px; right: 50%; transform: translateX(50%); animation: none; }
+      .ps-cols { grid-template-columns: 1fr; gap: 48px; }
+      .sm-inner { grid-template-columns: 1fr; gap: 48px; }
+      .sm-card-wrap { order: -1; }
+      .ft-inner { grid-template-columns: 1fr; gap: 48px; }
+      .footer-inner { grid-template-columns: 1fr 1fr; gap: 40px; }
     }
 
-    /* ── RESPONSIVE ── */
-    @media (max-width: 640px) {
-      section { padding: 60px 16px; }
-      .hero { padding: 64px 16px 72px; }
-      .hero-ctas { flex-direction: column; align-items: center; }
-      .btn-large, .btn-outline { width: 100%; max-width: 320px; justify-content: center; }
-      .trust-row { gap: 16px; }
-      nav { padding: 0 16px; }
-      .nav-links .btn-ghost { display: none; }
-      .footer-top { flex-direction: column; }
+    @media (max-width: 768px) {
+      .section { padding: 64px 0; }
+      .hero { padding: 112px 0 64px; }
+      .nav-links { display: none; }
+      .nav-actions { display: none; }
+      .hamburger { display: flex; }
+      .mobile-menu { display: block; }
+      .features-grid { grid-template-columns: 1fr; }
+      .steps-row { grid-template-columns: 1fr 1fr; gap: 40px; }
+      .steps-row::before { display: none; }
+      .testimonials-grid {
+        display: flex;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        -webkit-overflow-scrolling: touch;
+        gap: 16px;
+        padding-bottom: 16px;
+        margin-top: 40px;
+        scrollbar-width: none;
+      }
+      .testimonials-grid::-webkit-scrollbar { display: none; }
+      .testi-card {
+        min-width: 280px;
+        scroll-snap-align: start;
+        flex-shrink: 0;
+      }
+      .pricing-grid { grid-template-columns: 1fr; max-width: 420px; }
+      .footer-inner { grid-template-columns: 1fr 1fr; gap: 32px; }
+      .footer-brand { grid-column: 1 / -1; }
+      .hero-ctas { flex-direction: column; align-items: flex-start; }
+      .hero-ctas .btn { width: 100%; justify-content: center; }
+      .sm-stats { gap: 24px; }
+      .hero-sub { font-size: 16px; }
+      .match-card { max-width: 100%; }
     }
+
+    @media (max-width: 480px) {
+      .steps-row { grid-template-columns: 1fr; }
+      .footer-inner { grid-template-columns: 1fr; }
+      .cta-band-btns { flex-direction: column; align-items: center; }
+      .cta-band-btns .btn { width: 100%; max-width: 320px; }
+      .trust-inner { gap: 16px; }
+      .sm-stats { flex-wrap: wrap; gap: 20px; }
+    }
+
+    /* ─── Focus / Accessibility ───────────────────────────────── */
+    :focus-visible {
+      outline: 2px solid var(--purple);
+      outline-offset: 3px;
+      border-radius: 4px;
+    }
+    *:focus:not(:focus-visible) { outline: none; }
+
+    /* ─── Scroll Animations ───────────────────────────────────── */
+    .fade-up {
+      opacity: 0;
+      transform: translateY(24px);
+      transition: opacity 0.5s ease, transform 0.5s ease;
+    }
+    .fade-up.visible {
+      opacity: 1;
+      transform: translateY(0);
+    }
+    .fade-up-delay-1 { transition-delay: 0.1s; }
+    .fade-up-delay-2 { transition-delay: 0.2s; }
+    .fade-up-delay-3 { transition-delay: 0.3s; }
+    .fade-up-delay-4 { transition-delay: 0.4s; }
+    .fade-up-delay-5 { transition-delay: 0.5s; }
   </style>
 </head>
+
 <body>
 
-  <!-- NAV -->
-  <nav>
+  <!-- ═══ NAVBAR ═══════════════════════════════════════════════════ -->
+  <nav class="navbar" id="navbar">
     <div class="nav-inner">
-      <a href="/" class="logo">
-        <div class="logo-icon">TN</div>
-        TutorNest
+      <a href="/" class="nav-logo" aria-label="TutorNest home">
+        <div class="logo-mark">TN</div>
+        <span class="logo-text">TutorNest</span>
       </a>
-      <div class="nav-links">
-        <a href="#features" class="btn-ghost">Features</a>
-        <a href="#how-it-works" class="btn-ghost">How it works</a>
-        <a href="https://app.tutornest.org" class="btn-ghost">Sign in</a>
-        <a href="https://app.tutornest.org" class="btn-primary">Get Started →</a>
+      <ul class="nav-links" role="list">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">How it works</a></li>
+        <li><a href="#for-tutors">For Tutors</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="https://app.tutornest.org" class="btn btn-ghost btn-sm">Sign In</a>
+        <a href="https://app.tutornest.org" class="btn btn-primary btn-sm">Get Started</a>
+      </div>
+      <button class="hamburger" id="hamburger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <div class="mobile-menu" id="mobile-menu" role="navigation">
+      <ul role="list">
+        <li><a href="#features">Features</a></li>
+        <li><a href="#how-it-works">How it works</a></li>
+        <li><a href="#for-tutors">For Tutors</a></li>
+        <li><a href="#pricing">Pricing</a></li>
+      </ul>
+      <div class="mobile-menu-actions">
+        <a href="https://app.tutornest.org" class="btn-outline-mobile">Sign In</a>
+        <a href="https://app.tutornest.org" class="btn-fill-mobile">Get Started Free →</a>
       </div>
     </div>
   </nav>
 
-  <!-- HERO -->
-  <section class="hero">
+  <!-- ═══ HERO ══════════════════════════════════════════════════════ -->
+  <section class="hero" aria-label="Hero">
     <div class="hero-inner">
-      <div class="badge">
-        ✦ AI-Powered Tutor Matching
+      <div class="hero-content">
+        <div class="hero-badge">
+          <span class="hero-badge-dot"></span>
+          AI-Powered Smart Matching
+        </div>
+        <h1>Your Child's <em>Perfect Tutor</em>,<br>Matched by AI</h1>
+        <p class="hero-sub">
+          TutorNest connects Nigerian families with verified, qualified tutors using intelligent matching — so your child gets the right fit from day one, not after weeks of trial and error.
+        </p>
+        <div class="hero-ctas">
+          <a href="https://app.tutornest.org" class="btn btn-primary btn-lg">
+            Find a Tutor →
+          </a>
+          <a href="https://app.tutornest.org" class="btn btn-ghost btn-lg">
+            Become a Tutor
+          </a>
+        </div>
+        <div class="hero-proof">
+          <div class="avatar-stack" aria-hidden="true">
+            <div class="av av-1">AO</div>
+            <div class="av av-2">EK</div>
+            <div class="av av-3">SB</div>
+            <div class="av av-4">CI</div>
+          </div>
+          <p class="hero-proof-text">
+            <strong>500+ verified tutors</strong> ready to match your child
+          </p>
+        </div>
       </div>
-      <h1>Find the <span>perfect tutor</span><br>for your child</h1>
-      <p class="hero-sub">
-        TutorNest connects students with verified, qualified tutors across every subject. Smart matching, flexible scheduling, and real progress — all in one place.
-      </p>
-      <div class="hero-ctas">
-        <a href="https://app.tutornest.org" class="btn-primary btn-large">Start for free →</a>
-        <a href="#how-it-works" class="btn-outline">See how it works</a>
-      </div>
-      <div class="trust-row">
-        <div class="trust-item"><div class="dot">✓</div> Verified tutors</div>
-        <div class="trust-item"><div class="dot">✓</div> AI-powered matching</div>
-        <div class="trust-item"><div class="dot">✓</div> Safe payments</div>
-        <div class="trust-item"><div class="dot">✓</div> Progress tracking</div>
+
+      <div class="hero-visual">
+        <span class="float-match-count" aria-hidden="true">🎯 12 new matches today</span>
+        <div class="match-card" aria-label="Example tutor match card">
+          <div class="match-card-header">
+            <span class="match-card-title">Top Match</span>
+            <span class="match-badge">94% Match</span>
+          </div>
+          <div class="tutor-row">
+            <div class="tutor-av" aria-hidden="true">AO</div>
+            <div class="tutor-info">
+              <div class="tutor-name">Amaka Okafor</div>
+              <div class="tutor-sub">Mathematics · WAEC Prep</div>
+              <div class="tutor-rating">
+                <span class="stars" aria-hidden="true">★★★★★</span>
+                <span class="rating-text">4.9 · 127 sessions</span>
+              </div>
+            </div>
+          </div>
+          <div class="score-section">
+            <div class="score-label">
+              <span>AI Match Score</span>
+              <span class="score-pct">94%</span>
+            </div>
+            <div class="score-bar">
+              <div class="score-fill"></div>
+            </div>
+          </div>
+          <div class="match-criteria-mini" aria-label="Match criteria">
+            <div class="crit-row">
+              <div class="crit-check" aria-hidden="true">✓</div>
+              Subject expertise confirmed
+            </div>
+            <div class="crit-row">
+              <div class="crit-check" aria-hidden="true">✓</div>
+              Schedule fits your availability
+            </div>
+            <div class="crit-row">
+              <div class="crit-check" aria-hidden="true">✓</div>
+              Budget within your range
+            </div>
+          </div>
+          <a href="https://app.tutornest.org" class="card-book-btn">Book a Session →</a>
+        </div>
+        <div class="float-notif" aria-hidden="true">
+          <div class="notif-icon">📅</div>
+          <div class="notif-text">
+            <div class="notif-title">Next session: Tomorrow, 4:00 PM</div>
+            <div class="notif-sub">Mathematics — WAEC Prep · Amaka O.</div>
+          </div>
+        </div>
       </div>
     </div>
   </section>
 
-  <!-- STATS -->
-  <div class="stats-band">
-    <div class="stats-grid">
-      <div>
-        <div class="stat-num">500+</div>
-        <div class="stat-label">Verified tutors</div>
-      </div>
-      <div>
-        <div class="stat-num">20+</div>
-        <div class="stat-label">Subjects covered</div>
-      </div>
-      <div>
-        <div class="stat-num">98%</div>
-        <div class="stat-label">Parent satisfaction</div>
-      </div>
-      <div>
-        <div class="stat-num">24h</div>
-        <div class="stat-label">Average match time</div>
+  <!-- ═══ TRUST BAR ════════════════════════════════════════════════ -->
+  <div class="trust-bar" aria-label="Trusted by families across Nigeria">
+    <div class="trust-inner">
+      <span class="trust-label">Trusted by families across</span>
+      <div class="trust-divider" aria-hidden="true"></div>
+      <div class="trust-pills" role="list">
+        <span class="trust-pill" role="listitem">🏙️ Lagos</span>
+        <span class="trust-pill" role="listitem">🏛️ Abuja</span>
+        <span class="trust-pill" role="listitem">⚓ Port Harcourt</span>
+        <span class="trust-pill" role="listitem">🌊 Enugu</span>
+        <span class="trust-pill" role="listitem">📚 WAEC Prep</span>
+        <span class="trust-pill" role="listitem">🎓 JAMB Prep</span>
+        <span class="trust-pill" role="listitem">📐 Common Entrance</span>
       </div>
     </div>
   </div>
 
-  <!-- FEATURES -->
-  <section id="features">
-    <div class="section-inner">
-      <div class="section-label">Why TutorNest</div>
-      <h2 class="section-title">Everything you need, in one place</h2>
-      <p class="section-sub">From finding the right tutor to tracking your child's progress, TutorNest handles it all.</p>
+  <!-- ═══ PROBLEM / SOLUTION ═══════════════════════════════════════ -->
+  <section class="problem-solution" id="why-tutornest" aria-labelledby="ps-heading">
+    <div class="ps-inner">
+      <div class="section-header" style="margin-bottom: 56px;">
+        <span class="section-label">Why TutorNest?</span>
+        <h2 id="ps-heading">Tutoring is broken.<br>We fixed it.</h2>
+        <p>Parents waste time on unreliable referrals. Tutors chase payments. Students fall behind. There's a better way.</p>
+      </div>
+      <div class="ps-cols">
+        <div>
+          <div class="ps-col-header">
+            <h3>😩 The old way</h3>
+          </div>
+          <div class="ps-list">
+            <div class="ps-item ps-item-problem fade-up">
+              <span class="ps-icon">⚠️</span>
+              <div class="ps-text ps-text-problem">
+                <strong>Finding a trustworthy tutor is guesswork</strong>
+                <p>Word-of-mouth referrals, unverified credentials, no accountability. You're rolling the dice with your child's education.</p>
+              </div>
+            </div>
+            <div class="ps-item ps-item-problem fade-up fade-up-delay-1">
+              <span class="ps-icon">⚠️</span>
+              <div class="ps-text ps-text-problem">
+                <strong>No way to track if sessions are working</strong>
+                <p>Sessions happen behind closed doors. You pay monthly and hope for the best, with no data on actual progress.</p>
+              </div>
+            </div>
+            <div class="ps-item ps-item-problem fade-up fade-up-delay-2">
+              <span class="ps-icon">⚠️</span>
+              <div class="ps-text ps-text-problem">
+                <strong>Scheduling back-and-forth is exhausting</strong>
+                <p>WhatsApp negotiations, last-minute cancellations, unclear availability. It shouldn't be this hard.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div>
+          <div class="ps-col-header">
+            <h3>✨ The TutorNest way</h3>
+          </div>
+          <div class="ps-list">
+            <div class="ps-item ps-item-solution fade-up">
+              <span class="ps-icon">🛡️</span>
+              <div class="ps-text ps-text-solution">
+                <strong>Every tutor is verified and AI-matched</strong>
+                <p>Background-checked credentials, verified qualifications, and an AI engine that scores tutors against your child's exact needs.</p>
+              </div>
+            </div>
+            <div class="ps-item ps-item-solution fade-up fade-up-delay-1">
+              <span class="ps-icon">📊</span>
+              <div class="ps-text ps-text-solution">
+                <strong>Session reports after every lesson</strong>
+                <p>Tutors file structured reports covering topics covered, progress made, and areas to focus on next. You're always in the loop.</p>
+              </div>
+            </div>
+            <div class="ps-item ps-item-solution fade-up fade-up-delay-2">
+              <span class="ps-icon">📆</span>
+              <div class="ps-text ps-text-solution">
+                <strong>Book in seconds. Pay securely.</strong>
+                <p>Browse availability in real-time, confirm a session with one tap, and pay securely through Flutterwave. No cash, no stress.</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FEATURES ═════════════════════════════════════════════════ -->
+  <section class="features section" id="features" aria-labelledby="features-heading">
+    <div class="container">
+      <div class="section-header centered">
+        <span class="section-label">Platform Features</span>
+        <h2 id="features-heading">Everything you need,<br>nothing you don't</h2>
+        <p>A complete tutoring platform built for Nigerian families — from first match to final report.</p>
+      </div>
       <div class="features-grid">
-        <div class="feature-card">
-          <div class="feature-icon">🎯</div>
-          <div class="feature-title">Smart Matching</div>
-          <div class="feature-desc">Our AI analyses your child's learning style, subjects, schedule, and goals to surface the tutors most likely to make a real difference.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">✅</div>
-          <div class="feature-title">Verified Tutors</div>
-          <div class="feature-desc">Every tutor is identity-checked, qualification-verified, and reviewed before they appear on the platform. You can trust who you hire.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">📅</div>
-          <div class="feature-title">Easy Booking</div>
-          <div class="feature-desc">Book sessions that fit your family's schedule. Reschedule or cancel with ease — no awkward phone calls required.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">📈</div>
-          <div class="feature-title">Progress Reports</div>
-          <div class="feature-desc">Tutors file session reports after every lesson. You'll always know what was covered, what needs more work, and how your child is improving.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">🔒</div>
-          <div class="feature-title">Secure Payments</div>
-          <div class="feature-desc">Pay safely through the platform. Payments are held in escrow and released after each confirmed session — full protection for parents and tutors.</div>
-        </div>
-        <div class="feature-card">
-          <div class="feature-icon">💬</div>
-          <div class="feature-title">Direct Messaging</div>
-          <div class="feature-desc">Communicate with tutors directly before and between sessions. Ask questions, share resources, and stay connected in one inbox.</div>
-        </div>
+        <article class="feature-card fade-up">
+          <span class="feature-emoji" aria-hidden="true">🤖</span>
+          <h3>Smart AI Matching</h3>
+          <p>Our engine analyses subject needs, learning style, schedule, and budget to rank tutors by fit — not by who paid to be listed first.</p>
+        </article>
+        <article class="feature-card fade-up fade-up-delay-1">
+          <span class="feature-emoji" aria-hidden="true">🛡️</span>
+          <h3>Verified Tutors</h3>
+          <p>Every tutor undergoes credential verification before joining. Qualifications, teaching experience, and subject expertise — all checked.</p>
+        </article>
+        <article class="feature-card fade-up fade-up-delay-2">
+          <span class="feature-emoji" aria-hidden="true">📅</span>
+          <h3>Easy Booking</h3>
+          <p>Browse real-time availability, choose a time that works for you, and confirm in seconds. Cancellations and rescheduling are built in.</p>
+        </article>
+        <article class="feature-card fade-up fade-up-delay-1">
+          <span class="feature-emoji" aria-hidden="true">📋</span>
+          <h3>Session Reports</h3>
+          <p>After every lesson, your tutor files a structured report — topics covered, homework set, and specific areas your child needs to strengthen.</p>
+        </article>
+        <article class="feature-card fade-up fade-up-delay-2">
+          <span class="feature-emoji" aria-hidden="true">💳</span>
+          <h3>Secure Payments</h3>
+          <p>Pay for sessions through Flutterwave — Nigeria's trusted payment infrastructure. Receipts, invoices, and payment history all in one place.</p>
+        </article>
+        <article class="feature-card fade-up fade-up-delay-3">
+          <span class="feature-emoji" aria-hidden="true">💬</span>
+          <h3>Direct Messaging</h3>
+          <p>Message your tutor directly within the platform. No need to share personal numbers — everything stays organised and on record.</p>
+        </article>
       </div>
     </div>
   </section>
 
-  <!-- HOW IT WORKS -->
-  <section id="how-it-works" class="how-bg">
-    <div class="section-inner">
-      <div class="section-label">Getting started</div>
-      <h2 class="section-title">Up and running in minutes</h2>
-      <p class="section-sub">No lengthy forms, no waiting. From sign-up to first session in just a few steps.</p>
-      <div class="steps-grid">
-        <div class="step">
-          <div class="step-num">1</div>
-          <div class="step-title">Create a profile</div>
-          <div class="step-desc">Sign up as a parent and add your child's subjects, grade level, learning goals, and availability. Takes about two minutes.</div>
-        </div>
-        <div class="step">
-          <div class="step-num">2</div>
-          <div class="step-title">Get matched</div>
-          <div class="step-desc">Our Smart Match engine scores every verified tutor against your child's profile and surfaces the best fits — ranked and explained.</div>
-        </div>
-        <div class="step">
-          <div class="step-num">3</div>
-          <div class="step-title">Book a session</div>
-          <div class="step-desc">Choose a tutor, pick a time slot, and pay securely. Your tutor receives a confirmation instantly and you're on the calendar.</div>
-        </div>
-        <div class="step">
-          <div class="step-num">4</div>
-          <div class="step-title">Track progress</div>
-          <div class="step-desc">After every session, read the tutor's report, see what's improving, and adjust goals. Results you can actually measure.</div>
-        </div>
+  <!-- ═══ HOW IT WORKS ══════════════════════════════════════════════ -->
+  <section class="how-it-works section" id="how-it-works" aria-labelledby="hiw-heading">
+    <div class="container">
+      <div class="section-header centered">
+        <span class="section-label">How It Works</span>
+        <h2 id="hiw-heading">From profile to first<br>lesson in minutes</h2>
+        <p>No lengthy onboarding. No phone calls needed. Just a few simple steps to get your child learning with the right tutor.</p>
       </div>
-    </div>
-  </section>
-
-  <!-- SUBJECTS -->
-  <section>
-    <div class="section-inner">
-      <div class="section-label">Subjects</div>
-      <h2 class="section-title">Every subject. Every level.</h2>
-      <p class="section-sub" style="margin-bottom: 32px;">From primary school basics to A-level exam prep, we have specialists ready.</p>
-      <div class="subjects-wrap">
-        <div class="subject-chip">Mathematics</div>
-        <div class="subject-chip">English Language</div>
-        <div class="subject-chip">Physics</div>
-        <div class="subject-chip">Chemistry</div>
-        <div class="subject-chip">Biology</div>
-        <div class="subject-chip">Further Mathematics</div>
-        <div class="subject-chip">Literature in English</div>
-        <div class="subject-chip">Economics</div>
-        <div class="subject-chip">Computer Science</div>
-        <div class="subject-chip">French</div>
-        <div class="subject-chip">Government</div>
-        <div class="subject-chip">History</div>
-        <div class="subject-chip">Geography</div>
-        <div class="subject-chip">Accounting</div>
-        <div class="subject-chip">Commerce</div>
-        <div class="subject-chip">Agricultural Science</div>
-        <div class="subject-chip">Technical Drawing</div>
-        <div class="subject-chip">Music</div>
-        <div class="subject-chip">Civic Education</div>
-        <div class="subject-chip">+ many more</div>
-      </div>
-    </div>
-  </section>
-
-  <!-- TESTIMONIALS -->
-  <section style="background: var(--purple-light);">
-    <div class="section-inner">
-      <div class="section-label">What parents say</div>
-      <h2 class="section-title">Families that found their match</h2>
-      <p class="section-sub">Real results from real families on TutorNest.</p>
-      <div class="testimonials-grid">
-        <div class="testimonial-card">
-          <div class="stars">★★★★★</div>
-          <p class="testimonial-text">"The Smart Match feature is genuinely impressive. It suggested a tutor I wouldn't have picked myself, and my daughter's maths grade jumped a full grade within two terms."</p>
-          <div class="testimonial-author">
-            <div class="author-avatar">AO</div>
-            <div>
-              <div class="author-name">Adaeze O.</div>
-              <div class="author-role">Parent · Lagos</div>
-            </div>
+      <div class="steps-row">
+        <div class="step fade-up">
+          <div class="step-num-wrap">
+            <span class="step-icon" aria-hidden="true">👤</span>
+            <span class="step-num" aria-label="Step 1">1</span>
           </div>
+          <h3>Create a Profile</h3>
+          <p>Tell us your child's grade, subjects, learning style, schedule, and budget. Takes under 5 minutes.</p>
         </div>
-        <div class="testimonial-card">
-          <div class="stars">★★★★★</div>
-          <p class="testimonial-text">"I love that I get a report after every session. I finally feel like I know what's happening in my son's lessons, not just a vague 'it went well'."</p>
-          <div class="testimonial-author">
-            <div class="author-avatar">FK</div>
-            <div>
-              <div class="author-name">Funmi K.</div>
-              <div class="author-role">Parent · Abuja</div>
-            </div>
+        <div class="step fade-up fade-up-delay-1">
+          <div class="step-num-wrap">
+            <span class="step-icon" aria-hidden="true">🤖</span>
+            <span class="step-num" aria-label="Step 2">2</span>
           </div>
+          <h3>Get AI-Matched</h3>
+          <p>Our Smart Match engine instantly scores and ranks verified tutors by how well they fit your child's specific needs.</p>
         </div>
-        <div class="testimonial-card">
-          <div class="stars">★★★★★</div>
-          <p class="testimonial-text">"The verification process gave me real confidence. I know the tutors on this platform have been properly checked. That peace of mind is worth everything."</p>
-          <div class="testimonial-author">
-            <div class="author-avatar">EI</div>
-            <div>
-              <div class="author-name">Emmanuel I.</div>
-              <div class="author-role">Parent · Port Harcourt</div>
-            </div>
+        <div class="step fade-up fade-up-delay-2">
+          <div class="step-num-wrap">
+            <span class="step-icon" aria-hidden="true">📅</span>
+            <span class="step-num" aria-label="Step 3">3</span>
+          </div>
+          <h3>Book a Session</h3>
+          <p>Browse your matches, choose a tutor, pick a time, and pay securely. Your tutor is confirmed instantly.</p>
+        </div>
+        <div class="step fade-up fade-up-delay-3">
+          <div class="step-num-wrap">
+            <span class="step-icon" aria-hidden="true">📈</span>
+            <span class="step-num" aria-label="Step 4">4</span>
+          </div>
+          <h3>Track Progress</h3>
+          <p>Receive post-session reports, monitor progress over time, and adjust the match if you ever need a change.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ SMART MATCH SHOWCASE ══════════════════════════════════════ -->
+  <section class="smart-match" id="smart-match" aria-labelledby="sm-heading">
+    <div class="sm-inner">
+      <div class="sm-copy fade-up">
+        <span class="sm-label">🤖 Smart Match Engine</span>
+        <h2 id="sm-heading">Not just any tutor —<br><em style="font-style:normal;color:#c4beff;">your</em> tutor</h2>
+        <p>
+          Most platforms show you a list of tutors and leave you to guess. TutorNest analyses 6 compatibility dimensions — subject expertise, teaching style, schedule, budget, exam type, and student level — then gives every tutor a precise match score for <em>your child specifically</em>.
+        </p>
+        <div class="sm-stats">
+          <div class="sm-stat">
+            <div class="sm-stat-num">500+</div>
+            <div class="sm-stat-label">Verified tutors</div>
+          </div>
+          <div class="sm-stat">
+            <div class="sm-stat-num">98%</div>
+            <div class="sm-stat-label">Parent satisfaction</div>
+          </div>
+          <div class="sm-stat">
+            <div class="sm-stat-num">&lt;5 min</div>
+            <div class="sm-stat-label">To first match</div>
           </div>
         </div>
       </div>
+
+      <div class="sm-card-wrap">
+        <div class="ai-card" aria-label="AI matching in progress">
+          <div class="ai-card-top">
+            <div>
+              <div class="ai-card-title">🤖 AI Match Analysis</div>
+              <div class="ai-card-sub" id="ai-status-text">Analysing compatibility…</div>
+            </div>
+            <div class="ai-spinner" id="ai-spinner" aria-hidden="true"></div>
+          </div>
+          <div class="ai-crit-list" role="list">
+            <div class="ai-crit" id="crit-0" role="listitem">
+              <div class="ai-crit-icon" aria-hidden="true">📚</div>
+              <div class="ai-crit-text">
+                <div class="ai-crit-name">Subject Match</div>
+                <div class="ai-crit-value">Mathematics · WAEC</div>
+              </div>
+            </div>
+            <div class="ai-crit" id="crit-1" role="listitem">
+              <div class="ai-crit-icon" aria-hidden="true">🕐</div>
+              <div class="ai-crit-text">
+                <div class="ai-crit-name">Schedule Fit</div>
+                <div class="ai-crit-value">Mon/Wed/Fri, 4–6 PM</div>
+              </div>
+            </div>
+            <div class="ai-crit" id="crit-2" role="listitem">
+              <div class="ai-crit-icon" aria-hidden="true">💰</div>
+              <div class="ai-crit-text">
+                <div class="ai-crit-name">Budget Match</div>
+                <div class="ai-crit-value">Within your range</div>
+              </div>
+            </div>
+            <div class="ai-crit" id="crit-3" role="listitem">
+              <div class="ai-crit-icon" aria-hidden="true">🎯</div>
+              <div class="ai-crit-text">
+                <div class="ai-crit-name">Learning Style</div>
+                <div class="ai-crit-value">Visual & hands-on</div>
+              </div>
+            </div>
+          </div>
+          <div class="ai-score-reveal" id="ai-score-reveal" aria-live="polite">
+            <span class="ai-score-num" id="ai-score-num">97%</span>
+            <div class="ai-score-label">Overall Match Score</div>
+            <div class="ai-score-sub">Excellent fit — we recommend booking Amaka O.</div>
+          </div>
+        </div>
+      </div>
     </div>
   </section>
 
-  <!-- CTA BAND -->
-  <div class="cta-band">
-    <h2>Ready to find your child's perfect tutor?</h2>
-    <p>Join thousands of families who have already found their match.</p>
-    <a href="https://app.tutornest.org" class="btn-white">
-      Get started for free →
-    </a>
-  </div>
+  <!-- ═══ FOR TUTORS ════════════════════════════════════════════════ -->
+  <section class="for-tutors section" id="for-tutors" aria-labelledby="ft-heading">
+    <div class="ft-inner">
+      <div class="ft-copy fade-up">
+        <span class="section-label" style="background:rgba(255,255,255,0.15);color:rgba(255,255,255,0.9);">For Tutors</span>
+        <h2 id="ft-heading" style="color:#fff;">Turn your expertise<br>into stable income</h2>
+        <p>Stop chasing students through social media. TutorNest brings qualified, motivated students to you — and handles the admin so you can focus on teaching.</p>
+        <a href="https://app.tutornest.org" class="btn btn-white btn-lg">Apply as a Tutor →</a>
+      </div>
+      <div class="ft-benefits fade-up fade-up-delay-1">
+        <div class="ft-benefit">
+          <span class="ft-benefit-icon" aria-hidden="true">🏅</span>
+          <div>
+            <h4>Verified tutor badge</h4>
+            <p>Stand out with a verified badge that signals to parents that your credentials have been checked. Trust is your biggest selling point.</p>
+          </div>
+        </div>
+        <div class="ft-benefit">
+          <span class="ft-benefit-icon" aria-hidden="true">📆</span>
+          <div>
+            <h4>Steady, reliable bookings</h4>
+            <p>Our AI surfaces you to parents whose needs match your skills. No more dry spells — students find you when you're the right fit.</p>
+          </div>
+        </div>
+        <div class="ft-benefit">
+          <span class="ft-benefit-icon" aria-hidden="true">💸</span>
+          <div>
+            <h4>Automatic, on-time payments</h4>
+            <p>Get paid after every session — directly to your bank account. No more chasing families for cash at the end of the month.</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
 
-  <!-- FOOTER -->
-  <footer>
+  <!-- ═══ TESTIMONIALS ══════════════════════════════════════════════ -->
+  <section class="testimonials section" id="testimonials" aria-labelledby="testi-heading">
+    <div class="container">
+      <div class="section-header centered">
+        <span class="section-label">Parent Stories</span>
+        <h2 id="testi-heading">Families who found their match</h2>
+        <p>Real results from real Nigerian families. No paid reviews — just parents who wanted to share their experience.</p>
+      </div>
+      <div class="testimonials-grid" role="list">
+        <article class="testi-card" role="listitem">
+          <div class="testi-stars" aria-label="5 out of 5 stars">★★★★★</div>
+          <blockquote class="testi-quote">
+            "Before TutorNest, I spent weeks asking friends for referrals and still ended up with a tutor who wasn't consistent. With TutorNest, I found Amaka in minutes — my son's Maths grade went from a D to a B in one term."
+          </blockquote>
+          <div class="testi-footer">
+            <div class="testi-av tav-1" aria-hidden="true">FA</div>
+            <div class="testi-info">
+              <div class="testi-name">Funke A.</div>
+              <div class="testi-loc">Lagos, Nigeria</div>
+            </div>
+            <span class="testi-tag">WAEC Prep</span>
+          </div>
+        </article>
+        <article class="testi-card" role="listitem">
+          <div class="testi-stars" aria-label="5 out of 5 stars">★★★★★</div>
+          <blockquote class="testi-quote">
+            "The session reports are a game-changer. I actually know what topics were covered each week, and the tutor flags when my daughter is struggling with something specific. Real accountability — finally."
+          </blockquote>
+          <div class="testi-footer">
+            <div class="testi-av tav-2" aria-hidden="true">CO</div>
+            <div class="testi-info">
+              <div class="testi-name">Chukwuemeka O.</div>
+              <div class="testi-loc">Abuja, Nigeria</div>
+            </div>
+            <span class="testi-tag">Science Tutor</span>
+          </div>
+        </article>
+        <article class="testi-card" role="listitem">
+          <div class="testi-stars" aria-label="5 out of 5 stars">★★★★★</div>
+          <blockquote class="testi-quote">
+            "I was sceptical about paying online, but the platform is seamless. I pay, I get a receipt, and if there's ever an issue, support actually responds. My son is now genuinely confident in English."
+          </blockquote>
+          <div class="testi-footer">
+            <div class="testi-av tav-3" aria-hidden="true">SB</div>
+            <div class="testi-info">
+              <div class="testi-name">Shade B.</div>
+              <div class="testi-loc">Port Harcourt, Nigeria</div>
+            </div>
+            <span class="testi-tag">English Tutor</span>
+          </div>
+        </article>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ PRICING ═══════════════════════════════════════════════════ -->
+  <section class="pricing section" id="pricing" aria-labelledby="pricing-heading">
+    <div class="container">
+      <div class="section-header centered">
+        <span class="section-label">Simple Pricing</span>
+        <h2 id="pricing-heading">Transparent from day one</h2>
+        <p>No surprise fees. No subscriptions to cancel. You pay for sessions, we take a small platform fee — that's it.</p>
+      </div>
+      <div class="pricing-grid" style="margin-top: 56px;">
+        <div class="price-card price-card-families fade-up">
+          <div class="price-icon" aria-hidden="true">👨‍👩‍👧</div>
+          <h3>For Families</h3>
+          <p class="price-headline">Free to browse. Pay per session.</p>
+          <ul class="price-list" role="list">
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Free account & profile creation</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Unlimited AI-powered tutor matches</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Pay per session — rates set by tutor</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Secure Flutterwave payments</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Full session reports & progress history</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Direct messaging with tutors</li>
+          </ul>
+          <p class="price-note">No monthly subscription. No hidden fees. Only pay when you book.</p>
+        </div>
+        <div class="price-card price-card-tutors fade-up fade-up-delay-1">
+          <div class="price-icon" aria-hidden="true">🎓</div>
+          <h3>For Tutors</h3>
+          <p class="price-headline">Free to join. Small fee per session.</p>
+          <ul class="price-list" role="list">
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Free tutor profile & verification</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Matched with relevant students automatically</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Set your own hourly rate</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Automatic payouts after sessions</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Built-in scheduling & session tracking</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Verified badge to build trust faster</li>
+          </ul>
+          <p class="price-note">A small platform fee applies per completed session. No monthly fees to be listed.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FAQ ═══════════════════════════════════════════════════════ -->
+  <section class="faq section" id="faq" aria-labelledby="faq-heading">
+    <div class="container">
+      <div class="section-header centered">
+        <span class="section-label">FAQ</span>
+        <h2 id="faq-heading">Questions we hear often</h2>
+        <p>Still not sure? Here are the things most families ask before signing up.</p>
+      </div>
+      <div class="faq-list" role="list">
+        <details class="faq-item" role="listitem">
+          <summary class="faq-q">How does the AI matching actually work?</summary>
+          <div class="faq-a">
+            When you create a child profile, you tell us their grade level, the subjects they need help with, their learning style, your schedule, and your budget per session. Our Smart Match engine then scores every verified tutor in our database against those six dimensions and ranks them by overall fit. You see a percentage match score next to each tutor — the higher the score, the more aligned the tutor is with your child's specific needs.
+          </div>
+        </details>
+        <details class="faq-item" role="listitem">
+          <summary class="faq-q">Are tutors background-checked and verified?</summary>
+          <div class="faq-a">
+            Yes. Every tutor on TutorNest goes through a verification process before their profile is made visible to families. We verify academic credentials, teaching qualifications, and relevant experience. Tutors who pass verification receive a Verified badge on their profile. We take trust seriously — your child's safety and learning come first.
+          </div>
+        </details>
+        <details class="faq-item" role="listitem">
+          <summary class="faq-q">What subjects and exam types are covered?</summary>
+          <div class="faq-a">
+            TutorNest covers a wide range of subjects including Mathematics, English Language, Sciences (Physics, Chemistry, Biology), Social Studies, Further Mathematics, and more. We support major Nigerian exam preparations including WAEC/SSCE, NECO, JAMB/UTME, Common Entrance, and BECE. You can filter tutors by both subject and exam type when browsing.
+          </div>
+        </details>
+        <details class="faq-item" role="listitem">
+          <summary class="faq-q">How do payments work? Is it safe?</summary>
+          <div class="faq-a">
+            All payments are processed securely through Flutterwave, one of Nigeria's most trusted payment providers. You pay for sessions directly within the platform using your debit card or bank transfer. Tutors are not paid until a session is completed, which protects both parties. You'll receive an invoice and receipt for every transaction within your account.
+          </div>
+        </details>
+        <details class="faq-item" role="listitem">
+          <summary class="faq-q">What if I'm not happy with my tutor?</summary>
+          <div class="faq-a">
+            We want every match to be the right one. If a session doesn't meet your expectations, you can rate your tutor after each session, send feedback, or request a new match at any time. If you believe there was a serious issue, contact our support team at support@tutornest.org and we'll work to resolve it quickly. Our goal is for every family to find a tutor they love.
+          </div>
+        </details>
+        <details class="faq-item" role="listitem">
+          <summary class="faq-q">Can I switch tutors if the match isn't working?</summary>
+          <div class="faq-a">
+            Absolutely. There is no lock-in. If the tutor you matched with isn't the right fit — for any reason — you can return to your match results and book with another tutor. Your child profile and match preferences are saved, so finding a replacement is quick. We'd rather you switch than stay with a tutor who isn't working for your child.
+          </div>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FINAL CTA BAND ════════════════════════════════════════════ -->
+  <section class="cta-band" aria-labelledby="cta-heading">
+    <div class="cta-band-inner">
+      <h2 id="cta-heading">Your child's best tutor<br>is already on TutorNest</h2>
+      <p>Join hundreds of Nigerian families who've already found the right fit. Set up your profile in minutes — it's completely free to start.</p>
+      <div class="cta-band-btns">
+        <a href="https://app.tutornest.org" class="btn btn-white btn-lg">
+          Find a Tutor — It's Free →
+        </a>
+        <a href="https://app.tutornest.org" class="btn btn-ghost-white btn-lg">
+          Become a Tutor
+        </a>
+      </div>
+      <div class="cta-proof">
+        <div class="avatar-stack" aria-hidden="true">
+          <div class="av av-1">AO</div>
+          <div class="av av-2">EK</div>
+          <div class="av av-3">SB</div>
+        </div>
+        <p class="cta-proof-text">500+ verified tutors · 98% satisfaction · No subscription needed</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- ═══ FOOTER ════════════════════════════════════════════════════ -->
+  <footer class="footer" aria-label="Site footer">
     <div class="footer-inner">
-      <div class="footer-top">
-        <div class="footer-brand">
-          <div class="footer-logo">
-            <div class="logo-icon">TN</div>
-            TutorNest
-          </div>
-          <p class="footer-tagline">Connecting students with the right tutors, powered by smart matching and built on trust.</p>
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <div class="footer-logo-mark" aria-hidden="true">TN</div>
+          <span class="footer-logo-text">TutorNest</span>
         </div>
-        <div class="footer-links-col">
-          <h4>Platform</h4>
-          <ul>
-            <li><a href="https://app.tutornest.org">Sign up free</a></li>
-            <li><a href="https://app.tutornest.org">Find a tutor</a></li>
-            <li><a href="https://app.tutornest.org">Become a tutor</a></li>
-            <li><a href="https://app.tutornest.org">How it works</a></li>
-          </ul>
-        </div>
-        <div class="footer-links-col">
-          <h4>Support</h4>
-          <ul>
-            <li><a href="mailto:support@tutornest.org">Contact us</a></li>
-            <li><a href="https://app.tutornest.org">Help centre</a></li>
-            <li><a href="https://app.tutornest.org">Privacy policy</a></li>
-            <li><a href="https://app.tutornest.org">Terms of service</a></li>
-          </ul>
-        </div>
+        <p class="footer-tagline">
+          Connecting Nigerian families with verified, qualified tutors through AI-powered smart matching.
+        </p>
+        <p class="footer-contact">
+          Questions? <a href="mailto:support@tutornest.org">support@tutornest.org</a>
+        </p>
       </div>
-      <div class="footer-bottom">
-        <span>&copy; TutorNest 2025. All rights reserved.</span>
-        <span>Made with care in Nigeria 🇳🇬</span>
+      <div>
+        <h3 class="footer-col-title">Platform</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="https://app.tutornest.org">Find a Tutor</a></li>
+          <li><a href="https://app.tutornest.org">Become a Tutor</a></li>
+          <li><a href="https://app.tutornest.org">How It Works</a></li>
+          <li><a href="https://app.tutornest.org">Pricing</a></li>
+          <li><a href="https://app.tutornest.org">Sign In</a></li>
+        </ul>
       </div>
+      <div>
+        <h3 class="footer-col-title">Support</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="mailto:support@tutornest.org">Contact Us</a></li>
+          <li><a href="#faq">FAQ</a></li>
+          <li><a href="https://app.tutornest.org">Help Centre</a></li>
+          <li><a href="mailto:support@tutornest.org">Report an Issue</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="footer-col-title">Legal</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="https://app.tutornest.org">Privacy Policy</a></li>
+          <li><a href="https://app.tutornest.org">Terms of Service</a></li>
+          <li><a href="https://app.tutornest.org">Cookie Policy</a></li>
+          <li><a href="https://app.tutornest.org">Tutor Agreement</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2025 TutorNest. All rights reserved.</p>
+      <p>Made with care in Nigeria 🇳🇬</p>
     </div>
   </footer>
+
+  <script>
+    /* ─── Navbar Scroll Effect ───────────────────────────────── */
+    const navbar = document.getElementById('navbar');
+    let lastScroll = 0;
+    window.addEventListener('scroll', () => {
+      const scroll = window.scrollY;
+      if (scroll > 20) {
+        navbar.classList.add('scrolled');
+      } else {
+        navbar.classList.remove('scrolled');
+      }
+      lastScroll = scroll;
+    }, { passive: true });
+
+    /* ─── Hamburger Menu ─────────────────────────────────────── */
+    const hamburger = document.getElementById('hamburger');
+    const mobileMenu = document.getElementById('mobile-menu');
+
+    hamburger.addEventListener('click', () => {
+      const isOpen = mobileMenu.classList.toggle('open');
+      hamburger.classList.toggle('open', isOpen);
+      hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+
+    // Close on link click
+    mobileMenu.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        mobileMenu.classList.remove('open');
+        hamburger.classList.remove('open');
+        hamburger.setAttribute('aria-expanded', 'false');
+      });
+    });
+
+    /* ─── Scroll Animation (IntersectionObserver) ────────────── */
+    const fadeEls = document.querySelectorAll('.fade-up');
+    if ('IntersectionObserver' in window) {
+      const io = new IntersectionObserver((entries) => {
+        entries.forEach(e => {
+          if (e.isIntersecting) {
+            e.target.classList.add('visible');
+            io.unobserve(e.target);
+          }
+        });
+      }, { threshold: 0.12, rootMargin: '0px 0px -40px 0px' });
+      fadeEls.forEach(el => io.observe(el));
+    } else {
+      fadeEls.forEach(el => el.classList.add('visible'));
+    }
+
+    /* ─── AI Match Card Animation ────────────────────────────── */
+    function runMatchAnimation() {
+      const crits = document.querySelectorAll('.ai-crit');
+      const scoreReveal = document.getElementById('ai-score-reveal');
+      const spinner = document.getElementById('ai-spinner');
+      const statusText = document.getElementById('ai-status-text');
+
+      // Reset state
+      crits.forEach(c => c.classList.remove('revealed'));
+      scoreReveal.classList.remove('revealed');
+      spinner.style.animation = 'spin 1s linear infinite';
+      statusText.textContent = 'Analysing compatibility…';
+
+      let delay = 600;
+      crits.forEach((crit, i) => {
+        setTimeout(() => crit.classList.add('revealed'), delay + i * 500);
+      });
+
+      // Reveal score after all criteria shown
+      setTimeout(() => {
+        scoreReveal.classList.add('revealed');
+        spinner.style.animation = 'none';
+        spinner.classList.add('done');
+        statusText.textContent = 'Analysis complete ✓';
+      }, delay + crits.length * 500 + 400);
+
+      // Loop: reset after 4s hold
+      setTimeout(() => {
+        spinner.classList.remove('done');
+        runMatchAnimation();
+      }, delay + crits.length * 500 + 400 + 4000);
+    }
+
+    // Add spinner keyframe
+    const styleSheet = document.createElement('style');
+    styleSheet.textContent = '@keyframes spin { to { transform: rotate(360deg); } }';
+    document.head.appendChild(styleSheet);
+
+    // Start animation when the Smart Match section is visible
+    const smSection = document.querySelector('.smart-match');
+    if ('IntersectionObserver' in window) {
+      let smStarted = false;
+      const smObs = new IntersectionObserver((entries) => {
+        if (entries[0].isIntersecting && !smStarted) {
+          smStarted = true;
+          runMatchAnimation();
+          smObs.disconnect();
+        }
+      }, { threshold: 0.3 });
+      smObs.observe(smSection);
+    } else {
+      runMatchAnimation();
+    }
+
+    /* ─── Smooth scroll for hash links ──────────────────────── */
+    document.querySelectorAll('a[href^="#"]').forEach(a => {
+      a.addEventListener('click', e => {
+        const target = document.querySelector(a.getAttribute('href'));
+        if (target) {
+          e.preventDefault();
+          const top = target.getBoundingClientRect().top + window.scrollY - 80;
+          window.scrollTo({ top, behavior: 'smooth' });
+        }
+      });
+    });
+  </script>
 
 </body>
 </html>
