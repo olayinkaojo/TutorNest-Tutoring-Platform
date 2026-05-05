@@ -40,19 +40,29 @@ const getUserId = async (accessToken: string | null, supabase: any): Promise<str
 app.get('/make-server-cbd74580/google-calendar/auth-url', async (c) => {
   try {
     const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-    const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI') || 'http://localhost:5173/google-callback';
-    
+    const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI');
+
     if (!clientId) {
       return c.json({ error: 'Google Calendar integration not configured. Please set GOOGLE_CLIENT_ID.' }, 500);
     }
-    
+    if (!redirectUri) {
+      return c.json({ error: 'GOOGLE_REDIRECT_URI secret is not set.' }, 500);
+    }
+
+    const accessToken = c.req.header('Authorization')?.split(' ')[1] ?? null;
+    const supabase = c.get('supabase');
+    const userId = await getUserId(accessToken, supabase);
+    if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+    // Store userId against a nonce so the server-side callback can identify the user
+    const nonce = crypto.randomUUID();
+    await kv.set(`gcal_state:${nonce}`, { userId, createdAt: new Date().toISOString() });
+
     const scopes = [
       'https://www.googleapis.com/auth/calendar',
       'https://www.googleapis.com/auth/calendar.events'
     ].join(' ');
-    
-    const state = crypto.randomUUID();
-    
+
     const authUrl = `https://accounts.google.com/o/oauth2/v2/auth?` +
       `client_id=${encodeURIComponent(clientId)}&` +
       `redirect_uri=${encodeURIComponent(redirectUri)}&` +
@@ -60,12 +70,82 @@ app.get('/make-server-cbd74580/google-calendar/auth-url', async (c) => {
       `scope=${encodeURIComponent(scopes)}&` +
       `access_type=offline&` +
       `prompt=consent&` +
-      `state=${state}`;
-    
-    return c.json({ authUrl, state });
+      `state=${nonce}`;
+
+    return c.json({ authUrl });
   } catch (error: any) {
     console.error('Error generating auth URL:', error);
     return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
+// Server-side OAuth callback — Google redirects here, we exchange the code and redirect back to the app.
+// This avoids Supabase JS intercepting the ?code= param and logging the user out.
+app.get('/make-server-cbd74580/google-calendar/callback', async (c) => {
+  const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
+  const profileUrl = `${appUrl}/dashboard/tutor/profile`;
+
+  const code = c.req.query('code');
+  const state = c.req.query('state');
+  const oauthError = c.req.query('error');
+
+  if (oauthError || !code || !state) {
+    return c.redirect(`${profileUrl}?calendar=error&msg=${encodeURIComponent(oauthError || 'missing_params')}`);
+  }
+
+  try {
+    const pendingState = await kv.get(`gcal_state:${state}`) as any;
+    if (!pendingState?.userId) {
+      return c.redirect(`${profileUrl}?calendar=error&msg=invalid_state`);
+    }
+    const { userId } = pendingState;
+
+    const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
+    const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
+    const redirectUri = Deno.env.get('GOOGLE_REDIRECT_URI');
+
+    if (!clientId || !clientSecret || !redirectUri) {
+      return c.redirect(`${profileUrl}?calendar=error&msg=not_configured`);
+    }
+
+    const tokenResponse = await fetch('https://oauth2.googleapis.com/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({ code, client_id: clientId, client_secret: clientSecret, redirect_uri: redirectUri, grant_type: 'authorization_code' }),
+    });
+
+    if (!tokenResponse.ok) {
+      const errText = await tokenResponse.text();
+      console.error('Token exchange error:', errText);
+      return c.redirect(`${profileUrl}?calendar=error&msg=exchange_failed`);
+    }
+
+    const tokens = await tokenResponse.json();
+
+    await kv.set(`google_calendar_tokens:${userId}`, {
+      accessToken: tokens.access_token,
+      refreshToken: tokens.refresh_token,
+      expiresAt: Date.now() + (tokens.expires_in * 1000),
+      scope: tokens.scope,
+      tokenType: tokens.token_type,
+      createdAt: new Date().toISOString(),
+    });
+
+    const userProfile = await kv.get(`user:${userId}`) as any;
+    if (userProfile) {
+      await kv.set(`user:${userId}`, {
+        ...userProfile,
+        googleCalendarConnected: true,
+        googleCalendarConnectedAt: new Date().toISOString(),
+      });
+    }
+
+    await kv.del(`gcal_state:${state}`);
+
+    return c.redirect(`${profileUrl}?calendar=connected`);
+  } catch (err: any) {
+    console.error('Google Calendar callback error:', err);
+    return c.redirect(`${profileUrl}?calendar=error&msg=server_error`);
   }
 });
 

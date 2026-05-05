@@ -27,17 +27,27 @@ export function GoogleCalendarSetup({ session, onConnectionChange }: GoogleCalen
     checkConnectionStatus();
   }, []);
 
+  // The OAuth callback is now handled server-side (edge function /google-calendar/callback).
+  // Google redirects to the edge function → it exchanges the code → redirects back here
+  // with ?calendar=connected or ?calendar=error. No ?code= ever hits the React app,
+  // so Supabase JS can no longer intercept it and log the user out.
   useEffect(() => {
-    // Handle OAuth callback — use React Router location so the preserved query params are visible
     const urlParams = new URLSearchParams(location.search);
-    const code = urlParams.get('code');
-    const state = urlParams.get('state');
+    const calendar = urlParams.get('calendar');
+    const msg = urlParams.get('msg');
 
-    if (code && state) {
-      handleOAuthCallback(code);
-      // Do NOT navigate here — it flips isGoogleOAuthCallback to false and
-      // unmounts this component before the exchange-token fetch completes.
-      // URL stripping is handled inside handleOAuthCallback after success.
+    if (calendar === 'connected') {
+      toast.success('Google Calendar connected! Your sessions will now sync automatically.');
+      checkConnectionStatus();
+      navigate(location.pathname, { replace: true });
+    } else if (calendar === 'error') {
+      const label = msg === 'exchange_failed' ? 'Token exchange failed — check Google Cloud Console redirect URIs'
+        : msg === 'invalid_state' ? 'Session expired — please try connecting again'
+        : msg === 'not_configured' ? 'Google Calendar secrets are not configured'
+        : `Connection failed: ${msg || 'unknown error'}`;
+      setError(label);
+      toast.error(label);
+      navigate(location.pathname, { replace: true });
     }
   }, [location.search]);
 
@@ -63,51 +73,6 @@ export function GoogleCalendarSetup({ session, onConnectionChange }: GoogleCalen
       console.error('Error checking connection status:', err);
     } finally {
       setCheckingStatus(false);
-    }
-  };
-
-  const handleOAuthCallback = async (code: string) => {
-    setLoading(true);
-    setError('');
-    setSuccess('');
-
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/google-calendar/exchange-token`,
-        {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${session.access_token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ code }),
-        }
-      );
-
-      const data = await response.json();
-
-      if (response.ok) {
-        setSuccess('Google Calendar connected successfully!');
-        setConnected(true);
-        setConnectedAt(new Date().toISOString());
-        toast.success('Google Calendar connected! Your sessions will now sync automatically.');
-        if (onConnectionChange) {
-          onConnectionChange(true); // caller handles navigation (e.g. AuthenticatedAppRoutes)
-        } else {
-          navigate(location.pathname, { replace: true }); // strip code from URL in-place
-        }
-      } else {
-        const msg = data.error || 'Failed to connect Google Calendar';
-        setError(msg);
-        toast.error(msg);
-      }
-    } catch (err: any) {
-      console.error('Error exchanging token:', err);
-      const msg = 'An error occurred while connecting to Google Calendar';
-      setError(msg);
-      toast.error(msg);
-    } finally {
-      setLoading(false);
     }
   };
 

@@ -4,7 +4,6 @@ import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-do
 import ErrorBoundary from '../components/ErrorBoundary';
 import { Button } from '../components/ui/button';
 import { TutorSignup } from '../components/TutorSignup';
-import { GoogleCalendarSetup } from '../components/GoogleCalendarSetup';
 import type { NavigateTo, SignupData, UserProfile } from './types';
 
 const AdminDashboard = lazy(() => import('../components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
@@ -22,7 +21,6 @@ interface AuthenticatedAppRoutesProps {
   onRoleSwitch: (newRole: string) => Promise<void>;
   onRoleAdded: () => void;
   onSignupSuccess: () => Promise<void>;
-  isGoogleOAuthCallback: boolean;
 }
 
 const KNOWN_ROLES = ['admin', 'parent', 'student', 'tutor'];
@@ -37,7 +35,6 @@ export function AuthenticatedAppRoutes({
   onRoleSwitch,
   onRoleAdded,
   onSignupSuccess,
-  isGoogleOAuthCallback,
 }: AuthenticatedAppRoutesProps) {
   const buildDashboardPath = (role: string, tab?: string) => {
     if (!tab) return `/dashboard/${role}`;
@@ -117,45 +114,8 @@ export function AuthenticatedAppRoutes({
     );
   };
 
-  if (isGoogleOAuthCallback) {
-    return (
-      <ErrorBoundary>
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="max-w-md w-full px-4">
-            <GoogleCalendarSetup
-              session={session}
-              onConnectionChange={(connected) => {
-                if (connected) {
-                  setTimeout(() => {
-                    navigateTo(`/dashboard/${profile.role}/profile`, { replace: true });
-                  }, 1500);
-                }
-              }}
-            />
-            <div className="mt-4 text-center">
-              <button
-                className="text-sm text-gray-500 underline"
-                onClick={() => {
-                  navigateTo(`/dashboard/${profile.role}`, { replace: true });
-                }}
-              >
-                Back to dashboard
-              </button>
-            </div>
-          </div>
-        </div>
-      </ErrorBoundary>
-    );
-  }
 
-  // Preserves Google OAuth code+state in the URL when redirecting so
-  // GoogleCalendarSetup can detect and exchange the code.
   function WildcardRedirect({ role, buildDashboardPath }: { role: string; buildDashboardPath: (r: string, t?: string) => string }) {
-    const loc = useLocation();
-    const params = new URLSearchParams(loc.search);
-    if (params.has('code') && params.has('state') && role === 'tutor') {
-      return <Navigate to={`/dashboard/tutor/profile${loc.search}`} replace />;
-    }
     return <Navigate to={buildDashboardPath(role)} replace />;
   }
 

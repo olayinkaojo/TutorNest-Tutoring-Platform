@@ -262,9 +262,6 @@ export default function App() {
     }
   };
 
-  const isGoogleOAuthCallback =
-    new URLSearchParams(location.search).has('code') &&
-    new URLSearchParams(location.search).has('state');
 
   if (loading) {
     return (
@@ -318,7 +315,6 @@ export default function App() {
       onRoleSwitch={handleRoleSwitch}
       onRoleAdded={handleRoleAdded}
       onSignupSuccess={handleSignupSuccess}
-      isGoogleOAuthCallback={isGoogleOAuthCallback}
     />
   );
 }
