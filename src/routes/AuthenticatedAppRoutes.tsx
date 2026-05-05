@@ -126,7 +126,9 @@ export function AuthenticatedAppRoutes({
               session={session}
               onConnectionChange={(connected) => {
                 if (connected) {
-                  navigateTo(`/dashboard/${profile.role}`, { replace: true });
+                  setTimeout(() => {
+                    navigateTo(`/dashboard/${profile.role}`, { replace: true });
+                  }, 2000);
                 }
               }}
             />
