@@ -11,6 +11,7 @@ interface RateSessionDialogProps {
   onClose: () => void;
   onSuccess: () => void;
   accessToken: string;
+  parentId: string;
 }
 
 const RATING_LABELS: Record<number, { label: string; color: string }> = {
@@ -21,7 +22,7 @@ const RATING_LABELS: Record<number, { label: string; color: string }> = {
   5: { label: 'Excellent!', color: 'text-green-600' },
 };
 
-export function RateSessionDialog({ session, open, onClose, onSuccess, accessToken }: RateSessionDialogProps) {
+export function RateSessionDialog({ session, open, onClose, onSuccess, accessToken, parentId }: RateSessionDialogProps) {
   const [rating, setRating] = useState(0);
   const [hoveredRating, setHoveredRating] = useState(0);
   const [comment, setComment] = useState('');
@@ -58,7 +59,7 @@ export function RateSessionDialog({ session, open, onClose, onSuccess, accessTok
           body: JSON.stringify({
             sessionId: session.id,
             tutorId: session.tutorId,
-            parentId: session.parentId || session.userId,
+            parentId: parentId || session.parentId || session.userId,
             studentId: session.studentId,
             rating,
             comment: comment.trim(),

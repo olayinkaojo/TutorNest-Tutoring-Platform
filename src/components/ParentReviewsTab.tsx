@@ -347,6 +347,7 @@ export function ParentReviewsTab({ accessToken, parentId }: ParentReviewsTabProp
           }}
           onSuccess={handleReviewSuccess}
           accessToken={accessToken}
+          parentId={parentId}
         />
       )}
     </div>

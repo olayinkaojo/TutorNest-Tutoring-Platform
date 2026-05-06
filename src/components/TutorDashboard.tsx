@@ -49,7 +49,7 @@ import { TutorAvailabilityManager } from './TutorAvailabilityManager';
 import { BookingManager } from './BookingManager';
 import { TutorPerformanceDashboard } from './TutorPerformanceDashboard';
 import { TutorPayoutDashboard } from './TutorPayoutDashboard';
-import { GamificationSystem } from './GamificationSystem';
+import { ResourcesHub } from './ResourcesHub';
 import { AdvancedReporting } from './AdvancedReporting';
 import { TutorReviewsTab } from './TutorReviewsTab';
 import { TutorSessionReports } from './TutorSessionReports';
@@ -131,7 +131,7 @@ export function TutorDashboard({
     'history',
     'performance',
     'payouts',
-    'gamification',
+    'resources',
     'reporting',
     'reviews',
     'bookshop',
@@ -558,7 +558,7 @@ export function TutorDashboard({
       'bookshop': 'resources',
       'performance': 'students',
       'payouts': 'earnings',
-      'gamification': 'home',
+      'resources': 'home',
       'reporting': 'students',
       'reviews': 'home',
     };
@@ -1074,7 +1074,7 @@ export function TutorDashboard({
             <TabsTrigger value="history">History</TabsTrigger>
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="payouts">Payouts</TabsTrigger>
-            <TabsTrigger value="gamification">Gamification</TabsTrigger>
+            <TabsTrigger value="resources">Resources</TabsTrigger>
             <TabsTrigger value="reporting">Reporting</TabsTrigger>
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -1322,8 +1322,8 @@ export function TutorDashboard({
             )}
           </TabsContent>
 
-          <TabsContent value="gamification">
-            <GamificationSystem userId={profile.id || profile.userId} userType="tutor" />
+          <TabsContent value="resources">
+            <ResourcesHub session={session} userId={profile.id || profile.userId || ''} userRole="tutor" />
           </TabsContent>
 
           <TabsContent value="reporting">

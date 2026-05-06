@@ -43,7 +43,6 @@ import { ContentLibrary } from './ContentLibrary';
 import { SubscriptionsPage } from './SubscriptionsPage';
 import { PaymentMethodManager } from './PaymentMethodManager';
 import { ParentPaymentsDashboard } from './ParentPaymentsDashboard';
-import { ParentAnalyticsDashboard } from './ParentAnalyticsDashboard';
 import { AvatarUpload } from './AvatarUpload';
 import { SmartTutorMatches } from './SmartTutorMatches';
 
@@ -114,7 +113,6 @@ export function ParentDashboard({
     'bookshop',
     'resources',
     'payments',
-    'analytics',
     'reviews',
   ]);
 
@@ -822,7 +820,6 @@ export function ParentDashboard({
             <TabsTrigger value="messages">Messages</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
           </TabsList>
 
@@ -1204,12 +1201,6 @@ export function ParentDashboard({
           </TabsContent>
 
           {/* Analytics Tab */}
-          <TabsContent value="analytics">
-            {session && (
-              <ParentAnalyticsDashboard accessToken={session.access_token} childProfiles={children} activeChildId={activeChildId} />
-            )}
-          </TabsContent>
-
           {/* Reviews Tab */}
           <TabsContent value="reviews">
             {session && (
