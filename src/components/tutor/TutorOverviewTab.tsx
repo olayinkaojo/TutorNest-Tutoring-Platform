@@ -48,6 +48,8 @@ interface Profile {
   hourlyRate?: number;
   bio?: string;
   profilePhoto?: string;
+  googleCalendarConnected?: boolean;
+  availabilitySet?: boolean;
 }
 
 interface Session {
@@ -132,12 +134,15 @@ export function TutorOverviewTab({
   // Profile completeness check
   const profileChecks = [
     { label: 'Profile verified', done: isVerified, onClick: undefined },
-    { label: 'Subjects set', done: (profile.subjects?.length ?? 0) > 0, onClick: onViewProfile },
-    { label: 'Hourly rate set', done: !!profile.hourlyRate, onClick: onViewProfile },
+    { label: 'Profile photo uploaded', done: !!profile.profilePhoto, onClick: onViewProfile },
+    { label: 'Subjects added', done: (profile.subjects?.length ?? 0) > 0, onClick: onViewProfile },
     { label: 'Bio written', done: !!(profile.bio && profile.bio.length > 20), onClick: onViewProfile },
+    { label: 'Availability set', done: !!profile.availabilitySet, onClick: onViewAvailability },
+    { label: 'Google Calendar connected', done: !!profile.googleCalendarConnected, onClick: onViewProfile },
   ];
   const profileScore = profileChecks.filter(c => c.done).length;
-  const profileComplete = profileScore === profileChecks.length;
+  const profileTotal = profileChecks.length;
+  const profileComplete = profileScore === profileTotal;
 
   return (
     <div className="space-y-6">
@@ -334,7 +339,7 @@ export function TutorOverviewTab({
                   <CardTitle className="text-base">Profile Strength</CardTitle>
                 </div>
                 <CardDescription className="text-xs">
-                  {profileScore}/4 steps complete
+                  {profileScore}/{profileTotal} steps complete
                 </CardDescription>
               </CardHeader>
               <CardContent className="pt-0">
@@ -343,8 +348,8 @@ export function TutorOverviewTab({
                   <div
                     className="h-1.5 rounded-full transition-all"
                     style={{
-                      width: `${(profileScore / 4) * 100}%`,
-                      backgroundColor: profileScore < 2 ? '#e67e22' : profileScore < 4 ? '#5d9827' : '#625d9c',
+                      width: `${(profileScore / profileTotal) * 100}%`,
+                      backgroundColor: profileScore < 2 ? '#e67e22' : profileScore < profileTotal ? '#5d9827' : '#625d9c',
                     }}
                   />
                 </div>

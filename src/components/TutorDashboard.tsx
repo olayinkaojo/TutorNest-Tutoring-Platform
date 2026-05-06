@@ -113,6 +113,7 @@ export function TutorDashboard({
   const [parentRoleSuccess, setParentRoleSuccess] = useState(false);
   const [showRoleCongrats, setShowRoleCongrats] = useState(false);
   const [showVerificationCongrats, setShowVerificationCongrats] = useState(false);
+  const [availabilitySet, setAvailabilitySet] = useState(false);
 
   const [unreportedCount, setUnreportedCount] = useState(0);
 
@@ -436,6 +437,22 @@ export function TutorDashboard({
         );
 
         setPastStudents(pastStudentDetails.filter(Boolean));
+      }
+
+      // Check if tutor has set any availability slots
+      try {
+        const tutorId = profile.id || profile.userId;
+        const availRes = await fetch(
+          `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/availability/${tutorId}`,
+          { headers: { 'Authorization': `Bearer ${accessToken}` } }
+        );
+        if (availRes.ok) {
+          const availData = await availRes.json();
+          const slots = availData.availability || availData.slots || availData;
+          setAvailabilitySet(Array.isArray(slots) ? slots.length > 0 : !!slots);
+        }
+      } catch {
+        // non-critical — leave as false
       }
     } catch (error) {
       console.error('Error fetching dashboard data:', error);
@@ -1069,7 +1086,7 @@ export function TutorDashboard({
               students={students}
               loading={loading}
               stats={stats}
-              profile={profile}
+              profile={{ ...profile, availabilitySet }}
               onViewBookings={() => setActiveTab('bookings')}
               onViewAvailability={() => setActiveTab('availability')}
               onViewPayouts={() => setActiveTab('payouts')}
