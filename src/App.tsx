@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { toast } from 'sonner';
 import { AuthBackground } from './components/AuthBackground';
 import { getSupabaseClient } from './utils/supabase/client';
 import { edgeFunctionHeaders, edgeFunctionUrl } from './utils/supabase-edge-fetch';
 import { logger } from './utils/logger';
+import { useInactivityTimeout } from './hooks/useInactivityTimeout';
 import { PublicAuthRoutes } from './routes/PublicAuthRoutes';
 import { RoleSetupRoutes } from './routes/RoleSetupRoutes';
 import { AuthenticatedAppRoutes } from './routes/AuthenticatedAppRoutes';
@@ -245,10 +247,27 @@ export default function App() {
     }
   };
 
-  const handleSignOut = async () => {
-    await supabase.auth.signOut();
-    navigateTo('/auth', { replace: true });
+  const handleSignOut = async (reason?: 'inactivity') => {
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // Sign out regardless of API errors
+    }
+    // Clear all local auth state immediately — don't rely solely on onAuthStateChange
+    setSession(null);
+    setProfile(null);
+    setAvailableRoles([]);
+    localStorage.removeItem('tutornest_last_active');
+
+    if (reason === 'inactivity') {
+      toast.info('You were signed out after 8 hours of inactivity.', { duration: 6000 });
+    }
+
+    // Hard redirect — clears all React component state and subscriptions
+    window.location.replace('/auth');
   };
+
+  useInactivityTimeout(() => handleSignOut('inactivity'), !!session);
 
   const handleProfileComplete = () => {
     if (session) {
