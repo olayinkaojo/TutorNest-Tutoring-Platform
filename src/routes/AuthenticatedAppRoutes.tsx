@@ -4,6 +4,7 @@ import { Navigate, Route, Routes, useLocation, useParams } from 'react-router-do
 import ErrorBoundary from '../components/ErrorBoundary';
 import { Button } from '../components/ui/button';
 import { TutorSignup } from '../components/TutorSignup';
+import { PrivacyPolicy } from '../components/PrivacyPolicy';
 import type { NavigateTo, SignupData, UserProfile } from './types';
 
 const AdminDashboard = lazy(() => import('../components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
@@ -138,6 +139,8 @@ export function AuthenticatedAppRoutes({
           </ErrorBoundary>
         }
       />
+      <Route path="/privacy" element={<ErrorBoundary><PrivacyPolicy /></ErrorBoundary>} />
+      <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
       <Route path="/dashboard/:role" element={<DashboardRouteRenderer />} />
       <Route path="/dashboard/:role/:tab" element={<DashboardRouteRenderer />} />
       <Route path="*" element={<WildcardRedirect role={profile.role} buildDashboardPath={buildDashboardPath} />} />

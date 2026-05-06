@@ -7,6 +7,7 @@ import { SignupRoleChooser } from '../components/SignupRoleChooser';
 import { TutorSignup } from '../components/TutorSignup';
 import { StudentSignup } from '../components/StudentSignup';
 import { ParentSignup } from '../components/ParentSignup';
+import { PrivacyPolicy } from '../components/PrivacyPolicy';
 import type { NavigateTo, SignupData, UserProfile } from './types';
 
 interface PublicAuthRoutesProps {
@@ -127,6 +128,8 @@ export function PublicAuthRoutes({
           </ErrorBoundary>
         }
       />
+      <Route path="/privacy" element={<ErrorBoundary><PrivacyPolicy /></ErrorBoundary>} />
+      <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
       <Route path="*" element={<Navigate to="/auth" replace />} />
     </Routes>
   );
