@@ -1060,27 +1060,54 @@
     }
     .pricing-grid {
       display: grid;
-      grid-template-columns: 1fr 1fr;
+      grid-template-columns: repeat(3, 1fr);
       gap: 24px;
       margin-top: 56px;
-      max-width: 800px;
+      max-width: 1080px;
       margin-left: auto;
       margin-right: auto;
     }
     .price-card {
       border-radius: var(--radius-card);
-      padding: 36px 32px;
+      padding: 36px 28px;
       border: 2px solid var(--gray-100);
       transition: all 0.25s;
       position: relative;
+      display: flex;
+      flex-direction: column;
     }
     .price-card:hover { box-shadow: var(--shadow-md); transform: translateY(-4px); }
-    .price-card-families { background: var(--purple-light); border-color: rgba(98,93,156,0.20); }
-    .price-card-tutors { background: var(--gray-50); }
-    .price-icon { font-size: 36px; margin-bottom: 16px; }
-    .price-card h3 { font-size: 20px; margin-bottom: 8px; }
-    .price-headline { font-size: 14px; font-weight: 700; color: var(--purple); margin-bottom: 20px; }
-    .price-list { display: flex; flex-direction: column; gap: 10px; }
+    .price-card-trial { background: var(--purple-light); border-color: rgba(98,93,156,0.20); }
+    .price-card-popular { background: #fff; border-color: var(--purple); box-shadow: var(--shadow-sm); }
+    .price-card-best { background: var(--gray-50); border-color: var(--green); }
+    .price-badge {
+      position: absolute;
+      top: -14px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: var(--purple);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 700;
+      padding: 4px 16px;
+      border-radius: var(--radius-pill);
+      white-space: nowrap;
+      letter-spacing: 0.02em;
+    }
+    .price-badge-green { background: var(--green); }
+    .price-icon { font-size: 32px; margin-bottom: 12px; display: block; }
+    .price-card h3 { font-size: 20px; font-weight: 800; margin-bottom: 6px; }
+    .price-headline { font-size: 13px; font-weight: 600; color: var(--purple); margin-bottom: 20px; }
+    .price-amount { font-size: 38px; font-weight: 800; color: var(--gray-900); line-height: 1; margin-bottom: 4px; }
+    .price-per-session { font-size: 13px; color: var(--gray-500); margin-bottom: 6px; }
+    .price-duration {
+      font-size: 13px;
+      color: var(--gray-500);
+      margin-bottom: 20px;
+      padding-bottom: 20px;
+      border-bottom: 1px solid var(--gray-200);
+    }
+    .price-list { display: flex; flex-direction: column; gap: 10px; flex: 1; }
     .price-item {
       display: flex;
       align-items: center;
@@ -1089,13 +1116,25 @@
       color: var(--gray-700);
     }
     .price-check { color: var(--green); font-size: 16px; flex-shrink: 0; }
-    .price-note {
+    .price-cta {
+      display: block;
       margin-top: 24px;
-      padding-top: 20px;
-      border-top: 1px solid rgba(98,93,156,0.10);
-      font-size: 12px;
-      color: var(--gray-500);
-      font-style: italic;
+      padding: 13px;
+      border-radius: var(--radius-btn);
+      font-size: 15px;
+      font-weight: 600;
+      text-align: center;
+      transition: all 0.2s;
+    }
+    .price-cta-purple { background: var(--purple); color: #fff; }
+    .price-cta-purple:hover { background: var(--purple-dark); transform: translateY(-2px); }
+    .price-cta-outline { background: transparent; color: var(--purple); border: 1.5px solid var(--purple); }
+    .price-cta-outline:hover { background: var(--purple-light); }
+    .price-currency-note {
+      text-align: center;
+      font-size: 13px;
+      color: var(--gray-400);
+      margin-top: 28px;
     }
 
     /* ─── FAQ ─────────────────────────────────────────────────── */
@@ -1269,6 +1308,7 @@
 
     /* ─── Responsive ──────────────────────────────────────────── */
     @media (max-width: 1024px) {
+      .pricing-grid { grid-template-columns: 1fr 1fr; max-width: 720px; }
       .hero-inner { grid-template-columns: 1fr; gap: 48px; }
       .hero-visual { align-items: center; }
       .float-notif { left: 50%; transform: translateX(-50%); bottom: -24px; animation: none; }
@@ -1306,7 +1346,7 @@
         scroll-snap-align: start;
         flex-shrink: 0;
       }
-      .pricing-grid { grid-template-columns: 1fr; max-width: 420px; }
+      .pricing-grid { grid-template-columns: 1fr; max-width: 400px; }
       .footer-inner { grid-template-columns: 1fr 1fr; gap: 32px; }
       .footer-brand { grid-column: 1 / -1; }
       .hero-ctas { flex-direction: column; align-items: flex-start; }
@@ -1818,39 +1858,68 @@
     <div class="container">
       <div class="section-header centered">
         <span class="section-label">Simple Pricing</span>
-        <h2 id="pricing-heading">Transparent from day one</h2>
-        <p>No surprise fees. No subscriptions to cancel. You pay for sessions, we take a small platform fee — that's it.</p>
+        <h2 id="pricing-heading">Choose your learning plan</h2>
+        <p>Start with a single session to find the right tutor, then commit to a full-term plan for real, measurable progress.</p>
       </div>
-      <div class="pricing-grid" style="margin-top: 56px;">
-        <div class="price-card price-card-families fade-up">
-          <div class="price-icon" aria-hidden="true">👨‍👩‍👧</div>
-          <h3>For Families</h3>
-          <p class="price-headline">Free to browse. Pay per session.</p>
+      <div class="pricing-grid">
+
+        <!-- Trial -->
+        <div class="price-card price-card-trial fade-up">
+          <span class="price-icon" aria-hidden="true">🎯</span>
+          <h3>Trial Session</h3>
+          <p class="price-headline">Try before you commit</p>
+          <div class="price-amount">₦20,000</div>
+          <p class="price-per-session">₦20,000 per session</p>
+          <p class="price-duration">1 session · 60 minutes</p>
           <ul class="price-list" role="list">
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Free account & profile creation</li>
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Unlimited AI-powered tutor matches</li>
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Pay per session — rates set by tutor</li>
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Secure Flutterwave payments</li>
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Full session reports & progress history</li>
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Direct messaging with tutors</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> 1 × 60-minute session</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Pick your own time slot</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Verified, AI-matched tutor</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Post-session rating & feedback</li>
           </ul>
-          <p class="price-note">No monthly subscription. No hidden fees. Only pay when you book.</p>
+          <a href="https://app.tutornest.org" class="price-cta price-cta-outline">Get Started →</a>
         </div>
-        <div class="price-card price-card-tutors fade-up fade-up-delay-1">
-          <div class="price-icon" aria-hidden="true">🎓</div>
-          <h3>For Tutors</h3>
-          <p class="price-headline">Free to join. Small fee per session.</p>
+
+        <!-- Once a Week -->
+        <div class="price-card price-card-popular fade-up fade-up-delay-1">
+          <div class="price-badge" aria-label="Most popular plan">Most Popular</div>
+          <span class="price-icon" aria-hidden="true">📅</span>
+          <h3>Once a Week</h3>
+          <p class="price-headline">Consistent, steady progress</p>
+          <div class="price-amount">₦260,000</div>
+          <p class="price-per-session">₦20,000 per session</p>
+          <p class="price-duration">13 sessions · 1× per week · 1 full term</p>
           <ul class="price-list" role="list">
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Free tutor profile & verification</li>
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Matched with relevant students automatically</li>
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Set your own hourly rate</li>
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Automatic payouts after sessions</li>
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Built-in scheduling & session tracking</li>
-            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Verified badge to build trust faster</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> 13 × 60-minute sessions</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Auto-scheduled weekly sessions</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Progress tracking & session reports</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Google Calendar integration</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Direct messaging with tutor</li>
           </ul>
-          <p class="price-note">A small platform fee applies per completed session. No monthly fees to be listed.</p>
+          <a href="https://app.tutornest.org" class="price-cta price-cta-purple">Book This Plan →</a>
         </div>
+
+        <!-- Twice a Week -->
+        <div class="price-card price-card-best fade-up fade-up-delay-2">
+          <div class="price-badge price-badge-green" aria-label="Best value plan">Best Value</div>
+          <span class="price-icon" aria-hidden="true">🚀</span>
+          <h3>Twice a Week</h3>
+          <p class="price-headline">Maximum improvement, fastest results</p>
+          <div class="price-amount">₦520,000</div>
+          <p class="price-per-session">₦20,000 per session</p>
+          <p class="price-duration">26 sessions · 2× per week · 1 full term</p>
+          <ul class="price-list" role="list">
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> 26 × 60-minute sessions</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Intensive twice-weekly schedule</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Progress tracking & session reports</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Google Calendar integration</li>
+            <li class="price-item"><span class="price-check" aria-hidden="true">✓</span> Priority support from TutorNest</li>
+          </ul>
+          <a href="https://app.tutornest.org" class="price-cta price-cta-purple">Book This Plan →</a>
+        </div>
+
       </div>
+      <p class="price-currency-note">Prices shown in Nigerian Naira (₦). UK &amp; international pricing available in-app. All plans include full platform access — no hidden fees.</p>
     </div>
   </section>
 
