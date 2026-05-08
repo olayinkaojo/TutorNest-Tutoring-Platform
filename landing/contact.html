@@ -1,0 +1,327 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contact Us — TutorNest</title>
+  <meta name="description" content="Get in touch with the TutorNest team. We're here to help parents, students and tutors with any questions or concerns.">
+  <link rel="icon" type="image/png" href="logo.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: #111827; background: #ffffff; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    img { max-width: 100%; display: block; }
+    a { text-decoration: none; color: inherit; }
+    ul { list-style: none; }
+    button { cursor: pointer; border: none; background: none; font-family: inherit; }
+
+    :root {
+      --purple: #625d9c; --purple-light: #f0effe; --purple-mid: #8b85c9;
+      --purple-dark: #4a4580; --purple-deeper: #3d3870; --white: #ffffff;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-900: #111827;
+      --green: #16a34a; --green-light: #dcfce7; --red: #dc2626; --red-light: #fee2e2;
+      --shadow-sm: 0 4px 16px rgba(98,93,156,0.10); --shadow-md: 0 8px 32px rgba(98,93,156,0.18);
+      --radius-card: 16px; --radius-btn: 10px; --radius-chip: 8px; --radius-pill: 100px;
+    }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 28px; border-radius: var(--radius-btn); font-size: 15px; font-weight: 600; transition: all 0.2s ease; }
+    .btn-primary { background: var(--purple); color: #fff; box-shadow: 0 4px 12px rgba(98,93,156,0.30); }
+    .btn-primary:hover { background: var(--purple-dark); transform: translateY(-2px); }
+    .btn-ghost { background: transparent; color: var(--purple); border: 1.5px solid var(--purple); }
+    .btn-ghost:hover { background: var(--purple-light); transform: translateY(-2px); }
+    .btn-sm { padding: 9px 20px; font-size: 14px; border-radius: 8px; }
+
+    /* Navbar */
+    .navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; padding: 0; transition: all 0.3s ease; background: rgba(255,255,255,0.92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 1px 24px rgba(98,93,156,0.10); }
+    .nav-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 68px; display: flex; align-items: center; gap: 40px; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .logo-mark { height: 38px; width: auto; display: block; object-fit: contain; }
+    .logo-text { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 600; color: var(--purple); letter-spacing: 0.02em; }
+    .nav-links { display: flex; align-items: center; gap: 4px; margin: 0 auto; }
+    .nav-links a { padding: 7px 14px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--gray-600); transition: all 0.15s; }
+    .nav-links a:hover { color: var(--purple); background: var(--purple-light); }
+    .nav-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .hamburger { display: none; flex-direction: column; justify-content: center; align-items: center; gap: 5px; width: 40px; height: 40px; margin-left: auto; }
+    .hamburger span { display: block; width: 22px; height: 2px; background: var(--gray-700); border-radius: 2px; transition: all 0.25s; }
+    .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+    .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    .mobile-menu { display: none; background: rgba(255,255,255,0.97); backdrop-filter: blur(16px); border-top: 1px solid var(--gray-100); padding: 16px 24px 24px; max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); }
+    .mobile-menu.open { max-height: 400px; }
+    .mobile-menu ul { display: flex; flex-direction: column; gap: 2px; margin-bottom: 20px; }
+    .mobile-menu ul a { display: block; padding: 11px 12px; border-radius: 10px; font-size: 15px; font-weight: 500; color: var(--gray-700); transition: all 0.15s; }
+    .mobile-menu ul a:hover { background: var(--purple-light); color: var(--purple); }
+    .mobile-menu-actions { display: flex; flex-direction: column; gap: 10px; }
+    .btn-outline-mobile { display: block; padding: 12px 20px; border: 1.5px solid var(--gray-200); border-radius: var(--radius-btn); font-size: 15px; font-weight: 600; color: var(--gray-700); text-align: center; transition: all 0.15s; }
+    .btn-outline-mobile:hover { border-color: var(--purple); color: var(--purple); }
+    .btn-fill-mobile { display: block; padding: 13px 20px; background: var(--purple); border-radius: var(--radius-btn); font-size: 15px; font-weight: 600; color: #fff; text-align: center; transition: all 0.2s; }
+    .btn-fill-mobile:hover { background: var(--purple-dark); }
+
+    /* Page hero */
+    .page-hero { padding: 120px 0 64px; background: linear-gradient(135deg, var(--purple) 0%, var(--purple-dark) 100%); position: relative; overflow: hidden; }
+    .page-hero::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 28px 28px; pointer-events: none; }
+    .page-hero-inner { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 0 24px; text-align: center; }
+    .page-hero-label { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 600; padding: 5px 14px; border-radius: var(--radius-pill); margin-bottom: 20px; }
+    .page-hero h1 { font-size: clamp(32px, 5vw, 52px); font-weight: 800; color: #fff; margin-bottom: 16px; letter-spacing: -0.02em; line-height: 1.15; }
+    .page-hero p { font-size: 18px; color: rgba(255,255,255,0.8); max-width: 600px; margin: 0 auto; line-height: 1.7; }
+
+    /* Page content */
+    .page-content { max-width: 860px; margin: 0 auto; padding: 80px 24px; }
+    .content-meta { font-size: 13px; color: var(--gray-400); margin-bottom: 40px; text-align: center; }
+    .content-card { background: #fff; border: 1px solid var(--gray-200); border-radius: 16px; padding: 40px; margin-bottom: 28px; }
+    .content-card h2 { font-size: 20px; font-weight: 700; color: var(--gray-900); margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid var(--purple-light); line-height: 1.3; }
+    .content-card h3 { font-size: 16px; font-weight: 700; color: var(--gray-900); margin-top: 24px; margin-bottom: 10px; }
+    .content-card p { font-size: 15px; line-height: 1.8; color: var(--gray-600); margin-bottom: 14px; }
+    .content-card p:last-child { margin-bottom: 0; }
+    .content-card ul, .content-card ol { padding-left: 20px; margin-bottom: 14px; }
+    .content-card li { font-size: 15px; line-height: 1.8; color: var(--gray-600); margin-bottom: 6px; }
+    .content-card a { color: var(--purple); text-decoration: underline; }
+    .content-card a:hover { color: var(--purple-dark); }
+    .content-card strong { color: var(--gray-900); }
+
+    /* Footer */
+    .footer { background: var(--gray-900); color: var(--gray-400); padding: 64px 0 0; }
+    .footer-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 64px; }
+    .footer-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .footer-logo-mark { height: 36px; width: auto; display: block; object-fit: contain; opacity: 0.9; }
+    .footer-logo-text { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 600; color: #fff; letter-spacing: 0.02em; }
+    .footer-tagline { font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+    .footer-contact { font-size: 13px; color: var(--gray-500); }
+    .footer-contact a { color: var(--purple-mid); transition: color 0.15s; }
+    .footer-contact a:hover { color: #fff; }
+    .footer-col-title { font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 18px; }
+    .footer-links li { margin-bottom: 10px; }
+    .footer-links a { font-size: 14px; color: var(--gray-400); transition: color 0.15s; }
+    .footer-links a:hover { color: #fff; }
+    .footer-bottom { border-top: 1px solid rgba(255,255,255,0.07); padding: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; max-width: 1200px; margin: 0 auto; }
+    .footer-bottom p { font-size: 13px; color: var(--gray-500); margin: 0; }
+
+    /* Contact page specific */
+    .contact-info-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 20px; margin-bottom: 40px; }
+    .contact-info-card { background: var(--purple-light); border-radius: 12px; padding: 28px; text-align: center; }
+    .contact-info-icon { font-size: 32px; margin-bottom: 12px; }
+    .contact-info-card h3 { font-size: 17px; font-weight: 700; color: var(--gray-900); margin-bottom: 10px; }
+    .contact-info-card p { font-size: 14px; color: var(--gray-600); line-height: 1.65; margin-bottom: 16px; }
+    .contact-info-card a.btn { font-size: 13px; padding: 8px 18px; }
+    .form-card { background: #fff; border: 1px solid var(--gray-200); border-radius: 16px; padding: 40px; }
+    .form-card h2 { font-size: 22px; font-weight: 700; color: var(--gray-900); margin-bottom: 8px; }
+    .form-card > p { font-size: 15px; color: var(--gray-500); margin-bottom: 32px; }
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .form-group { margin-bottom: 20px; }
+    .form-group label { display: block; font-size: 14px; font-weight: 600; color: var(--gray-700); margin-bottom: 8px; }
+    .form-group input, .form-group select, .form-group textarea { width: 100%; padding: 12px 16px; border: 1.5px solid var(--gray-200); border-radius: 10px; font-size: 15px; font-family: inherit; color: var(--gray-900); background: #fff; transition: border-color 0.2s; outline: none; }
+    .form-group input:focus, .form-group select:focus, .form-group textarea:focus { border-color: var(--purple); box-shadow: 0 0 0 3px rgba(98,93,156,0.10); }
+    .form-group textarea { resize: vertical; min-height: 140px; }
+    .form-note { font-size: 13px; color: var(--gray-400); margin-top: 12px; }
+    .btn-submit { background: var(--purple); color: #fff; padding: 14px 36px; border-radius: var(--radius-btn); font-size: 16px; font-weight: 600; border: none; cursor: pointer; transition: all 0.2s; }
+    .btn-submit:hover { background: var(--purple-dark); transform: translateY(-2px); }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-actions { display: none; }
+      .hamburger { display: flex; }
+      .mobile-menu { display: block; }
+      .footer-inner { grid-template-columns: 1fr 1fr; gap: 32px; }
+      .footer-brand { grid-column: 1 / -1; }
+      .content-card { padding: 24px; }
+      .contact-info-grid { grid-template-columns: 1fr; }
+      .form-row { grid-template-columns: 1fr; }
+      .form-card { padding: 24px; }
+    }
+    @media (max-width: 480px) {
+      .footer-inner { grid-template-columns: 1fr; }
+      .page-hero { padding: 100px 0 48px; }
+    }
+
+    :focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; border-radius: 4px; }
+    *:focus:not(:focus-visible) { outline: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo" aria-label="TutorNest home">
+        <img src="logo.png" alt="" class="logo-mark" aria-hidden="true">
+        <span class="logo-text">TutorNest</span>
+      </a>
+      <ul class="nav-links" role="list">
+        <li><a href="/#features">Features</a></li>
+        <li><a href="/#how-it-works">How it works</a></li>
+        <li><a href="/#for-tutors">For Tutors</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="https://app.tutornest.org" class="btn btn-ghost btn-sm">Sign In</a>
+        <a href="https://app.tutornest.org" class="btn btn-primary btn-sm">Get Started</a>
+      </div>
+      <button class="hamburger" id="hamburger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <div class="mobile-menu" id="mobile-menu" role="navigation">
+      <ul role="list">
+        <li><a href="/#features">Features</a></li>
+        <li><a href="/#how-it-works">How it works</a></li>
+        <li><a href="/#for-tutors">For Tutors</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+      <div class="mobile-menu-actions">
+        <a href="https://app.tutornest.org" class="btn-outline-mobile">Sign In</a>
+        <a href="https://app.tutornest.org" class="btn-fill-mobile">Get Started Free →</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Page Hero -->
+  <section class="page-hero">
+    <div class="page-hero-inner">
+      <span class="page-hero-label">Support</span>
+      <h1>Contact Us</h1>
+      <p>We're here to help. Most queries are answered within one business day.</p>
+    </div>
+  </section>
+
+  <!-- Page Content -->
+  <main class="page-content">
+
+    <!-- Info Cards -->
+    <div class="contact-info-grid">
+      <div class="contact-info-card">
+        <div class="contact-info-icon">📧</div>
+        <h3>Email Us</h3>
+        <p>Send us a message at support@tutornest.org — we aim to reply within 1 business day.</p>
+        <a href="mailto:support@tutornest.org" class="btn btn-primary btn-sm">Email Support</a>
+      </div>
+      <div class="contact-info-card">
+        <div class="contact-info-icon">⏱️</div>
+        <h3>Response Time</h3>
+        <p>Monday to Friday, 9am – 6pm (GMT). Emails sent outside these hours will be responded to the next working day.</p>
+      </div>
+      <div class="contact-info-card">
+        <div class="contact-info-icon">🛡️</div>
+        <h3>Safeguarding Concerns</h3>
+        <p>For urgent safeguarding concerns, email safeguarding@tutornest.org and mark your message as URGENT.</p>
+      </div>
+    </div>
+
+    <!-- Contact Form -->
+    <div class="form-card">
+      <h2>Send Us a Message</h2>
+      <p>Fill in the form below and we'll get back to you as soon as possible.</p>
+
+      <form action="mailto:support@tutornest.org" method="get" enctype="text/plain">
+        <div class="form-row">
+          <div class="form-group">
+            <label for="name">Full Name</label>
+            <input type="text" id="name" name="name" placeholder="Your full name" required>
+          </div>
+          <div class="form-group">
+            <label for="email">Email Address</label>
+            <input type="email" id="email" name="email" placeholder="you@example.com" required>
+          </div>
+        </div>
+
+        <div class="form-group">
+          <label for="subject">Subject</label>
+          <select id="subject" name="subject" required>
+            <option value="" disabled selected>Select a subject…</option>
+            <option value="General Enquiry">General Enquiry</option>
+            <option value="Technical Issue">Technical Issue</option>
+            <option value="Billing Question">Billing Question</option>
+            <option value="Tutor Support">Tutor Support</option>
+            <option value="Parent/Student Support">Parent/Student Support</option>
+            <option value="Partnership Enquiry">Partnership Enquiry</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+
+        <div class="form-group">
+          <label for="message">Message</label>
+          <textarea id="message" name="message" placeholder="Tell us how we can help you…" required></textarea>
+        </div>
+
+        <button type="submit" class="btn-submit">Send Message</button>
+
+        <p class="form-note">Your message will open in your email client. Alternatively, you can email us directly at <a href="mailto:support@tutornest.org" style="color: var(--purple);">support@tutornest.org</a>.</p>
+      </form>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer" aria-label="Site footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <img src="logo.png" alt="" class="footer-logo-mark" aria-hidden="true">
+          <span class="footer-logo-text">TutorNest</span>
+        </div>
+        <p class="footer-tagline">Connecting families across Africa, the UK, the US and beyond with verified, qualified tutors through AI-powered smart matching.</p>
+        <p class="footer-contact">Questions? <a href="mailto:support@tutornest.org">support@tutornest.org</a></p>
+      </div>
+      <div>
+        <h3 class="footer-col-title">Platform</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="https://app.tutornest.org">Find a Tutor</a></li>
+          <li><a href="https://app.tutornest.org">Become a Tutor</a></li>
+          <li><a href="/#how-it-works">How It Works</a></li>
+          <li><a href="/#pricing">Pricing</a></li>
+          <li><a href="https://app.tutornest.org">Sign In</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="footer-col-title">Support</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="contact.html">Contact Us</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="help.html">Help Centre</a></li>
+          <li><a href="report.html">Report an Issue</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="footer-col-title">Legal</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="privacy.html">Privacy Policy</a></li>
+          <li><a href="terms.html">Terms of Service</a></li>
+          <li><a href="cookies.html">Cookie Policy</a></li>
+          <li><a href="tutor-agreement.html">Tutor Agreement</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2025 TutorNest. All rights reserved.</p>
+      <p>Built in Africa 🌍 · Serving the world</p>
+    </div>
+  </footer>
+
+  <script>
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 20) navbar.classList.add('scrolled');
+      else navbar.classList.remove('scrolled');
+    }, { passive: true });
+    const hamburger = document.getElementById('hamburger');
+    const mobileMenu = document.getElementById('mobile-menu');
+    hamburger.addEventListener('click', () => {
+      const isOpen = mobileMenu.classList.toggle('open');
+      hamburger.classList.toggle('open', isOpen);
+      hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+    mobileMenu.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        mobileMenu.classList.remove('open');
+        hamburger.classList.remove('open');
+        hamburger.setAttribute('aria-expanded', 'false');
+      });
+    });
+  </script>
+
+</body>
+</html>

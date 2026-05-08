@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Terms of Service — TutorNest</title>
+  <meta name="description" content="TutorNest Terms of Service. Read the terms governing your use of the TutorNest platform for finding and booking qualified tutors.">
+  <link rel="icon" href="logo.png" type="image/png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: #111827; background: #ffffff; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    img { max-width: 100%; display: block; }
+    a { text-decoration: none; color: inherit; }
+    ul { list-style: none; }
+    button { cursor: pointer; border: none; background: none; font-family: inherit; }
+
+    :root {
+      --purple: #625d9c; --purple-light: #f0effe; --purple-mid: #8b85c9;
+      --purple-dark: #4a4580; --purple-deeper: #3d3870; --white: #ffffff;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-900: #111827;
+      --green: #16a34a; --green-light: #dcfce7; --red: #dc2626; --red-light: #fee2e2;
+      --shadow-sm: 0 4px 16px rgba(98,93,156,0.10); --shadow-md: 0 8px 32px rgba(98,93,156,0.18);
+      --radius-card: 16px; --radius-btn: 10px; --radius-chip: 8px; --radius-pill: 100px;
+    }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 28px; border-radius: var(--radius-btn); font-size: 15px; font-weight: 600; transition: all 0.2s ease; }
+    .btn-primary { background: var(--purple); color: #fff; box-shadow: 0 4px 12px rgba(98,93,156,0.30); }
+    .btn-primary:hover { background: var(--purple-dark); transform: translateY(-2px); }
+    .btn-ghost { background: transparent; color: var(--purple); border: 1.5px solid var(--purple); }
+    .btn-ghost:hover { background: var(--purple-light); transform: translateY(-2px); }
+    .btn-sm { padding: 9px 20px; font-size: 14px; border-radius: 8px; }
+
+    /* Navbar */
+    .navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; padding: 0; transition: all 0.3s ease; background: rgba(255,255,255,0.92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 1px 24px rgba(98,93,156,0.10); }
+    .nav-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 68px; display: flex; align-items: center; gap: 40px; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .logo-mark { height: 38px; width: auto; display: block; object-fit: contain; }
+    .logo-text { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 600; color: var(--purple); letter-spacing: 0.02em; }
+    .nav-links { display: flex; align-items: center; gap: 4px; margin: 0 auto; }
+    .nav-links a { padding: 7px 14px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--gray-600); transition: all 0.15s; }
+    .nav-links a:hover { color: var(--purple); background: var(--purple-light); }
+    .nav-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .hamburger { display: none; flex-direction: column; justify-content: center; align-items: center; gap: 5px; width: 40px; height: 40px; margin-left: auto; }
+    .hamburger span { display: block; width: 22px; height: 2px; background: var(--gray-700); border-radius: 2px; transition: all 0.25s; }
+    .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+    .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    .mobile-menu { display: none; background: rgba(255,255,255,0.97); backdrop-filter: blur(16px); border-top: 1px solid var(--gray-100); padding: 16px 24px 24px; max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); }
+    .mobile-menu.open { max-height: 400px; }
+    .mobile-menu ul { display: flex; flex-direction: column; gap: 2px; margin-bottom: 20px; }
+    .mobile-menu ul a { display: block; padding: 11px 12px; border-radius: 10px; font-size: 15px; font-weight: 500; color: var(--gray-700); transition: all 0.15s; }
+    .mobile-menu ul a:hover { background: var(--purple-light); color: var(--purple); }
+    .mobile-menu-actions { display: flex; flex-direction: column; gap: 10px; }
+    .btn-outline-mobile { display: block; padding: 12px 20px; border: 1.5px solid var(--gray-200); border-radius: var(--radius-btn); font-size: 15px; font-weight: 600; color: var(--gray-700); text-align: center; transition: all 0.15s; }
+    .btn-outline-mobile:hover { border-color: var(--purple); color: var(--purple); }
+    .btn-fill-mobile { display: block; padding: 13px 20px; background: var(--purple); border-radius: var(--radius-btn); font-size: 15px; font-weight: 600; color: #fff; text-align: center; transition: all 0.2s; }
+    .btn-fill-mobile:hover { background: var(--purple-dark); }
+
+    /* Page hero */
+    .page-hero { padding: 120px 0 64px; background: linear-gradient(135deg, var(--purple) 0%, var(--purple-dark) 100%); position: relative; overflow: hidden; }
+    .page-hero::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 28px 28px; pointer-events: none; }
+    .page-hero-inner { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 0 24px; text-align: center; }
+    .page-hero-label { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 600; padding: 5px 14px; border-radius: var(--radius-pill); margin-bottom: 20px; }
+    .page-hero h1 { font-size: clamp(32px, 5vw, 52px); font-weight: 800; color: #fff; margin-bottom: 16px; letter-spacing: -0.02em; line-height: 1.15; }
+    .page-hero p { font-size: 18px; color: rgba(255,255,255,0.8); max-width: 600px; margin: 0 auto; line-height: 1.7; }
+
+    /* Page content */
+    .page-content { max-width: 800px; margin: 0 auto; padding: 80px 24px; }
+    .content-meta { font-size: 13px; color: var(--gray-400); margin-bottom: 40px; text-align: center; }
+    .content-card { background: #fff; border: 1px solid var(--gray-200); border-radius: 16px; padding: 40px; margin-bottom: 28px; }
+    .content-card h2 { font-size: 20px; font-weight: 700; color: var(--gray-900); margin-bottom: 20px; padding-bottom: 16px; border-bottom: 2px solid var(--purple-light); line-height: 1.3; }
+    .content-card h3 { font-size: 16px; font-weight: 700; color: var(--gray-900); margin-top: 24px; margin-bottom: 10px; }
+    .content-card p { font-size: 15px; line-height: 1.8; color: var(--gray-600); margin-bottom: 14px; }
+    .content-card p:last-child { margin-bottom: 0; }
+    .content-card ul, .content-card ol { padding-left: 20px; margin-bottom: 14px; }
+    .content-card li { font-size: 15px; line-height: 1.8; color: var(--gray-600); margin-bottom: 6px; }
+    .content-card a { color: var(--purple); text-decoration: underline; }
+    .content-card a:hover { color: var(--purple-dark); }
+    .content-card strong { color: var(--gray-900); }
+
+    /* Footer */
+    .footer { background: var(--gray-900); color: var(--gray-400); padding: 64px 0 0; }
+    .footer-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 64px; }
+    .footer-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .footer-logo-mark { height: 36px; width: auto; display: block; object-fit: contain; opacity: 0.9; }
+    .footer-logo-text { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 600; color: #fff; letter-spacing: 0.02em; }
+    .footer-tagline { font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+    .footer-contact { font-size: 13px; color: var(--gray-500); }
+    .footer-contact a { color: var(--purple-mid); transition: color 0.15s; }
+    .footer-contact a:hover { color: #fff; }
+    .footer-col-title { font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 18px; }
+    .footer-links li { margin-bottom: 10px; }
+    .footer-links a { font-size: 14px; color: var(--gray-400); transition: color 0.15s; }
+    .footer-links a:hover { color: #fff; }
+    .footer-bottom { border-top: 1px solid rgba(255,255,255,0.07); padding: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; max-width: 1200px; margin: 0 auto; }
+    .footer-bottom p { font-size: 13px; color: var(--gray-500); margin: 0; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-actions { display: none; }
+      .hamburger { display: flex; }
+      .mobile-menu { display: block; }
+      .footer-inner { grid-template-columns: 1fr 1fr; gap: 32px; }
+      .footer-brand { grid-column: 1 / -1; }
+      .content-card { padding: 24px; }
+    }
+    @media (max-width: 480px) {
+      .footer-inner { grid-template-columns: 1fr; }
+      .page-hero { padding: 100px 0 48px; }
+    }
+
+    :focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; border-radius: 4px; }
+    *:focus:not(:focus-visible) { outline: none; }
+  </style>
+</head>
+<body>
+
+  <!-- NAVBAR -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo" aria-label="TutorNest home">
+        <img src="logo.png" alt="" class="logo-mark" aria-hidden="true">
+        <span class="logo-text">TutorNest</span>
+      </a>
+      <ul class="nav-links" role="list">
+        <li><a href="/#features">Features</a></li>
+        <li><a href="/#how-it-works">How it works</a></li>
+        <li><a href="/#for-tutors">For Tutors</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="https://app.tutornest.org" class="btn btn-ghost btn-sm">Sign In</a>
+        <a href="https://app.tutornest.org" class="btn btn-primary btn-sm">Get Started</a>
+      </div>
+      <button class="hamburger" id="hamburger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <div class="mobile-menu" id="mobile-menu" role="navigation">
+      <ul role="list">
+        <li><a href="/#features">Features</a></li>
+        <li><a href="/#how-it-works">How it works</a></li>
+        <li><a href="/#for-tutors">For Tutors</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+      <div class="mobile-menu-actions">
+        <a href="https://app.tutornest.org" class="btn-outline-mobile">Sign In</a>
+        <a href="https://app.tutornest.org" class="btn-fill-mobile">Get Started Free →</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- PAGE HERO -->
+  <section class="page-hero" aria-label="Page header">
+    <div class="page-hero-inner">
+      <span class="page-hero-label">Legal</span>
+      <h1>Terms of Service</h1>
+      <p>Last updated: 8 May 2025 · Please read these terms carefully before using TutorNest.</p>
+    </div>
+  </section>
+
+  <!-- PAGE CONTENT -->
+  <main class="page-content">
+
+    <div class="content-card">
+      <h2>1. Acceptance of Terms</h2>
+      <p>By creating an account, accessing, or otherwise using the TutorNest platform (the "Platform"), you agree to be bound by these Terms of Service ("Terms"), our <a href="privacy.html">Privacy Policy</a>, and our <a href="cookies.html">Cookie Policy</a>, which are incorporated into these Terms by reference.</p>
+      <p>If you do not agree to these Terms, you must not use the Platform. If you are accepting these Terms on behalf of a minor child, you confirm that you are their parent or legal guardian and that you accept full responsibility for your child's use of the Platform and compliance with these Terms.</p>
+      <p>These Terms form a legally binding agreement between you and <strong>TutorNest Ltd</strong> ("TutorNest", "we", "our", "us"). We may update these Terms from time to time — see Section 15 for how we notify you of changes.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>2. About TutorNest</h2>
+      <p>TutorNest is an <strong>online marketplace</strong> that connects families seeking educational support with independent, qualified tutors. TutorNest is not a tutoring agency, and tutors who use our platform are <strong>independent contractors</strong> — they are not employees, agents, or representatives of TutorNest.</p>
+      <p>TutorNest provides the technology infrastructure that enables:</p>
+      <ul>
+        <li>AI-powered tutor discovery and smart matching</li>
+        <li>Tutor profiles with credential verification</li>
+        <li>Session booking, scheduling, and management</li>
+        <li>Secure payment processing and earnings disbursement</li>
+        <li>Ratings, reviews, and quality assurance</li>
+        <li>Customer support and dispute resolution</li>
+      </ul>
+      <p>The quality and content of individual tutoring sessions are the responsibility of the tutors themselves. TutorNest does not guarantee any specific learning outcomes and makes no representations about the results any student may achieve through use of the Platform.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>3. Your Account</h2>
+      <p>To access the core features of TutorNest, you must create an account. By creating an account, you confirm that:</p>
+      <ul>
+        <li>You are at least <strong>18 years of age</strong>. If you are creating an account to book sessions for a minor child, you confirm you are their parent or legal guardian.</li>
+        <li>All information you provide during registration and in your profile is <strong>accurate, current, and complete</strong>. You will keep this information up to date.</li>
+        <li>You will <strong>maintain the security</strong> of your account credentials and will not share your password with any other person.</li>
+        <li>You are responsible for all activity that occurs under your account, whether or not you authorised it. If you suspect unauthorised use of your account, you must notify us immediately at <a href="mailto:support@tutornest.org">support@tutornest.org</a>.</li>
+        <li>You will maintain <strong>only one account</strong> per individual. Creating multiple accounts to circumvent restrictions, reviews, or bans is prohibited.</li>
+      </ul>
+      <p>TutorNest reserves the right to refuse account registration or suspend existing accounts at our discretion, including where we have reason to believe the information provided is false or misleading.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>4. For Parents and Students</h2>
+      <p>If you are using TutorNest as a parent or guardian to arrange tutoring for your child, the following additional terms apply:</p>
+
+      <h3>Responsibility for Sessions</h3>
+      <p>You are responsible for your child's participation in sessions booked through TutorNest. For online sessions, you should ensure your child is in a safe, appropriate environment. You agree to supervise sessions with younger children as you judge appropriate.</p>
+
+      <h3>Accurate Information</h3>
+      <p>You must provide accurate and complete information about your child's educational needs, year group, and any relevant learning requirements. Providing misleading information may result in poor tutor matching and is unfair to tutors who prepare sessions based on the information provided.</p>
+
+      <h3>Platform-Only Bookings</h3>
+      <p>All bookings must be made through TutorNest. You must not attempt to arrange or pay for tutoring sessions outside the Platform with tutors you have met through TutorNest. Such off-platform activity removes important safety and quality protections for both you and the tutor, and is a breach of these Terms.</p>
+
+      <h3>Respectful Conduct</h3>
+      <p>You agree to treat all tutors with courtesy and professionalism. Harassment, abuse, discrimination, or otherwise disrespectful conduct towards tutors is strictly prohibited and will result in account suspension. TutorNest reserves the right to remove any parent or student account for conduct that is harmful to tutors or the platform community.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>5. For Tutors</h2>
+      <p>If you are registering as a tutor on TutorNest, the following additional terms apply alongside our separate <a href="tutor-agreement.html">Tutor Agreement</a>, which governs your participation in full detail. In the event of any conflict between these Terms and the Tutor Agreement, the Tutor Agreement prevails with respect to tutor-specific matters.</p>
+
+      <h3>Eligibility</h3>
+      <p>Tutors must be at least <strong>18 years old</strong> and legally permitted to provide tutoring or educational services in their country of residence. You must not have any unspent criminal convictions that would make it inappropriate for you to work with children or vulnerable adults.</p>
+
+      <h3>Profile Accuracy</h3>
+      <p>Your tutor profile must accurately reflect your qualifications, experience, and teaching capabilities. Misrepresenting your credentials — including claiming qualifications you do not hold — is a serious breach of these Terms, grounds for immediate account termination, and may be reported to relevant professional bodies or authorities.</p>
+
+      <h3>Independent Contractor Status</h3>
+      <p>Tutors are independent contractors. TutorNest does not employ tutors and is not responsible for your tax obligations, insurance requirements, or compliance with employment law in your jurisdiction. You are solely responsible for these matters.</p>
+
+      <h3>Professional Standards</h3>
+      <p>You must maintain professional conduct in all sessions, including punctuality, adequate preparation, respectful communication, and safeguarding awareness. TutorNest's <a href="tutor-agreement.html">Tutor Agreement</a> sets out the full standards expected.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>6. Bookings and Cancellations</h2>
+      <p>Sessions are <strong>confirmed upon successful payment</strong> processing. Both the tutor and the parent/student will receive confirmation notifications.</p>
+
+      <h3>Cancellations by Parents/Students</h3>
+      <ul>
+        <li><strong>Full refund:</strong> Cancellations made <strong>24 hours or more</strong> before the scheduled session start time are eligible for a full refund.</li>
+        <li><strong>50% refund:</strong> Cancellations made <strong>less than 24 hours</strong> before the scheduled session start time are eligible for a 50% refund. The remaining 50% is paid to the tutor in recognition of their time and preparation.</li>
+        <li><strong>No refund:</strong> Cancellations made after a session has commenced are not eligible for a refund.</li>
+      </ul>
+
+      <h3>Cancellations by Tutors</h3>
+      <p>Tutors are expected to honour all confirmed bookings. Cancellations by tutors made <strong>less than 12 hours</strong> before the scheduled session start time constitute a late cancellation and may result in platform penalties, including reduced search visibility, warnings, or account suspension for repeated occurrences. Affected families will receive a full refund.</p>
+
+      <h3>No-Shows</h3>
+      <p>If a student/parent fails to attend a session without cancelling, the session is considered a no-show and is <strong>non-refundable</strong>. Tutor no-shows will result in a full refund to the family and appropriate platform penalties.</p>
+
+      <h3>Extenuating Circumstances</h3>
+      <p>TutorNest may, at its sole discretion, grant refunds or waive cancellation penalties in genuine extenuating circumstances (such as medical emergencies). Contact <a href="mailto:support@tutornest.org">support@tutornest.org</a> within 24 hours of the session with appropriate context.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>7. Payments</h2>
+      <p>All payments are processed securely through TutorNest's third-party payment providers. By completing a booking, you authorise TutorNest to charge the relevant payment method for the session fee.</p>
+
+      <h3>Platform Service Fee</h3>
+      <p>TutorNest charges tutors a platform service fee as a percentage of their session earnings. The current fee rate is displayed clearly in the tutor dashboard. This fee covers platform infrastructure, payment processing, matching technology, support services, and quality assurance.</p>
+
+      <h3>Tutor Payouts</h3>
+      <p>Tutors are paid within <strong>3–5 business days</strong> of a completed session and the expiry of the client satisfaction window. Payments are made to the payment details provided in your tutor dashboard.</p>
+
+      <h3>Currency</h3>
+      <p>All prices are displayed in your local currency where available (Nigerian Naira, British Pounds, US Dollars, etc.). Currency conversion rates are determined by our payment processors and TutorNest is not responsible for fluctuations in exchange rates.</p>
+
+      <h3>Payment Disputes</h3>
+      <p>Any disputes regarding payments — including requests for refunds beyond our standard policy — must be raised with our support team at <a href="mailto:support@tutornest.org">support@tutornest.org</a> within <strong>7 days</strong> of the session date. We will investigate and aim to resolve all disputes within 10 business days.</p>
+
+      <h3>Fraudulent Activity</h3>
+      <p>Any attempt to conduct fraudulent transactions, initiate unauthorised chargebacks, or otherwise misuse our payment systems will result in immediate account termination and may be reported to relevant authorities.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>8. Platform Rules — Prohibited Conduct</h2>
+      <p>You must not use TutorNest for any purpose that is unlawful or prohibited by these Terms. The following conduct is expressly prohibited:</p>
+      <ol>
+        <li><strong>Off-platform payments or bookings:</strong> Arranging or soliciting tutoring sessions, or making or accepting payments, outside the TutorNest platform in order to circumvent our service fee. This applies to tutors and families alike.</li>
+        <li><strong>Harassment, abuse, or discrimination:</strong> Any form of bullying, harassment, sexual harassment, verbal abuse, or discrimination based on race, ethnicity, gender, age, disability, religion, sexual orientation, or any other protected characteristic.</li>
+        <li><strong>Misrepresentation of credentials:</strong> Submitting false, fabricated, or misleading qualifications, certificates, identity documents, or any other information in connection with your TutorNest account.</li>
+        <li><strong>Safeguarding violations:</strong> Any conduct that puts a child or vulnerable person at risk, including inappropriate communication, grooming, or any violation of TutorNest's safeguarding policies.</li>
+        <li><strong>Unauthorised data use:</strong> Accessing, collecting, or using the personal data of other users for any purpose other than the intended use of the Platform.</li>
+        <li><strong>Platform interference:</strong> Attempting to reverse-engineer, scrape, hack, disrupt, or otherwise interfere with the TutorNest platform, its infrastructure, or its users.</li>
+        <li><strong>Spam and fake reviews:</strong> Submitting fake, misleading, or commercially motivated reviews; spamming other users with unsolicited messages.</li>
+        <li><strong>Illegal activity:</strong> Using TutorNest to facilitate any activity that is illegal under applicable law.</li>
+      </ol>
+      <p>Violations of these rules may result in immediate account suspension or termination, and — where appropriate — referral to law enforcement or relevant authorities.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>9. Reviews and Ratings</h2>
+      <p>After a completed session, both parents/students and tutors may submit ratings and written reviews. Reviews are an important part of our platform quality and trust framework.</p>
+      <p>Reviews must be <strong>honest, fair, and based on genuine experiences</strong> with the specific tutor or student. You must not:</p>
+      <ul>
+        <li>Submit fake or manufactured reviews for yourself or others</li>
+        <li>Offer or solicit incentives in exchange for positive reviews</li>
+        <li>Use reviews to harass, defame, or make false claims about another user</li>
+        <li>Attempt to manipulate your rating by any artificial means</li>
+      </ul>
+      <p>TutorNest reserves the right to remove reviews that violate our community standards, contain personal information, or are otherwise inappropriate, without prior notice. Our moderation decisions regarding reviews are final.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>10. Intellectual Property</h2>
+      <p><strong>TutorNest's intellectual property:</strong> The TutorNest platform, including its software, algorithms, design, branding, logos, and all platform-generated content, is owned by TutorNest Ltd and protected by intellectual property laws. You may not copy, reproduce, distribute, or create derivative works from any part of our platform without express written permission.</p>
+      <p><strong>Your content:</strong> You retain ownership of content you create and upload to TutorNest (such as session notes, teaching materials, or profile descriptions). By submitting content to the Platform, you grant TutorNest a <strong>limited, non-exclusive, royalty-free, worldwide licence</strong> to use, display, and reproduce that content solely for the purposes of operating and marketing the Platform (e.g., displaying your tutor profile to prospective students). You may revoke this licence by deleting the relevant content or closing your account.</p>
+      <p><strong>Feedback:</strong> If you submit suggestions, ideas, or feedback about TutorNest, you grant us the right to use that feedback without restriction or compensation.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>11. Disclaimer of Warranties</h2>
+      <p>To the fullest extent permitted by applicable law, TutorNest and the Platform are provided on an <strong>"as is" and "as available"</strong> basis, without warranties of any kind, either express or implied.</p>
+      <p>TutorNest makes no warranty or representation that:</p>
+      <ul>
+        <li>The Platform will be uninterrupted, error-free, or free from viruses or other harmful components</li>
+        <li>Any particular tutor will meet your requirements or expectations</li>
+        <li>Tutoring sessions will result in any specific educational outcome or improvement</li>
+        <li>Any information on the Platform is accurate, complete, or current</li>
+      </ul>
+      <p>Nothing in this section affects your statutory rights as a consumer under applicable mandatory consumer protection laws.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>12. Limitation of Liability</h2>
+      <p>To the maximum extent permitted by applicable law, TutorNest's total aggregate liability to you for all claims arising out of or relating to these Terms or your use of the Platform shall not exceed the <strong>total amount you have paid to TutorNest in the 12 months immediately preceding the event giving rise to the claim</strong>.</p>
+      <p>TutorNest shall not be liable for any:</p>
+      <ul>
+        <li>Indirect, incidental, special, consequential, or punitive damages</li>
+        <li>Loss of profits, revenue, data, or business opportunities</li>
+        <li>Damages arising from the conduct of tutors, students, or parents (who are independent third parties)</li>
+        <li>Service interruptions, data loss, or system failures outside our reasonable control</li>
+      </ul>
+      <p>These limitations apply regardless of the legal theory under which the claim is brought (contract, tort, negligence, strict liability, or otherwise) and even if TutorNest has been advised of the possibility of such damages. Nothing in these Terms limits TutorNest's liability for death, personal injury, or fraud caused by our negligence, or any other liability that cannot be excluded under applicable law.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>13. Termination</h2>
+      <p><strong>By TutorNest:</strong> We may suspend or permanently terminate your access to the Platform at any time, with or without notice, for any breach of these Terms, our Tutor Agreement, or for any conduct that we determine (in our sole discretion) is harmful to other users, TutorNest, or the public. Where possible, we will notify you of the reason for termination.</p>
+      <p><strong>By you:</strong> You may close your account at any time by contacting us at <a href="mailto:support@tutornest.org">support@tutornest.org</a> or using the account closure option in your dashboard settings. Closing your account does not affect any obligations that arose before closure (e.g., pending sessions, outstanding payments).</p>
+      <p><strong>Effect of termination:</strong> Upon account closure or termination, your right to use the Platform ceases immediately. Sections of these Terms that by their nature should survive termination (including Sections 10, 11, 12, and 14) shall remain in effect.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>14. Governing Law and Jurisdiction</h2>
+      <p>These Terms of Service and any dispute or claim arising out of or in connection with them (including non-contractual disputes) shall be governed by and construed in accordance with the <strong>laws of England and Wales</strong>.</p>
+      <p>Any disputes arising out of or in connection with these Terms shall be subject to the <strong>exclusive jurisdiction of the courts of England and Wales</strong>, except where mandatory consumer protection laws in your country of residence provide you with additional or alternative rights to bring claims in local courts.</p>
+      <p>If you are a consumer in the European Union, you may also use the <a href="https://ec.europa.eu/consumers/odr" target="_blank" rel="noopener noreferrer">EU Online Dispute Resolution (ODR) platform</a> for dispute resolution.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>15. Changes to Terms</h2>
+      <p>We may update these Terms from time to time. When we make changes, we will update the "Last updated" date at the top of this page.</p>
+      <p>For <strong>material changes</strong> — those that meaningfully affect your rights or obligations — we will provide at least <strong>14 days' prior notice</strong> by email (to the address associated with your account) and/or by displaying a prominent notice within the Platform.</p>
+      <p>Your continued use of TutorNest after the effective date of any updated Terms constitutes your acceptance of those changes. If you do not agree to the updated Terms, you must close your account before the effective date.</p>
+    </div>
+
+    <div class="content-card">
+      <h2>16. Contact</h2>
+      <p>If you have any questions about these Terms of Service, please contact us:</p>
+      <p><strong>Email:</strong> <a href="mailto:support@tutornest.org">support@tutornest.org</a></p>
+      <p>We aim to respond to all enquiries within <strong>5 business days</strong>.</p>
+    </div>
+
+  </main>
+
+  <!-- FOOTER -->
+  <footer class="footer" aria-label="Site footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <img src="logo.png" alt="" class="footer-logo-mark" aria-hidden="true">
+          <span class="footer-logo-text">TutorNest</span>
+        </div>
+        <p class="footer-tagline">Connecting families across Africa, the UK, the US and beyond with verified, qualified tutors through AI-powered smart matching.</p>
+        <p class="footer-contact">Questions? <a href="mailto:support@tutornest.org">support@tutornest.org</a></p>
+      </div>
+      <div>
+        <h3 class="footer-col-title">Platform</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="https://app.tutornest.org">Find a Tutor</a></li>
+          <li><a href="https://app.tutornest.org">Become a Tutor</a></li>
+          <li><a href="/#how-it-works">How It Works</a></li>
+          <li><a href="/#pricing">Pricing</a></li>
+          <li><a href="https://app.tutornest.org">Sign In</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="footer-col-title">Support</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="contact.html">Contact Us</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="help.html">Help Centre</a></li>
+          <li><a href="report.html">Report an Issue</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="footer-col-title">Legal</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="privacy.html">Privacy Policy</a></li>
+          <li><a href="terms.html">Terms of Service</a></li>
+          <li><a href="cookies.html">Cookie Policy</a></li>
+          <li><a href="tutor-agreement.html">Tutor Agreement</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2025 TutorNest. All rights reserved.</p>
+      <p>Built in Africa 🌍 · Serving the world</p>
+    </div>
+  </footer>
+
+  <script>
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 20) navbar.classList.add('scrolled');
+      else navbar.classList.remove('scrolled');
+    }, { passive: true });
+    const hamburger = document.getElementById('hamburger');
+    const mobileMenu = document.getElementById('mobile-menu');
+    hamburger.addEventListener('click', () => {
+      const isOpen = mobileMenu.classList.toggle('open');
+      hamburger.classList.toggle('open', isOpen);
+      hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+    mobileMenu.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        mobileMenu.classList.remove('open');
+        hamburger.classList.remove('open');
+        hamburger.setAttribute('aria-expanded', 'false');
+      });
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Frequently Asked Questions — TutorNest</title>
+  <meta name="description" content="Find answers to common questions about TutorNest — how to find a tutor, how payments work, tutor verification, and more.">
+  <link rel="icon" type="image/png" href="logo.png">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Outfit:wght@600&display=swap" rel="stylesheet">
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    html { scroll-behavior: smooth; font-size: 16px; }
+    body { font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif; color: #111827; background: #ffffff; -webkit-font-smoothing: antialiased; overflow-x: hidden; }
+    img { max-width: 100%; display: block; }
+    a { text-decoration: none; color: inherit; }
+    ul { list-style: none; }
+    button { cursor: pointer; border: none; background: none; font-family: inherit; }
+
+    :root {
+      --purple: #625d9c; --purple-light: #f0effe; --purple-mid: #8b85c9;
+      --purple-dark: #4a4580; --purple-deeper: #3d3870; --white: #ffffff;
+      --gray-50: #f9fafb; --gray-100: #f3f4f6; --gray-200: #e5e7eb;
+      --gray-300: #d1d5db; --gray-400: #9ca3af; --gray-500: #6b7280;
+      --gray-600: #4b5563; --gray-700: #374151; --gray-900: #111827;
+      --green: #16a34a; --green-light: #dcfce7; --red: #dc2626; --red-light: #fee2e2;
+      --shadow-sm: 0 4px 16px rgba(98,93,156,0.10); --shadow-md: 0 8px 32px rgba(98,93,156,0.18);
+      --radius-card: 16px; --radius-btn: 10px; --radius-chip: 8px; --radius-pill: 100px;
+    }
+
+    /* Buttons */
+    .btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 14px 28px; border-radius: var(--radius-btn); font-size: 15px; font-weight: 600; transition: all 0.2s ease; }
+    .btn-primary { background: var(--purple); color: #fff; box-shadow: 0 4px 12px rgba(98,93,156,0.30); }
+    .btn-primary:hover { background: var(--purple-dark); transform: translateY(-2px); }
+    .btn-ghost { background: transparent; color: var(--purple); border: 1.5px solid var(--purple); }
+    .btn-ghost:hover { background: var(--purple-light); transform: translateY(-2px); }
+    .btn-sm { padding: 9px 20px; font-size: 14px; border-radius: 8px; }
+
+    /* Navbar */
+    .navbar { position: fixed; top: 0; left: 0; right: 0; z-index: 1000; padding: 0; transition: all 0.3s ease; background: rgba(255,255,255,0.92); backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); box-shadow: 0 1px 24px rgba(98,93,156,0.10); }
+    .nav-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; height: 68px; display: flex; align-items: center; gap: 40px; }
+    .nav-logo { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .logo-mark { height: 38px; width: auto; display: block; object-fit: contain; }
+    .logo-text { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 600; color: var(--purple); letter-spacing: 0.02em; }
+    .nav-links { display: flex; align-items: center; gap: 4px; margin: 0 auto; }
+    .nav-links a { padding: 7px 14px; border-radius: 8px; font-size: 14px; font-weight: 500; color: var(--gray-600); transition: all 0.15s; }
+    .nav-links a:hover { color: var(--purple); background: var(--purple-light); }
+    .nav-actions { display: flex; align-items: center; gap: 10px; flex-shrink: 0; }
+    .hamburger { display: none; flex-direction: column; justify-content: center; align-items: center; gap: 5px; width: 40px; height: 40px; margin-left: auto; }
+    .hamburger span { display: block; width: 22px; height: 2px; background: var(--gray-700); border-radius: 2px; transition: all 0.25s; }
+    .hamburger.open span:nth-child(1) { transform: translateY(7px) rotate(45deg); }
+    .hamburger.open span:nth-child(2) { opacity: 0; transform: scaleX(0); }
+    .hamburger.open span:nth-child(3) { transform: translateY(-7px) rotate(-45deg); }
+    .mobile-menu { display: none; background: rgba(255,255,255,0.97); backdrop-filter: blur(16px); border-top: 1px solid var(--gray-100); padding: 16px 24px 24px; max-height: 0; overflow: hidden; transition: max-height 0.35s cubic-bezier(0.4,0,0.2,1); }
+    .mobile-menu.open { max-height: 400px; }
+    .mobile-menu ul { display: flex; flex-direction: column; gap: 2px; margin-bottom: 20px; }
+    .mobile-menu ul a { display: block; padding: 11px 12px; border-radius: 10px; font-size: 15px; font-weight: 500; color: var(--gray-700); transition: all 0.15s; }
+    .mobile-menu ul a:hover { background: var(--purple-light); color: var(--purple); }
+    .mobile-menu-actions { display: flex; flex-direction: column; gap: 10px; }
+    .btn-outline-mobile { display: block; padding: 12px 20px; border: 1.5px solid var(--gray-200); border-radius: var(--radius-btn); font-size: 15px; font-weight: 600; color: var(--gray-700); text-align: center; transition: all 0.15s; }
+    .btn-outline-mobile:hover { border-color: var(--purple); color: var(--purple); }
+    .btn-fill-mobile { display: block; padding: 13px 20px; background: var(--purple); border-radius: var(--radius-btn); font-size: 15px; font-weight: 600; color: #fff; text-align: center; transition: all 0.2s; }
+    .btn-fill-mobile:hover { background: var(--purple-dark); }
+
+    /* Page hero */
+    .page-hero { padding: 120px 0 64px; background: linear-gradient(135deg, var(--purple) 0%, var(--purple-dark) 100%); position: relative; overflow: hidden; }
+    .page-hero::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle, rgba(255,255,255,0.05) 1px, transparent 1px); background-size: 28px 28px; pointer-events: none; }
+    .page-hero-inner { position: relative; z-index: 1; max-width: 800px; margin: 0 auto; padding: 0 24px; text-align: center; }
+    .page-hero-label { display: inline-flex; align-items: center; gap: 6px; background: rgba(255,255,255,0.15); color: rgba(255,255,255,0.9); font-size: 13px; font-weight: 600; padding: 5px 14px; border-radius: var(--radius-pill); margin-bottom: 20px; }
+    .page-hero h1 { font-size: clamp(32px, 5vw, 52px); font-weight: 800; color: #fff; margin-bottom: 16px; letter-spacing: -0.02em; line-height: 1.15; }
+    .page-hero p { font-size: 18px; color: rgba(255,255,255,0.8); max-width: 600px; margin: 0 auto; line-height: 1.7; }
+    .page-hero p a { color: rgba(255,255,255,0.95); text-decoration: underline; }
+
+    /* Page content */
+    .page-content { max-width: 860px; margin: 0 auto; padding: 80px 24px; }
+
+    /* Footer */
+    .footer { background: var(--gray-900); color: var(--gray-400); padding: 64px 0 0; }
+    .footer-inner { max-width: 1200px; margin: 0 auto; padding: 0 24px; display: grid; grid-template-columns: 1.4fr 1fr 1fr 1fr; gap: 48px; margin-bottom: 64px; }
+    .footer-logo { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .footer-logo-mark { height: 36px; width: auto; display: block; object-fit: contain; opacity: 0.9; }
+    .footer-logo-text { font-family: 'Outfit', sans-serif; font-size: 20px; font-weight: 600; color: #fff; letter-spacing: 0.02em; }
+    .footer-tagline { font-size: 14px; line-height: 1.6; margin-bottom: 20px; }
+    .footer-contact { font-size: 13px; color: var(--gray-500); }
+    .footer-contact a { color: var(--purple-mid); transition: color 0.15s; }
+    .footer-contact a:hover { color: #fff; }
+    .footer-col-title { font-size: 13px; font-weight: 700; color: #fff; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 18px; }
+    .footer-links li { margin-bottom: 10px; }
+    .footer-links a { font-size: 14px; color: var(--gray-400); transition: color 0.15s; }
+    .footer-links a:hover { color: #fff; }
+    .footer-bottom { border-top: 1px solid rgba(255,255,255,0.07); padding: 24px; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; max-width: 1200px; margin: 0 auto; }
+    .footer-bottom p { font-size: 13px; color: var(--gray-500); margin: 0; }
+
+    /* FAQ specific */
+    .faq-section { margin-bottom: 40px; }
+    .faq-section-title { font-size: 22px; font-weight: 800; color: var(--gray-900); margin-bottom: 20px; padding-bottom: 12px; border-bottom: 3px solid var(--purple-light); }
+    .faq-item { border: 1px solid var(--gray-200); border-radius: 12px; overflow: hidden; margin-bottom: 8px; transition: border-color 0.2s; }
+    .faq-item:hover { border-color: rgba(98,93,156,0.3); }
+    details[open].faq-item { border-color: var(--purple); }
+    summary.faq-q { display: flex; justify-content: space-between; align-items: center; padding: 20px 24px; font-size: 15px; font-weight: 600; color: var(--gray-900); cursor: pointer; user-select: none; list-style: none; transition: color 0.2s; }
+    summary.faq-q::-webkit-details-marker { display: none; }
+    summary.faq-q::after { content: '+'; font-size: 22px; font-weight: 400; color: var(--purple); flex-shrink: 0; line-height: 1; transition: transform 0.25s; }
+    details[open] summary.faq-q::after { transform: rotate(45deg); }
+    details[open] summary.faq-q { color: var(--purple); }
+    .faq-a { padding: 0 24px 22px; font-size: 15px; line-height: 1.75; color: var(--gray-600); border-top: 1px solid var(--gray-100); padding-top: 16px; }
+    .faq-a a { color: var(--purple); text-decoration: underline; }
+
+    /* CTA */
+    .faq-cta { background: var(--purple-light); border-radius: 16px; padding: 40px; text-align: center; margin-top: 8px; }
+    .faq-cta h2 { font-size: 22px; font-weight: 800; color: var(--gray-900); margin-bottom: 12px; }
+    .faq-cta p { font-size: 15px; color: var(--gray-600); margin-bottom: 24px; }
+    .faq-cta-buttons { display: flex; gap: 12px; justify-content: center; flex-wrap: wrap; }
+
+    /* Responsive */
+    @media (max-width: 768px) {
+      .nav-links { display: none; }
+      .nav-actions { display: none; }
+      .hamburger { display: flex; }
+      .mobile-menu { display: block; }
+      .footer-inner { grid-template-columns: 1fr 1fr; gap: 32px; }
+      .footer-brand { grid-column: 1 / -1; }
+      summary.faq-q { padding: 16px 18px; font-size: 14px; }
+      .faq-a { padding: 0 18px 18px; padding-top: 14px; }
+    }
+    @media (max-width: 480px) {
+      .footer-inner { grid-template-columns: 1fr; }
+      .page-hero { padding: 100px 0 48px; }
+    }
+
+    :focus-visible { outline: 2px solid var(--purple); outline-offset: 3px; border-radius: 4px; }
+    *:focus:not(:focus-visible) { outline: none; }
+  </style>
+</head>
+<body>
+
+  <!-- Navbar -->
+  <nav class="navbar" id="navbar">
+    <div class="nav-inner">
+      <a href="/" class="nav-logo" aria-label="TutorNest home">
+        <img src="logo.png" alt="" class="logo-mark" aria-hidden="true">
+        <span class="logo-text">TutorNest</span>
+      </a>
+      <ul class="nav-links" role="list">
+        <li><a href="/#features">Features</a></li>
+        <li><a href="/#how-it-works">How it works</a></li>
+        <li><a href="/#for-tutors">For Tutors</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+      <div class="nav-actions">
+        <a href="https://app.tutornest.org" class="btn btn-ghost btn-sm">Sign In</a>
+        <a href="https://app.tutornest.org" class="btn btn-primary btn-sm">Get Started</a>
+      </div>
+      <button class="hamburger" id="hamburger" aria-label="Toggle navigation" aria-expanded="false">
+        <span></span><span></span><span></span>
+      </button>
+    </div>
+    <div class="mobile-menu" id="mobile-menu" role="navigation">
+      <ul role="list">
+        <li><a href="/#features">Features</a></li>
+        <li><a href="/#how-it-works">How it works</a></li>
+        <li><a href="/#for-tutors">For Tutors</a></li>
+        <li><a href="/#pricing">Pricing</a></li>
+      </ul>
+      <div class="mobile-menu-actions">
+        <a href="https://app.tutornest.org" class="btn-outline-mobile">Sign In</a>
+        <a href="https://app.tutornest.org" class="btn-fill-mobile">Get Started Free →</a>
+      </div>
+    </div>
+  </nav>
+
+  <!-- Page Hero -->
+  <section class="page-hero">
+    <div class="page-hero-inner">
+      <span class="page-hero-label">Support</span>
+      <h1>Frequently Asked Questions</h1>
+      <p>Can't find what you're looking for? Email us at <a href="mailto:support@tutornest.org">support@tutornest.org</a></p>
+    </div>
+  </section>
+
+  <!-- Page Content -->
+  <main class="page-content">
+
+    <!-- Category 1: Getting Started -->
+    <div class="faq-section">
+      <h2 class="faq-section-title">Getting Started</h2>
+
+      <details class="faq-item">
+        <summary class="faq-q">What is TutorNest?</summary>
+        <div class="faq-a">TutorNest is an AI-powered tutoring marketplace that connects families with verified, qualified tutors. We serve families across Africa, the UK, the US and internationally.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">Is TutorNest free to use?</summary>
+        <div class="faq-a">It's free to create an account, browse tutors and see match recommendations. You only pay when you book a session.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">What subjects and curricula do you cover?</summary>
+        <div class="faq-a">We cover Mathematics, English, Sciences, Humanities, Languages and more. We support GCSE, A-Levels, SAT/ACT, AP, WAEC, JAMB, NECO, Common Entrance, IB, IGCSE and other international curricula.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">What countries do you operate in?</summary>
+        <div class="faq-a">We serve families across Nigeria, Ghana, Kenya, South Africa and wider Africa, the United Kingdom, the United States, and internationally. Tutors can teach students from any country via online sessions.</div>
+      </details>
+    </div>
+
+    <!-- Category 2: For Parents and Students -->
+    <div class="faq-section">
+      <h2 class="faq-section-title">For Parents and Students</h2>
+
+      <details class="faq-item">
+        <summary class="faq-q">How does the AI matching work?</summary>
+        <div class="faq-a">You fill in your child's profile with their subjects, year group, learning goals, and preferences. Our algorithm analyses tutor profiles, qualifications, teaching style, availability and reviews to recommend the best matches — ranked by compatibility score.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">How do I book a session?</summary>
+        <div class="faq-a">After finding a tutor you like, view their available times, choose a slot, and pay to confirm. You'll receive a booking confirmation with a session link.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">Can I try a tutor before committing long-term?</summary>
+        <div class="faq-a">Absolutely. There's no subscription or minimum commitment. Book a single session and see how it goes before booking more.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">What if I'm not satisfied with a session?</summary>
+        <div class="faq-a">Contact <a href="mailto:support@tutornest.org">support@tutornest.org</a> within 48 hours. We'll review the session and work to make it right, including discussing a refund or a free replacement session.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">Are tutors background-checked?</summary>
+        <div class="faq-a">Yes. Every tutor is verified before their profile is published. We check academic credentials, relevant qualifications, and identity. UK-based tutors may also provide a DBS check.</div>
+      </details>
+    </div>
+
+    <!-- Category 3: For Tutors -->
+    <div class="faq-section">
+      <h2 class="faq-section-title">For Tutors</h2>
+
+      <details class="faq-item">
+        <summary class="faq-q">How do I apply to become a tutor?</summary>
+        <div class="faq-a">Click "Become a Tutor" on our website, create your account, and complete your profile. You'll go through a verification process before your profile goes live.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">What are the requirements to join?</summary>
+        <div class="faq-a">You must be 18+, hold the qualifications you list, and pass our verification process. You must be legally able to provide services in your country.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">How much can I earn?</summary>
+        <div class="faq-a">You set your own hourly rate. TutorNest charges a platform service fee. Your dashboard shows your earnings in real time.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">When do I get paid?</summary>
+        <div class="faq-a">Payments are released 3–5 business days after a session is completed and the satisfaction window closes.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">Can I teach from anywhere?</summary>
+        <div class="faq-a">Yes. TutorNest supports online sessions via video call. You can teach students from anywhere in the world.</div>
+      </details>
+    </div>
+
+    <!-- Category 4: Payments and Pricing -->
+    <div class="faq-section">
+      <h2 class="faq-section-title">Payments and Pricing</h2>
+
+      <details class="faq-item">
+        <summary class="faq-q">How does pricing work?</summary>
+        <div class="faq-a">Each tutor sets their own hourly rate. There are no hidden fees for parents beyond the session price. Tutors pay a platform service fee from their earnings.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">What payment methods are accepted?</summary>
+        <div class="faq-a">We accept debit/credit cards and bank transfers. Supported methods vary by region — all major African payment methods (Paystack, Flutterwave), UK cards, and international cards are supported.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">What is the refund policy?</summary>
+        <div class="faq-a">Cancellations made 24+ hours before a session receive a full refund. Cancellations within 24 hours receive a 50% refund. No-shows are non-refundable. See our <a href="terms.html">Terms of Service</a> for full details.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">Is my payment information secure?</summary>
+        <div class="faq-a">Yes. We use industry-standard encryption and do not store card numbers. Payments are processed by regulated payment providers.</div>
+      </details>
+    </div>
+
+    <!-- Category 5: Technical and Account -->
+    <div class="faq-section">
+      <h2 class="faq-section-title">Technical and Account</h2>
+
+      <details class="faq-item">
+        <summary class="faq-q">How do I reset my password?</summary>
+        <div class="faq-a">On the sign-in page, click "Forgot password?" and enter your email. You'll receive a reset link within a few minutes.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">Can I have multiple roles (e.g., parent and tutor)?</summary>
+        <div class="faq-a">Yes. TutorNest supports multiple roles under one account. You can switch between parent and tutor views in your dashboard.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">What if I have a technical issue?</summary>
+        <div class="faq-a">Email <a href="mailto:support@tutornest.org">support@tutornest.org</a> or visit our <a href="help.html">Help Centre</a>. For urgent issues, describe the problem clearly and include any error messages.</div>
+      </details>
+
+      <details class="faq-item">
+        <summary class="faq-q">How do I delete my account?</summary>
+        <div class="faq-a">Contact <a href="mailto:support@tutornest.org">support@tutornest.org</a> with your request. We'll process account deletions within 30 days in accordance with our <a href="privacy.html">Privacy Policy</a>.</div>
+      </details>
+    </div>
+
+    <!-- CTA -->
+    <div class="faq-cta">
+      <h2>Still have a question?</h2>
+      <p>Our support team is happy to help with anything not covered here.</p>
+      <div class="faq-cta-buttons">
+        <a href="mailto:support@tutornest.org" class="btn btn-primary">Email Support</a>
+        <a href="contact.html" class="btn btn-ghost">Contact Us</a>
+      </div>
+    </div>
+
+  </main>
+
+  <!-- Footer -->
+  <footer class="footer" aria-label="Site footer">
+    <div class="footer-inner">
+      <div class="footer-brand">
+        <div class="footer-logo">
+          <img src="logo.png" alt="" class="footer-logo-mark" aria-hidden="true">
+          <span class="footer-logo-text">TutorNest</span>
+        </div>
+        <p class="footer-tagline">Connecting families across Africa, the UK, the US and beyond with verified, qualified tutors through AI-powered smart matching.</p>
+        <p class="footer-contact">Questions? <a href="mailto:support@tutornest.org">support@tutornest.org</a></p>
+      </div>
+      <div>
+        <h3 class="footer-col-title">Platform</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="https://app.tutornest.org">Find a Tutor</a></li>
+          <li><a href="https://app.tutornest.org">Become a Tutor</a></li>
+          <li><a href="/#how-it-works">How It Works</a></li>
+          <li><a href="/#pricing">Pricing</a></li>
+          <li><a href="https://app.tutornest.org">Sign In</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="footer-col-title">Support</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="contact.html">Contact Us</a></li>
+          <li><a href="faq.html">FAQ</a></li>
+          <li><a href="help.html">Help Centre</a></li>
+          <li><a href="report.html">Report an Issue</a></li>
+        </ul>
+      </div>
+      <div>
+        <h3 class="footer-col-title">Legal</h3>
+        <ul class="footer-links" role="list">
+          <li><a href="privacy.html">Privacy Policy</a></li>
+          <li><a href="terms.html">Terms of Service</a></li>
+          <li><a href="cookies.html">Cookie Policy</a></li>
+          <li><a href="tutor-agreement.html">Tutor Agreement</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="footer-bottom">
+      <p>© 2025 TutorNest. All rights reserved.</p>
+      <p>Built in Africa 🌍 · Serving the world</p>
+    </div>
+  </footer>
+
+  <script>
+    const navbar = document.getElementById('navbar');
+    window.addEventListener('scroll', () => {
+      if (window.scrollY > 20) navbar.classList.add('scrolled');
+      else navbar.classList.remove('scrolled');
+    }, { passive: true });
+    const hamburger = document.getElementById('hamburger');
+    const mobileMenu = document.getElementById('mobile-menu');
+    hamburger.addEventListener('click', () => {
+      const isOpen = mobileMenu.classList.toggle('open');
+      hamburger.classList.toggle('open', isOpen);
+      hamburger.setAttribute('aria-expanded', isOpen ? 'true' : 'false');
+    });
+    mobileMenu.querySelectorAll('a').forEach(a => {
+      a.addEventListener('click', () => {
+        mobileMenu.classList.remove('open');
+        hamburger.classList.remove('open');
+        hamburger.setAttribute('aria-expanded', 'false');
+      });
+    });
+  </script>
+
+</body>
+</html>
