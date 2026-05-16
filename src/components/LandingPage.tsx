@@ -1,6 +1,7 @@
 import { Button } from './ui/button';
 import { AuthBackground } from './AuthBackground';
 import TutorNestLogo from './TutorNestLogo';
+import { FeedbackForms } from './FeedbackForms';
 
 interface LandingPageProps {
   onSignIn: () => void;
@@ -10,8 +11,8 @@ interface LandingPageProps {
 
 export function LandingPage({ onSignIn, onSignUp, onBecomeTutor }: LandingPageProps) {
   return (
-    <AuthBackground className="flex items-center justify-center px-4 py-10 sm:px-6 sm:py-14">
-      <div className="w-full max-w-4xl">
+    <AuthBackground className="flex items-start justify-center px-4 py-10 sm:px-6 sm:py-14">
+      <div className="w-full max-w-4xl space-y-6">
         <div className="rounded-3xl bg-white/95 p-6 shadow-2xl backdrop-blur-sm sm:p-10">
           <div className="mb-6 flex justify-center sm:mb-8">
             <TutorNestLogo />
@@ -45,6 +46,8 @@ export function LandingPage({ onSignIn, onSignUp, onBecomeTutor }: LandingPagePr
             </button>
           </div>
         </div>
+
+        <FeedbackForms />
       </div>
     </AuthBackground>
   );
