@@ -5,6 +5,7 @@ import ErrorBoundary from '../components/ErrorBoundary';
 import { Button } from '../components/ui/button';
 import { TutorSignup } from '../components/TutorSignup';
 import { PrivacyPolicy } from '../components/PrivacyPolicy';
+import { FeedbackPage } from '../components/FeedbackPage';
 import type { NavigateTo, SignupData, UserProfile } from './types';
 
 const AdminDashboard = lazy(() => import('../components/AdminDashboard').then(m => ({ default: m.AdminDashboard })));
@@ -141,6 +142,7 @@ export function AuthenticatedAppRoutes({
       />
       <Route path="/privacy" element={<ErrorBoundary><PrivacyPolicy /></ErrorBoundary>} />
       <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
+      <Route path="/feedback" element={<ErrorBoundary><FeedbackPage /></ErrorBoundary>} />
       <Route path="/dashboard/:role" element={<DashboardRouteRenderer />} />
       <Route path="/dashboard/:role/:tab" element={<DashboardRouteRenderer />} />
       <Route path="*" element={<WildcardRedirect role={profile.role} buildDashboardPath={buildDashboardPath} />} />

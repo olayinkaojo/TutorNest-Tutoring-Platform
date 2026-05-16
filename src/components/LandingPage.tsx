@@ -1,7 +1,7 @@
 import { Button } from './ui/button';
 import { AuthBackground } from './AuthBackground';
 import TutorNestLogo from './TutorNestLogo';
-import { FeedbackForms } from './FeedbackForms';
+import { MessageSquare } from 'lucide-react';
 
 interface LandingPageProps {
   onSignIn: () => void;
@@ -11,8 +11,8 @@ interface LandingPageProps {
 
 export function LandingPage({ onSignIn, onSignUp, onBecomeTutor }: LandingPageProps) {
   return (
-    <AuthBackground className="flex items-start justify-center px-4 py-10 sm:px-6 sm:py-14">
-      <div className="w-full max-w-4xl space-y-6">
+    <AuthBackground className="flex items-center justify-center px-4 py-10 sm:px-6 sm:py-14">
+      <div className="w-full max-w-4xl">
         <div className="rounded-3xl bg-white/95 p-6 shadow-2xl backdrop-blur-sm sm:p-10">
           <div className="mb-6 flex justify-center sm:mb-8">
             <TutorNestLogo />
@@ -45,9 +45,17 @@ export function LandingPage({ onSignIn, onSignUp, onBecomeTutor }: LandingPagePr
               Become a Tutor
             </button>
           </div>
-        </div>
 
-        <FeedbackForms />
+          <div className="mx-auto mt-4 max-w-xl text-center">
+            <a
+              href="/feedback"
+              className="inline-flex items-center gap-1.5 text-sm text-gray-400 hover:text-gray-600 transition-colors"
+            >
+              <MessageSquare className="h-3.5 w-3.5" />
+              Share feedback on the beta
+            </a>
+          </div>
+        </div>
       </div>
     </AuthBackground>
   );
