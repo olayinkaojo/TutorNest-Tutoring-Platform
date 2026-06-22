@@ -1,0 +1,15 @@
+info:
+  name: Admin - Monitor Sessions
+  type: http
+  seq: 6
+
+http:
+  method: GET
+  url: "{{baseUrl}}/make-server-cbd74580/admin/sessions/monitor"
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5

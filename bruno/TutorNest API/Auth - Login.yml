@@ -1,0 +1,19 @@
+info:
+  name: Auth - Login
+  type: http
+  seq: 3
+
+http:
+  method: POST
+  url: https://wevmvbskunhnhuxzaqoz.supabase.co/auth/v1/token?grant_type=password
+  params:
+    - name: grant_type
+      value: password
+      type: query
+  auth: inherit
+
+settings:
+  encodeUrl: true
+  timeout: 0
+  followRedirects: true
+  maxRedirects: 5
