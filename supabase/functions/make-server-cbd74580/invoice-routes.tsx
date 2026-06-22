@@ -108,7 +108,7 @@ invoiceRoutes.post('/create', async (c) => {
       
       // Metadata
       createdAt: new Date().toISOString(),
-      issuedBy: 'TutorNest Platform'
+      issuedBy: 'Knowledge Fons Academy Platform'
     };
 
     // Save invoice

@@ -14,7 +14,7 @@ import {
   MIN_PASSWORD_STRENGTH_SCORE,
 } from '../utils/onboarding-helpers';
 import { CheckCircle, AlertCircle, ArrowLeft, UserPlus, Mail, Clock, RotateCcw } from 'lucide-react';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 
 const supabase = getSupabaseClient();
@@ -476,7 +476,7 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
     <AuthBackground className="py-8 px-4">
       <div className="container mx-auto px-4 py-6">
         <div className="mb-6 flex items-center justify-between">
-          <TutorNestLogo />
+          <KFALogo />
           <Button type="button" variant="ghost" onClick={onBackToSignIn}>
             <ArrowLeft className="mr-2 h-4 w-4" aria-hidden />
             Back
@@ -510,7 +510,7 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
           <Card>
             <CardHeader className="text-center">
               <CardTitle className="mb-2 text-3xl">Student signup</CardTitle>
-              <CardDescription>Create your account and start learning on TutorNest</CardDescription>
+              <CardDescription>Create your account and start learning on Knowledge Fons Academy</CardDescription>
             </CardHeader>
             <CardContent>
               {stepIndicator}

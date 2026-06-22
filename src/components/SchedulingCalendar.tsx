@@ -51,7 +51,7 @@ export function SchedulingCalendar({ session, userId, userRole, googleCalendarCo
       const timeMin = startOfMonth.toISOString();
       const timeMax = endOfMonth.toISOString();
       
-      // Load TutorNest bookings
+      // Load Knowledge Fons Academy bookings
       promises.push(
         fetch(
           `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookings`,
@@ -81,7 +81,7 @@ export function SchedulingCalendar({ session, userId, userRole, googleCalendarCo
       
       const allEvents: Event[] = [];
       
-      // Process TutorNest bookings
+      // Process Knowledge Fons Academy bookings
       if (results[0]?.bookings) {
         const bookingEvents = results[0].bookings
           .filter((b: any) => b.status !== 'cancelled')
@@ -91,7 +91,7 @@ export function SchedulingCalendar({ session, userId, userRole, googleCalendarCo
             description: booking.notes || '',
             start: { dateTime: `${booking.date}T${booking.startTime}` },
             end: { dateTime: `${booking.date}T${booking.endTime}` },
-            location: 'TutorNest Virtual Classroom',
+            location: 'Knowledge Fons Academy Virtual Classroom',
             source: 'tutornest' as const,
             status: booking.status,
           }));
@@ -302,7 +302,7 @@ export function SchedulingCalendar({ session, userId, userRole, googleCalendarCo
               <div className="flex items-center gap-4 mt-4 text-xs">
                 <div className="flex items-center gap-1">
                   <div className="w-3 h-3 rounded bg-purple-100"></div>
-                  <span className="text-gray-600">TutorNest Sessions</span>
+                  <span className="text-gray-600">Knowledge Fons Academy Sessions</span>
                 </div>
                 {googleCalendarConnected && (
                   <div className="flex items-center gap-1">
@@ -361,7 +361,7 @@ export function SchedulingCalendar({ session, userId, userRole, googleCalendarCo
                         )}
                       </div>
                       <Badge variant={event.source === 'tutornest' ? 'default' : 'secondary'}>
-                        {event.source === 'tutornest' ? 'TutorNest' : 'Google'}
+                        {event.source === 'tutornest' ? 'Knowledge Fons Academy' : 'Google'}
                       </Badge>
                     </div>
                     {event.htmlLink && (

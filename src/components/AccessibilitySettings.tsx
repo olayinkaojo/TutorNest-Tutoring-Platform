@@ -373,7 +373,7 @@ export function AccessibilitySettings({ userId, accessToken }: AccessibilitySett
 
       <Card className="p-4 bg-blue-50 border-blue-200">
         <p className="text-sm text-blue-900">
-          <strong>WCAG 2.1 AA Compliance:</strong> TutorNest meets Web Content Accessibility Guidelines 2.1 Level AA standards on core flows including sign-up, search, booking, and sessions.{' '}
+          <strong>WCAG 2.1 AA Compliance:</strong> Knowledge Fons Academy meets Web Content Accessibility Guidelines 2.1 Level AA standards on core flows including sign-up, search, booking, and sessions.{' '}
           <a href="/accessibility-statement" className="underline hover:text-blue-700">
             Read our full accessibility statement
           </a>

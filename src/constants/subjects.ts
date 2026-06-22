@@ -1,4 +1,4 @@
-// TutorNest Subject Categories and Pricing
+// Knowledge Fons Academy Subject Categories and Pricing
 
 export const SUBJECT_CATEGORIES = {
   MATHEMATICS: 'Mathematics',

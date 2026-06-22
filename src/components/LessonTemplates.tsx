@@ -906,7 +906,7 @@ export function LessonTemplates({ session, userRole }: LessonTemplatesProps) {
               className="w-4 h-4"
             />
             <label htmlFor="isPublic" className="text-sm">
-              Make this template public (share with TutorNest community)
+              Make this template public (share with Knowledge Fons Academy community)
             </label>
           </div>
         </CardContent>

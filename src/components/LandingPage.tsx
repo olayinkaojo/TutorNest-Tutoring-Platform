@@ -1,6 +1,6 @@
 import { Button } from './ui/button';
 import { AuthBackground } from './AuthBackground';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import { MessageSquare } from 'lucide-react';
 
 interface LandingPageProps {
@@ -15,13 +15,13 @@ export function LandingPage({ onSignIn, onSignUp, onBecomeTutor }: LandingPagePr
       <div className="w-full max-w-4xl">
         <div className="rounded-3xl bg-white/95 p-6 shadow-2xl backdrop-blur-sm sm:p-10">
           <div className="mb-6 flex justify-center sm:mb-8">
-            <TutorNestLogo />
+            <KFALogo />
           </div>
 
           <div className="mx-auto max-w-2xl text-center">
             <h1 className="text-3xl text-gray-900 sm:text-5xl">Find the right tutor, faster</h1>
             <p className="mt-4 text-base text-gray-600 sm:text-lg">
-              TutorNest connects students, parents, and tutors with safe booking, progress tracking,
+              Knowledge Fons Academy connects students, parents, and tutors with safe booking, progress tracking,
               and live learning tools in one place.
             </p>
           </div>
@@ -36,7 +36,7 @@ export function LandingPage({ onSignIn, onSignUp, onBecomeTutor }: LandingPagePr
           </div>
 
           <div className="mx-auto mt-6 max-w-xl rounded-xl border border-[#d9edd0] bg-[#f3faee] p-4 text-center">
-            <p className="text-sm text-gray-700">Want to teach and earn on TutorNest?</p>
+            <p className="text-sm text-gray-700">Want to teach and earn on Knowledge Fons Academy?</p>
             <button
               className="mt-2 text-sm font-medium underline"
               style={{ color: '#5d9827' }}

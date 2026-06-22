@@ -27,7 +27,7 @@ import { edgeFunctionUrl, edgeFunctionHeaders } from '../utils/supabase-edge-fet
 import { NotificationCenter } from './NotificationCenter';
 import { MobileNavigation } from './MobileNavigation';
 import { StudentAssessmentsList } from './StudentAssessmentsList';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import studentAPI, { StudentAPIError } from '../utils/student-api-client';
 import { useState, useEffect, useRef, useCallback } from 'react';
 import {
@@ -552,7 +552,7 @@ export function StudentDashboard({
       <header className="hidden lg:block bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <TutorNestLogo />
+            <KFALogo />
             <div className="flex items-center gap-4">
               {/* Bookshop Button */}
               <Button

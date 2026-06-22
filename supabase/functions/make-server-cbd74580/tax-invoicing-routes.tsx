@@ -388,7 +388,7 @@ app.get('/invoices/:invoiceId/download', async (c) => {
     const formattedInvoice = {
       ...invoice,
       companyInfo: {
-        name: 'TutorNest Ltd',
+        name: 'Knowledge Fons Academy Ltd',
         address: '123 Education Street, London, UK',
         vatNumber: 'GB123456789',
         email: 'billing@tutornest.org',

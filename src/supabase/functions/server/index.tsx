@@ -217,7 +217,7 @@ async function createGoogleCalendarEvent(userId: string, eventData: any) {
       dateTime: eventData.endDateTime,
       timeZone: 'Africa/Lagos',
     },
-    location: eventData.location || 'TutorNest Virtual Classroom',
+    location: eventData.location || 'Knowledge Fons Academy Virtual Classroom',
     reminders: {
       useDefault: false,
       overrides: [
@@ -733,11 +733,11 @@ app.post('/make-server-cbd74580/signup', async (c) => {
         if (verificationUrl) {
           await sendEmail({
             to: email,
-            subject: `Confirm your TutorNest account`,
+            subject: `Confirm your Knowledge Fons Academy account`,
             html: `
               <div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
                 <h2 style="color:#625d9c">Almost there, ${name}!</h2>
-                <p>Thank you for signing up to TutorNest. Please confirm your email address to activate your account.</p>
+                <p>Thank you for signing up to Knowledge Fons Academy. Please confirm your email address to activate your account.</p>
                 <p style="margin:24px 0">
                   <a href="${verificationUrl}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
                     Confirm Email Address
@@ -811,12 +811,12 @@ app.post('/make-server-cbd74580/signup', async (c) => {
         try {
           await sendEmail({
             to: email,
-            subject: 'Your TutorNest Application Has Been Received',
+            subject: 'Your Knowledge Fons Academy Application Has Been Received',
             html: `
               <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
                 <!-- Header -->
                 <div style="background:linear-gradient(135deg,#625d9c 0%,#4e4a7a 100%);padding:40px 32px;text-align:center">
-                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px">TutorNest</h1>
+                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px">Knowledge Fons Academy</h1>
                   <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:15px">Connecting students with great tutors</p>
                 </div>
 
@@ -826,7 +826,7 @@ app.post('/make-server-cbd74580/signup', async (c) => {
                   <p style="margin:0 0 24px;font-size:16px;color:#374151">Hi <strong>${name}</strong>,</p>
 
                   <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
-                    Thank you for applying to become a tutor on TutorNest. We're excited to have you on board and have received your application successfully.
+                    Thank you for applying to become a tutor on Knowledge Fons Academy. We're excited to have you on board and have received your application successfully.
                   </p>
 
                   <!-- Status box -->
@@ -883,8 +883,8 @@ app.post('/make-server-cbd74580/signup', async (c) => {
 
                 <!-- Footer -->
                 <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:24px 32px;text-align:center">
-                  <p style="margin:0 0 8px;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} TutorNest. All rights reserved.</p>
-                  <p style="margin:0;font-size:13px;color:#9ca3af">You're receiving this because you applied to become a TutorNest tutor.</p>
+                  <p style="margin:0 0 8px;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} Knowledge Fons Academy. All rights reserved.</p>
+                  <p style="margin:0;font-size:13px;color:#9ca3af">You're receiving this because you applied to become a Knowledge Fons Academy tutor.</p>
                 </div>
               </div>
             `,
@@ -1684,7 +1684,7 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
         if (action === 'approve') {
           await sendEmail({
             to: tutorEmail,
-            subject: 'Congratulations — You\'re Approved to Tutor on TutorNest! 🎉',
+            subject: 'Congratulations — You\'re Approved to Tutor on Knowledge Fons Academy! 🎉',
             html: `
               <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
                 <!-- Header -->
@@ -1692,8 +1692,8 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
                   <div style="width:64px;height:64px;background:rgba(255,255,255,0.2);border-radius:50%;margin:0 auto 16px;display:flex;align-items:center;justify-content:center">
                     <span style="font-size:32px">✅</span>
                   </div>
-                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px">TutorNest</h1>
-                  <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:15px">You're officially a TutorNest Tutor!</p>
+                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff;letter-spacing:-0.5px">Knowledge Fons Academy</h1>
+                  <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:15px">You're officially a Knowledge Fons Academy Tutor!</p>
                 </div>
 
                 <!-- Body -->
@@ -1701,7 +1701,7 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
                   <h2 style="margin:0 0 16px;font-size:24px;font-weight:700;color:#111827">Welcome to the team, ${tutorName}! 🎉</h2>
 
                   <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
-                    We're thrilled to let you know that your TutorNest tutor application has been <strong style="color:#5d9827">reviewed and approved</strong>. You can now access your full tutor dashboard and start accepting bookings from students.
+                    We're thrilled to let you know that your Knowledge Fons Academy tutor application has been <strong style="color:#5d9827">reviewed and approved</strong>. You can now access your full tutor dashboard and start accepting bookings from students.
                   </p>
 
                   <!-- Status badge -->
@@ -1757,7 +1757,7 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
 
                   <div style="background:#fffbeb;border:1px solid #fde68a;border-radius:8px;padding:16px 20px;margin:0 0 24px">
                     <p style="margin:0;font-size:14px;color:#92400e;line-height:1.5">
-                      <strong>Earnings reminder:</strong> You keep <strong>80%</strong> of every session fee. TutorNest retains a 20% platform fee that covers payment processing, support, and student matching.
+                      <strong>Earnings reminder:</strong> You keep <strong>80%</strong> of every session fee. Knowledge Fons Academy retains a 20% platform fee that covers payment processing, support, and student matching.
                     </p>
                   </div>
 
@@ -1768,7 +1768,7 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
 
                 <!-- Footer -->
                 <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:24px 32px;text-align:center">
-                  <p style="margin:0 0 8px;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} TutorNest. All rights reserved.</p>
+                  <p style="margin:0 0 8px;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} Knowledge Fons Academy. All rights reserved.</p>
                   <p style="margin:0;font-size:13px;color:#9ca3af">This email was sent because your tutor application was approved.</p>
                 </div>
               </div>
@@ -1778,16 +1778,16 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
         } else if (action === 'reject') {
           await sendEmail({
             to: tutorEmail,
-            subject: 'Update on Your TutorNest Application',
+            subject: 'Update on Your Knowledge Fons Academy Application',
             html: `
               <div style="font-family:'Helvetica Neue',Arial,sans-serif;max-width:600px;margin:auto;background:#ffffff;border-radius:12px;overflow:hidden;border:1px solid #e5e7eb">
                 <div style="background:linear-gradient(135deg,#625d9c 0%,#4e4a7a 100%);padding:40px 32px;text-align:center">
-                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff">TutorNest</h1>
+                  <h1 style="margin:0;font-size:28px;font-weight:700;color:#ffffff">Knowledge Fons Academy</h1>
                 </div>
                 <div style="padding:40px 32px">
                   <h2 style="margin:0 0 16px;font-size:22px;font-weight:700;color:#111827">Hi ${tutorName},</h2>
                   <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
-                    Thank you for applying to TutorNest. After carefully reviewing your application, we're unable to approve your profile at this time.
+                    Thank you for applying to Knowledge Fons Academy. After carefully reviewing your application, we're unable to approve your profile at this time.
                   </p>
                   ${rejectionReason ? `
                   <div style="background:#fef2f2;border-left:4px solid #ef4444;border-radius:0 8px 8px 0;padding:16px 20px;margin:0 0 24px">
@@ -1795,7 +1795,7 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
                     <p style="margin:0;font-size:15px;color:#374151">${rejectionReason}</p>
                   </div>` : ''}
                   <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6">
-                    If you believe this decision was made in error, or if you'd like to address the concerns raised, you may submit an appeal through your TutorNest account. Our team will be happy to reconsider your application with any additional information you provide.
+                    If you believe this decision was made in error, or if you'd like to address the concerns raised, you may submit an appeal through your Knowledge Fons Academy account. Our team will be happy to reconsider your application with any additional information you provide.
                   </p>
                   <div style="text-align:center;margin:0 0 28px">
                     <a href="${Deno.env.get('VITE_APP_URL') || 'https://tutornest.org'}" style="display:inline-block;background:#625d9c;color:#ffffff;text-decoration:none;font-weight:700;font-size:15px;padding:12px 32px;border-radius:10px">
@@ -1807,7 +1807,7 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
                   </p>
                 </div>
                 <div style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:24px 32px;text-align:center">
-                  <p style="margin:0;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} TutorNest. All rights reserved.</p>
+                  <p style="margin:0;font-size:13px;color:#9ca3af">© ${new Date().getFullYear()} Knowledge Fons Academy. All rights reserved.</p>
                 </div>
               </div>
             `,
@@ -2588,7 +2588,7 @@ app.get('/make-server-cbd74580/availability/:tutorId/slots', async (c) => {
 
     const daySchedule = availability.schedule[dayOfWeek];
     
-    // Get all TutorNest bookings for this tutor on this date
+    // Get all Knowledge Fons Academy bookings for this tutor on this date
     const allBookings = await kv.getByPrefix('booking:');
     const dateBookings = allBookings.filter((b: any) => 
       b.tutorId === tutorId && 
@@ -2649,8 +2649,8 @@ app.get('/make-server-cbd74580/availability/:tutorId/slots', async (c) => {
         const slotStart = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
         const slotEnd = `${String(Math.floor((minutes + 60) / 60)).padStart(2, '0')}:${String((minutes + 60) % 60).padStart(2, '0')}`;
 
-        // Check if slot is booked in TutorNest
-        const isTutorNestBooked = dateBookings.some((b: any) => {
+        // Check if slot is booked in Knowledge Fons Academy
+        const isKnowledge Fons AcademyBooked = dateBookings.some((b: any) => {
           const bookingStart = b.startTime;
           const bookingEnd = b.endTime;
           return !(slotEnd <= bookingStart || slotStart >= bookingEnd);
@@ -2665,7 +2665,7 @@ app.get('/make-server-cbd74580/availability/:tutorId/slots', async (c) => {
           date: dateParam,
           startTime: slotStart,
           endTime: slotEnd,
-          available: !isTutorNestBooked && !isGoogleCalendarBusy,
+          available: !isKnowledge Fons AcademyBooked && !isGoogleCalendarBusy,
         });
       }
     }
@@ -2756,10 +2756,10 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
           accessToken: parentAccessToken,
           event: {
             summary: `Tutoring Session with ${booking.tutorName}`,
-            description: `TutorNest tutoring session for ${booking.studentName}\n\nSubject: ${tutorProfile?.subjects?.[0] || 'General'}\nPrice: £${price}`,
+            description: `Knowledge Fons Academy tutoring session for ${booking.studentName}\n\nSubject: ${tutorProfile?.subjects?.[0] || 'General'}\nPrice: £${price}`,
             startDateTime: `${date}T${startTime}:00`,
             endDateTime: `${date}T${endTime}:00`,
-            location: 'TutorNest Virtual Classroom',
+            location: 'Knowledge Fons Academy Virtual Classroom',
             attendees: attendeeEmails,
           }
         });
@@ -2776,10 +2776,10 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
           accessToken: tutorAccessToken,
           event: {
             summary: `Tutoring Session with ${booking.studentName}`,
-            description: `TutorNest tutoring session\n\nStudent: ${booking.studentName}\nParent: ${parentProfile?.firstName || 'Parent'}\nPrice: £${price}`,
+            description: `Knowledge Fons Academy tutoring session\n\nStudent: ${booking.studentName}\nParent: ${parentProfile?.firstName || 'Parent'}\nPrice: £${price}`,
             startDateTime: `${date}T${startTime}:00`,
             endDateTime: `${date}T${endTime}:00`,
-            location: 'TutorNest Virtual Classroom',
+            location: 'Knowledge Fons Academy Virtual Classroom',
             attendees: attendeeEmails,
           }
         });
@@ -3376,7 +3376,7 @@ app.get('/make-server-cbd74580/payouts/dashboard', async (c) => {
       // Use the actual booking price if available, otherwise fall back to subject rate
       const grossAmount = booking.price ? parseFloat(booking.price) : getSubjectRate(booking.subject || '');
 
-      // Tutor receives 80%, TutorNest takes 20%
+      // Tutor receives 80%, Knowledge Fons Academy takes 20%
       const platformFee = (grossAmount * 0.20).toFixed(2);
       const netAmount = (grossAmount * 0.80).toFixed(2);
 

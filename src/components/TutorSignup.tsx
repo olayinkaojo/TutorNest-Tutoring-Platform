@@ -11,7 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Progress } from './ui/progress';
 import { CheckCircle, AlertCircle, User, BookOpen, Award, Shield, RotateCcw } from 'lucide-react';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import {
   TUTOR_ONBOARDING_DRAFT_KEY,
   passwordStrength,
@@ -861,7 +861,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
       clearOnboardingDraft();
 
       if (!isExistingUser) {
-        setSuccess('Account created successfully! Welcome to TutorNest!');
+        setSuccess('Account created successfully! Welcome to Knowledge Fons Academy!');
         setTimeout(() => {
           if (onSignupComplete) {
             onSignupComplete();
@@ -871,7 +871,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         }, 1000);
       } else {
         // For existing users, show success and trigger callback
-        setSuccess('Tutor profile created successfully! Welcome to TutorNest!');
+        setSuccess('Tutor profile created successfully! Welcome to Knowledge Fons Academy!');
         
         setTimeout(() => {
           if (onSignupComplete) {
@@ -965,7 +965,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         )}
         {/* Logo */}
         <div className="flex justify-center mb-6">
-          <TutorNestLogo />
+          <KFALogo />
         </div>
 
         {emailConfirmationSent ? (
@@ -1012,7 +1012,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         ) : (
 
         <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8">
-          <h1 className="text-center mb-2 text-gray-900">Become a TutorNest Tutor</h1>
+          <h1 className="text-center mb-2 text-gray-900">Become a Knowledge Fons Academy Tutor</h1>
           <p className="text-center text-gray-600 mb-8">
             Complete your profile to start connecting with students
           </p>
@@ -1303,10 +1303,10 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                     <p><strong>Flat Rate per Session:</strong> ₦20,000</p>
                     <div className="pl-4 space-y-1">
                       <p>• You receive: <strong>80%</strong> of session fee</p>
-                      <p>• TutorNest Platform Fee: <strong>20%</strong></p>
+                      <p>• Knowledge Fons Academy Platform Fee: <strong>20%</strong></p>
                     </div>
                     <p className="text-xs mt-2 text-green-700">
-                      All tutors on TutorNest receive the same competitive rate. This ensures fair compensation and transparent pricing for parents.
+                      All tutors on Knowledge Fons Academy receive the same competitive rate. This ensures fair compensation and transparent pricing for parents.
                     </p>
                   </div>
                 </div>
@@ -1703,7 +1703,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                     <Label htmlFor="agreeBackgroundCheck" className="cursor-pointer">
                       <strong className="text-[#625d9c]">I agree to undergo a background check *</strong>
                       <p className="text-sm text-gray-600 mt-1">
-                        TutorNest is committed to student safety. All tutors are subject to background verification including identity verification, qualification verification, and safeguarding checks. This process helps build trust with parents and students.
+                        Knowledge Fons Academy is committed to student safety. All tutors are subject to background verification including identity verification, qualification verification, and safeguarding checks. This process helps build trust with parents and students.
                       </p>
                     </Label>
                   </div>
@@ -1720,7 +1720,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                     <Label htmlFor="agreeTerms" className="cursor-pointer">
                       <strong className="text-[#625d9c]">I agree to the Terms of Service and Privacy Policy *</strong>
                       <p className="text-sm text-gray-600 mt-1">
-                        By checking this box, you agree to TutorNest's Terms of Service, Privacy Policy, and Tutor Code of Conduct.
+                        By checking this box, you agree to Knowledge Fons Academy's Terms of Service, Privacy Policy, and Tutor Code of Conduct.
                       </p>
                     </Label>
                   </div>

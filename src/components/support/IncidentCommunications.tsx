@@ -327,7 +327,7 @@ export function IncidentCommunications({
             </h3>
             <p className={allOperational ? 'text-green-800' : 'text-red-800'}>
               {allOperational
-                ? 'TutorNest is running smoothly with no reported issues'
+                ? 'Knowledge Fons Academy is running smoothly with no reported issues'
                 : `${activeIncidents.length} active incident${activeIncidents.length !== 1 ? 's' : ''} affecting platform services`
               }
             </p>

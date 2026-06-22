@@ -1,5 +1,5 @@
 /**
- * Currency utility functions for TutorNest
+ * Currency utility functions for Knowledge Fons Academy
  * All amounts are handled in Naira (NGN / ₦)
  */
 

@@ -39,7 +39,7 @@ import {
 } from 'lucide-react';
 import { NairaIcon } from './icons/NairaIcon';
 import { formatNaira } from '../utils/currency';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import { MobileNavigation } from './MobileNavigation';
 import { NotificationCenter } from './NotificationCenter';
 import { TutorProfileEditor } from './TutorProfileEditor';
@@ -165,7 +165,7 @@ export function TutorDashboard({
     if (!profile.id && !profile.userId) return;
 
     const userId = profile.id || profile.userId;
-    const congratsKey = `tutornest_show_tutor_congrats_${userId}`;
+    const congratsKey = `kfa_show_tutor_congrats_${userId}`;
     const shouldShow = localStorage.getItem(congratsKey);
 
     if (shouldShow) {
@@ -180,7 +180,7 @@ export function TutorDashboard({
     if (!profile.id && !profile.userId) return;
 
     const userId = profile.id || profile.userId;
-    const verificationCongratsKey = `tutornest_verification_congrats_${userId}`;
+    const verificationCongratsKey = `kfa_verification_congrats_${userId}`;
     const hasSeenVerificationCongrats = localStorage.getItem(verificationCongratsKey);
 
     // Check if profile shows verification is complete
@@ -645,7 +645,7 @@ export function TutorDashboard({
     const userId = profile.id || profile.userId;
     if (!userId) return;
 
-    const congratsKey = `tutornest_role_congrats_tutor_to_parent_${userId}`;
+    const congratsKey = `kfa_role_congrats_tutor_to_parent_${userId}`;
     const alreadyShown = localStorage.getItem(congratsKey) === 'true';
 
     if (!canBecomeParent && availableRoles && availableRoles.length > 1 && !alreadyShown) {
@@ -686,7 +686,7 @@ export function TutorDashboard({
       {/* Header - Hidden on mobile */}
       <header className="hidden lg:block bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between">
-          <TutorNestLogo />
+          <KFALogo />
           <div className="flex items-center gap-4">
             {/* Bookshop Button - Prominent */}
             <Button
@@ -822,7 +822,7 @@ export function TutorDashboard({
                 </div>
                 <div className="flex-1">
                   <h2 className="text-xl md:text-2xl mb-2" style={{ color: '#625d9c' }}>
-                    Become a Parent on TutorNest
+                    Become a Parent on Knowledge Fons Academy
                   </h2>
                   <p className="text-sm md:text-base text-gray-700 mb-4">
                     Manage your children's learning and book tutoring sessions

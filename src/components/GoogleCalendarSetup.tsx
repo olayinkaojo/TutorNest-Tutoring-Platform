@@ -174,7 +174,7 @@ export function GoogleCalendarSetup({ session, onConnectionChange }: GoogleCalen
           Google Calendar Integration
         </CardTitle>
         <CardDescription>
-          Sync your TutorNest sessions with Google Calendar automatically
+          Sync your Knowledge Fons Academy sessions with Google Calendar automatically
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4">
@@ -267,7 +267,7 @@ export function GoogleCalendarSetup({ session, onConnectionChange }: GoogleCalen
         <Alert>
           <AlertCircle className="h-4 w-4" />
           <AlertDescription className="text-xs">
-            By connecting Google Calendar, you allow TutorNest to create, read, and manage calendar events on your behalf. You can disconnect at any time.
+            By connecting Google Calendar, you allow Knowledge Fons Academy to create, read, and manage calendar events on your behalf. You can disconnect at any time.
           </AlertDescription>
         </Alert>
       </CardContent>

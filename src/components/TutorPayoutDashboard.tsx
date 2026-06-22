@@ -552,7 +552,7 @@ export function TutorPayoutDashboard({ session, tutorId }: TutorPayoutDashboardP
       <Alert className="bg-gray-50 border-gray-200">
         <AlertCircle className="h-4 w-4 text-gray-600" />
         <AlertDescription className="text-gray-700 text-sm">
-          <strong>Platform Fee:</strong> TutorNest charges a 20% platform fee on all lesson earnings.
+          <strong>Platform Fee:</strong> Knowledge Fons Academy charges a 20% platform fee on all lesson earnings.
           This covers payment processing, insurance, customer support, and platform maintenance.
         </AlertDescription>
       </Alert>

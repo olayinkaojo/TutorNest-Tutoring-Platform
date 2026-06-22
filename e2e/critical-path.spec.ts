@@ -8,7 +8,7 @@ import { test, expect } from '@playwright/test';
 test.describe('Critical Path: Complete User Journey', () => {
   test('should load homepage and verify key elements', async ({ page }) => {
     await page.goto('/');
-    await expect(page).toHaveTitle(/TutorNest|Tutoring/i);
+    await expect(page).toHaveTitle(/Knowledge Fons Academy|Tutoring/i);
 
     // Verify header/nav exists
     const nav = page.locator('nav, header, [role="navigation"]').first();

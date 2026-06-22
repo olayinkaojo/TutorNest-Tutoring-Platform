@@ -74,7 +74,7 @@ export async function initializeFlutterwavePayment(
       },
       payment_options: 'card,banktransfer,ussd,mobile_money',
       customizations: {
-        title: `TutorNest - ${getPaymentTypeDisplayName(request.type)}`,
+        title: `Knowledge Fons Academy - ${getPaymentTypeDisplayName(request.type)}`,
         description: request.description,
         logo: 'https://tutornest.com/logo.png',
       },

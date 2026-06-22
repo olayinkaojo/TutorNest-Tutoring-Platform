@@ -21,7 +21,7 @@ import {
   Star,
   X
 } from 'lucide-react';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 
 interface MobileNavigationProps {
   userType: 'student' | 'tutor' | 'parent' | 'admin';
@@ -90,7 +90,7 @@ export function MobileNavigation({
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 bg-white border-b z-50">
         <div className="flex items-center justify-between px-4 py-3">
-          <TutorNestLogo />
+          <KFALogo />
           
           <div className="flex items-center gap-2">
             {/* Quick action badges */}

@@ -40,7 +40,7 @@ const TUTOR_FORM: FormConfig = {
   id: 'tutor',
   label: 'Tutor',
   icon: '🎓',
-  emailSubject: 'TutorNest Beta — Tutor Feedback',
+  emailSubject: 'Knowledge Fons Academy Beta — Tutor Feedback',
   intro:
     'Thank you for taking part in our beta testing programme. Your honest feedback helps us build the best possible experience for tutors like you. All responses are confidential. Estimated time: 5–8 minutes.',
   sections: [
@@ -97,10 +97,10 @@ const TUTOR_FORM: FormConfig = {
     {
       title: 'Section 5: Final Feedback',
       questions: [
-        { id: 'overall_satisfaction', label: 'Overall, how satisfied are you with your TutorNest experience?', type: 'radio', options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very Dissatisfied'], required: true },
-        { id: 'nps', label: 'How likely are you to recommend TutorNest to a colleague?\n(0 = Not at all likely   |   10 = Extremely likely)', type: 'rating10', required: true },
+        { id: 'overall_satisfaction', label: 'Overall, how satisfied are you with your Knowledge Fons Academy experience?', type: 'radio', options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very Dissatisfied'], required: true },
+        { id: 'nps', label: 'How likely are you to recommend Knowledge Fons Academy to a colleague?\n(0 = Not at all likely   |   10 = Extremely likely)', type: 'rating10', required: true },
         { id: 'nps_reason', label: 'What is the main reason for your score?', type: 'textarea', placeholder: 'Tell us more...' },
-        { id: 'would_teach', label: 'Would you use TutorNest to teach after the official launch?', type: 'radio', options: ['Definitely', 'Probably', 'Maybe', 'No'], required: true },
+        { id: 'would_teach', label: 'Would you use Knowledge Fons Academy to teach after the official launch?', type: 'radio', options: ['Definitely', 'Probably', 'Maybe', 'No'], required: true },
         { id: 'top_feature', label: 'What one feature would most improve your experience?', type: 'textarea', placeholder: 'Your top feature request...' },
         { id: 'fix_before_launch', label: 'What is the most important issue we should fix before going live?', type: 'textarea', placeholder: 'Be as specific as possible...' },
         { id: 'follow_up', label: 'Would you be happy to join a follow-up discussion?', type: 'radio', options: ['Yes', 'No'], required: true },
@@ -113,9 +113,9 @@ const STUDENT_FORM: FormConfig = {
   id: 'student',
   label: 'Student',
   icon: '📚',
-  emailSubject: 'TutorNest Beta — Student Feedback',
+  emailSubject: 'Knowledge Fons Academy Beta — Student Feedback',
   intro:
-    "Hi! We'd love to know what you think about TutorNest. There are no right or wrong answers — just tell us honestly what you thought. Estimated time: 3–5 minutes.",
+    "Hi! We'd love to know what you think about Knowledge Fons Academy. There are no right or wrong answers — just tell us honestly what you thought. Estimated time: 3–5 minutes.",
   sections: [
     {
       title: 'Section 1: About You',
@@ -123,7 +123,7 @@ const STUDENT_FORM: FormConfig = {
         { id: 'student_name', label: 'First Name or Nickname (optional)', type: 'text', placeholder: 'What can we call you?' },
         { id: 'age_group', label: 'Age Group', type: 'radio', options: ['Under 8', '9–12', '13–16', '17–20', '21+'], required: true },
         { id: 'grade', label: 'School Year / Grade (optional)', type: 'text', placeholder: 'e.g. Year 7, Grade 10' },
-        { id: 'subjects', label: 'Subject(s) you explored on TutorNest', type: 'text', placeholder: 'e.g. Maths, English' },
+        { id: 'subjects', label: 'Subject(s) you explored on Knowledge Fons Academy', type: 'text', placeholder: 'e.g. Maths, English' },
         { id: 'device', label: 'Device used during testing', type: 'radio', options: ['Phone', 'Tablet', 'Laptop', 'Desktop'], required: true },
       ],
     },
@@ -131,7 +131,7 @@ const STUDENT_FORM: FormConfig = {
       title: 'Section 2: Platform Experience',
       questions: [
         { id: 'platform_easy', label: 'How easy was the platform to use overall?', type: 'radio', options: ['Very Easy', 'Easy', 'Difficult', 'Very Difficult'], required: true },
-        { id: 'enjoyed', label: 'Did you enjoy using TutorNest?', type: 'radio', options: ['Yes', 'A Little', 'No'], required: true },
+        { id: 'enjoyed', label: 'Did you enjoy using Knowledge Fons Academy?', type: 'radio', options: ['Yes', 'A Little', 'No'], required: true },
         { id: 'book_lesson', label: 'Could you easily find and book a lesson?', type: 'radio', options: ['Yes', 'Mostly', 'No'] },
         { id: 'join_lesson', label: 'Could you easily join a lesson when it started?', type: 'radio', options: ['Yes', 'No', "Didn't try"] },
         { id: 'message_tutor', label: 'Could you easily message your tutor?', type: 'radio', options: ['Yes', 'No', "Didn't try"] },
@@ -174,11 +174,11 @@ const STUDENT_FORM: FormConfig = {
     {
       title: 'Section 6: Final Feedback',
       questions: [
-        { id: 'overall_satisfaction', label: 'Overall, how satisfied are you with your TutorNest experience?', type: 'radio', options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very Dissatisfied'], required: true },
-        { id: 'nps', label: 'How likely are you to recommend TutorNest to a friend?\n(0 = Not at all   |   10 = Definitely)', type: 'rating10', required: true },
+        { id: 'overall_satisfaction', label: 'Overall, how satisfied are you with your Knowledge Fons Academy experience?', type: 'radio', options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very Dissatisfied'], required: true },
+        { id: 'nps', label: 'How likely are you to recommend Knowledge Fons Academy to a friend?\n(0 = Not at all   |   10 = Definitely)', type: 'rating10', required: true },
         { id: 'nps_reason', label: 'What is the main reason for your score?', type: 'textarea', placeholder: 'Tell us more...' },
-        { id: 'would_use', label: 'Would you use TutorNest for your learning?', type: 'radio', options: ['Yes', 'Maybe', 'No'], required: true },
-        { id: 'improvement', label: 'What one thing would make TutorNest better for students?', type: 'textarea', placeholder: 'Your top suggestion...' },
+        { id: 'would_use', label: 'Would you use Knowledge Fons Academy for your learning?', type: 'radio', options: ['Yes', 'Maybe', 'No'], required: true },
+        { id: 'improvement', label: 'What one thing would make Knowledge Fons Academy better for students?', type: 'textarea', placeholder: 'Your top suggestion...' },
         { id: 'follow_up', label: 'Would you be happy to chat with us again about your experience?', type: 'radio', options: ['Yes', 'No'], required: true },
       ],
     },
@@ -189,9 +189,9 @@ const PARENT_FORM: FormConfig = {
   id: 'parent',
   label: 'Parent',
   icon: '👪',
-  emailSubject: 'TutorNest Beta — Parent Feedback',
+  emailSubject: 'Knowledge Fons Academy Beta — Parent Feedback',
   intro:
-    "Thank you for helping us test TutorNest. Your feedback as a parent is invaluable in making sure our platform is safe, easy to use, and genuinely helpful for your family. All responses are confidential. Estimated time: 5–8 minutes.",
+    "Thank you for helping us test Knowledge Fons Academy. Your feedback as a parent is invaluable in making sure our platform is safe, easy to use, and genuinely helpful for your family. All responses are confidential. Estimated time: 5–8 minutes.",
   sections: [
     {
       title: 'Section 1: Basic Information',
@@ -201,7 +201,7 @@ const PARENT_FORM: FormConfig = {
         { id: 'child_age', label: "Child's Age", type: 'radio', options: ['Under 5', '5–8', '9–12', '13–16', '17–18', '18+ (adult learner)'], required: true },
         { id: 'subjects', label: 'Subjects interested in', type: 'text', placeholder: 'e.g. Maths, English, Science' },
         { id: 'device', label: 'Device used during testing', type: 'radio', options: ['Mobile', 'Tablet', 'Laptop', 'Desktop'], required: true },
-        { id: 'heard_from', label: 'How did you hear about TutorNest?', type: 'radio', options: ['Social Media', 'Friend / Family', 'Search Engine', 'Email', 'Other'] },
+        { id: 'heard_from', label: 'How did you hear about Knowledge Fons Academy?', type: 'radio', options: ['Social Media', 'Friend / Family', 'Search Engine', 'Email', 'Other'] },
       ],
     },
     {
@@ -251,11 +251,11 @@ const PARENT_FORM: FormConfig = {
     {
       title: 'Section 5: Final Feedback',
       questions: [
-        { id: 'overall_satisfaction', label: 'Overall, how satisfied are you with your TutorNest experience?', type: 'radio', options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very Dissatisfied'], required: true },
-        { id: 'nps', label: 'How likely are you to recommend TutorNest to another parent?\n(0 = Not at all likely   |   10 = Extremely likely)', type: 'rating10', required: true },
+        { id: 'overall_satisfaction', label: 'Overall, how satisfied are you with your Knowledge Fons Academy experience?', type: 'radio', options: ['Very Satisfied', 'Satisfied', 'Neutral', 'Dissatisfied', 'Very Dissatisfied'], required: true },
+        { id: 'nps', label: 'How likely are you to recommend Knowledge Fons Academy to another parent?\n(0 = Not at all likely   |   10 = Extremely likely)', type: 'rating10', required: true },
         { id: 'nps_reason', label: 'What is the main reason for your score?', type: 'textarea', placeholder: 'Tell us more...' },
-        { id: 'would_use', label: 'Would you use TutorNest for your child?', type: 'radio', options: ['Definitely', 'Probably', 'Maybe', 'No'], required: true },
-        { id: 'would_recommend', label: 'Would you recommend TutorNest to another parent?', type: 'radio', options: ['Yes', 'No'] },
+        { id: 'would_use', label: 'Would you use Knowledge Fons Academy for your child?', type: 'radio', options: ['Definitely', 'Probably', 'Maybe', 'No'], required: true },
+        { id: 'would_recommend', label: 'Would you recommend Knowledge Fons Academy to another parent?', type: 'radio', options: ['Yes', 'No'] },
         { id: 'top_improvement', label: 'What is the single most important improvement we should make?', type: 'textarea', placeholder: 'Your top priority...' },
         { id: 'follow_up', label: 'Would you be happy to join a follow-up discussion?', type: 'radio', options: ['Yes', 'No'], required: true },
       ],
@@ -464,7 +464,7 @@ function FeedbackForm({ config }: { config: FormConfig }) {
         <CheckCircle2 className="h-14 w-14 text-[#5d9827]" />
         <h3 className="text-xl font-semibold text-gray-800">Thank you for your feedback!</h3>
         <p className="max-w-sm text-sm text-gray-500">
-          Your responses have been sent to the TutorNest team. We really appreciate you taking the time.
+          Your responses have been sent to the Knowledge Fons Academy team. We really appreciate you taking the time.
         </p>
         <button
           className="mt-2 text-sm font-medium underline"
@@ -545,7 +545,7 @@ export function FeedbackForms() {
       <div className="border-b border-gray-100 px-6 py-6 sm:px-10">
         <h2 className="text-2xl font-semibold text-gray-900">Share Your Feedback</h2>
         <p className="mt-1 text-sm text-gray-500">
-          Help us improve TutorNest — select your role and complete the form below.
+          Help us improve Knowledge Fons Academy — select your role and complete the form below.
         </p>
       </div>
 

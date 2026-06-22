@@ -1,5 +1,5 @@
 /**
- * db.tsx — Typed Supabase Postgres operations for TutorNest core tables.
+ * db.tsx — Typed Supabase Postgres operations for Knowledge Fons Academy core tables.
  *
  * Tables covered: profiles, bookings, payments, tutor_balance, notifications
  *

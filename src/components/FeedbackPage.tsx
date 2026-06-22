@@ -1,5 +1,5 @@
 import { AuthBackground } from './AuthBackground';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import { FeedbackForms } from './FeedbackForms';
 
 export function FeedbackPage() {
@@ -8,7 +8,7 @@ export function FeedbackPage() {
       <div className="w-full max-w-4xl space-y-6">
         <div className="flex items-center justify-between">
           <a href="/" className="flex items-center gap-2 opacity-80 hover:opacity-100 transition-opacity">
-            <TutorNestLogo />
+            <KFALogo />
           </a>
           <a
             href="/"

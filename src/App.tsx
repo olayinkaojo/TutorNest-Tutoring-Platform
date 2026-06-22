@@ -257,7 +257,7 @@ export default function App() {
     setSession(null);
     setProfile(null);
     setAvailableRoles([]);
-    localStorage.removeItem('tutornest_last_active');
+    localStorage.removeItem('kfa_last_active');
 
     if (reason === 'inactivity') {
       toast.info('You were signed out after 8 hours of inactivity.', { duration: 6000 });

@@ -133,7 +133,7 @@ function downloadCsv(filename: string, rows: string[][]) {
 
 function buildExportRows(stats: PlatformStats, meta: OverviewMeta | null): string[][] {
   const rows: string[][] = [
-    ['TutorNest — platform overview'],
+    ['Knowledge Fons Academy — platform overview'],
     ['Exported', new Date().toISOString()],
     ['API snapshot', meta?.generatedAt || ''],
     ['Currency', meta?.currency || 'NGN'],

@@ -349,10 +349,10 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         if (!linkError && linkData?.properties?.action_link) {
           await sendEmail({
             to: email,
-            subject: `Confirm your TutorNest account`,
+            subject: `Confirm your Knowledge Fons Academy account`,
             html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
               <h2 style="color:#625d9c">Almost there, ${firstName}!</h2>
-              <p>Please confirm your email address to activate your TutorNest student account.</p>
+              <p>Please confirm your email address to activate your Knowledge Fons Academy student account.</p>
               <p style="margin:24px 0">
                 <a href="${linkData.properties.action_link}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Confirm Email Address</a>
               </p>
@@ -486,10 +486,10 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         if (!linkError2 && linkData2?.properties?.action_link) {
           await sendEmail({
             to: email,
-            subject: `Confirm your TutorNest account`,
+            subject: `Confirm your Knowledge Fons Academy account`,
             html: `<div style="font-family:sans-serif;max-width:600px;margin:auto;padding:24px">
               <h2 style="color:#625d9c">Almost there, ${firstName}!</h2>
-              <p>Please confirm your email address to activate your TutorNest account. Your parent/guardian will also receive an invitation to link their account to yours.</p>
+              <p>Please confirm your email address to activate your Knowledge Fons Academy account. Your parent/guardian will also receive an invitation to link their account to yours.</p>
               <p style="margin:24px 0">
                 <a href="${linkData2.properties.action_link}" style="background:#625d9c;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">Confirm Email Address</a>
               </p>
@@ -508,15 +508,15 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       const parentInviteEmail = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background-color: #625d9c; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
-            <h1>Link Your Child's TutorNest Account</h1>
+            <h1>Link Your Child's Knowledge Fons Academy Account</h1>
           </div>
           
           <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px;">
             <p>Hi there,</p>
             
-            <p>${firstName} ${lastName} has created a TutorNest account and would like you to approve it.</p>
+            <p>${firstName} ${lastName} has created a Knowledge Fons Academy account and would like you to approve it.</p>
             
-            <p>As their parent/guardian, you'll need to verify this account link to allow them to access TutorNest tutoring sessions.</p>
+            <p>As their parent/guardian, you'll need to verify this account link to allow them to access Knowledge Fons Academy tutoring sessions.</p>
             
             <div style="text-align: center; margin: 30px 0;">
               <a href="${parentLinkUrl}" style="display: inline-block; background-color: #625d9c; color: white; padding: 14px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 16px;">
@@ -538,7 +538,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       
       const parentEmailResult = await sendEmail({
         to: parentEmail,
-        subject: `${firstName} ${lastName} wants to use TutorNest - Approve Account`,
+        subject: `${firstName} ${lastName} wants to use Knowledge Fons Academy - Approve Account`,
         html: parentInviteEmail,
       });
       

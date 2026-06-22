@@ -1,5 +1,5 @@
 import { Users, GraduationCap, BookOpen } from 'lucide-react';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import { Button } from './ui/button';
 import { AuthBackground } from './AuthBackground';
 
@@ -46,11 +46,11 @@ export function SignupRoleChooser({
         <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8">
           {/* Logo */}
           <div className="flex justify-center mb-6">
-            <TutorNestLogo />
+            <KFALogo />
           </div>
 
           {/* Title */}
-          <h1 className="text-center mb-2 text-gray-900">Join TutorNest</h1>
+          <h1 className="text-center mb-2 text-gray-900">Join Knowledge Fons Academy</h1>
           <p className="text-center text-gray-600 mb-8">
             Choose how you want to get started
           </p>

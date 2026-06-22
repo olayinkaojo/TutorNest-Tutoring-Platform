@@ -108,7 +108,7 @@ app.post('/payments/initialize', async (c) => {
         },
         payment_options: 'card,banktransfer',
         customizations: {
-          title: 'TutorNest Session Booking',
+          title: 'Knowledge Fons Academy Session Booking',
           description: `Booking for ${subject ?? 'Tutoring Session'}`,
           logo: 'https://tutornest.com/logo.png',
         },
@@ -490,7 +490,7 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
         account_bank: payout.bankDetails.bankCode,
         account_number: payout.bankDetails.accountNumber,
         amount: payout.amount,
-        narration: `TutorNest payout - ${payoutId}`,
+        narration: `Knowledge Fons Academy payout - ${payoutId}`,
         currency: 'NGN',
         reference: `PAYOUT_${payoutId}_${Date.now()}`,
         beneficiary_name: payout.bankDetails.accountName || 'Tutor',
@@ -607,7 +607,7 @@ app.get('/payments/:paymentId/invoice', async (c) => {
       paidDate: payment.verifiedAt,
       status: payment.status,
       from: {
-        name: 'TutorNest',
+        name: 'Knowledge Fons Academy',
         address: 'Lagos, Nigeria',
         email: 'billing@tutornest.com',
       },
@@ -630,7 +630,7 @@ app.get('/payments/:paymentId/invoice', async (c) => {
       subtotal: payment.amount,
       tax: 0,
       total: payment.amount,
-      notes: 'Thank you for using TutorNest!',
+      notes: 'Thank you for using Knowledge Fons Academy!',
     };
 
     return c.json({ invoice });
@@ -805,7 +805,7 @@ async function createMeetEvent(
 ): Promise<string | null> {
   const tz = 'Africa/Lagos';
   const event = {
-    summary: `TutorNest: ${opts.subject ?? 'Tutoring Session'}`,
+    summary: `Knowledge Fons Academy: ${opts.subject ?? 'Tutoring Session'}`,
     description: opts.sessionLabel,
     start: { dateTime: `${opts.date}T${opts.startTime}:00`, timeZone: tz },
     end:   { dateTime: `${opts.date}T${opts.endTime}:00`,   timeZone: tz },
@@ -933,7 +933,7 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
         startTime: payment.startTime,
         endTime,
         subject: payment.subject,
-        sessionLabel: `${plan.name} (${plan.sessions} sessions) — TutorNest`,
+        sessionLabel: `${plan.name} (${plan.sessions} sessions) — Knowledge Fons Academy`,
       });
       if (meetLink) {
         await db.updateBookingsMeetLink(bookingIds, meetLink);

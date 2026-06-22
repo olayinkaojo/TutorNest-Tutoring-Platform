@@ -193,7 +193,7 @@ export function TutorOverviewTab({
               <div className="min-w-0 flex-1">
                 <CardTitle className="text-lg text-gray-900">Your profile is being verified</CardTitle>
                 <CardDescription className="text-gray-600 mt-1">
-                  TutorNest reviews every educator before they appear in search and can accept bookings. Most reviews finish
+                  Knowledge Fons Academy reviews every educator before they appear in search and can accept bookings. Most reviews finish
                   within <strong>24–48 hours</strong> on working days.
                 </CardDescription>
               </div>

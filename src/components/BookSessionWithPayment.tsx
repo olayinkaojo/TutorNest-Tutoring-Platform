@@ -173,7 +173,7 @@ export function BookSessionWithPayment({
             name: studentName,
           },
           customizations: {
-            title: 'TutorNest',
+            title: 'Knowledge Fons Academy',
             description: `${plan.name}${subject ? ' — ' + subject : ''}`,
             logo: 'https://app.tutornest.org/logo.png',
           },

@@ -108,7 +108,7 @@ export function PaymentHistory() {
             </head>
             <body>
               <div class="header">
-                <h1>TutorNest</h1>
+                <h1>Knowledge Fons Academy</h1>
                 <p>Invoice ${data.invoice.id}</p>
                 <span class="badge ${data.invoice.status === 'successful' ? 'badge-success' : 'badge-warning'}">
                   ${data.invoice.status.toUpperCase()}

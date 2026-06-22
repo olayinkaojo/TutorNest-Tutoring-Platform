@@ -500,14 +500,14 @@ function PaymentMethodsPanel() {
             <Wallet className="h-5 w-5" style={{ color: '#5d9827' }} />
             Payment Methods
           </CardTitle>
-          <CardDescription>How payments are processed on TutorNest</CardDescription>
+          <CardDescription>How payments are processed on Knowledge Fons Academy</CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
           <Alert className="border-blue-200 bg-blue-50">
             <ShieldCheck className="h-4 w-4 text-blue-600" />
             <AlertDescription className="text-blue-800 text-sm">
               <strong>Secure checkout via Flutterwave.</strong> Your card details are encrypted and processed
-              directly by Flutterwave — TutorNest never stores full card numbers.
+              directly by Flutterwave — Knowledge Fons Academy never stores full card numbers.
             </AlertDescription>
           </Alert>
 
@@ -674,7 +674,7 @@ function generateInvoiceHTML(invoice: any, payment: Payment): string {
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <title>Invoice — TutorNest</title>
+  <title>Invoice — Knowledge Fons Academy</title>
   <style>
     *{margin:0;padding:0;box-sizing:border-box}
     body{font-family:'Segoe UI',system-ui,sans-serif;background:#f8fafc;color:#1e293b;line-height:1.5}
@@ -710,7 +710,7 @@ function generateInvoiceHTML(invoice: any, payment: Payment): string {
 <div class="page">
   <div class="header">
     <div class="brand">
-      <h1>TutorNest</h1>
+      <h1>Knowledge Fons Academy</h1>
       <p>Professional Online Tutoring Platform · Nigeria</p>
     </div>
     <div class="invoice-meta">
@@ -724,7 +724,7 @@ function generateInvoiceHTML(invoice: any, payment: Payment): string {
     <div class="meta-row">
       <div class="meta-block">
         <h3>From</h3>
-        <p><strong>${invoice.from?.name || 'TutorNest'}</strong></p>
+        <p><strong>${invoice.from?.name || 'Knowledge Fons Academy'}</strong></p>
         <p class="muted">${invoice.from?.address || 'Lagos, Nigeria'}</p>
         <p class="muted">${invoice.from?.email || 'billing@tutornest.org'}</p>
       </div>
@@ -776,7 +776,7 @@ function generateInvoiceHTML(invoice: any, payment: Payment): string {
     <div class="footer">
       <p>Thank you for investing in quality education!</p>
       <p style="margin-top:6px">Questions? Email support@tutornest.org · Phone: +234(0)800-TUTOR</p>
-      <p style="margin-top:10px;color:#cbd5e1">Generated ${new Date().toLocaleString('en-NG')} · TutorNest Platform · Page 1 of 1</p>
+      <p style="margin-top:10px;color:#cbd5e1">Generated ${new Date().toLocaleString('en-NG')} · Knowledge Fons Academy Platform · Page 1 of 1</p>
     </div>
   </div>
 </div>

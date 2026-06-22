@@ -8,7 +8,7 @@ test.describe('Student Gamification Flow', () => {
 
   test('should complete trivia game flow', async ({ page }) => {
     // 1. Check page loads
-    await expect(page).toHaveTitle(/TutorNest|Tutoring/i);
+    await expect(page).toHaveTitle(/Knowledge Fons Academy|Tutoring/i);
 
     // 2. Navigate to trivia (assuming button exists)
     const playTriviaBtn = page.locator('button:has-text("Play Trivia"), a:has-text("Play Trivia")').first();

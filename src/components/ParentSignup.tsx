@@ -14,7 +14,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Progress } from './ui/progress';
 import { Users, AlertCircle, CheckCircle, RotateCcw } from 'lucide-react';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 
 interface ParentSignupProps {
   onBackToSignIn?: () => void;
@@ -351,7 +351,7 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
         )}
 
         <div className="flex justify-center mb-6">
-          <TutorNestLogo />
+          <KFALogo />
         </div>
 
         {emailConfirmationSent ? (
@@ -398,7 +398,7 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
           <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8">
             <h1 className="text-center mb-2 text-gray-900">Create parent account</h1>
             <p className="text-center text-gray-600 mb-6">
-              Join TutorNest to manage your children&apos;s learning — takes about two minutes.
+              Join Knowledge Fons Academy to manage your children&apos;s learning — takes about two minutes.
             </p>
 
             {stepIndicator}
@@ -579,7 +579,7 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
                       <Label htmlFor="agreeTerms" className="cursor-pointer">
                         <strong className="text-[#625d9c]">Terms & privacy *</strong>
                         <p className="text-sm text-gray-600 mt-1">
-                          I agree to TutorNest&apos;s Terms of Service and Privacy Policy.
+                          I agree to Knowledge Fons Academy&apos;s Terms of Service and Privacy Policy.
                         </p>
                       </Label>
                     </div>

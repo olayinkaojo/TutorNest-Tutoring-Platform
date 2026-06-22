@@ -1,5 +1,5 @@
 /**
- * Performance Optimization Utilities for TutorNest
+ * Performance Optimization Utilities for Knowledge Fons Academy
  * 
  * This module provides utilities for:
  * - Debouncing and throttling

@@ -78,12 +78,12 @@ export function SecurityPrivacySettings({
             <h3 className="text-2xl mb-4">Cookie Preferences</h3>
             <p className="text-gray-600 mb-6">
               Manage your cookie consent preferences. You can customize which types of cookies
-              you allow TutorNest to use.
+              you allow Knowledge Fons Academy to use.
             </p>
             <Button
               onClick={() => {
                 // Clear consent to show banner again
-                localStorage.removeItem('tutornest_cookie_consent');
+                localStorage.removeItem('kfa_cookie_consent');
                 window.location.reload();
               }}
               variant="outline"

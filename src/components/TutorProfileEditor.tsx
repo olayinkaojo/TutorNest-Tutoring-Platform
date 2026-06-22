@@ -1445,7 +1445,7 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
                 <div className="text-sm text-green-900">
                   <p className="font-medium mb-1">Payout Information</p>
                   <ul className="text-xs space-y-1 list-disc list-inside">
-                    <li>Tutors receive 80% of session fees (TutorNest takes 20%)</li>
+                    <li>Tutors receive 80% of session fees (Knowledge Fons Academy takes 20%)</li>
                     <li>Payouts are processed weekly for completed sessions</li>
                     <li>Subject-based rates: ₦14,000 - ₦28,000 per session</li>
                     <li>Minimum payout threshold: ₦5,000</li>

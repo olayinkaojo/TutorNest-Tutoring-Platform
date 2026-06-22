@@ -252,7 +252,7 @@ async function createGoogleCalendarEvent(userId: string, eventData: any) {
       dateTime: eventData.endDateTime,
       timeZone: 'Africa/Lagos',
     },
-    location: eventData.location || 'TutorNest Virtual Classroom',
+    location: eventData.location || 'Knowledge Fons Academy Virtual Classroom',
     reminders: {
       useDefault: false,
       overrides: [
@@ -1717,7 +1717,7 @@ app.get('/make-server-cbd74580/availability/:tutorId/slots', async (c) => {
 
     const daySchedule = availability.schedule[dayOfWeek];
     
-    // Get all TutorNest bookings for this tutor on this date
+    // Get all Knowledge Fons Academy bookings for this tutor on this date
     const allBookings = await kv.getByPrefix('booking:');
     const dateBookings = allBookings.filter((b: any) => 
       b.tutorId === tutorId && 
@@ -1778,8 +1778,8 @@ app.get('/make-server-cbd74580/availability/:tutorId/slots', async (c) => {
         const slotStart = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
         const slotEnd = `${String(Math.floor((minutes + 60) / 60)).padStart(2, '0')}:${String((minutes + 60) % 60).padStart(2, '0')}`;
 
-        // Check if slot is booked in TutorNest
-        const isTutorNestBooked = dateBookings.some((b: any) => {
+        // Check if slot is booked in Knowledge Fons Academy
+        const isKnowledge Fons AcademyBooked = dateBookings.some((b: any) => {
           const bookingStart = b.startTime;
           const bookingEnd = b.endTime;
           return !(slotEnd <= bookingStart || slotStart >= bookingEnd);
@@ -1794,7 +1794,7 @@ app.get('/make-server-cbd74580/availability/:tutorId/slots', async (c) => {
           date: dateParam,
           startTime: slotStart,
           endTime: slotEnd,
-          available: !isTutorNestBooked && !isGoogleCalendarBusy,
+          available: !isKnowledge Fons AcademyBooked && !isGoogleCalendarBusy,
         });
       }
     }
@@ -1921,10 +1921,10 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
           accessToken: parentAccessToken,
           event: {
             summary: `Tutoring Session with ${booking.tutorName}`,
-            description: `TutorNest tutoring session for ${booking.studentName}\n\nSubject: ${tutorProfile?.subjects?.[0] || 'General'}\nPrice: £${price}`,
+            description: `Knowledge Fons Academy tutoring session for ${booking.studentName}\n\nSubject: ${tutorProfile?.subjects?.[0] || 'General'}\nPrice: £${price}`,
             startDateTime: `${date}T${startTime}:00`,
             endDateTime: `${date}T${endTime}:00`,
-            location: 'TutorNest Virtual Classroom',
+            location: 'Knowledge Fons Academy Virtual Classroom',
             attendees: attendeeEmails,
           }
         });
@@ -1941,10 +1941,10 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
           accessToken: tutorAccessToken,
           event: {
             summary: `Tutoring Session with ${booking.studentName}`,
-            description: `TutorNest tutoring session\n\nStudent: ${booking.studentName}\nParent: ${parentProfile?.firstName || 'Parent'}\nPrice: £${price}`,
+            description: `Knowledge Fons Academy tutoring session\n\nStudent: ${booking.studentName}\nParent: ${parentProfile?.firstName || 'Parent'}\nPrice: £${price}`,
             startDateTime: `${date}T${startTime}:00`,
             endDateTime: `${date}T${endTime}:00`,
-            location: 'TutorNest Virtual Classroom',
+            location: 'Knowledge Fons Academy Virtual Classroom',
             attendees: attendeeEmails,
           }
         });
@@ -2503,7 +2503,7 @@ app.get('/make-server-cbd74580/payouts/dashboard', async (c) => {
       // Use the actual booking price if available, otherwise fall back to subject rate
       const grossAmount = booking.price ? parseFloat(booking.price) : getSubjectRate(booking.subject || '');
 
-      // Tutor receives 80%, TutorNest takes 20%
+      // Tutor receives 80%, Knowledge Fons Academy takes 20%
       const platformFee = (grossAmount * 0.20).toFixed(2);
       const netAmount = (grossAmount * 0.80).toFixed(2);
 
@@ -3046,11 +3046,11 @@ app.post('/make-server-cbd74580/test-email', async (c: any) => {
 
     const result = await sendEmail({
       to: toEmail,
-      subject: 'TutorNest — Email Delivery Test',
+      subject: 'Knowledge Fons Academy — Email Delivery Test',
       html: `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
           <h2 style="color:#625d9c">Email is working!</h2>
-          <p>This is a test email from TutorNest to confirm that email delivery is functioning correctly.</p>
+          <p>This is a test email from Knowledge Fons Academy to confirm that email delivery is functioning correctly.</p>
           <p style="color:#888;font-size:12px">Sent at ${new Date().toISOString()}</p>
         </div>
       `,

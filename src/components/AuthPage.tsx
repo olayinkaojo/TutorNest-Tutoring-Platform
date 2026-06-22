@@ -4,7 +4,7 @@ import { Mail, Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Alert, AlertDescription } from './ui/alert';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import { AuthBackground } from './AuthBackground';
 
 const supabase = getSupabaseClient();
@@ -172,7 +172,7 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
           {/* Logo — 5 rapid clicks activates staff login */}
           <div className="flex justify-center mb-6 sm:mb-8">
             <button type="button" onClick={handleLogoClick} className="focus:outline-none select-none">
-              <TutorNestLogo />
+              <KFALogo />
             </button>
           </div>
 
@@ -429,7 +429,7 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
             <div className="mt-6 p-4 border-2 rounded-lg text-center" style={{ borderColor: '#5d9827', backgroundColor: '#f0f9e8' }}>
               <h3 className="mb-2" style={{ color: '#5d9827' }}>Want to teach?</h3>
               <p className="text-sm text-gray-700 mb-3">
-                Join TutorNest and start earning by sharing your knowledge
+                Join Knowledge Fons Academy and start earning by sharing your knowledge
               </p>
               <Button
                 type="button"
@@ -447,7 +447,7 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
             <div className="mt-6 p-4 border-2 rounded-lg text-center" style={{ borderColor: '#5d9827', backgroundColor: '#f0f9e8' }}>
               <h3 className="mb-2" style={{ color: '#5d9827' }}>Want to learn?</h3>
               <p className="text-sm text-gray-700 mb-3">
-                Join TutorNest and find the best tutors for you
+                Join Knowledge Fons Academy and find the best tutors for you
               </p>
               <Button
                 type="button"
@@ -462,7 +462,7 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
         </div>
 
         <p className="text-center mt-6 text-sm text-gray-600">
-          By continuing, you agree to TutorNest's Terms of Service and Privacy Policy
+          By continuing, you agree to Knowledge Fons Academy's Terms of Service and Privacy Policy
         </p>
         
       </div>

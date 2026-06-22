@@ -52,7 +52,7 @@ export function PrivacyPolicy() {
     const content = document.getElementById('policy-content')?.innerText || '';
     const file = new Blob([content], { type: 'text/plain' });
     element.href = URL.createObjectURL(file);
-    element.download = `TutorNest-Privacy-Policy-v${selectedVersion}.txt`;
+    element.download = `Knowledge Fons Academy-Privacy-Policy-v${selectedVersion}.txt`;
     element.click();
   };
 
@@ -118,7 +118,7 @@ export function PrivacyPolicy() {
         <Card className="p-6">
           <h2 className="text-2xl mb-4">Introduction</h2>
           <p className="text-gray-700 leading-relaxed mb-4">
-            TutorNest ("we", "our", "us") is committed to protecting your privacy and ensuring the security
+            Knowledge Fons Academy ("we", "our", "us") is committed to protecting your privacy and ensuring the security
             of your personal information. This Privacy Policy explains how we collect, use, disclose, and
             safeguard your information when you use our online tutoring platform.
           </p>
@@ -135,7 +135,7 @@ export function PrivacyPolicy() {
             <h2 className="text-2xl">Data Controller</h2>
           </div>
           <div className="text-gray-700 space-y-2">
-            <p><strong>Company Name:</strong> TutorNest Ltd</p>
+            <p><strong>Company Name:</strong> Knowledge Fons Academy Ltd</p>
             <p><strong>Registered Address:</strong> 123 Education Street, London, EC1A 1BB, United Kingdom</p>
             <p><strong>ICO Registration:</strong> ZA123456</p>
             <p><strong>Data Protection Officer:</strong> dpo@tutornest.com</p>
@@ -364,7 +364,7 @@ export function PrivacyPolicy() {
           <h2 className="text-2xl mb-4">Children's Privacy & Safeguarding</h2>
           
           <p className="text-gray-700 mb-4">
-            TutorNest is a platform for children's education. We take special care to protect children's data:
+            Knowledge Fons Academy is a platform for children's education. We take special care to protect children's data:
           </p>
           
           <ul className="text-gray-700 space-y-2 ml-4">
@@ -397,7 +397,7 @@ export function PrivacyPolicy() {
             <p><strong>Data Protection Officer:</strong> dpo@tutornest.com</p>
             <p><strong>Privacy Team:</strong> privacy@tutornest.com</p>
             <p><strong>Phone:</strong> +44 (0)20 1234 5678</p>
-            <p><strong>Post:</strong> TutorNest Ltd, 123 Education Street, London, EC1A 1BB</p>
+            <p><strong>Post:</strong> Knowledge Fons Academy Ltd, 123 Education Street, London, EC1A 1BB</p>
           </div>
           
           <div className="mt-4 p-4 bg-gray-100 rounded-lg">
@@ -421,7 +421,7 @@ export function PrivacyPolicy() {
           })}
         </p>
         <p className="mt-2">
-          © 2025 TutorNest Ltd. All rights reserved.
+          © 2025 Knowledge Fons Academy Ltd. All rights reserved.
         </p>
       </div>
     </div>

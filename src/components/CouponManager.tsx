@@ -201,7 +201,7 @@ export function CouponManager({ adminId }: CouponManagerProps) {
               <DialogHeader>
                 <DialogTitle>Create New Coupon</DialogTitle>
                 <DialogDescription>
-                  Set up a promotional discount code for TutorNest subscriptions
+                  Set up a promotional discount code for Knowledge Fons Academy subscriptions
                 </DialogDescription>
               </DialogHeader>
 

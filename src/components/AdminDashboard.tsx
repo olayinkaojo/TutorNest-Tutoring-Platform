@@ -36,7 +36,7 @@ import {
   Clock,
   Filter
 } from 'lucide-react';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import { NotificationCenter } from './NotificationCenter';
 import { AdminDashboardHealthCheck } from './AdminDashboardHealthCheck';
 import { PlatformOverview } from './admin/PlatformOverview';
@@ -236,7 +236,7 @@ export function AdminDashboard({
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-3 sm:px-4 py-3 sm:py-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between min-w-0">
           <div className="min-w-0 shrink-0">
-            <TutorNestLogo />
+            <KFALogo />
           </div>
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 min-w-0 justify-start sm:justify-end">
             {/* Notification Center */}

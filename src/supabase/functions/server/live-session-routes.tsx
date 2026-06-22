@@ -59,7 +59,7 @@ app.post('/sessions/:bookingId/start', async (c) => {
         tutor: booking.tutorId === userId,
         student: booking.studentId === userId,
       },
-      videoRoomId: `tutornest_${bookingId}_${Date.now()}`,
+      videoRoomId: `kfa_${bookingId}_${Date.now()}`,
     };
 
     await kv.set(`live_session:${sessionId}`, liveSession);

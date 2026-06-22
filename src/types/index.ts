@@ -1,4 +1,4 @@
-// Shared type definitions for TutorNest application
+// Shared type definitions for Knowledge Fons Academy application
 
 export type UserRole = 'parent' | 'student' | 'tutor' | null;
 

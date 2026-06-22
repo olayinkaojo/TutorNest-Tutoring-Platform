@@ -1,4 +1,4 @@
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import { Chatroom } from './Chatroom';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { getSupabaseClient } from '../utils/supabase/client';
@@ -158,7 +158,7 @@ export function EnhancedTutorDashboard({ profile, onSignOut }: EnhancedTutorDash
       <header className="bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
-            <TutorNestLogo />
+            <KFALogo />
             <div className="flex items-center gap-4">
               {/* Notification Center */}
               {session && (

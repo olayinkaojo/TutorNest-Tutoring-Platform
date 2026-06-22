@@ -17,7 +17,7 @@ interface ConsentPreferences {
 }
 
 const COOKIE_CONSENT_VERSION = '1.0.0';
-const CONSENT_STORAGE_KEY = 'tutornest_cookie_consent';
+const CONSENT_STORAGE_KEY = 'kfa_cookie_consent';
 
 export function CookieConsent() {
   const [showBanner, setShowBanner] = useState(false);
@@ -224,9 +224,9 @@ export function CookieConsent() {
                       View cookies (3)
                     </summary>
                     <ul className="text-xs text-gray-600 mt-2 space-y-1 ml-4">
-                      <li>• tutornest_session - Authentication session (30 days)</li>
-                      <li>• tutornest_csrf - Security token (Session)</li>
-                      <li>• tutornest_consent - Consent preferences (1 year)</li>
+                      <li>• kfa_session - Authentication session (30 days)</li>
+                      <li>• kfa_csrf - Security token (Session)</li>
+                      <li>• kfa_consent - Consent preferences (1 year)</li>
                     </ul>
                   </details>
                 </div>
@@ -254,8 +254,8 @@ export function CookieConsent() {
                       View cookies (2)
                     </summary>
                     <ul className="text-xs text-gray-600 mt-2 space-y-1 ml-4">
-                      <li>• tutornest_lang - Language preference (1 year)</li>
-                      <li>• tutornest_video_prefs - Video player settings (6 months)</li>
+                      <li>• kfa_lang - Language preference (1 year)</li>
+                      <li>• kfa_video_prefs - Video player settings (6 months)</li>
                     </ul>
                   </details>
                 </div>
@@ -285,8 +285,8 @@ export function CookieConsent() {
                     <ul className="text-xs text-gray-600 mt-2 space-y-1 ml-4">
                       <li>• _ga - Google Analytics (2 years)</li>
                       <li>• _gid - Google Analytics (24 hours)</li>
-                      <li>• tutornest_analytics - Internal analytics (1 year)</li>
-                      <li>• tutornest_session_replay - Session recording (30 days)</li>
+                      <li>• kfa_analytics - Internal analytics (1 year)</li>
+                      <li>• kfa_session_replay - Session recording (30 days)</li>
                     </ul>
                   </details>
                 </div>
@@ -318,8 +318,8 @@ export function CookieConsent() {
                       <li>• _fbp - Facebook Pixel (3 months)</li>
                       <li>• fr - Facebook (3 months)</li>
                       <li>• IDE - Google Ads (2 years)</li>
-                      <li>• tutornest_marketing - Marketing preferences (1 year)</li>
-                      <li>• tutornest_referral - Referral tracking (30 days)</li>
+                      <li>• kfa_marketing - Marketing preferences (1 year)</li>
+                      <li>• kfa_referral - Referral tracking (30 days)</li>
                     </ul>
                   </details>
                 </div>

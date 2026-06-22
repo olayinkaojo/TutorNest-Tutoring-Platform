@@ -15,7 +15,7 @@ interface ParentGettingStartedCardProps {
   onPayments: () => void;
 }
 
-const STORAGE_PREFIX = 'tutornest_parent_getting_started_dismissed';
+const STORAGE_PREFIX = 'kfa_parent_getting_started_dismissed';
 
 export function ParentGettingStartedCard({
   userId,

@@ -15,7 +15,7 @@ export function AccessibilityStatement() {
   return (
     <div className="max-w-4xl mx-auto space-y-6">
       <div className="text-center mb-8">
-        <h1 className="text-4xl mb-4">Accessibility Statement for TutorNest</h1>
+        <h1 className="text-4xl mb-4">Accessibility Statement for Knowledge Fons Academy</h1>
         <p className="text-gray-600">
           Last updated: November 15, 2025
         </p>
@@ -24,7 +24,7 @@ export function AccessibilityStatement() {
       <Card className="p-6">
         <h2 className="text-2xl mb-4">Our Commitment</h2>
         <p className="text-gray-700 leading-relaxed">
-          TutorNest is committed to ensuring digital accessibility for all users, including those with disabilities.
+          Knowledge Fons Academy is committed to ensuring digital accessibility for all users, including those with disabilities.
           We are continually improving the user experience for everyone and applying the relevant accessibility standards
           to ensure we provide equal access to all of our users.
         </p>
@@ -38,7 +38,7 @@ export function AccessibilityStatement() {
             <div>
               <h3 className="text-lg font-medium mb-2">WCAG 2.1 Level AA</h3>
               <p className="text-gray-700">
-                TutorNest conforms to the Web Content Accessibility Guidelines (WCAG) 2.1 Level AA.
+                Knowledge Fons Academy conforms to the Web Content Accessibility Guidelines (WCAG) 2.1 Level AA.
                 The WCAG 2.1 guidelines explain how to make web content more accessible for people with disabilities,
                 and user friendly for everyone.
               </p>
@@ -129,7 +129,7 @@ export function AccessibilityStatement() {
       <Card className="p-6">
         <h2 className="text-2xl mb-4">Special Educational Needs (SEN) Support</h2>
         <p className="text-gray-700 mb-4">
-          We recognize that accessibility extends beyond technical compliance. TutorNest provides additional
+          We recognize that accessibility extends beyond technical compliance. Knowledge Fons Academy provides additional
           support for learners with special educational needs:
         </p>
         <ul className="space-y-2 text-gray-700">
@@ -145,7 +145,7 @@ export function AccessibilityStatement() {
       <Card className="p-6">
         <h2 className="text-2xl mb-4">Technologies We Support</h2>
         <p className="text-gray-700 mb-4">
-          TutorNest is designed to be compatible with:
+          Knowledge Fons Academy is designed to be compatible with:
         </p>
         <div className="grid md:grid-cols-2 gap-4">
           <div>
@@ -194,7 +194,7 @@ export function AccessibilityStatement() {
       <Card className="p-6">
         <h2 className="text-2xl mb-4">Assessment & Testing</h2>
         <p className="text-gray-700 mb-4">
-          TutorNest has been assessed using:
+          Knowledge Fons Academy has been assessed using:
         </p>
         <ul className="space-y-2 text-gray-700">
           <li>• Automated testing with axe DevTools and WAVE</li>
@@ -208,7 +208,7 @@ export function AccessibilityStatement() {
       <Card className="p-6 bg-blue-50 border-blue-200">
         <h2 className="text-2xl mb-4">Feedback & Contact</h2>
         <p className="text-gray-700 mb-4">
-          We welcome your feedback on the accessibility of TutorNest. Please let us know if you encounter
+          We welcome your feedback on the accessibility of Knowledge Fons Academy. Please let us know if you encounter
           accessibility barriers:
         </p>
         

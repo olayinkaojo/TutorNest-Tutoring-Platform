@@ -3,7 +3,7 @@ import { ParentStatsSection } from './parent/ParentStatsSection';
 import { ParentQuickActions } from './parent/ParentQuickActions';
 import { ParentOverviewTab } from './parent/ParentOverviewTab';
 import ErrorBoundary from './ErrorBoundary';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import { TutorSearch } from './TutorSearch';
 import { NairaIcon } from './icons/NairaIcon';
 import { formatNaira } from '../utils/currency';
@@ -89,7 +89,7 @@ export function ParentDashboard({
   // Initialize from localStorage to persist across page refreshes
   const [activeChildId, setActiveChildId] = useState<string | null>(() => {
     if (typeof window === 'undefined') return null;
-    return localStorage.getItem(`tutornest_active_child_${profile.id || profile.userId}`);
+    return localStorage.getItem(`kfa_active_child_${profile.id || profile.userId}`);
   });
   const [subscriptionTier, setSubscriptionTier] = useState('basic');
   const [isAddingTutorRole, setIsAddingTutorRole] = useState(false);
@@ -152,7 +152,7 @@ export function ParentDashboard({
     const userId = profile.id || profile.userId;
     if (!userId) return;
 
-    const userCongratsKey = `tutornest_role_congrats_parent_to_tutor_${userId}`;
+    const userCongratsKey = `kfa_role_congrats_parent_to_tutor_${userId}`;
     const hasSeenCongrats = localStorage.getItem(userCongratsKey);
     
     // Show congratulations if:
@@ -204,7 +204,7 @@ export function ParentDashboard({
       if (stillExists) return prev; // keep the selection intact
       // Default to first child on initial load or after deletion
       const firstId = children[0].id;
-      if (userId) localStorage.setItem(`tutornest_active_child_${userId}`, firstId);
+      if (userId) localStorage.setItem(`kfa_active_child_${userId}`, firstId);
       return firstId;
     });
   }, [children, profile.id, profile.userId]);
@@ -378,7 +378,7 @@ export function ParentDashboard({
   const handleSwitchChild = (childId: string) => {
     setActiveChildId(childId);
     // Persist to localStorage
-    localStorage.setItem(`tutornest_active_child_${profile.id || profile.userId}`, childId);
+    localStorage.setItem(`kfa_active_child_${profile.id || profile.userId}`, childId);
     setBookingsSubTab('book-session'); // reset to booking view when switching child
   };
 
@@ -512,7 +512,7 @@ export function ParentDashboard({
         setTutorRoleSuccess(true);
         // Mark that congratulations should show on tutor dashboard first load
         const userId = profile.id || profile.userId;
-        localStorage.setItem(`tutornest_show_tutor_congrats_${userId}`, 'true');
+        localStorage.setItem(`kfa_show_tutor_congrats_${userId}`, 'true');
         
         setTimeout(() => {
           // Instead of redirecting to signup, switch to the tutor role
@@ -558,7 +558,7 @@ export function ParentDashboard({
       {/* Header - Hidden on mobile */}
       <header className="hidden lg:block bg-white border-b">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <TutorNestLogo />
+          <KFALogo />
           <div className="flex items-center gap-4">
             {/* Bookshop Button - Prominent */}
             <Button
@@ -731,7 +731,7 @@ export function ParentDashboard({
                 </div>
                 <div className="flex-1">
                   <h2 className="text-xl md:text-2xl mb-2" style={{ color: '#5d9827' }}>
-                    Become a Tutor on TutorNest
+                    Become a Tutor on Knowledge Fons Academy
                   </h2>
                   <p className="text-sm md:text-base text-gray-700 mb-4">
                     Share your knowledge and earn by teaching students globally

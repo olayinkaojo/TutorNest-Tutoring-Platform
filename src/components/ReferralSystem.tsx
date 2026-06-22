@@ -166,7 +166,7 @@ export function ReferralSystem({ userId, userEmail }: ReferralSystemProps) {
             Refer Friends & Earn £25
           </CardTitle>
           <CardDescription>
-            Share TutorNest with friends and you'll both receive £25 credit when they subscribe!
+            Share Knowledge Fons Academy with friends and you'll both receive £25 credit when they subscribe!
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -174,7 +174,7 @@ export function ReferralSystem({ userId, userEmail }: ReferralSystemProps) {
             <h4>How it works:</h4>
             <ol className="list-decimal list-inside space-y-2 text-sm">
               <li>Share your unique referral link or send an invitation via email</li>
-              <li>Your friend signs up and subscribes to any TutorNest plan</li>
+              <li>Your friend signs up and subscribes to any Knowledge Fons Academy plan</li>
               <li>You both receive £25 credit automatically applied to your accounts</li>
             </ol>
           </div>

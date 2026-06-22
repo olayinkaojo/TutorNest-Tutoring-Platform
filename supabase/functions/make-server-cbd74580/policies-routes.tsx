@@ -44,7 +44,7 @@ All strikes expire after 90 days of good behavior.
 ## Prohibited Content Policy
 
 ### Strictly Prohibited
-The following content is not allowed on TutorNest:
+The following content is not allowed on Knowledge Fons Academy:
 
 #### Contact Sharing
 - Email addresses, phone numbers, or social media handles

@@ -964,8 +964,8 @@ async function createCalendarEventForBooking(
     if (parentEmail) attendees.push({ email: parentEmail });
 
     const event = {
-      summary: `TutorNest: ${tutorName} & ${studentName}`,
-      description: `TutorNest tutoring session\n\nStudent: ${studentName}\nTutor: ${tutorName}${notes ? `\n\nNotes: ${notes}` : ''}`,
+      summary: `Knowledge Fons Academy: ${tutorName} & ${studentName}`,
+      description: `Knowledge Fons Academy tutoring session\n\nStudent: ${studentName}\nTutor: ${tutorName}${notes ? `\n\nNotes: ${notes}` : ''}`,
       start: { dateTime: `${date}T${startTime}:00`, timeZone: 'Africa/Lagos' },
       end: { dateTime: `${date}T${endTime}:00`, timeZone: 'Africa/Lagos' },
       attendees,

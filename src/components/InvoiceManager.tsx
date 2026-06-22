@@ -134,7 +134,7 @@ export function InvoiceManager({ userId, session, isAdmin = false }: InvoiceMana
 <body>
   <div class="header">
     <div>
-      <div class="brand">TutorNest</div>
+      <div class="brand">Knowledge Fons Academy</div>
       <div class="brand-sub">Personalised Tutoring Platform</div>
       <div class="brand-sub" style="margin-top:8px">Lagos, Nigeria</div>
       <div class="brand-sub">billing@tutornest.org</div>
@@ -148,7 +148,7 @@ export function InvoiceManager({ userId, session, isAdmin = false }: InvoiceMana
   <div class="parties">
     <div>
       <div class="party-label">Issued By</div>
-      <div class="party-name">TutorNest Platform</div>
+      <div class="party-name">Knowledge Fons Academy Platform</div>
       <div class="party-detail">billing@tutornest.org</div>
     </div>
     <div>
@@ -207,7 +207,7 @@ export function InvoiceManager({ userId, session, isAdmin = false }: InvoiceMana
   ${inv.paymentMethod ? `<p style="margin-top:12px;font-size:12px;color:#888;text-align:center">Payment method: ${inv.paymentMethod}</p>` : ''}
 
   <div class="footer">
-    Thank you for choosing TutorNest. This is a system-generated invoice and does not require a signature.<br>
+    Thank you for choosing Knowledge Fons Academy. This is a system-generated invoice and does not require a signature.<br>
     For queries, contact billing@tutornest.org
   </div>
 </body>
@@ -311,7 +311,7 @@ export function InvoiceManager({ userId, session, isAdmin = false }: InvoiceMana
                 <div className="grid grid-cols-2 gap-6">
                   <div>
                     <p className="text-xs uppercase text-gray-400 font-semibold mb-1 tracking-wide">From</p>
-                    <p className="font-semibold">TutorNest Platform</p>
+                    <p className="font-semibold">Knowledge Fons Academy Platform</p>
                     <p className="text-sm text-gray-500">Lagos, Nigeria</p>
                     <p className="text-sm text-gray-500">billing@tutornest.org</p>
                   </div>

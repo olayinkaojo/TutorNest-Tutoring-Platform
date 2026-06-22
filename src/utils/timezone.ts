@@ -1,4 +1,4 @@
-// All times in TutorNest are West Africa Time (WAT) = GMT+1
+// All times in Knowledge Fons Academy are West Africa Time (WAT) = GMT+1
 
 export const WAT_TIMEZONE = 'Africa/Lagos';
 export const WAT_OFFSET   = '+01:00';

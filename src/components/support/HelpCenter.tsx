@@ -53,7 +53,7 @@ const HELP_CATEGORIES: HelpCategory[] = [
     name: 'Getting Started',
     icon: '🚀',
     articleCount: 12,
-    description: 'Learn the basics of TutorNest'
+    description: 'Learn the basics of Knowledge Fons Academy'
   },
   {
     id: 'booking',

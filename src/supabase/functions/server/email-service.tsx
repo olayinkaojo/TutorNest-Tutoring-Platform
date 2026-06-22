@@ -54,7 +54,7 @@ export const emailTemplates = {
             <!-- Header -->
             <tr>
               <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -132,13 +132,13 @@ export const emailTemplates = {
                 <p style="font-size:14px;color:#374151;line-height:1.6;">
                   If you have any questions, reply to this email or visit your dashboard. We're committed to making learning exceptional.
                 </p>
-                <p style="font-size:14px;color:#374151;">Best regards,<br><strong>The TutorNest Team</strong></p>
+                <p style="font-size:14px;color:#374151;">Best regards,<br><strong>The Knowledge Fons Academy Team</strong></p>
               </td>
             </tr>
             <!-- Footer -->
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
               </td>
             </tr>
           </table>
@@ -162,7 +162,7 @@ export const emailTemplates = {
             <!-- Header -->
             <tr>
               <td style="background:linear-gradient(135deg,#5d9827 0%,#7ab84e 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -233,15 +233,15 @@ export const emailTemplates = {
                 </table>
 
                 <p style="font-size:14px;color:#374151;line-height:1.6;">
-                  Questions? Check your dashboard or contact support. Thank you for being an excellent tutor on TutorNest!
+                  Questions? Check your dashboard or contact support. Thank you for being an excellent tutor on Knowledge Fons Academy!
                 </p>
-                <p style="font-size:14px;color:#374151;">Best regards,<br><strong>The TutorNest Team</strong></p>
+                <p style="font-size:14px;color:#374151;">Best regards,<br><strong>The Knowledge Fons Academy Team</strong></p>
               </td>
             </tr>
             <!-- Footer -->
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
               </td>
             </tr>
           </table>
@@ -264,7 +264,7 @@ export const emailTemplates = {
           <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
             <tr>
               <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -306,12 +306,12 @@ export const emailTemplates = {
                     </a>
                   </td></tr>
                 </table>
-                <p style="font-size:14px;color:#374151;">Best of luck,<br><strong>The TutorNest Team</strong></p>
+                <p style="font-size:14px;color:#374151;">Best of luck,<br><strong>The Knowledge Fons Academy Team</strong></p>
               </td>
             </tr>
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
               </td>
             </tr>
           </table>
@@ -341,9 +341,9 @@ export const emailTemplates = {
                 <p style="margin:0;font-size:12px;color:#6b7280;word-break:break-all;">Transaction: ${transactionId}</p>
               </td></tr>
             </table>
-            <p style="margin:22px 0 0;font-size:13px;color:#6b7280;">You will receive session details and reminders by email. Thank you for choosing TutorNest.</p>
+            <p style="margin:22px 0 0;font-size:13px;color:#6b7280;">You will receive session details and reminders by email. Thank you for choosing Knowledge Fons Academy.</p>
           </td></tr>
-          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()}</td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© Knowledge Fons Academy ${new Date().getFullYear()}</td></tr>
         </table>
       </td></tr></table></body></html>`,
   }),
@@ -378,7 +378,7 @@ export const emailTemplates = {
           <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
             <tr>
               <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -421,12 +421,12 @@ export const emailTemplates = {
                     </p>
                   </td></tr>
                 </table>
-                <p style="font-size:14px;color:#374151;">Warm regards,<br><strong>The TutorNest Team</strong></p>
+                <p style="font-size:14px;color:#374151;">Warm regards,<br><strong>The Knowledge Fons Academy Team</strong></p>
               </td>
             </tr>
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
               </td>
             </tr>
           </table>
@@ -439,10 +439,10 @@ export const emailTemplates = {
 
   // Welcome email for new users
   welcomeEmail: (name: string, role: string, dashboardLink: string) => ({
-    subject: "Welcome to TutorNest!",
+    subject: "Welcome to Knowledge Fons Academy!",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h2>Welcome to TutorNest! 🎓</h2>
+        <h2>Welcome to Knowledge Fons Academy! 🎓</h2>
         <p>Hi ${name},</p>
         <p>Your account has been created successfully as a <strong>${role}</strong>.</p>
         
@@ -486,7 +486,7 @@ export const emailTemplates = {
 
   // Email verification/confirmation for signup
   emailVerification: (name: string, confirmationLink: string) => ({
-    subject: "Confirm Your Email Address - TutorNest",
+    subject: "Confirm Your Email Address - Knowledge Fons Academy",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #625d9c; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
@@ -496,7 +496,7 @@ export const emailTemplates = {
         <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px;">
           <p>Hi ${name},</p>
           
-          <p>Thank you for signing up for <strong>TutorNest</strong>! We're excited to have you join our tutoring community.</p>
+          <p>Thank you for signing up for <strong>Knowledge Fons Academy</strong>! We're excited to have you join our tutoring community.</p>
           
           <p>To complete your signup and activate your account, please verify your email address by clicking the button below:</p>
           
@@ -513,8 +513,8 @@ export const emailTemplates = {
           
           <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999;">
             <p>This link will expire in 24 hours.</p>
-            <p>If you didn't sign up for TutorNest, you can safely ignore this email.</p>
-            <p>© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+            <p>If you didn't sign up for Knowledge Fons Academy, you can safely ignore this email.</p>
+            <p>© Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -547,7 +547,7 @@ export const emailTemplates = {
             <!-- Header -->
             <tr>
               <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -644,14 +644,14 @@ export const emailTemplates = {
                 <p style="font-size:14px;color:#374151;line-height:1.6;margin-bottom:8px;">
                   If you have any questions, simply reply to this email or visit your dashboard. We're here to make learning excellent.
                 </p>
-                <p style="font-size:14px;color:#374151;">Warm regards,<br><strong>The TutorNest Team</strong></p>
+                <p style="font-size:14px;color:#374151;">Warm regards,<br><strong>The Knowledge Fons Academy Team</strong></p>
               </td>
             </tr>
             <!-- Footer -->
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
                 <p style="margin:0;font-size:12px;color:#9ca3af;">Transaction Ref: ${transactionRef}</p>
-                <p style="margin:6px 0 0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:6px 0 0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
               </td>
             </tr>
           </table>
@@ -687,7 +687,7 @@ export const emailTemplates = {
             <!-- Header -->
             <tr>
               <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">TutorNest</h1>
+                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -752,7 +752,7 @@ export const emailTemplates = {
                   <tr><td style="padding:16px 24px;">
                     <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#92400e;text-transform:uppercase;letter-spacing:0.8px;">&#128197; Calendar Notice</p>
                     <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">
-                      These time slots have been automatically blocked in your TutorNest availability calendar.
+                      These time slots have been automatically blocked in your Knowledge Fons Academy availability calendar.
                       Please do not accept conflicting bookings for the scheduled times.
                     </p>
                   </td></tr>
@@ -779,8 +779,8 @@ export const emailTemplates = {
                     <ul style="margin:0;padding-left:18px;color:#374151;font-size:14px;line-height:1.8;">
                       <li>Begin each session punctually at the scheduled time.</li>
                       <li>File a session report on your dashboard after each class.</li>
-                      <li>Contact TutorNest support if you need to reschedule a session.</li>
-                      <li>Earnings will be credited to your TutorNest balance after each completed session.</li>
+                      <li>Contact Knowledge Fons Academy support if you need to reschedule a session.</li>
+                      <li>Earnings will be credited to your Knowledge Fons Academy balance after each completed session.</li>
                     </ul>
                   </td></tr>
                 </table>
@@ -795,13 +795,13 @@ export const emailTemplates = {
                 <p style="font-size:14px;color:#374151;line-height:1.6;margin-bottom:8px;">
                   Thank you for your dedication to quality education. If you have any questions, please reach out to us.
                 </p>
-                <p style="font-size:14px;color:#374151;">Best regards,<br><strong>The TutorNest Team</strong></p>
+                <p style="font-size:14px;color:#374151;">Best regards,<br><strong>The Knowledge Fons Academy Team</strong></p>
               </td>
             </tr>
             <!-- Footer -->
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; TutorNest ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
               </td>
             </tr>
           </table>
@@ -814,7 +814,7 @@ export const emailTemplates = {
 
   // Account verification successful
   emailVerificationSuccess: (name: string, dashboardLink: string) => ({
-    subject: "Email Verified! Welcome to TutorNest",
+    subject: "Email Verified! Welcome to Knowledge Fons Academy",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #4CAF50; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">
@@ -824,7 +824,7 @@ export const emailTemplates = {
         <div style="background-color: #f9f9f9; padding: 30px; border-radius: 0 0 5px 5px;">
           <p>Hi ${name},</p>
           
-          <p>Excellent! Your email has been verified and your TutorNest account is now active.</p>
+          <p>Excellent! Your email has been verified and your Knowledge Fons Academy account is now active.</p>
           
           <p>You can now:</p>
           <ul style="color: #333;">
@@ -845,8 +845,8 @@ export const emailTemplates = {
           </p>
           
           <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999;">
-            <p>Welcome to the TutorNest community!</p>
-            <p>© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+            <p>Welcome to the Knowledge Fons Academy community!</p>
+            <p>© Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -855,11 +855,11 @@ export const emailTemplates = {
 
   // Tutor verification approval
   tutorVerificationApproved: (tutorName: string, dashboardLink: string) => ({
-    subject: "🎉 Congratulations! Your TutorNest Verification is Approved",
+    subject: "🎉 Congratulations! Your Knowledge Fons Academy Verification is Approved",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #625d9c 0%, #5d9827 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="margin: 0; font-size: 28px;">🎉 Welcome to TutorNest!</h1>
+          <h1 style="margin: 0; font-size: 28px;">🎉 Welcome to Knowledge Fons Academy!</h1>
           <p style="margin: 10px 0 0 0; font-size: 18px;">Your Verification is Approved</p>
         </div>
         
@@ -867,7 +867,7 @@ export const emailTemplates = {
           <p style="font-size: 16px; color: #333;">Hi ${tutorName},</p>
           
           <p style="font-size: 15px; color: #555; line-height: 1.6;">
-            Excellent news! Your application to become a tutor on TutorNest has been <strong>approved</strong> after careful review of your qualifications and credentials.
+            Excellent news! Your application to become a tutor on Knowledge Fons Academy has been <strong>approved</strong> after careful review of your qualifications and credentials.
           </p>
           
           <div style="background-color: #e8f5e9; border-left: 4px solid #5d9827; padding: 20px; margin: 25px 0; border-radius: 4px;">
@@ -904,8 +904,8 @@ export const emailTemplates = {
           </p>
           
           <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
-            <p style="margin: 0 0 5px 0;">We're excited to have you as part of the TutorNest community!</p>
-            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+            <p style="margin: 0 0 5px 0;">We're excited to have you as part of the Knowledge Fons Academy community!</p>
+            <p style="margin: 0;">© Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -914,7 +914,7 @@ export const emailTemplates = {
 
   // Tutor verification rejection
   tutorVerificationRejected: (tutorName: string, rejectionReason: string, dashboardLink: string) => ({
-    subject: "Application Review: Next Steps for Your TutorNest Verification",
+    subject: "Application Review: Next Steps for Your Knowledge Fons Academy Verification",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background-color: #f44336; color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
@@ -926,7 +926,7 @@ export const emailTemplates = {
           <p style="font-size: 16px; color: #333;">Hi ${tutorName},</p>
           
           <p style="font-size: 15px; color: #555; line-height: 1.6;">
-            Thank you for applying to become a tutor on TutorNest. We've carefully reviewed your application and qualifications.
+            Thank you for applying to become a tutor on Knowledge Fons Academy. We've carefully reviewed your application and qualifications.
           </p>
           
           <div style="background-color: #ffebee; border-left: 4px solid #f44336; padding: 20px; margin: 25px 0; border-radius: 4px;">
@@ -960,7 +960,7 @@ export const emailTemplates = {
           <div style="background-color: #e3f2fd; border-left: 4px solid #2196f3; padding: 15px; margin: 25px 0; border-radius: 4px;">
             <p style="margin: 0; color: #0d47a1; font-size: 14px; font-weight: bold;">ℹ️ We Want You to Succeed</p>
             <p style="margin: 5px 0 0 0; color: #0d47a1; font-size: 13px; line-height: 1.5;">
-              Becoming a tutor on TutorNest requires high standards to ensure quality education for our students. We believe in your potential and would love to see your application resubmitted.
+              Becoming a tutor on Knowledge Fons Academy requires high standards to ensure quality education for our students. We believe in your potential and would love to see your application resubmitted.
             </p>
           </div>
           
@@ -970,7 +970,7 @@ export const emailTemplates = {
           
           <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
             <p style="margin: 0 0 5px 0;">We look forward to reviewing your updated application!</p>
-            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+            <p style="margin: 0;">© Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -979,11 +979,11 @@ export const emailTemplates = {
 
   // Tutor verification pending (for new tutor signups or role additions)
   tutorVerificationPending: (tutorName: string, dashboardLink: string) => ({
-    subject: "Welcome to TutorNest! Your Verification is Under Review",
+    subject: "Welcome to Knowledge Fons Academy! Your Verification is Under Review",
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
         <div style="background: linear-gradient(135deg, #625d9c 0%, #8b7cb8 100%); color: white; padding: 30px; text-align: center; border-radius: 8px 8px 0 0;">
-          <h1 style="margin: 0; font-size: 26px;">Welcome to TutorNest! 👋</h1>
+          <h1 style="margin: 0; font-size: 26px;">Welcome to Knowledge Fons Academy! 👋</h1>
           <p style="margin: 10px 0 0 0; font-size: 16px;">Your Tutor Application is Under Review</p>
         </div>
         
@@ -991,7 +991,7 @@ export const emailTemplates = {
           <p style="font-size: 16px; color: #333;">Hi ${tutorName},</p>
           
           <p style="font-size: 15px; color: #555; line-height: 1.6;">
-            Excellent! We've received your tutor application and we're excited to have you join the TutorNest community. Our verification team is currently reviewing your qualifications and credentials.
+            Excellent! We've received your tutor application and we're excited to have you join the Knowledge Fons Academy community. Our verification team is currently reviewing your qualifications and credentials.
           </p>
           
           <div style="background-color: #f0f4ff; border-left: 4px solid #625d9c; padding: 20px; margin: 25px 0; border-radius: 4px;">
@@ -1007,7 +1007,7 @@ export const emailTemplates = {
             <li>Upload professional profile photo and credentials</li>
             <li>Set up your payment methods</li>
             <li>Explore our tutor resources and guidelines</li>
-            <li>Join the TutorNest tutor community</li>
+            <li>Join the Knowledge Fons Academy tutor community</li>
           </ul>
           
           <div style="text-align: center; margin: 30px 0;">
@@ -1031,7 +1031,7 @@ export const emailTemplates = {
           
           <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
             <p style="margin: 0 0 5px 0;">We're excited to get you started! 🚀</p>
-            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+            <p style="margin: 0;">© Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -1052,7 +1052,7 @@ export const emailTemplates = {
           <p style="font-size: 16px; color: #333;">Hi ${userName},</p>
           
           <p style="font-size: 15px; color: #555; line-height: 1.6;">
-            Fantastic! You've successfully added the <strong>${newRole}</strong> role to your TutorNest account. You now have access to ${newRole === 'tutor' ? 'tutor dashboards, booking management, and earning opportunities' : 'parent dashboards, student management, and learning tools'}.
+            Fantastic! You've successfully added the <strong>${newRole}</strong> role to your Knowledge Fons Academy account. You now have access to ${newRole === 'tutor' ? 'tutor dashboards, booking management, and earning opportunities' : 'parent dashboards, student management, and learning tools'}.
           </p>
           
           <div style="background-color: #e8f5e9; border-left: 4px solid #5d9827; padding: 20px; margin: 25px 0; border-radius: 4px;">
@@ -1097,8 +1097,8 @@ export const emailTemplates = {
           </p>
           
           <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
-            <p style="margin: 0 0 5px 0;">Welcome to your new TutorNest experience! 🚀</p>
-            <p style="margin: 0;">© TutorNest ${new Date().getFullYear()}. All rights reserved.</p>
+            <p style="margin: 0 0 5px 0;">Welcome to your new Knowledge Fons Academy experience! 🚀</p>
+            <p style="margin: 0;">© Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved.</p>
           </div>
         </div>
       </div>
@@ -1109,12 +1109,12 @@ export const emailTemplates = {
   signupConfirmEmail: (name: string, role: string, confirmationLink: string) => {
     const r = (role || '').toLowerCase();
     let headline = 'Confirm your email';
-    let sub = 'You are one step away from activating your TutorNest account.';
+    let sub = 'You are one step away from activating your Knowledge Fons Academy account.';
     let tip =
       'After confirming, sign in to complete your profile and explore the platform.';
     if (r === 'parent') {
       headline = 'Welcome, parent — confirm your email';
-      sub = 'Thank you for joining TutorNest. Confirm your address so we can keep you updated on bookings, sessions, and payments.';
+      sub = 'Thank you for joining Knowledge Fons Academy. Confirm your address so we can keep you updated on bookings, sessions, and payments.';
       tip = 'You will be able to add children, browse vetted tutors, and book sessions securely.';
     } else if (r === 'tutor') {
       headline = 'Tutor application — confirm your email';
@@ -1127,13 +1127,13 @@ export const emailTemplates = {
       tip = 'If you are under 13, a parent or guardian may manage bookings on your behalf.';
     }
     return {
-      subject: `Confirm your email — TutorNest`,
+      subject: `Confirm your email — Knowledge Fons Academy`,
       html: `
       <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:32px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;">TutorNest</h1>
+            <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;">Knowledge Fons Academy</h1>
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">${headline}</p>
           </td></tr>
           <tr><td style="padding:32px 40px;">
@@ -1149,7 +1149,7 @@ export const emailTemplates = {
             <p style="margin:24px 0 0;font-size:13px;color:#9ca3af;">This link expires in 24 hours. If you did not create an account, you can ignore this message.</p>
           </td></tr>
           <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;">
-            <p style="margin:0;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()} · <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+            <p style="margin:0;font-size:12px;color:#9ca3af;">© Knowledge Fons Academy ${new Date().getFullYear()} · <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
           </td></tr>
         </table>
       </td></tr></table></body></html>`,
@@ -1194,7 +1194,7 @@ export const emailTemplates = {
             </div>
             <p style="margin:20px 0 0;font-size:13px;color:#6b7280;">Please update your calendar. If this change was unexpected, contact support from your dashboard.</p>
           </td></tr>
-          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px;text-align:center;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()}</td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px;text-align:center;font-size:12px;color:#9ca3af;">© Knowledge Fons Academy ${new Date().getFullYear()}</td></tr>
         </table>
       </td></tr></table></body></html>`,
   }),
@@ -1236,7 +1236,7 @@ export const emailTemplates = {
             <p style="margin:16px 0 0;font-size:13px;color:#6b7280;">A parent or guardian may manage bookings on your behalf. Questions? Use Messages in your dashboard.</p>
             <div style="text-align:center;margin-top:20px;"><a href="${dashboardLink}" style="color:#625d9c;font-weight:600;">Dashboard</a></div>
           </td></tr>
-          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()}</td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© Knowledge Fons Academy ${new Date().getFullYear()}</td></tr>
         </table>
       </td></tr></table></body></html>`,
   }),
@@ -1270,7 +1270,7 @@ export const emailTemplates = {
             <a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:14px;font-weight:600;padding:12px 26px;border-radius:8px;text-decoration:none;">View dashboard</a>
             <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Keep this email for your records. For billing questions, reply to this thread or contact support@tutornest.org.</p>
           </td></tr>
-          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()}</td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© Knowledge Fons Academy ${new Date().getFullYear()}</td></tr>
         </table>
       </td></tr></table></body></html>`,
   }),
@@ -1289,7 +1289,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#5d9827 0%,#4d7c0f 100%);padding:24px 36px;text-align:center;">
-            <p style="margin:0;color:#fff;font-size:16px;font-weight:600;">New payment on TutorNest</p>
+            <p style="margin:0;color:#fff;font-size:16px;font-weight:600;">New payment on Knowledge Fons Academy</p>
           </td></tr>
           <tr><td style="padding:32px 36px;">
             <p style="margin:0 0 8px;font-size:16px;color:#111827;">Hi ${tutorName},</p>
@@ -1303,7 +1303,7 @@ export const emailTemplates = {
             <p style="margin:18px 0 0;font-size:14px;color:#374151;">${contextLine}</p>
             <div style="text-align:center;margin-top:22px;"><a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:14px;font-weight:600;padding:12px 24px;border-radius:8px;text-decoration:none;">Tutor dashboard</a></div>
           </td></tr>
-          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© TutorNest ${new Date().getFullYear()}</td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© Knowledge Fons Academy ${new Date().getFullYear()}</td></tr>
         </table>
       </td></tr></table></body></html>`,
   }),

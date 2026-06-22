@@ -92,7 +92,7 @@ export function AddRoleCard({ currentRole, availableRoles, userId, accessToken, 
       color: '#625d9c',
       bgColor: 'bg-purple-50',
       borderColor: 'border-purple-200',
-      title: 'Become a Parent on TutorNest',
+      title: 'Become a Parent on Knowledge Fons Academy',
       description: 'Find and book qualified tutors for your children',
       benefits: [
         'Search and book tutors',
@@ -111,7 +111,7 @@ export function AddRoleCard({ currentRole, availableRoles, userId, accessToken, 
       color: '#5d9827',
       bgColor: 'bg-green-50',
       borderColor: 'border-green-200',
-      title: 'Become a Tutor on TutorNest',
+      title: 'Become a Tutor on Knowledge Fons Academy',
       description: 'Share your knowledge and earn by teaching students',
       benefits: [
         'Set your own schedule and rates',
@@ -147,7 +147,7 @@ export function AddRoleCard({ currentRole, availableRoles, userId, accessToken, 
       {currentRole === 'tutor' && shouldShowParent && (
         <>
           <div>
-            <h3 className="text-lg mb-2">Expand Your TutorNest Experience</h3>
+            <h3 className="text-lg mb-2">Expand Your Knowledge Fons Academy Experience</h3>
             <p className="text-sm text-gray-600">
               Become a parent to access additional features and manage your children&apos;s learning
             </p>
@@ -180,7 +180,7 @@ export function AddRoleCard({ currentRole, availableRoles, userId, accessToken, 
                 </div>
                 <div className="flex-1">
                   <CardTitle className="text-xl" style={{ color: '#625d9c' }}>
-                    Become a Parent on TutorNest
+                    Become a Parent on Knowledge Fons Academy
                   </CardTitle>
                   <CardDescription className="mt-2">
                     Find and book qualified tutors for your children
@@ -242,7 +242,7 @@ export function AddRoleCard({ currentRole, availableRoles, userId, accessToken, 
       {currentRole === 'parent' && shouldShowTutor && (
         <>
           <div>
-            <h3 className="text-lg mb-2">Expand Your TutorNest Experience</h3>
+            <h3 className="text-lg mb-2">Expand Your Knowledge Fons Academy Experience</h3>
             <p className="text-sm text-gray-600">
               Become a tutor to share your knowledge and earn by teaching students
             </p>
@@ -275,7 +275,7 @@ export function AddRoleCard({ currentRole, availableRoles, userId, accessToken, 
                 </div>
                 <div className="flex-1">
                   <CardTitle className="text-xl" style={{ color: '#5d9827' }}>
-                    Become a Tutor on TutorNest
+                    Become a Tutor on Knowledge Fons Academy
                   </CardTitle>
                   <CardDescription className="mt-2">
                     Share your knowledge and earn by teaching students
@@ -337,9 +337,9 @@ export function AddRoleCard({ currentRole, availableRoles, userId, accessToken, 
       {currentRole !== 'tutor' && currentRole !== 'parent' && (
         <>
           <div>
-            <h3 className="text-lg mb-2">Expand Your TutorNest Experience</h3>
+            <h3 className="text-lg mb-2">Expand Your Knowledge Fons Academy Experience</h3>
             <p className="text-sm text-gray-600">
-              Add additional roles to access more features on TutorNest
+              Add additional roles to access more features on Knowledge Fons Academy
             </p>
           </div>
 

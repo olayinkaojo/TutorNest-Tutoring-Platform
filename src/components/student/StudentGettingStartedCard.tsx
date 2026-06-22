@@ -20,7 +20,7 @@ interface StudentGettingStartedCardProps {
   onOpenReports: () => void;
 }
 
-const STORAGE_PREFIX = 'tutornest_student_getting_started_dismissed';
+const STORAGE_PREFIX = 'kfa_student_getting_started_dismissed';
 
 function hasLearningFocus(p: StudentProfile): boolean {
   if ((p.subjects?.length ?? 0) > 0) return true;

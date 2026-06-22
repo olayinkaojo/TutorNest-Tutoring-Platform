@@ -101,7 +101,7 @@ async function initializeFlutterwavePayment(
       redirect_url: `${Deno.env.get('FRONTEND_URL') || 'http://localhost:3000'}/payment/verify`,
       meta: metadata,
       customizations: {
-        title: 'TutorNest',
+        title: 'Knowledge Fons Academy',
         logo: 'https://tutornest.com/logo.png',
       },
     }),

@@ -498,7 +498,7 @@ export function TutorPayoutDashboard({ session, tutorId }: TutorPayoutDashboardP
             <CardContent className="space-y-4">
               <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
                 <p className="text-sm text-blue-800">
-                  <strong>Tax Information:</strong> TutorNest withholds 5% tax on all earnings for Nigerian tax compliance (FIRS). This is deducted from your net earnings.
+                  <strong>Tax Information:</strong> Knowledge Fons Academy withholds 5% tax on all earnings for Nigerian tax compliance (FIRS). This is deducted from your net earnings.
                 </p>
               </div>
               <div className="grid md:grid-cols-2 gap-4">
@@ -528,7 +528,7 @@ export function TutorPayoutDashboard({ session, tutorId }: TutorPayoutDashboardP
       <Alert className="bg-gray-50 border-gray-200">
         <AlertCircle className="h-4 w-4 text-gray-600" />
         <AlertDescription className="text-gray-700 text-xs">
-          <strong>Platform Fee & Standards:</strong> TutorNest charges 20% platform fee covering payment processing, insurance, customer support, and platform maintenance. All timestamps are in ISO 8601 format. Payouts follow international financial standards with full audit trails for compliance.
+          <strong>Platform Fee & Standards:</strong> Knowledge Fons Academy charges 20% platform fee covering payment processing, insurance, customer support, and platform maintenance. All timestamps are in ISO 8601 format. Payouts follow international financial standards with full audit trails for compliance.
         </AlertDescription>
       </Alert>
     </div>

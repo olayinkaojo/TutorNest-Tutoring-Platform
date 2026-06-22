@@ -1,8 +1,8 @@
 /** Shared signup/onboarding utilities (parent, student, tutor flows). */
 
-export const TUTOR_ONBOARDING_DRAFT_KEY = 'tutornest_tutor_onboarding_v1';
-export const PARENT_ONBOARDING_DRAFT_KEY = 'tutornest_parent_onboarding_v1';
-export const STUDENT_ONBOARDING_DRAFT_KEY = 'tutornest_student_onboarding_v1';
+export const TUTOR_ONBOARDING_DRAFT_KEY = 'kfa_tutor_onboarding_v1';
+export const PARENT_ONBOARDING_DRAFT_KEY = 'kfa_parent_onboarding_v1';
+export const STUDENT_ONBOARDING_DRAFT_KEY = 'kfa_student_onboarding_v1';
 
 export function passwordStrength(password: string): { score: number; label: string; bar: number } {
   if (!password) return { score: 0, label: '', bar: 0 };

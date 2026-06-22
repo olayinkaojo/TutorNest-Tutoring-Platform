@@ -318,7 +318,7 @@ app.post('/make-server-cbd74580/google-calendar/events', async (c) => {
         timeZone: 'Africa/Lagos',
       },
       attendees: attendees?.map((email: string) => ({ email })) || [],
-      location: location || 'TutorNest Virtual Classroom',
+      location: location || 'Knowledge Fons Academy Virtual Classroom',
       reminders: {
         useDefault: false,
         overrides: [

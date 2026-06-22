@@ -1,7 +1,7 @@
 import { useEffect, useRef, useCallback } from 'react';
 
 const INACTIVITY_MS = 8 * 60 * 60 * 1000; // 8 hours
-const STORAGE_KEY = 'tutornest_last_active';
+const STORAGE_KEY = 'kfa_last_active';
 const ACTIVITY_EVENTS = ['mousedown', 'keydown', 'touchstart', 'click', 'scroll'] as const;
 
 function getLastActive(): number {

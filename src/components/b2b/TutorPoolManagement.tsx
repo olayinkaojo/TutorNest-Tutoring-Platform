@@ -519,7 +519,7 @@ export function TutorPoolManagement({ organisationId, accessToken, isCoordinator
                     <div className="text-sm text-blue-900">
                       <p className="font-medium">Browse Available Tutors</p>
                       <p className="mt-1">
-                        These tutors are available on TutorNest and can be added to your organisation's
+                        These tutors are available on Knowledge Fons Academy and can be added to your organisation's
                         approved pool. All tutors are DBS checked and verified.
                       </p>
                     </div>

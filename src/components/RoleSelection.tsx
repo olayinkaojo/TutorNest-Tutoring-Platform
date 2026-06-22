@@ -5,7 +5,7 @@ import { getSupabaseClient } from '../utils/supabase/client';
 import { Button } from './ui/button';
 import { Users, GraduationCap, BookOpen, AlertCircle, CheckCircle2, ArrowRight, LogOut } from 'lucide-react';
 import { Alert, AlertDescription } from './ui/alert';
-import TutorNestLogo from './TutorNestLogo';
+import KFALogo from './KFALogo';
 import { ParentProfileForm } from './ParentProfileForm';
 import { StudentProfileForm } from './StudentProfileForm';
 import { TutorProfileForm } from './TutorProfileForm';
@@ -147,7 +147,7 @@ export function RoleSelection({ session, currentProfile, onComplete, onTutorSele
         <div className="bg-white rounded-3xl shadow-2xl p-8 sm:p-10 border-4 border-purple-100">
           {/* Logo */}
           <div className="flex justify-center mb-8">
-            <TutorNestLogo />
+            <KFALogo />
           </div>
 
           {/* Important Notice Banner */}
@@ -159,7 +159,7 @@ export function RoleSelection({ session, currentProfile, onComplete, onTutorSele
               <div>
                 <h3 className="mb-2 text-purple-900">Action Required: Choose Your Account Type</h3>
                 <p className="text-gray-700 text-sm leading-relaxed">
-                  To access TutorNest, you need to define your role. Please select how you'll be using the platform below. 
+                  To access Knowledge Fons Academy, you need to define your role. Please select how you'll be using the platform below. 
                   This determines your dashboard features and available functionality.
                 </p>
               </div>

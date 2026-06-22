@@ -127,7 +127,7 @@ const DEFAULT_POLICIES: Omit<Policy, 'id'>[] = [
       '1st offense: Written warning and educational notice',
       '2nd offense: 7-day suspension',
       '3rd offense: Permanent account ban',
-      'Loss of TutorNest protection and payment guarantees'
+      'Loss of Knowledge Fons Academy protection and payment guarantees'
     ],
     thresholds: { warning: 1, suspension: 2, ban: 3 },
     appealable: true,

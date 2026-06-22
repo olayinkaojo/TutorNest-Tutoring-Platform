@@ -83,7 +83,7 @@ export function CurrentSubscription({
           <div>
             <h3 className="mb-2">No Active Subscription</h3>
             <p className="text-gray-600 mb-4">
-              Choose a subscription plan to get started with TutorNest
+              Choose a subscription plan to get started with Knowledge Fons Academy
             </p>
           </div>
           <Button onClick={onManageSubscription} className="bg-[#625d9c] hover:bg-[#4f4a7d]">

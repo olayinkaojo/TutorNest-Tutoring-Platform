@@ -68,7 +68,7 @@ export function ResourcesHub({ session, userId, userRole, gradeLevel }: Resource
                 <div className="w-20 h-20 mx-auto mb-4 rounded-full flex items-center justify-center" style={{ backgroundColor: '#625d9c' }}>
                   <BookOpen className="w-10 h-10 text-white" />
                 </div>
-                <h3 className="text-xl mb-2">TutorNest Workbook</h3>
+                <h3 className="text-xl mb-2">Knowledge Fons Academy Workbook</h3>
                 <p className="text-gray-600 max-w-2xl mx-auto">
                   Comprehensive workbooks tailored to each grade level with exercises, 
                   practice problems, and learning materials aligned with the curriculum

@@ -200,7 +200,7 @@ export function Bookshop({ session, subscriptionTier }: BookshopProps) {
         <div>
           <h2 className="flex items-center gap-2 mb-2">
             <Book className="w-6 h-6" style={{ color: '#625d9c' }} />
-            TutorNest Bookshop
+            Knowledge Fons Academy Bookshop
           </h2>
           <p className="text-gray-600">
             Access educational books through your subscription or purchase individually
