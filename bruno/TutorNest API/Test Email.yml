@@ -6,6 +6,12 @@ info:
 http:
   method: POST
   url: "{{baseUrl}}/make-server-cbd74580/test-email"
+  body:
+    type: json
+    data: |-
+      {
+        "email": "olayinkaojo.ng@gmail.com"
+      }
   auth: inherit
 
 settings:

@@ -5,7 +5,14 @@ info:
 
 http:
   method: GET
-  url: "{{baseUrl}}/make-server-cbd74580/payments/methods"
+  url: "{{baseUrl}}/make-server-cbd74580/payments/methods?Authorization=Bearer {{token}}&apikey={{anonKey}}"
+  params:
+    - name: Authorization
+      value: Bearer {{token}}
+      type: query
+    - name: apikey
+      value: "{{anonKey}}"
+      type: query
   auth: inherit
 
 settings:

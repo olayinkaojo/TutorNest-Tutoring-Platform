@@ -6,10 +6,22 @@ info:
 http:
   method: POST
   url: https://wevmvbskunhnhuxzaqoz.supabase.co/auth/v1/token?grant_type=password
+  headers:
+    - name: Content-Type
+      value: application/json
+    - name: apikey
+      value: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Indldm12YnNrdW5obmh1eHphcW96Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjMxMjQzNDcsImV4cCI6MjA3ODcwMDM0N30.L_N8kMAOitpFO28SJx_OpS7uAb7NYwMCOo5RiRBvx5c
   params:
     - name: grant_type
       value: password
       type: query
+  body:
+    type: json
+    data: |-
+      {
+        "email": "olayinkaojo.ng@gmail.com",
+        "password": "olayinkaojo.ng@gmail.com"
+      }
   auth: inherit
 
 settings:
