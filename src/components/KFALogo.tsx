@@ -3,7 +3,7 @@ export default function KFALogo({ className = '' }: { className?: string }) {
     <img
       src="/Logo.png"
       alt="Knowledge Fons Academy"
-      className={`h-20 w-auto object-contain ${className}`}
+      className={`h-36 w-auto object-contain ${className}`}
     />
   );
 }
