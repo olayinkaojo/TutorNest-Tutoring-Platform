@@ -326,7 +326,7 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
 
   const handleExport = () => {
     if (!stats) return;
-    const name = `tutornest-platform-overview-${new Date().toISOString().slice(0, 10)}.csv`;
+    const name = `kfa-platform-overview-${new Date().toISOString().slice(0, 10)}.csv`;
     downloadCsv(name, buildExportRows(stats, meta));
   };
 

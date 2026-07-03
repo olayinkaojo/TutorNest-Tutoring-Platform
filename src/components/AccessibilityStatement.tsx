@@ -217,8 +217,8 @@ export function AccessibilityStatement() {
             <Mail className="w-5 h-5 text-[#625d9c] flex-shrink-0 mt-0.5" />
             <div>
               <p className="font-medium">Email</p>
-              <a href="mailto:accessibility@tutornest.com" className="text-[#625d9c] hover:underline">
-                accessibility@tutornest.com
+              <a href="mailto:accessibility@knowledgefonsacademy.com" className="text-[#625d9c] hover:underline">
+                accessibility@knowledgefonsacademy.com
               </a>
             </div>
           </div>

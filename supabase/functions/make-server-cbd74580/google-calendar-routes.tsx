@@ -82,7 +82,7 @@ app.get('/make-server-cbd74580/google-calendar/auth-url', async (c) => {
 // Server-side OAuth callback — Google redirects here, we exchange the code and redirect back to the app.
 // This avoids Supabase JS intercepting the ?code= param and logging the user out.
 app.get('/make-server-cbd74580/google-calendar/callback', async (c) => {
-  const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
+  const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
   const profileUrl = `${appUrl}/dashboard/tutor/profile`;
 
   const code = c.req.query('code');

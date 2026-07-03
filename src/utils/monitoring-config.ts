@@ -211,7 +211,7 @@ export const defaultAlertRules: AlertRule[] = [
     severity: 'critical',
     enabled: true,
     actions: [
-      { type: 'email', target: 'devops@tutornest.com' },
+      { type: 'email', target: 'devops@knowledgefonsacademy.com' },
       { type: 'slack', target: '#alerts' },
       { type: 'pagerduty', target: 'on-call' },
     ],
@@ -273,7 +273,7 @@ export const defaultAlertRules: AlertRule[] = [
     severity: 'critical',
     enabled: true,
     actions: [
-      { type: 'email', target: 'devops@tutornest.com' },
+      { type: 'email', target: 'devops@knowledgefonsacademy.com' },
       { type: 'slack', target: '#database-alerts' },
       { type: 'pagerduty', target: 'on-call' },
     ],

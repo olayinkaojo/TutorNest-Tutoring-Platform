@@ -102,7 +102,7 @@ async function initializeFlutterwavePayment(
       meta: metadata,
       customizations: {
         title: 'Knowledge Fons Academy',
-        logo: 'https://tutornest.com/logo.png',
+        logo: 'https://app.knowledgefonsacademy.com/Logo.png',
       },
     }),
   });

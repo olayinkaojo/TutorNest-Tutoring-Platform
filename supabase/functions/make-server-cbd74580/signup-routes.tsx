@@ -130,7 +130,7 @@ signupRoutes.post('/signup', async (c) => {
     }
 
     // Step 2: Generate verification link and send confirmation email via Resend
-    const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
+    const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
     try {
       const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
         type: 'magiclink',
@@ -160,7 +160,7 @@ signupRoutes.post('/signup', async (c) => {
     console.log('User created successfully for:', email);
 
     // Detect admin email and auto-assign role
-    const isAdmin = email.toLowerCase().includes('admin@') || email.toLowerCase() === 'admin@tutornest.org';
+    const isAdmin = email.toLowerCase().includes('admin@') || email.toLowerCase() === 'admin@knowledgefonsacademy.com';
 
     // Create initial user profile in KV store
     console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -221,7 +221,7 @@ signupRoutes.post('/signup', async (c) => {
           console.log('✅ Application received email sent to tutor:', email);
 
           // Notify admin of new tutor application
-          const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'admin@tutornest.org';
+          const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'admin@knowledgefonsacademy.com';
           const adminDash = `${appUrl}/admin/verifications`;
           const adminTpl = emailTemplates.adminTutorApplicationAlert(name, email, adminDash);
           await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch(() => {});

@@ -1,6 +1,6 @@
 // Load Resend only when sending email. A top-level `import "npm:resend"` + `new Resend()` can throw
 // during module init and take down the whole Edge Function worker (HTTP 503 BOOT_ERROR).
-const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "noreply@resend.dev"; // Switch to noreply@tutornest.org once domain is verified in Resend
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "noreply@resend.dev"; // Switch to noreply@knowledgefonsacademy.com once domain is verified in Resend
 
 export interface EmailData {
   to: string;
@@ -138,7 +138,7 @@ export const emailTemplates = {
             <!-- Footer -->
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.knowledgefonsacademy.com" style="color:#625d9c;text-decoration:none;">knowledgefonsacademy.com</a></p>
               </td>
             </tr>
           </table>
@@ -241,7 +241,7 @@ export const emailTemplates = {
             <!-- Footer -->
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.knowledgefonsacademy.com" style="color:#625d9c;text-decoration:none;">knowledgefonsacademy.com</a></p>
               </td>
             </tr>
           </table>
@@ -311,7 +311,7 @@ export const emailTemplates = {
             </tr>
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.knowledgefonsacademy.com" style="color:#625d9c;text-decoration:none;">knowledgefonsacademy.com</a></p>
               </td>
             </tr>
           </table>
@@ -417,7 +417,7 @@ export const emailTemplates = {
                   <tr><td style="padding:16px 24px;">
                     <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
                       💡 <strong>What's next?</strong> You can book another session anytime from your dashboard.
-                      <a href="https://tutornest.org/dashboard" style="color:#1d4ed8;font-weight:600;">Visit Dashboard →</a>
+                      <a href="https://app.knowledgefonsacademy.com/dashboard" style="color:#1d4ed8;font-weight:600;">Visit Dashboard →</a>
                     </p>
                   </td></tr>
                 </table>
@@ -426,7 +426,7 @@ export const emailTemplates = {
             </tr>
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.knowledgefonsacademy.com" style="color:#625d9c;text-decoration:none;">knowledgefonsacademy.com</a></p>
               </td>
             </tr>
           </table>
@@ -651,7 +651,7 @@ export const emailTemplates = {
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
                 <p style="margin:0;font-size:12px;color:#9ca3af;">Transaction Ref: ${transactionRef}</p>
-                <p style="margin:6px 0 0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:6px 0 0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.knowledgefonsacademy.com" style="color:#625d9c;text-decoration:none;">knowledgefonsacademy.com</a></p>
               </td>
             </tr>
           </table>
@@ -801,7 +801,7 @@ export const emailTemplates = {
             <!-- Footer -->
             <tr>
               <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
-                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+                <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.knowledgefonsacademy.com" style="color:#625d9c;text-decoration:none;">knowledgefonsacademy.com</a></p>
               </td>
             </tr>
           </table>
@@ -900,7 +900,7 @@ export const emailTemplates = {
           </div>
           
           <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
-            If you have any questions or need assistance, feel free to reach out to our support team at support@tutornest.org or visit our Help Center.
+            If you have any questions or need assistance, feel free to reach out to our support team at support@knowledgefonsacademy.com or visit our Help Center.
           </p>
           
           <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
@@ -965,7 +965,7 @@ export const emailTemplates = {
           </div>
           
           <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
-            Have questions? Contact our support team at support@tutornest.org and we'll be happy to guide you through the process.
+            Have questions? Contact our support team at support@knowledgefonsacademy.com and we'll be happy to guide you through the process.
           </p>
           
           <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
@@ -1026,7 +1026,7 @@ export const emailTemplates = {
           </div>
           
           <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
-            Have questions about the verification process? Reply to this email or contact our support team at support@tutornest.org. We're here to help!
+            Have questions about the verification process? Reply to this email or contact our support team at support@knowledgefonsacademy.com. We're here to help!
           </p>
           
           <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
@@ -1093,7 +1093,7 @@ export const emailTemplates = {
           </div>
           
           <p style="color: #666; font-size: 13px; margin-top: 25px; line-height: 1.6;">
-            Have questions or need assistance? Our support team is always available at support@tutornest.org.
+            Have questions or need assistance? Our support team is always available at support@knowledgefonsacademy.com.
           </p>
           
           <div style="border-top: 1px solid #ddd; margin-top: 30px; padding-top: 20px; font-size: 12px; color: #999; text-align: center;">
@@ -1149,7 +1149,7 @@ export const emailTemplates = {
             <p style="margin:24px 0 0;font-size:13px;color:#9ca3af;">This link expires in 24 hours. If you did not create an account, you can ignore this message.</p>
           </td></tr>
           <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;">
-            <p style="margin:0;font-size:12px;color:#9ca3af;">© Knowledge Fons Academy ${new Date().getFullYear()} · <a href="https://www.tutornest.org" style="color:#625d9c;text-decoration:none;">tutornest.org</a></p>
+            <p style="margin:0;font-size:12px;color:#9ca3af;">© Knowledge Fons Academy ${new Date().getFullYear()} · <a href="https://www.knowledgefonsacademy.com" style="color:#625d9c;text-decoration:none;">knowledgefonsacademy.com</a></p>
           </td></tr>
         </table>
       </td></tr></table></body></html>`,
@@ -1268,7 +1268,7 @@ export const emailTemplates = {
             </table>
             <p style="margin:0 0 20px;font-size:14px;color:#374151;">${contextLine}</p>
             <a href="${dashboardLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:14px;font-weight:600;padding:12px 26px;border-radius:8px;text-decoration:none;">View dashboard</a>
-            <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Keep this email for your records. For billing questions, reply to this thread or contact support@tutornest.org.</p>
+            <p style="margin:24px 0 0;font-size:12px;color:#9ca3af;">Keep this email for your records. For billing questions, reply to this thread or contact support@knowledgefonsacademy.com.</p>
           </td></tr>
           <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:14px;text-align:center;font-size:12px;color:#9ca3af;">© Knowledge Fons Academy ${new Date().getFullYear()}</td></tr>
         </table>

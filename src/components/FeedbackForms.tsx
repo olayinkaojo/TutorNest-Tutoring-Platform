@@ -439,7 +439,7 @@ function FeedbackForm({ config }: { config: FormConfig }) {
     }
     setSubmitting(true);
     try {
-      const res = await fetch('https://formsubmit.co/ajax/afoma@tutornest.org', {
+      const res = await fetch('https://formsubmit.co/ajax/afoma@knowledgefonsacademy.com', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
         body: JSON.stringify({

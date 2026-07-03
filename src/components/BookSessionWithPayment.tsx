@@ -175,7 +175,7 @@ export function BookSessionWithPayment({
           customizations: {
             title: 'Knowledge Fons Academy',
             description: `${plan.name}${subject ? ' — ' + subject : ''}`,
-            logo: 'https://app.tutornest.org/logo.png',
+            logo: 'https://app.knowledgefonsacademy.com/Logo.png',
           },
           callback: (response: { status: string; tx_ref: string; transaction_id: number }) => {
             if (response.status === 'successful' || response.status === 'completed') {

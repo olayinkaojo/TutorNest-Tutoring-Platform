@@ -180,7 +180,7 @@ export function DataSubjectRights({ userId, accessToken, userEmail }: DataSubjec
         const url = window.URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `tutornest-data-export-${requestId}.zip`;
+        a.download = `kfa-data-export-${requestId}.zip`;
         a.click();
         window.URL.revokeObjectURL(url);
         toast.success('Download started');
@@ -446,8 +446,8 @@ export function DataSubjectRights({ userId, accessToken, userEmail }: DataSubjec
         <div className="space-y-2 text-sm">
           <p>
             <strong>Email:</strong>{' '}
-            <a href="mailto:dpo@tutornest.com" className="text-[#625d9c] hover:underline">
-              dpo@tutornest.com
+            <a href="mailto:dpo@knowledgefonsacademy.com" className="text-[#625d9c] hover:underline">
+              dpo@knowledgefonsacademy.com
             </a>
           </p>
           <p>

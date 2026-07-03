@@ -1969,13 +1969,13 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
           console.log(`Sending approval email to ${tutor.email}`);
           const emailData = emailTemplates.tutorVerificationApproved(
             tutor.fullName || tutor.full_name || tutor.name || 'Tutor',
-            `https://tutornest.org/tutor-dashboard`
+            `https://app.knowledgefonsacademy.com/tutor-dashboard`
           );
           await sendEmail({
             to: tutor.email,
             subject: emailData.subject,
             html: emailData.html,
-            replyTo: 'support@tutornest.org'
+            replyTo: 'support@knowledgefonsacademy.com'
           });
           console.log('Approval email sent successfully');
         } else if (action === 'reject' && tutor.email) {
@@ -1983,13 +1983,13 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
           const emailData = emailTemplates.tutorVerificationRejected(
             tutor.fullName || tutor.full_name || tutor.name || 'Tutor',
             rejectionReason,
-            `https://tutornest.org/tutor-dashboard`
+            `https://app.knowledgefonsacademy.com/tutor-dashboard`
           );
           await sendEmail({
             to: tutor.email,
             subject: emailData.subject,
             html: emailData.html,
-            replyTo: 'support@tutornest.org'
+            replyTo: 'support@knowledgefonsacademy.com'
           });
           console.log('Rejection email sent successfully');
         } else {

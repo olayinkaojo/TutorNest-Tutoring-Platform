@@ -726,7 +726,7 @@ function generateInvoiceHTML(invoice: any, payment: Payment): string {
         <h3>From</h3>
         <p><strong>${invoice.from?.name || 'Knowledge Fons Academy'}</strong></p>
         <p class="muted">${invoice.from?.address || 'Lagos, Nigeria'}</p>
-        <p class="muted">${invoice.from?.email || 'billing@tutornest.org'}</p>
+        <p class="muted">${invoice.from?.email || 'billing@knowledgefonsacademy.com'}</p>
       </div>
       <div class="meta-block" style="text-align:right">
         <h3>Bill To</h3>
@@ -775,7 +775,7 @@ function generateInvoiceHTML(invoice: any, payment: Payment): string {
 
     <div class="footer">
       <p>Thank you for investing in quality education!</p>
-      <p style="margin-top:6px">Questions? Email support@tutornest.org · Phone: +234(0)800-TUTOR</p>
+      <p style="margin-top:6px">Questions? Email support@knowledgefonsacademy.com · Phone: +234(0)800-TUTOR</p>
       <p style="margin-top:10px;color:#cbd5e1">Generated ${new Date().toLocaleString('en-NG')} · Knowledge Fons Academy Platform · Page 1 of 1</p>
     </div>
   </div>

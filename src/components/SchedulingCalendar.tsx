@@ -92,7 +92,7 @@ export function SchedulingCalendar({ session, userId, userRole, googleCalendarCo
             start: { dateTime: `${booking.date}T${booking.startTime}` },
             end: { dateTime: `${booking.date}T${booking.endTime}` },
             location: 'Knowledge Fons Academy Virtual Classroom',
-            source: 'tutornest' as const,
+            source: 'kfa' as const,
             status: booking.status,
           }));
         allEvents.push(...bookingEvents);

@@ -137,7 +137,7 @@ export function InvoiceManager({ userId, session, isAdmin = false }: InvoiceMana
       <div class="brand">Knowledge Fons Academy</div>
       <div class="brand-sub">Personalised Tutoring Platform</div>
       <div class="brand-sub" style="margin-top:8px">Lagos, Nigeria</div>
-      <div class="brand-sub">billing@tutornest.org</div>
+      <div class="brand-sub">billing@knowledgefonsacademy.com</div>
     </div>
     <div class="invoice-title">
       <h1>INVOICE</h1>
@@ -149,7 +149,7 @@ export function InvoiceManager({ userId, session, isAdmin = false }: InvoiceMana
     <div>
       <div class="party-label">Issued By</div>
       <div class="party-name">Knowledge Fons Academy Platform</div>
-      <div class="party-detail">billing@tutornest.org</div>
+      <div class="party-detail">billing@knowledgefonsacademy.com</div>
     </div>
     <div>
       <div class="party-label">Bill To</div>
@@ -208,7 +208,7 @@ export function InvoiceManager({ userId, session, isAdmin = false }: InvoiceMana
 
   <div class="footer">
     Thank you for choosing Knowledge Fons Academy. This is a system-generated invoice and does not require a signature.<br>
-    For queries, contact billing@tutornest.org
+    For queries, contact billing@knowledgefonsacademy.com
   </div>
 </body>
 </html>`;
@@ -313,7 +313,7 @@ export function InvoiceManager({ userId, session, isAdmin = false }: InvoiceMana
                     <p className="text-xs uppercase text-gray-400 font-semibold mb-1 tracking-wide">From</p>
                     <p className="font-semibold">Knowledge Fons Academy Platform</p>
                     <p className="text-sm text-gray-500">Lagos, Nigeria</p>
-                    <p className="text-sm text-gray-500">billing@tutornest.org</p>
+                    <p className="text-sm text-gray-500">billing@knowledgefonsacademy.com</p>
                   </div>
                   <div>
                     <p className="text-xs uppercase text-gray-400 font-semibold mb-1 tracking-wide">Bill To</p>

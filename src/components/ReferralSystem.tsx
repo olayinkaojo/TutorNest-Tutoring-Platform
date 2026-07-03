@@ -31,7 +31,7 @@ export function ReferralSystem({ userId, userEmail }: ReferralSystemProps) {
   const [sending, setSending] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const referralLink = `https://tutornest.com/signup?ref=${userId}`;
+  const referralLink = `https://app.knowledgefonsacademy.com/signup?ref=${userId}`;
 
   useEffect(() => {
     fetchReferrals();

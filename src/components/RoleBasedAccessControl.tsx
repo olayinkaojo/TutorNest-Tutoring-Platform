@@ -660,7 +660,7 @@ export function RoleBasedAccessControl({ adminId, accessToken }: RoleBasedAccess
                   type="email"
                   value={newUserEmail}
                   onChange={(e) => setNewUserEmail(e.target.value)}
-                  placeholder="john@tutornest.com"
+                  placeholder="john@knowledgefonsacademy.com"
                 />
               </div>
 

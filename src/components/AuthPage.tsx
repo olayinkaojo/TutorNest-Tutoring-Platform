@@ -20,7 +20,7 @@ interface AuthPageProps {
 
 export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData, onStudentSignupWithData, onParentSignupWithData, onSignupClicked, staffMode }: AuthPageProps & { staffMode?: boolean } = {}) {
   const [mode, setMode] = useState<'signin' | 'reset'>('signin');
-  const [email, setEmail] = useState(staffMode ? 'admin@tutornest.com' : '');
+  const [email, setEmail] = useState(staffMode ? 'admin@knowledgefonsacademy.com' : '');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [name, setName] = useState('');
@@ -41,7 +41,7 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
     if (logoClickCount.current >= 5) {
       logoClickCount.current = 0;
       setIsStaffMode(true);
-      setEmail('admin@tutornest.com');
+      setEmail('admin@knowledgefonsacademy.com');
       setTimeout(() => document.getElementById('password')?.focus(), 100);
       return;
     }

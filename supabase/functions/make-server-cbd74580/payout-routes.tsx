@@ -330,7 +330,7 @@ payoutRoutes.patch('/admin/requests/:requestId', async (c) => {
       const tutorName = tutorProfile?.fullName || tutorProfile?.name || 'Tutor';
       const amountDisplay = `₦${Number(payoutRequest.amount).toLocaleString('en-NG', { minimumFractionDigits: 0 })}`;
       const processedDate = new Date().toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' });
-      const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
+      const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
 
       if (tutorEmail) {
         if (action === 'approve') {

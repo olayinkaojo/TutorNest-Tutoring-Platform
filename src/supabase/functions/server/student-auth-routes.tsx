@@ -52,7 +52,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
 
       // Generate student email if not provided
       const finalStudentEmail = studentEmail || 
-        `${child.firstName.toLowerCase()}.${child.lastName.toLowerCase()}.${childId.slice(-4)}@student.tutornest.com`;
+        `${child.firstName.toLowerCase()}.${child.lastName.toLowerCase()}.${childId.slice(-4)}@student.knowledgefonsacademy.com`;
 
       // Check if a user with this email already exists
       let authUserId = null;
@@ -339,7 +339,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
 
       // Send verification email via Resend
-      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+      const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
       try {
         const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
           type: 'magiclink',
@@ -476,7 +476,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       });
 
       // Send verification email to student
-      const appUrl2 = Deno.env.get('VITE_APP_URL') || 'https://tutornest.org';
+      const appUrl2 = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
       try {
         const { data: linkData2, error: linkError2 } = await supabase.auth.admin.generateLink({
           type: 'magiclink',
@@ -504,7 +504,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       }
 
       // Send email to parent with linking invitation
-      const parentLinkUrl = `${Deno.env.get('VITE_APP_URL') || 'https://tutornest.org'}/parent/link-student?token=${studentProfile.parentLinkToken}&studentId=${authData.user.id}`;
+      const parentLinkUrl = `${Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com'}/parent/link-student?token=${studentProfile.parentLinkToken}&studentId=${authData.user.id}`;
       const parentInviteEmail = `
         <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto;">
           <div style="background-color: #625d9c; color: white; padding: 20px; text-align: center; border-radius: 5px 5px 0 0;">

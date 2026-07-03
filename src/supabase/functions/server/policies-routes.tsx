@@ -141,8 +141,8 @@ All decisions may be appealed through our appeals process.
 - Legal requirements: Some data retained for 7 years
 
 ### Contact
-For data requests: privacy@tutornest.com
-For DPO: dpo@tutornest.com
+For data requests: privacy@knowledgefonsacademy.com
+For DPO: dpo@knowledgefonsacademy.com
     `,
     category: 'legal',
   },

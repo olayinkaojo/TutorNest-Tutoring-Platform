@@ -1240,12 +1240,12 @@ app.post('/make-server-cbd74580/profile/complete', async (c) => {
       try {
         const profileEmail = profile.email || updatedProfile.email;
         const profileName = updatedProfile.fullName || updatedProfile.name || profile.name || 'Tutor';
-        const appBase = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
+        const appBase = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
         if (profileEmail) {
           const submittedTpl = emailTemplates.tutorProfileSubmitted(profileName, `${appBase}/dashboard`);
           await sendEmail({ to: profileEmail, subject: submittedTpl.subject, html: submittedTpl.html }).catch(() => {});
         }
-        const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'admin@tutornest.org';
+        const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'admin@knowledgefonsacademy.com';
         const adminTpl = emailTemplates.adminTutorApplicationAlert(profileName, profileEmail || 'unknown', `${appBase}/admin/verifications`);
         await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch(() => {});
       } catch (_e) {}
@@ -1406,16 +1406,16 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
     // Send outcome email to the tutor
     const tutorEmail = userProfile.email;
     const tutorName = userProfile.fullName || userProfile.full_name || userProfile.name || 'Tutor';
-    const _appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
+    const _appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
     if (tutorEmail) {
       try {
         if (action === 'approve') {
           const approveTpl = emailTemplates.tutorVerificationApproved(tutorName, `${_appUrl}/dashboard`);
-          await sendEmail({ to: tutorEmail, subject: approveTpl.subject, html: approveTpl.html, replyTo: 'support@tutornest.org' });
+          await sendEmail({ to: tutorEmail, subject: approveTpl.subject, html: approveTpl.html, replyTo: 'support@knowledgefonsacademy.com' });
           console.log('✅ Approval email sent to tutor:', tutorEmail);
         } else if (action === 'reject') {
           const rejectTpl = emailTemplates.tutorVerificationRejected(tutorName, rejectionReason || 'Please see the notes in your dashboard.', `${_appUrl}/dashboard`);
-          await sendEmail({ to: tutorEmail, subject: rejectTpl.subject, html: rejectTpl.html, replyTo: 'support@tutornest.org' });
+          await sendEmail({ to: tutorEmail, subject: rejectTpl.subject, html: rejectTpl.html, replyTo: 'support@knowledgefonsacademy.com' });
           console.log('✅ Rejection email sent to tutor:', tutorEmail);
         }
       } catch (emailErr: any) {
@@ -2035,7 +2035,7 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
 
     try {
       const dashboardBase =
-        Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
+        Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
       const parentName = resolveDisplayName(parentProfile, 'Parent');
       const studentName = resolveDisplayName(studentRecord, 'Student');
       const tutorName = resolveDisplayName(tutorProfile, 'Tutor');
@@ -2058,7 +2058,7 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
       });
       const timeOnly = String(startTime).replace(/\s*WAT\s*$/i, '').trim();
       const roomSafe = encodeURIComponent(bookingId.replace(/[^a-zA-Z0-9]/g, '').slice(-24));
-      const meetLink = `https://meet.jit.si/tutornest-${roomSafe}`;
+      const meetLink = `https://meet.jit.si/kfa-${roomSafe}`;
       const dashboardLink = `${dashboardBase}/dashboard`;
 
       if (parentEmailAddr) {
@@ -3072,7 +3072,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
     const supabase = getSupabaseClient();
     const testTutors = [
       {
-        email: 'sarah.mathematics@tutornest.org',
+        email: 'sarah.mathematics@knowledgefonsacademy.com',
         password: 'test1234',
         firstName: 'Sarah',
         lastName: 'Thompson',
@@ -3087,7 +3087,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 245
       },
       {
-        email: 'james.physics@tutornest.org',
+        email: 'james.physics@knowledgefonsacademy.com',
         password: 'test1234',
         firstName: 'James',
         lastName: 'Chen',
@@ -3102,7 +3102,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 189
       },
       {
-        email: 'emily.english@tutornest.org',
+        email: 'emily.english@knowledgefonsacademy.com',
         password: 'test1234',
         firstName: 'Emily',
         lastName: 'Parker',
@@ -3117,7 +3117,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 312
       },
       {
-        email: 'david.science@tutornest.org',
+        email: 'david.science@knowledgefonsacademy.com',
         password: 'test1234',
         firstName: 'David',
         lastName: 'Williams',
@@ -3132,7 +3132,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 156
       },
       {
-        email: 'maria.languages@tutornest.org',
+        email: 'maria.languages@knowledgefonsacademy.com',
         password: 'test1234',
         firstName: 'Maria',
         lastName: 'Rodriguez',

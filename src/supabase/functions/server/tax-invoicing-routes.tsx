@@ -391,7 +391,7 @@ app.get('/invoices/:invoiceId/download', async (c) => {
         name: 'Knowledge Fons Academy Ltd',
         address: '123 Education Street, London, UK',
         vatNumber: 'GB123456789',
-        email: 'billing@tutornest.com',
+        email: 'billing@knowledgefonsacademy.com',
         phone: '+44 20 1234 5678'
       },
       formattedDates: {

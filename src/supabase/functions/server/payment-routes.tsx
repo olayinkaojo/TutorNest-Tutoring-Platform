@@ -110,7 +110,7 @@ app.post('/payments/initialize', async (c) => {
         customizations: {
           title: 'Knowledge Fons Academy Session Booking',
           description: `Booking for ${subject ?? 'Tutoring Session'}`,
-          logo: 'https://tutornest.com/logo.png',
+          logo: 'https://app.knowledgefonsacademy.com/Logo.png',
         },
         meta: {
           bookingId,
@@ -120,7 +120,7 @@ app.post('/payments/initialize', async (c) => {
           userId,
           ...metadata,
         },
-        redirect_url: `${c.req.header('origin') ?? 'https://tutornest.com'}/payment/callback`,
+        redirect_url: `${c.req.header('origin') ?? 'https://app.knowledgefonsacademy.com'}/payment/callback`,
       }),
     });
 
@@ -609,7 +609,7 @@ app.get('/payments/:paymentId/invoice', async (c) => {
       from: {
         name: 'Knowledge Fons Academy',
         address: 'Lagos, Nigeria',
-        email: 'billing@tutornest.com',
+        email: 'billing@knowledgefonsacademy.com',
       },
       to: {
         name: payer?.fullName || payer?.name || 'Customer',
