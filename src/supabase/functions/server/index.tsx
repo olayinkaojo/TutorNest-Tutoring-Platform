@@ -3313,63 +3313,9 @@ app.get('/make-server-cbd74580/payouts/dashboard', async (c) => {
       b.tutorId === userId && b.status === 'completed'
     );
 
-    // Helper function to get payout rate based on subject
-    const getSubjectRate = (subject: string): number => {
-      // Subject-based pricing tiers (in NGN per session)
-      const subjectRates: Record<string, number> = {
-        // High-demand STEM subjects
-        'Mathematics': 20000,
-        'Physics': 20000,
-        'Chemistry': 20000,
-        'Biology': 18000,
-        'Computer Science': 22000,
-        'Information Technology': 20000,
-        
-        // Languages (higher for specialized ones)
-        'English': 16000,
-        'Mandarin Chinese': 25000,
-        'Arabic': 22000,
-        'Spanish': 18000,
-        'French': 18000,
-        'German': 18000,
-        'Italian': 16000,
-        'Latin': 20000,
-        
-        // Advanced/Test Prep
-        'A-Level Preparation': 22000,
-        'GCSE Preparation': 18000,
-        '11+ Entrance Exams': 20000,
-        'SAT Preparation': 25000,
-        'ACT Preparation': 25000,
-        'IELTS': 20000,
-        'TOEFL': 20000,
-        
-        // Special Needs (premium rates)
-        'Special Educational Needs (SEN)': 25000,
-        'Dyslexia Support': 25000,
-        'ADHD Support': 25000,
-        'Autism Spectrum': 28000,
-        
-        // Other subjects
-        'Science': 16000,
-        'History': 15000,
-        'Geography': 15000,
-        'Economics': 18000,
-        'Business Studies': 16000,
-        'Accounting': 18000,
-        'Psychology': 16000,
-        'Sociology': 15000,
-        'Philosophy': 16000,
-        'Politics': 16000,
-        'Religious Studies': 14000,
-        'Art & Design': 15000,
-        'Music': 16000,
-        'Drama': 14000,
-        'Law': 22000,
-      };
-      
-      // Default rate for subjects not specifically listed
-      return subjectRates[subject] || 16000;
+    // Helper function to get payout rate based on subject — platform-fixed flat rate
+    const getSubjectRate = (_subject: string): number => {
+      return 15000;
     };
 
     const earnings = tutorBookings.map((booking: any) => {

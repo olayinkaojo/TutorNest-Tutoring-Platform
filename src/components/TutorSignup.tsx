@@ -224,7 +224,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
 
   // Step 2: Professional Info
   const [bio, setBio] = useState('');
-  const hourlyRate = '20000'; // Platform-fixed rate — tutors cannot change this
+  const hourlyRate = '15000'; // Platform-fixed rate — tutors cannot change this
   const [experienceYears, setExperienceYears] = useState('');
   const [qualifications, setQualifications] = useState('');
   const [teachingStyle, setTeachingStyle] = useState('');
@@ -1300,7 +1300,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                 <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
                   <h3 className="font-semibold text-green-900 mb-2">💰 Session Payment Structure</h3>
                   <div className="space-y-2 text-sm text-green-800">
-                    <p><strong>Flat Rate per Session:</strong> ₦20,000</p>
+                    <p><strong>Flat Rate per Session:</strong> ₦15,000</p>
                     <div className="pl-4 space-y-1">
                       <p>• You receive: <strong>80%</strong> of session fee</p>
                       <p>• Knowledge Fons Academy Platform Fee: <strong>20%</strong></p>

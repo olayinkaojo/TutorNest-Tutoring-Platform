@@ -336,7 +336,7 @@ export function SubscriptionsPage({ parentId, accessToken, onBack }: Subscriptio
             </p>
             <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
               <p className="text-sm text-blue-800">
-                <strong>Note:</strong> Live tutoring sessions are billed separately at ₦20,000 per session.
+                <strong>Note:</strong> Live tutoring sessions are billed separately at ₦15,000 per session.
                 Subscriptions give you access to our library of educational resources, not tutoring sessions.
               </p>
             </div>

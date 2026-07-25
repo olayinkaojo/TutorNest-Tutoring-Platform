@@ -179,7 +179,7 @@ export function SessionBookingCalendar({
           // Photo
           photoUrl: tutor.photoUrl || tutor.photo_url || null,
           // Engagement
-          hourlyRate: 20000,
+          hourlyRate: 15000,
           availability: tutor.availability,
           rating: tutor.rating != null ? Number(tutor.rating)
                 : tutor.averageRating != null ? Number(tutor.averageRating)

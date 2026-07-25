@@ -10,7 +10,7 @@ export const CURRENCY_SYMBOL = '₦';
  * Format amount in Naira with proper symbol and thousands separator
  * @param amount - Amount in Naira
  * @param includeDecimals - Whether to include decimal places (default: true)
- * @returns Formatted string e.g., "₦20,000.00"
+ * @returns Formatted string e.g., "₦15,000.00"
  */
 export function formatNaira(amount: number, includeDecimals: boolean = true): string {
   const formatted = new Intl.NumberFormat('en-NG', {
@@ -42,47 +42,10 @@ export function koboToNaira(kobo: number): number {
 
 /**
  * Get subject-based session rate
- * Returns the standard rate in Naira based on subject complexity
+ * Platform-fixed flat rate — same for every subject
  */
-export function getSubjectRate(subject: string): number {
-  const subjectLower = subject.toLowerCase();
-  
-  // Complex subjects (₦28,000 per session)
-  const complexSubjects = [
-    'further mathematics',
-    'further maths',
-    'physics',
-    'chemistry',
-    'advanced mathematics',
-    'calculus',
-    'statistics',
-    'computer science',
-    'programming',
-  ];
-  
-  // Medium complexity (₦21,000 per session)
-  const mediumSubjects = [
-    'mathematics',
-    'maths',
-    'biology',
-    'economics',
-    'accounting',
-    'geography',
-    'literature',
-  ];
-  
-  // Check for complex subjects
-  if (complexSubjects.some(s => subjectLower.includes(s))) {
-    return 28000;
-  }
-  
-  // Check for medium subjects
-  if (mediumSubjects.some(s => subjectLower.includes(s))) {
-    return 21000;
-  }
-  
-  // Basic subjects (₦14,000 per session)
-  return 14000;
+export function getSubjectRate(_subject: string): number {
+  return 15000;
 }
 
 /**

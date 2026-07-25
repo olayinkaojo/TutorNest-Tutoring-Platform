@@ -134,13 +134,13 @@ app.post('/add-role', async (c) => {
       const emailData = emailTemplates.roleAdditionCongratulations(
         userProfile.fullName || userProfile.name || 'User',
         newRole,
-        `https://app.knowledgefonsacademy.com/dashboard`
+        `https://app.tutornest.org/dashboard`
       );
       await sendEmail({
         to: userProfile.email,
         subject: emailData.subject,
         html: emailData.html,
-        replyTo: 'support@knowledgefonsacademy.com'
+        replyTo: 'support@tutornest.org'
       });
     }
 
@@ -148,13 +148,13 @@ app.post('/add-role', async (c) => {
     if (newRole === 'tutor' && userProfile?.email) {
       const verificationEmailData = emailTemplates.tutorVerificationPending(
         userProfile.fullName || userProfile.name || 'Tutor',
-        `https://app.knowledgefonsacademy.com/tutor-dashboard`
+        `https://app.tutornest.org/tutor-dashboard`
       );
       await sendEmail({
         to: userProfile.email,
         subject: verificationEmailData.subject,
         html: verificationEmailData.html,
-        replyTo: 'support@knowledgefonsacademy.com'
+        replyTo: 'support@tutornest.org'
       });
     }
 

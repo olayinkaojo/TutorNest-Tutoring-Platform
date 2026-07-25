@@ -412,7 +412,7 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
             <div className="py-3 px-2 text-center">
               <p className="text-[10px] text-gray-400 uppercase tracking-wider mb-1">Fee</p>
               <p className="text-sm font-bold text-gray-800 leading-tight">
-                {formatNaira(parseFloat(booking.price || '20000'))}
+                {formatNaira(parseFloat(booking.price || '15000'))}
               </p>
             </div>
           </div>

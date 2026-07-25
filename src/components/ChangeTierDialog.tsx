@@ -160,7 +160,7 @@ export function ChangeTierDialog({
             </p>
             <p>✓ You can change your plan again at any time</p>
             <p className="text-xs italic">
-              Note: Live tutoring sessions are separate and billed at ₦20,000 per session.
+              Note: Live tutoring sessions are separate and billed at ₦15,000 per session.
             </p>
           </div>
         </div>

@@ -140,7 +140,7 @@ app.get('/bookings', async (c) => {
         parentName:     resolveName(parent,  ''),
         parentId:       b.userId,
         googleMeetLink: b.meetLink ?? null,
-        price:          String(20000),
+        price:          String(15000),
         createdAt:      new Date().toISOString(),
       };
     });
@@ -251,7 +251,7 @@ app.get('/tutors', async (c) => {
 
         // ── Engagement ───────────────────────────────────────────────────────
         rating:        tutor.rating ?? tutor.averageRating ?? null,
-        hourlyRate:    20000,   // platform-fixed
+        hourlyRate:    15000,   // platform-fixed
         availability:  tutor.availability || {},
       }));
 
