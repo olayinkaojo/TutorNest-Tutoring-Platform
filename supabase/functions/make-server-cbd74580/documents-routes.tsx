@@ -5,12 +5,39 @@ import {
   assertDocumentShareAllowed,
   parseChildIdsQuery,
   userCanAccessDocument,
+  verifyChildIds,
 } from './document-share-access.tsx';
 import {
   bookingIdentityIdsForUser,
   collectBookingsForUser,
   MESSAGING_BOOKING_STATUSES,
 } from './messaging-access.tsx';
+
+/**
+ * The `userRole` query parameter is supplied by the client and must not be
+ * trusted on its own: userCanAccessDocument() returns true for every document
+ * when the role is 'admin', so an unverified '?userRole=admin' exposed the whole
+ * document store to any authenticated caller.
+ *
+ * Returns the role to authorise with, or null when admin was claimed falsely.
+ */
+async function resolveRequestedRole(userId: string, requestedRole: string): Promise<string | null> {
+  const role = (requestedRole || 'parent').toLowerCase();
+  if (role !== 'admin') return role;
+  try {
+    const user = (await kv.get(`user:${userId}`)) as Record<string, unknown> | null;
+    return String(user?.role || '').toLowerCase() === 'admin' ? 'admin' : null;
+  } catch (error) {
+    console.error('Error resolving admin role:', error);
+    return null;
+  }
+}
+
+/** childIds only means anything for a parent, and only for children they own. */
+async function resolveChildIds(userId: string, role: string, query: string | undefined): Promise<string[]> {
+  if (role !== 'parent') return [];
+  return verifyChildIds(userId, parseChildIdsQuery(query));
+}
 
 function roleDisplayLabel(role: string): string {
   const r = (role || '').toLowerCase();
@@ -306,8 +333,11 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
 
       const documentType = c.req.query('documentType'); // Optional filter
       const relatedToId = c.req.query('relatedToId'); // Optional filter
-      const userRole = (c.req.query('userRole') || 'parent').toLowerCase();
-      const childIds = parseChildIdsQuery(c.req.query('childIds'));
+      const userRole = await resolveRequestedRole(userId, c.req.query('userRole') || '');
+      if (!userRole) {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+      const childIds = await resolveChildIds(userId, userRole, c.req.query('childIds'));
 
       const allDocuments = await kv.getByPrefix('document:');
 
@@ -410,8 +440,11 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         return c.json({ error: 'Document not found' }, 404);
       }
 
-      const userRole = (c.req.query('userRole') || 'parent').toLowerCase();
-      const childIds = parseChildIdsQuery(c.req.query('childIds'));
+      const userRole = await resolveRequestedRole(userId, c.req.query('userRole') || '');
+      if (!userRole) {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+      const childIds = await resolveChildIds(userId, userRole, c.req.query('childIds'));
       const hasAccess = await userCanAccessDocument(document, userId, userRole, childIds);
 
       if (!hasAccess) {

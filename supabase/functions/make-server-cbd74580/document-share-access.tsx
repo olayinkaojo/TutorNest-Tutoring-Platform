@@ -115,6 +115,21 @@ export async function assertDocumentShareAllowed(
   return { ok: false, error: 'Role cannot share documents to that recipient.' };
 }
 
+/**
+ * Filters client-supplied child ids down to the ones this parent actually owns.
+ *
+ * userCanAccessDocument() treats a document shared with any id in `childIds` as
+ * readable, so an unfiltered list from the query string would let a parent read
+ * documents shared with another family's child.
+ */
+export async function verifyChildIds(parentId: string, childIds: string[]): Promise<string[]> {
+  if (childIds.length === 0) return [];
+  const checked = await Promise.all(
+    childIds.map(async (id) => ((await parentOwnsChild(parentId, id)) ? id : null)),
+  );
+  return checked.filter((id): id is string => id !== null);
+}
+
 export function parseChildIdsQuery(q: string | undefined): string[] {
   if (!q?.trim()) return [];
   return q.split(',').map((s) => s.trim()).filter(Boolean);

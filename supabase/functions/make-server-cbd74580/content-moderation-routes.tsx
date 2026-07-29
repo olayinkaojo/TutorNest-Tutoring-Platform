@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { requireAdmin, requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
 
 const app = new Hono();
 
@@ -76,6 +77,8 @@ function moderateContent(text: string, type: 'message' | 'bio' | 'profile'): {
 // Moderate content endpoint
 app.post('/moderate', async (c) => {
   try {
+    const callerId = await verifyUser(c);
+    if (!callerId) return c.json({ error: 'Unauthorized' }, 401);
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -130,6 +133,8 @@ app.post('/moderate', async (c) => {
 // Get moderation queue for admins
 app.get('/queue', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -163,6 +168,8 @@ app.get('/queue', async (c) => {
 // Review moderation item
 app.post('/queue/:itemId/review', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -213,6 +220,8 @@ app.post('/queue/:itemId/review', async (c) => {
 // Get user strikes
 app.get('/strikes/:userId', async (c) => {
   try {
+    const auth = await requireSelfOrAdmin(c, c.req.param('userId'));
+    if (auth instanceof Response) return auth;
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);

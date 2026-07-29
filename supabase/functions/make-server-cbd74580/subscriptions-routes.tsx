@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { requireSelfOrAdmin } from './route-auth.tsx';
 
 const app = new Hono();
 
@@ -113,6 +114,8 @@ app.get('/subscription-tiers', async (c) => {
 // Get current subscription for a parent
 app.get('/subscription/:parentId', async (c) => {
   try {
+    const auth = await requireSelfOrAdmin(c, c.req.param('parentId'));
+    if (auth instanceof Response) return auth;
     const parentId = c.req.param('parentId');
     
     const subscription = await kv.get(`subscription_parent_${parentId}`);
@@ -146,6 +149,9 @@ app.get('/subscription/:parentId', async (c) => {
 // Subscribe to a tier (new subscription)
 app.post('/subscription/subscribe', async (c) => {
   try {
+    const authBody = await c.req.json();
+    const auth = await requireSelfOrAdmin(c, authBody?.parentId);
+    if (auth instanceof Response) return auth;
     const { parentId, tierId, paymentMethodId } = await c.req.json();
 
     if (!parentId || !tierId) {
@@ -230,6 +236,9 @@ function calculateProRataCharge(currentTier: any, newTier: any, daysRemaining: n
 // Upgrade subscription (with pro-rata billing)
 app.post('/subscription/upgrade', async (c) => {
   try {
+    const authBody = await c.req.json();
+    const auth = await requireSelfOrAdmin(c, authBody?.parentId);
+    if (auth instanceof Response) return auth;
     const { parentId, newTierId } = await c.req.json();
 
     if (!parentId || !newTierId) {
@@ -308,6 +317,9 @@ app.post('/subscription/upgrade', async (c) => {
 // Downgrade subscription (credit for next cycle)
 app.post('/subscription/downgrade', async (c) => {
   try {
+    const authBody = await c.req.json();
+    const auth = await requireSelfOrAdmin(c, authBody?.parentId);
+    if (auth instanceof Response) return auth;
     const { parentId, newTierId } = await c.req.json();
 
     if (!parentId || !newTierId) {
@@ -384,6 +396,9 @@ app.post('/subscription/downgrade', async (c) => {
 // Cancel subscription
 app.post('/subscription/cancel', async (c) => {
   try {
+    const authBody = await c.req.json();
+    const auth = await requireSelfOrAdmin(c, authBody?.parentId);
+    if (auth instanceof Response) return auth;
     const { parentId, reason, feedback } = await c.req.json();
 
     if (!parentId) {
@@ -441,6 +456,8 @@ app.post('/subscription/cancel', async (c) => {
 // Get subscription history
 app.get('/subscription/:parentId/history', async (c) => {
   try {
+    const auth = await requireSelfOrAdmin(c, c.req.param('parentId'));
+    if (auth instanceof Response) return auth;
     const parentId = c.req.param('parentId');
     
     const history = await kv.get(`subscription_history_${parentId}`) || [];
@@ -458,6 +475,9 @@ app.get('/subscription/:parentId/history', async (c) => {
 // Reactivate/renew subscription
 app.post('/subscription/reactivate', async (c) => {
   try {
+    const authBody = await c.req.json();
+    const auth = await requireSelfOrAdmin(c, authBody?.parentId);
+    if (auth instanceof Response) return auth;
     const { parentId } = await c.req.json();
 
     if (!parentId) {
@@ -511,6 +531,9 @@ app.post('/subscription/reactivate', async (c) => {
 // Update auto-renew setting
 app.post('/subscription/auto-renew', async (c) => {
   try {
+    const authBody = await c.req.json();
+    const auth = await requireSelfOrAdmin(c, authBody?.parentId);
+    if (auth instanceof Response) return auth;
     const { parentId, autoRenew } = await c.req.json();
 
     if (!parentId || typeof autoRenew !== 'boolean') {
@@ -546,6 +569,8 @@ app.post('/subscription/auto-renew', async (c) => {
 // Check if parent can add more children based on subscription tier
 app.get('/subscription/:parentId/can-add-child', async (c) => {
   try {
+    const auth = await requireSelfOrAdmin(c, c.req.param('parentId'));
+    if (auth instanceof Response) return auth;
     const parentId = c.req.param('parentId');
     
     const subscription = await kv.get(`subscription_parent_${parentId}`);

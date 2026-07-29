@@ -177,6 +177,38 @@ app.get(`${ROUTE_PREFIX}/health`, (c) =>
   }),
 );
 
+/**
+ * Single enforcement point for every /admin/* route.
+ *
+ * These handlers each resolve the caller and name it `adminId`, but none of
+ * them check that the caller holds the admin role, so any authenticated parent
+ * or student could reach user management, moderation, verification review, data
+ * export and impersonation. /admin/fix-user-role does not authenticate at all —
+ * an unauthenticated POST of {userEmail, correctRole} could grant any account
+ * the admin role.
+ *
+ * Guarding centrally rather than per-handler means a newly added admin route is
+ * covered by default instead of depending on the author remembering the check.
+ *
+ * Registered before the route modules so it runs ahead of their handlers.
+ */
+app.use(`${ROUTE_PREFIX}/admin/*`, async (c, next) => {
+  const accessToken = c.req.header('Authorization')?.split(' ')[1];
+  const userId = await getUserId(accessToken ?? null);
+
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const profile = (await kv.get(`user:${userId}`)) as { role?: string } | null;
+  if (String(profile?.role || '').toLowerCase() !== 'admin') {
+    console.warn(`Blocked non-admin ${userId} from ${c.req.method} ${c.req.path}`);
+    return c.json({ error: 'Admin access required' }, 403);
+  }
+
+  await next();
+});
+
 // Helper function to get fresh Google Calendar access token
 async function getGoogleAccessToken(userId: string): Promise<string | null> {
   const tokens = await kv.get(`google_calendar_tokens:${userId}`) as any;
@@ -1781,7 +1813,7 @@ app.get('/make-server-cbd74580/availability/:tutorId/slots', async (c) => {
         const slotEnd = `${String(Math.floor((minutes + 60) / 60)).padStart(2, '0')}:${String((minutes + 60) % 60).padStart(2, '0')}`;
 
         // Check if slot is booked in Knowledge Fons Academy
-        const isKnowledge Fons AcademyBooked = dateBookings.some((b: any) => {
+        const isPlatformBooked = dateBookings.some((b: any) => {
           const bookingStart = b.startTime;
           const bookingEnd = b.endTime;
           return !(slotEnd <= bookingStart || slotStart >= bookingEnd);
@@ -1796,7 +1828,7 @@ app.get('/make-server-cbd74580/availability/:tutorId/slots', async (c) => {
           date: dateParam,
           startTime: slotStart,
           endTime: slotEnd,
-          available: !isKnowledge Fons AcademyBooked && !isGoogleCalendarBusy,
+          available: !isPlatformBooked && !isGoogleCalendarBusy,
         });
       }
     }

@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { requireAdmin, requireSelfOrAdmin, verifyUser, isAdmin } from './route-auth.tsx';
 
 const app = new Hono();
 
@@ -145,6 +146,9 @@ app.get('/tax/vat-rate/:countryCode', async (c) => {
 // Create invoice for subscription
 app.post('/invoices/create', async (c) => {
   try {
+    const authBody = await c.req.json();
+    const auth = await requireSelfOrAdmin(c, authBody?.userId);
+    if (auth instanceof Response) return auth;
     const {
       userId,
       userEmail,
@@ -263,6 +267,11 @@ app.post('/invoices/create', async (c) => {
 // Get invoice by ID
 app.get('/invoices/:invoiceId', async (c) => {
   try {
+    const callerId = await verifyUser(c);
+    if (!callerId) return c.json({ success: false, error: 'Unauthorized' }, 401);
+    const ownerInvoice: any = await kv.get(`invoice_${c.req.param('invoiceId')}`);
+    if (!ownerInvoice) return c.json({ success: false, error: 'Invoice not found' }, 404);
+    if (ownerInvoice.userId !== callerId && !(await isAdmin(callerId))) return c.json({ success: false, error: 'Forbidden' }, 403);
     const invoiceId = c.req.param('invoiceId');
     
     const invoice: Invoice | null = await kv.get(`invoice_${invoiceId}`);
@@ -284,6 +293,8 @@ app.get('/invoices/:invoiceId', async (c) => {
 // Get user's invoices
 app.get('/invoices/user/:userId', async (c) => {
   try {
+    const auth = await requireSelfOrAdmin(c, c.req.param('userId'));
+    if (auth instanceof Response) return auth;
     const userId = c.req.param('userId');
     
     const invoiceIds = await kv.get(`user_invoices_${userId}`) || [];
@@ -309,6 +320,8 @@ app.get('/invoices/user/:userId', async (c) => {
 // Mark invoice as paid
 app.post('/invoices/:invoiceId/paid', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const invoiceId = c.req.param('invoiceId');
     const { paymentMethod, transactionId } = await c.req.json();
 
@@ -343,6 +356,8 @@ app.post('/invoices/:invoiceId/paid', async (c) => {
 // Void invoice
 app.post('/invoices/:invoiceId/void', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const invoiceId = c.req.param('invoiceId');
     const { reason } = await c.req.json();
 
@@ -376,6 +391,11 @@ app.post('/invoices/:invoiceId/void', async (c) => {
 // Generate downloadable invoice (returns formatted data for PDF generation on frontend)
 app.get('/invoices/:invoiceId/download', async (c) => {
   try {
+    const callerId = await verifyUser(c);
+    if (!callerId) return c.json({ success: false, error: 'Unauthorized' }, 401);
+    const ownerInvoice: any = await kv.get(`invoice_${c.req.param('invoiceId')}`);
+    if (!ownerInvoice) return c.json({ success: false, error: 'Invoice not found' }, 404);
+    if (ownerInvoice.userId !== callerId && !(await isAdmin(callerId))) return c.json({ success: false, error: 'Forbidden' }, 403);
     const invoiceId = c.req.param('invoiceId');
     
     const invoice: Invoice | null = await kv.get(`invoice_${invoiceId}`);
@@ -422,6 +442,8 @@ app.get('/invoices/:invoiceId/download', async (c) => {
 // Generate tax report for a period
 app.post('/tax/reports/generate', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const { reportType, startDate, endDate, adminId } = await c.req.json();
 
     if (!reportType || !startDate || !endDate || !adminId) {
@@ -517,6 +539,8 @@ app.post('/tax/reports/generate', async (c) => {
 // Get all tax reports
 app.get('/tax/reports', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const reportsData = await kv.getByPrefix('tax_report_');
     const reports = reportsData.map(item => item.value);
 
@@ -536,6 +560,8 @@ app.get('/tax/reports', async (c) => {
 // Export accounting data (CSV format)
 app.post('/tax/export', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const { startDate, endDate, format } = await c.req.json();
 
     if (!startDate || !endDate) {
