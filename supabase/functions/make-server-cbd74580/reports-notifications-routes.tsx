@@ -436,11 +436,15 @@ app.post('/make-server-cbd74580/notifications/:userId/create-test', async (c) =>
 app.get('/make-server-cbd74580/users/:userId/notification-preferences', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
+    const currentUserId = await getUserId(accessToken);
+    if (!currentUserId) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
     const userId = c.req.param('userId');
+    if (userId !== currentUserId) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const preferences = await kv.get(`notification-preferences:${userId}`) as any;
 
     return c.json({ preferences: preferences || null });
@@ -454,11 +458,15 @@ app.get('/make-server-cbd74580/users/:userId/notification-preferences', async (c
 app.post('/make-server-cbd74580/users/:userId/notification-preferences', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
+    const currentUserId = await getUserId(accessToken);
+    if (!currentUserId) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
     const userId = c.req.param('userId');
+    if (userId !== currentUserId) {
+      return c.json({ error: 'Forbidden' }, 403);
+    }
     const { preferences } = await c.req.json();
 
     await kv.set(`notification-preferences:${userId}`, preferences);
