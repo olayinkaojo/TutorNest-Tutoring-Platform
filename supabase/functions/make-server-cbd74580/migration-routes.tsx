@@ -1,24 +1,19 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { verifyAccessToken } from './route-auth.tsx';
 import * as db from './db.tsx';
 
 const migrationRoutes = new Hono();
 
-const getUserIdFromToken = (accessToken: string | null): string | null => {
-  if (!accessToken) return null;
-  try {
-    const parts = accessToken.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    return payload.sub || null;
-  } catch { return null; }
+const getUserIdFromToken = async (accessToken: string | null): Promise<string | null> => {
+  return verifyAccessToken(accessToken);
 };
 
 // POST /admin/migrate-kv-to-postgres
 // Migrates all KV bookings and payments to Postgres. Safe to run multiple times (upsert).
 migrationRoutes.post('/admin/migrate-kv-to-postgres', async (c) => {
   const accessToken = c.req.header('Authorization')?.split(' ')[1];
-  const userId = getUserIdFromToken(accessToken);
+  const userId = await getUserIdFromToken(accessToken);
   if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
   const adminUser = await kv.get(`user:${userId}`);

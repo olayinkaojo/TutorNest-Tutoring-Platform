@@ -1,18 +1,12 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { verifyAccessToken } from './route-auth.tsx';
 
 const payoutsComplete = new Hono();
 
 const getUserId = async (accessToken: string | null): Promise<string | null> => {
-  if (!accessToken) return null;
-  try {
-    const parts = accessToken.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    return payload.sub || null;
-  } catch (err) {
-    return null;
-  }
+  // Verify the JWT signature + expiry via Supabase; never trust an unverified decode.
+  return verifyAccessToken(accessToken);
 };
 
 // Helper: Get subject-based rate — platform-fixed flat rate, same for every subject

@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
+import { verifyAccessToken } from './route-auth.tsx';
 import { PaymentProcessor } from './unified-payment-processor.tsx';
 import { NotificationBroker } from './notification-broker.tsx';
 
@@ -16,36 +17,8 @@ const getSupabaseClient = () => {
 
 // Helper to get user from token
 const getUserFromToken = async (accessToken: string | null) => {
-  if (!accessToken) {
-    console.log('No access token provided');
-    return null;
-  }
-  
-  try {
-    // Decode JWT to extract user ID (same approach as main getUserId function)
-    const parts = accessToken.split('.');
-    if (parts.length !== 3) {
-      console.error('Invalid JWT token format');
-      return null;
-    }
-
-    // Decode the payload (second part of JWT)
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    
-    // Extract user ID from payload (Supabase uses 'sub' claim for user ID)
-    const userId = payload.sub;
-    
-    if (!userId) {
-      console.error('No user ID found in token payload');
-      return null;
-    }
-    
-    // Return a user object with the ID
-    return { id: userId };
-  } catch (err) {
-    console.error('Exception in getUserFromToken:', err);
-    return null;
-  }
+  const userId = await verifyAccessToken(accessToken);
+  return userId ? { id: userId } : null;
 };
 
 // Sample books data - in production, this would come from a database

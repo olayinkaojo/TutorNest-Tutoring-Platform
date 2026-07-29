@@ -1,48 +1,21 @@
 import { Hono } from 'npm:hono@4';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
+import { verifyAccessToken } from './route-auth.tsx';
 import { sendEmail } from './email-service.tsx';
 
 const parentChildrenRoutes = new Hono();
 
 // Helper to get user ID from access token
-const getUserIdFromToken = (accessToken: string | null): string | null => {
-  if (!accessToken) {
-    console.log('No access token provided');
-    return null;
-  }
-  
-  try {
-    // Decode JWT to extract user ID
-    const parts = accessToken.split('.');
-    if (parts.length !== 3) {
-      console.error('Invalid JWT token format');
-      return null;
-    }
-
-    // Decode the payload (second part of JWT)
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    
-    // Extract user ID from payload (Supabase uses 'sub' claim for user ID)
-    const userId = payload.sub;
-    
-    if (!userId) {
-      console.error('No user ID found in token payload');
-      return null;
-    }
-    
-    return userId;
-  } catch (err) {
-    console.error('Exception in getUserIdFromToken:', err);
-    return null;
-  }
+const getUserIdFromToken = async (accessToken: string | null): Promise<string | null> => {
+  return verifyAccessToken(accessToken);
 };
 
 // Add a child to a parent's account
 parentChildrenRoutes.post('/add-child', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -142,7 +115,7 @@ parentChildrenRoutes.post('/add-child', async (c) => {
 parentChildrenRoutes.get('/children/:parentId', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     console.log('=== GET /children/:parentId Debug ===');
     console.log('Extracted userId from token:', userId);
@@ -261,7 +234,7 @@ parentChildrenRoutes.get('/children/:parentId', async (c) => {
 parentChildrenRoutes.get('/child/:childId', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -290,7 +263,7 @@ parentChildrenRoutes.get('/child/:childId', async (c) => {
 parentChildrenRoutes.put('/update-child', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -345,7 +318,7 @@ parentChildrenRoutes.put('/update-child', async (c) => {
 parentChildrenRoutes.put('/child/:childId', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -391,7 +364,7 @@ parentChildrenRoutes.put('/child/:childId', async (c) => {
 parentChildrenRoutes.delete('/child/:childId', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401);

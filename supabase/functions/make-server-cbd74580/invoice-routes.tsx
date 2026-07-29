@@ -1,21 +1,12 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { verifyAccessToken } from './route-auth.tsx';
 
 const invoiceRoutes = new Hono();
 
 // Helper to get user ID from access token
-const getUserIdFromToken = (accessToken: string | null): string | null => {
-  if (!accessToken) return null;
-  
-  try {
-    const parts = accessToken.split('.');
-    if (parts.length !== 3) return null;
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    return payload.sub || null;
-  } catch (err) {
-    console.error('getUserIdFromToken error:', err);
-    return null;
-  }
+const getUserIdFromToken = async (accessToken: string | null): Promise<string | null> => {
+  return verifyAccessToken(accessToken);
 };
 
 // Generate invoice number
@@ -29,7 +20,7 @@ const generateInvoiceNumber = (): string => {
 invoiceRoutes.post('/create', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -133,7 +124,7 @@ invoiceRoutes.post('/create', async (c) => {
 invoiceRoutes.get('/user/:userId', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const requestingUserId = getUserIdFromToken(accessToken);
+    const requestingUserId = await getUserIdFromToken(accessToken);
     
     if (!requestingUserId) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -178,7 +169,7 @@ invoiceRoutes.get('/user/:userId', async (c) => {
 invoiceRoutes.get('/:invoiceId', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -212,7 +203,7 @@ invoiceRoutes.get('/:invoiceId', async (c) => {
 invoiceRoutes.get('/booking/:bookingId', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -251,7 +242,7 @@ invoiceRoutes.get('/booking/:bookingId', async (c) => {
 invoiceRoutes.get('/admin/all', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401);

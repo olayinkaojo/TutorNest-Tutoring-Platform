@@ -1,51 +1,19 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { verifyAccessToken } from './route-auth.tsx';
 
 const assessmentsRoutes = new Hono();
 
 // Helper to get user ID from access token
-const getUserIdFromToken = (accessToken: string | null): string | null => {
-  if (!accessToken) {
-    console.log('getUserIdFromToken: No access token provided');
-    return null;
-  }
-  
-  try {
-    const parts = accessToken.split('.');
-    if (parts.length !== 3) {
-      console.error('getUserIdFromToken: Invalid JWT token format - expected 3 parts, got:', parts.length);
-      return null;
-    }
-
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    const userId = payload.sub;
-    
-    if (!userId) {
-      console.error('getUserIdFromToken: No user ID (sub) found in token payload');
-      return null;
-    }
-
-    // Check if token is expired
-    const exp = payload.exp;
-    if (exp && Date.now() >= exp * 1000) {
-      const expiryDate = new Date(exp * 1000);
-      console.error(`getUserIdFromToken: Token expired at ${expiryDate.toISOString()}`);
-      return null;
-    }
-    
-    console.log('getUserIdFromToken: Successfully extracted userId:', userId);
-    return userId;
-  } catch (err) {
-    console.error('getUserIdFromToken: Exception:', err);
-    return null;
-  }
+const getUserIdFromToken = async (accessToken: string | null): Promise<string | null> => {
+  return verifyAccessToken(accessToken);
 };
 
 // Submit a new assessment
 assessmentsRoutes.post('/submit', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       return c.json({ error: 'Unauthorized', message: 'Invalid or missing access token' }, 401);
@@ -159,7 +127,7 @@ assessmentsRoutes.get('/student/:studentId', async (c) => {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     console.log('GET /student/:studentId - Access token present:', !!accessToken);
     
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       console.error('GET /student/:studentId - Failed to get userId from token');
@@ -270,7 +238,7 @@ assessmentsRoutes.get('/stats/student/:studentId', async (c) => {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     console.log('GET /stats/student/:studentId - Access token present:', !!accessToken);
     
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       console.error('GET /stats/student/:studentId - Failed to get userId from token');
@@ -448,7 +416,7 @@ assessmentsRoutes.get('/stats/student/:studentId', async (c) => {
 assessmentsRoutes.get('/tutor/:tutorId', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = getUserIdFromToken(accessToken);
+    const userId = await getUserIdFromToken(accessToken);
     
     if (!userId) {
       return c.json({ error: 'Unauthorized', message: 'Invalid or missing access token' }, 401);

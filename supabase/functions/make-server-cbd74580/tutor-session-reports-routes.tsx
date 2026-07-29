@@ -1,36 +1,13 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { verifyAccessToken } from './route-auth.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 
 const app = new Hono();
 
 // Helper to get user ID from token
 const getUserId = async (accessToken: string | null): Promise<string | null> => {
-  if (!accessToken) {
-    console.log('No access token provided');
-    return null;
-  }
-  
-  try {
-    const parts = accessToken.split('.');
-    if (parts.length !== 3) {
-      console.error('Invalid JWT token format');
-      return null;
-    }
-
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    const userId = payload.sub;
-    
-    if (!userId) {
-      console.error('No user ID found in token payload');
-      return null;
-    }
-    
-    return userId;
-  } catch (err) {
-    console.error('Exception in getUserId:', err);
-    return null;
-  }
+  return verifyAccessToken(accessToken);
 };
 
 // Get all session reports for a tutor

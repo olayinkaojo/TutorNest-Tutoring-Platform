@@ -1,39 +1,12 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { verifyAccessToken } from './route-auth.tsx';
 
 const app = new Hono();
 
 // Helper function to get user ID from access token
-const getUserId = async (accessToken: string | null, supabase: any): Promise<string | null> => {
-  if (!accessToken) {
-    console.log('No access token provided');
-    return null;
-  }
-  
-  try {
-    // Decode JWT to extract user ID (same approach as main getUserId function)
-    const parts = accessToken.split('.');
-    if (parts.length !== 3) {
-      console.error('Invalid JWT token format');
-      return null;
-    }
-
-    // Decode the payload (second part of JWT)
-    const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')));
-    
-    // Extract user ID from payload (Supabase uses 'sub' claim for user ID)
-    const userId = payload.sub;
-    
-    if (!userId) {
-      console.error('No user ID found in token payload');
-      return null;
-    }
-    
-    return userId;
-  } catch (err) {
-    console.error('Exception in getUserId:', err);
-    return null;
-  }
+const getUserId = async (accessToken: string | null, _supabase?: any): Promise<string | null> => {
+  return verifyAccessToken(accessToken);
 };
 
 // Initialize Google OAuth URL
