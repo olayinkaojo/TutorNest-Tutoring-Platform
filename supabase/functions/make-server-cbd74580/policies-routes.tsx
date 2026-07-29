@@ -3,6 +3,8 @@ import * as kv from './kv_store.tsx';
 
 const app = new Hono();
 
+import { requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
+
 // Platform policies
 const PLATFORM_POLICIES = {
   'no-show': {
@@ -186,6 +188,8 @@ app.get('/:policyId', async (c) => {
 // Record policy acceptance
 app.post('/:policyId/accept', async (c) => {
   try {
+    const callerId = await verifyUser(c);
+    if (!callerId) return c.json({ success: false, error: 'Unauthorized' }, 401);
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -218,6 +222,8 @@ app.post('/:policyId/accept', async (c) => {
 // Check if user has accepted policy
 app.get('/:policyId/acceptance/:userId', async (c) => {
   try {
+    const auth = await requireSelfOrAdmin(c, c.req.param('userId'));
+    if (auth instanceof Response) return auth;
     const policyId = c.req.param('policyId');
     const userId = c.req.param('userId');
 

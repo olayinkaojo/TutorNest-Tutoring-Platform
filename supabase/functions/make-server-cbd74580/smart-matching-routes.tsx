@@ -4,6 +4,8 @@ import { getProfile, getProfilesByRole } from './db.tsx';
 
 const app = new Hono();
 
+import { requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
+
 // Smart Matching Algorithm
 function calculateMatchScore(student: any, tutor: any): {score: number, breakdown: any} {
   let totalScore = 0;
@@ -196,6 +198,8 @@ function calculateExperienceMatch(student: any, tutor: any): number {
 // Get matched tutors for a student
 app.get('/match/student/:studentId', async (c) => {
   try {
+    const callerId = await verifyUser(c);
+    if (!callerId) return c.json({ error: 'Unauthorized' }, 401);
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -300,6 +304,8 @@ app.get('/match/student/:studentId', async (c) => {
 // Get matched students for a tutor
 app.get('/match/tutor/:tutorId', async (c) => {
   try {
+    const callerId = await verifyUser(c);
+    if (!callerId) return c.json({ error: 'Unauthorized' }, 401);
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -360,13 +366,10 @@ app.get('/match/tutor/:tutorId', async (c) => {
 // Add enhanced child profile endpoint
 app.post('/parent/add-child-enhanced', async (c) => {
   try {
-    const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
     const data = await c.req.json();
     const { parentId, ...childData } = data;
+    const auth = await requireSelfOrAdmin(c, parentId);
+    if (auth instanceof Response) return auth;
 
     // Check subscription limits (simplified)
     const existingChildren = await kv.getByPrefix(`child:${parentId}:`);
