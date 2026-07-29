@@ -257,6 +257,10 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       }
 
       const notificationId = c.req.param('notificationId');
+      const existing = await kv.get(notificationId) as any;
+      if (existing && existing.userId && existing.userId !== userId) {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
       await kv.del(notificationId);
 
       return c.json({ success: true });
@@ -277,6 +281,9 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       }
 
       const userId = c.req.param('userId');
+      if (userId !== currentUserId) {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
       let preferences = await kv.get(`notification-preferences:${userId}`) as any;
 
       // Default preferences if not set
@@ -324,6 +331,9 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       }
 
       const userId = c.req.param('userId');
+      if (userId !== currentUserId) {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
       const { preferences } = await c.req.json();
 
       await kv.set(`notification-preferences:${userId}`, preferences);

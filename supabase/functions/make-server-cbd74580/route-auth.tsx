@@ -29,18 +29,22 @@ function authClient() {
   return cachedClient;
 }
 
-/** Verified auth user id, or null if the bearer token is missing/invalid/expired. */
-export async function verifyUser(c: any): Promise<string | null> {
-  const accessToken = c.req.header('Authorization')?.split(' ')[1];
+/** Verified auth user id for a raw access token, or null if invalid/expired. */
+export async function verifyAccessToken(accessToken: string | undefined | null): Promise<string | null> {
   if (!accessToken) return null;
   try {
     const { data: { user }, error } = await authClient().auth.getUser(accessToken);
     if (error || !user) return null;
     return user.id;
   } catch (err) {
-    console.error('verifyUser: token verification failed:', err);
+    console.error('verifyAccessToken: token verification failed:', err);
     return null;
   }
+}
+
+/** Verified auth user id, or null if the bearer token is missing/invalid/expired. */
+export async function verifyUser(c: any): Promise<string | null> {
+  return verifyAccessToken(c.req.header('Authorization')?.split(' ')[1]);
 }
 
 /** True when the profile for `userId` has the admin role. */

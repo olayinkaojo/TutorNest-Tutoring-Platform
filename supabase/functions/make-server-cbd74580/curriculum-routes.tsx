@@ -3,6 +3,8 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 
 const app = new Hono();
 
+import { requireAdmin } from './route-auth.tsx';
+
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
@@ -11,6 +13,8 @@ const supabase = createClient(
 // Upload curriculum PDF for a specific grade level
 app.post('/upload', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const formData = await c.req.formData();
     const file = formData.get('file') as File;
     const gradeLevel = formData.get('gradeLevel') as string;
@@ -193,6 +197,8 @@ app.get('/all', async (c) => {
 // Delete a curriculum
 app.delete('/:curriculumId', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const curriculumId = c.req.param('curriculumId');
 
     // Find the curriculum in KV store

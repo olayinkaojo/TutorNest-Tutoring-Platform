@@ -1,19 +1,24 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { verifyAccessToken } from './route-auth.tsx';
 
 const app = new Hono();
 
-// Helper to get user from access token
+// Helper to get user from access token.
+//
+// SECURITY: this previously matched the raw bearer token against stored users'
+// id/userId/accessToken fields — which a real JWT never equals, so it was both
+// broken (returned nothing for valid tokens) and unverified. It now verifies the
+// token against Supabase and returns the caller's profile.
 async function getUserFromToken(accessToken: string | undefined) {
-  if (!accessToken) return null;
-  
+  const userId = await verifyAccessToken(accessToken);
+  if (!userId) return null;
   try {
-    const users = await kv.getByPrefix('user:');
-    const user = users.find((u: any) => u.accessToken === accessToken || u.userId === accessToken || u.id === accessToken);
-    return user;
+    const profile = (await kv.get(`user:${userId}`)) as any;
+    return profile ? { ...profile, id: userId, userId } : { id: userId, userId };
   } catch (error) {
-    console.error('Error getting user from token:', error);
-    return null;
+    console.error('Error loading user profile:', error);
+    return { id: userId, userId };
   }
 }
 
@@ -21,7 +26,8 @@ async function getUserFromToken(accessToken: string | undefined) {
 app.post('/sessions/:bookingId/start', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
+    const authedUser = await getUserFromToken(accessToken);
+    if (!authedUser) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
@@ -84,7 +90,8 @@ app.post('/sessions/:bookingId/start', async (c) => {
 app.post('/sessions/:sessionId/join', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
+    const authedUser = await getUserFromToken(accessToken);
+    if (!authedUser) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
@@ -137,7 +144,8 @@ app.post('/sessions/:sessionId/join', async (c) => {
 app.post('/sessions/:sessionId/end', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
+    const authedUser = await getUserFromToken(accessToken);
+    if (!authedUser) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
@@ -213,7 +221,8 @@ app.post('/sessions/:sessionId/end', async (c) => {
 app.get('/sessions/booking/:bookingId', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
+    const authedUser = await getUserFromToken(accessToken);
+    if (!authedUser) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
@@ -239,7 +248,8 @@ app.get('/sessions/booking/:bookingId', async (c) => {
 app.get('/sessions/:sessionId/stats', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
+    const authedUser = await getUserFromToken(accessToken);
+    if (!authedUser) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
@@ -269,7 +279,8 @@ app.get('/sessions/:sessionId/stats', async (c) => {
 app.post('/sessions/:sessionId/report', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
+    const authedUser = await getUserFromToken(accessToken);
+    if (!authedUser) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
