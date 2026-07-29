@@ -176,6 +176,38 @@ app.get(`${ROUTE_PREFIX}/health`, (c) =>
   }),
 );
 
+/**
+ * Single enforcement point for every /admin/* route.
+ *
+ * These handlers each resolve the caller and name it `adminId`, but none of
+ * them check that the caller holds the admin role, so any authenticated parent
+ * or student could reach user management, moderation, verification review, data
+ * export and impersonation. /admin/fix-user-role does not authenticate at all —
+ * an unauthenticated POST of {userEmail, correctRole} could grant any account
+ * the admin role.
+ *
+ * Guarding centrally rather than per-handler means a newly added admin route is
+ * covered by default instead of depending on the author remembering the check.
+ *
+ * Registered before the route modules so it runs ahead of their handlers.
+ */
+app.use(`${ROUTE_PREFIX}/admin/*`, async (c, next) => {
+  const accessToken = c.req.header('Authorization')?.split(' ')[1];
+  const userId = await getUserId(accessToken ?? null);
+
+  if (!userId) {
+    return c.json({ error: 'Unauthorized' }, 401);
+  }
+
+  const profile = (await kv.get(`user:${userId}`)) as { role?: string } | null;
+  if (String(profile?.role || '').toLowerCase() !== 'admin') {
+    console.warn(`Blocked non-admin ${userId} from ${c.req.method} ${c.req.path}`);
+    return c.json({ error: 'Admin access required' }, 403);
+  }
+
+  await next();
+});
+
 // Helper function to get fresh Google Calendar access token
 async function getGoogleAccessToken(userId: string): Promise<string | null> {
   const tokens = await kv.get(`google_calendar_tokens:${userId}`) as any;
