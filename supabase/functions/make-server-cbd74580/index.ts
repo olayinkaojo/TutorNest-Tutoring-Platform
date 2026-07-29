@@ -12,6 +12,7 @@ import { documentsRoutes } from './documents-routes.tsx';
 import { systemAlertsRoutes } from './system-alerts-routes.tsx';
 import parentChildrenRoutes from './parent-children-routes.tsx';
 import { adminRoutes } from './admin-routes.tsx';
+import { adminVerificationExtraRoutes } from './admin-verification-extra-routes.tsx';
 import reviewsDisputesRoutes from './reviews-disputes-routes.tsx';
 import subscriptionsRoutes from './subscriptions-routes.tsx';
 import googleCalendarRoutes from './google-calendar-routes.tsx';
@@ -342,6 +343,7 @@ app.route('/make-server-cbd74580/parent', parentChildrenRoutes);
 
 // Register admin routes
 adminRoutes(app, getUserId);
+adminVerificationExtraRoutes(app, getUserId);
 
 // Register student auth routes
 studentAuthRoutes(app, getUserId);

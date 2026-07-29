@@ -104,7 +104,14 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
 
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState('newest');
-  const [showHistory, setShowHistory] = useState(false);
+  // 'pending' = new tutors awaiting review, 'all' = every tutor (verify existing/legacy),
+  // 'history' = already reviewed.
+  const [viewMode, setViewMode] = useState<'pending' | 'all' | 'history'>('pending');
+  const showHistory = viewMode === 'history';
+
+  // Certificates the selected tutor uploaded from their profile tab.
+  const [uploadedDocs, setUploadedDocs] = useState<Array<{ id: string; title?: string; fileName: string; fileSize?: number; createdAt?: string }>>([]);
+  const [loadingUploadedDocs, setLoadingUploadedDocs] = useState(false);
 
   const [reviewData, setReviewData] = useState({
     action: 'approve',
@@ -134,8 +141,13 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
 
         const headers = { Authorization: `Bearer ${session.access_token}` };
 
+        const listPath =
+          viewMode === 'all' ? '/admin/tutors'
+          : viewMode === 'history' ? '/admin/verifications/history'
+          : '/admin/verifications/pending';
+
         const [listRes, metricsRes] = await Promise.all([
-          fetch(`${BASE}/admin/verifications/${showHistory ? 'history' : 'pending'}`, { headers }),
+          fetch(`${BASE}${listPath}`, { headers }),
           fetch(`${BASE}/admin/verifications/metrics`, { headers }),
         ]);
 
@@ -156,7 +168,7 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
         setRefreshing(false);
       }
     },
-    [session.access_token, showHistory]
+    [session.access_token, viewMode]
   );
 
   useEffect(() => {
@@ -233,6 +245,53 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
     }
   };
 
+  // Load the selected tutor's profile-tab certificate uploads.
+  useEffect(() => {
+    const userId = selected?.userId;
+    if (!userId) { setUploadedDocs([]); return; }
+    let cancelled = false;
+    (async () => {
+      setLoadingUploadedDocs(true);
+      try {
+        const res = await fetch(`${BASE}/admin/tutors/${userId}/documents`, {
+          headers: { Authorization: `Bearer ${session.access_token}` },
+        });
+        if (res.ok && !cancelled) {
+          const data = await res.json();
+          setUploadedDocs(data.documents || []);
+        } else if (!cancelled) {
+          setUploadedDocs([]);
+        }
+      } catch {
+        if (!cancelled) setUploadedDocs([]);
+      } finally {
+        if (!cancelled) setLoadingUploadedDocs(false);
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [selected?.userId, session.access_token]);
+
+  // Admins are authorised on the document download route via userRole=admin.
+  const openUploadedDoc = async (documentId: string) => {
+    try {
+      const res = await fetch(`${BASE}/documents/${documentId}/download?userRole=admin`, {
+        headers: { Authorization: `Bearer ${session.access_token}` },
+      });
+      if (!res.ok) throw new Error('Could not retrieve document');
+      const data = await res.json();
+      window.open(data.downloadUrl, '_blank', 'noopener,noreferrer');
+    } catch (err: any) {
+      setError(err.message);
+    }
+  };
+
+  const formatDocSize = (bytes?: number) => {
+    if (!bytes) return '';
+    if (bytes < 1024) return `${bytes} B`;
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  };
+
   const exportCSV = () => {
     const rows = [
       ['Name', 'Email', 'Phone', 'Subjects', 'Status', 'Submitted', 'Risk Flags'],
@@ -286,20 +345,32 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
             Tutor Verification
           </h1>
           <p className="text-sm text-gray-500 mt-0.5">
-            {showHistory ? 'Showing reviewed applications' : `${metrics.total_pending} application${metrics.total_pending !== 1 ? 's' : ''} awaiting review`}
+            {viewMode === 'history' ? 'Showing reviewed applications'
+              : viewMode === 'all' ? 'All tutors — verify new or existing profiles'
+              : `${metrics.total_pending} application${metrics.total_pending !== 1 ? 's' : ''} awaiting review`}
           </p>
         </div>
         <div className="flex gap-2 flex-wrap">
-          <Button
-            variant={showHistory ? 'default' : 'outline'}
-            size="sm"
-            onClick={() => { setShowHistory((h) => !h); setSelected(null); }}
-            className="gap-2"
-            style={showHistory ? { backgroundColor: '#625d9c' } : {}}
-          >
-            <History className="w-4 h-4" />
-            {showHistory ? 'View Pending' : 'View History'}
-          </Button>
+          {/* New tutors, every tutor (verify existing), or already-reviewed */}
+          <div className="inline-flex rounded-md border border-gray-200 overflow-hidden">
+            {([
+              { key: 'pending', label: 'Pending' },
+              { key: 'all', label: 'All Tutors' },
+              { key: 'history', label: 'History' },
+            ] as const).map(({ key, label }) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => { setViewMode(key); setSelected(null); }}
+                className={`px-3 py-1.5 text-sm transition-colors ${
+                  viewMode === key ? 'text-white' : 'bg-white text-gray-600 hover:bg-gray-50'
+                }`}
+                style={viewMode === key ? { backgroundColor: '#625d9c' } : {}}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
           <Button
             variant="outline"
             size="sm"
@@ -379,7 +450,7 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
         <Card className="lg:col-span-2 flex flex-col overflow-hidden" style={{ maxHeight: 720 }}>
           <CardHeader className="pb-3 border-b">
             <CardTitle className="text-base" style={{ color: '#625d9c' }}>
-              {showHistory ? 'Reviewed' : 'Pending'} ({displayed.length})
+              {viewMode === 'history' ? 'Reviewed' : viewMode === 'all' ? 'All Tutors' : 'Pending'} ({displayed.length})
             </CardTitle>
           </CardHeader>
           <div className="overflow-y-auto flex-1 p-3 space-y-2">
@@ -387,7 +458,7 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
               <div className="text-center py-12">
                 <FileText className="w-10 h-10 mx-auto text-gray-300 mb-3" />
                 <p className="text-sm text-gray-500">
-                  {showHistory ? 'No reviewed applications yet' : 'No pending applications'}
+                  {viewMode === 'history' ? 'No reviewed applications yet' : viewMode === 'all' ? 'No tutors found' : 'No pending applications'}
                 </p>
               </div>
             ) : (
@@ -413,11 +484,18 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
                       <p className="font-medium text-sm truncate">{resolveName(v.profile)}</p>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         {flags.length > 0 && <Flag className="w-3.5 h-3.5 text-red-500" />}
-                        {showHistory && v.status === 'verified' && (
-                          <Badge className="bg-green-600 text-white text-xs">Approved</Badge>
+                        {/* Status badge in History and All Tutors views */}
+                        {viewMode !== 'pending' && (v.status === 'verified' || v.status === 'approved') && (
+                          <Badge className="bg-green-600 text-white text-xs">Verified</Badge>
                         )}
-                        {showHistory && v.status === 'rejected' && (
+                        {viewMode !== 'pending' && v.status === 'rejected' && (
                           <Badge variant="destructive" className="text-xs">Rejected</Badge>
+                        )}
+                        {viewMode === 'all' && (v.status === 'pending') && (
+                          <Badge className="bg-amber-500 text-white text-xs">Pending</Badge>
+                        )}
+                        {viewMode === 'all' && v.status === 'unverified' && (
+                          <Badge variant="outline" className="text-xs">Unverified</Badge>
                         )}
                       </div>
                     </div>
@@ -428,7 +506,7 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
                           {v.profile.subjects[0]}
                         </Badge>
                       )}
-                      {!showHistory && (
+                      {viewMode === 'pending' && (
                         <span className="text-xs text-gray-400">
                           {days === 0 ? 'Today' : `${days}d waiting`}
                         </span>
@@ -628,7 +706,40 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
                     </div>
                   )}
 
-                  {!hasPhoto && !hasDbs && !hasInsurance && !selected.documents?.qualifications?.length && (
+                  {/* Certificates the tutor uploaded from their dashboard profile tab */}
+                  <div className="pt-3 border-t">
+                    <p className="text-xs font-medium text-gray-600 mb-2">
+                      Uploaded Certificates &amp; Documents ({uploadedDocs.length})
+                    </p>
+                    {loadingUploadedDocs ? (
+                      <p className="text-sm text-gray-400">Loading…</p>
+                    ) : uploadedDocs.length === 0 ? (
+                      <p className="text-sm text-gray-400">None uploaded from the tutor's profile</p>
+                    ) : (
+                      <div className="space-y-2">
+                        {uploadedDocs.map((doc) => (
+                          <Button
+                            key={doc.id}
+                            variant="outline"
+                            className="w-full justify-start gap-3 h-auto py-2"
+                            onClick={() => openUploadedDoc(doc.id)}
+                          >
+                            <FileText className="w-4 h-4 text-[#625d9c] flex-shrink-0" />
+                            <span className="flex flex-col items-start min-w-0">
+                              <span className="text-sm truncate max-w-full">{doc.title || doc.fileName}</span>
+                              <span className="text-xs text-gray-500 font-normal">
+                                {[formatDocSize(doc.fileSize), doc.createdAt ? new Date(doc.createdAt).toLocaleDateString() : '']
+                                  .filter(Boolean).join(' • ')}
+                              </span>
+                            </span>
+                            <Eye className="w-4 h-4 ml-auto flex-shrink-0" />
+                          </Button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+
+                  {!hasPhoto && !hasDbs && !hasInsurance && !selected.documents?.qualifications?.length && uploadedDocs.length === 0 && !loadingUploadedDocs && (
                     <div className="text-center py-10">
                       <FileText className="w-10 h-10 mx-auto text-gray-300 mb-3" />
                       <p className="text-sm text-gray-500">No documents uploaded by this tutor</p>

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from './ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Input } from './ui/input';
@@ -6,10 +6,43 @@ import { Label } from './ui/label';
 import { Textarea } from './ui/textarea';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
-import { User, Mail, Phone, MapPin, DollarSign, BookOpen, Award, CheckCircle, AlertCircle, CreditCard, Upload, FileText, X, Download } from 'lucide-react';
+import { Progress } from './ui/progress';
+import { User, Mail, Phone, MapPin, DollarSign, BookOpen, Award, CheckCircle, AlertCircle, CreditCard, Upload, FileText, X, Download, RefreshCw, Loader2, Clock } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { getSupabaseClient } from '../utils/supabase/client';
+import { toast } from 'sonner@2.0.3';
+
+// Certificate/document upload settings
+const CERTIFICATE_DOCUMENT_TYPE = 'tutor_certificate';
+const MAX_CERTIFICATE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_CERTIFICATES = 20;
+const UPLOAD_CONCURRENCY = 3; // upload a few at a time; responsive without hammering the edge fn
+const ACCEPTED_CERTIFICATE_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
+const ACCEPTED_CERTIFICATE_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg'];
+
+const formatFileSize = (bytes: number) => {
+  if (!bytes) return '';
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+};
+
+// Some browsers report an empty MIME type (notably PDFs from certain file
+// managers), so fall back to the extension before rejecting a file.
+const hasAcceptedCertificateType = (file: File) => {
+  if (file.type) return ACCEPTED_CERTIFICATE_TYPES.includes(file.type);
+  const name = file.name.toLowerCase();
+  return ACCEPTED_CERTIFICATE_EXTENSIONS.some(ext => name.endsWith(ext));
+};
+
+type CertificateUpload = {
+  id: string;
+  file: File;
+  status: 'queued' | 'uploading' | 'success' | 'error';
+  progress: number;
+  error?: string;
+};
 
 const AVAILABLE_SUBJECTS = [
   // Core Subjects
@@ -315,9 +348,219 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
   const [otherProfessionalCertifications, setOtherProfessionalCertifications] = useState<string>('');
 
   // Certificates state
-  const [certificates, setCertificates] = useState<Array<{ id: string; name: string; url: string; type: string; uploadedAt: string }>>([]);
+  const [certificates, setCertificates] = useState<Array<{ id: string; title: string; fileName: string; fileSize: number; fileType: string; createdAt: string }>>([]);
   const [uploading, setUploading] = useState(false);
+  const [loadingCertificates, setLoadingCertificates] = useState(false);
+  const [uploadQueue, setUploadQueue] = useState<CertificateUpload[]>([]);
+  const [isDraggingFiles, setIsDraggingFiles] = useState(false);
+  const certificateInputRef = useRef<HTMLInputElement>(null);
+  // Nested dragenter/leave fire for children; count them so the drop zone only
+  // un-highlights when the pointer truly leaves.
+  const dragDepth = useRef(0);
   const supabase = getSupabaseClient();
+
+  useEffect(() => {
+    if (session?.access_token) loadCertificates();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [session?.access_token]);
+
+  const loadCertificates = async () => {
+    setLoadingCertificates(true);
+    try {
+      // userRole=tutor is required: the server defaults to 'parent', under which
+      // a tutor's own uploads are filtered out.
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/documents?documentType=${CERTIFICATE_DOCUMENT_TYPE}&userRole=tutor`,
+        { headers: { 'Authorization': `Bearer ${session.access_token}` } }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setCertificates(data.documents || []);
+      } else {
+        console.error('Failed to load certificates');
+      }
+    } catch (error) {
+      console.error('Error loading certificates:', error);
+    } finally {
+      setLoadingCertificates(false);
+    }
+  };
+
+  const updateQueueItem = (id: string, patch: Partial<CertificateUpload>) => {
+    setUploadQueue(prev => prev.map(e => (e.id === id ? { ...e, ...patch } : e)));
+  };
+
+  // XMLHttpRequest (not fetch) so we can report real upload progress.
+  const uploadCertificate = (item: CertificateUpload): Promise<void> =>
+    new Promise((resolve, reject) => {
+      const payload = new FormData();
+      payload.append('file', item.file);
+      payload.append('title', item.file.name);
+      payload.append('description', 'Tutor qualification document');
+      payload.append('documentType', CERTIFICATE_DOCUMENT_TYPE);
+      payload.append('uploadedByRole', 'tutor');
+      payload.append('relatedToId', tutorId);
+      payload.append('relatedToType', 'tutor');
+
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/documents/upload`);
+      xhr.setRequestHeader('Authorization', `Bearer ${session.access_token}`);
+      xhr.upload.onprogress = (ev) => {
+        if (!ev.lengthComputable) return;
+        updateQueueItem(item.id, { progress: Math.min(99, Math.round((ev.loaded / ev.total) * 100)) });
+      };
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) return resolve();
+        let msg = '';
+        try { msg = JSON.parse(xhr.responseText)?.error || ''; } catch { /* non-JSON */ }
+        reject(new Error(msg || `Upload failed (${xhr.status})`));
+      };
+      xhr.onerror = () => reject(new Error('Network error — check your connection and try again'));
+      xhr.ontimeout = () => reject(new Error('Upload timed out'));
+      xhr.timeout = 120000;
+      xhr.send(payload);
+    });
+
+  const processUploadQueue = async (items: CertificateUpload[]): Promise<number> => {
+    let succeeded = 0, cursor = 0;
+    const worker = async () => {
+      while (cursor < items.length) {
+        const item = items[cursor++];
+        updateQueueItem(item.id, { status: 'uploading', progress: 0, error: undefined });
+        try {
+          await uploadCertificate(item);
+          updateQueueItem(item.id, { status: 'success', progress: 100 });
+          succeeded++;
+        } catch (error) {
+          const text = error instanceof Error ? error.message : 'Upload failed';
+          console.error('Certificate upload failed:', item.file.name, error);
+          updateQueueItem(item.id, { status: 'error', error: text });
+        }
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(UPLOAD_CONCURRENCY, items.length) }, worker));
+    return succeeded;
+  };
+
+  const enqueueCertificates = async (fileList: File[]) => {
+    if (fileList.length === 0) return;
+    const rejected: string[] = [];
+    const accepted: File[] = [];
+    for (const file of fileList) {
+      if (!hasAcceptedCertificateType(file)) rejected.push(`${file.name} (unsupported format)`);
+      else if (file.size > MAX_CERTIFICATE_SIZE) rejected.push(`${file.name} (over 5MB)`);
+      else accepted.push(file);
+    }
+    if (rejected.length > 0) {
+      toast.error(`Skipped ${rejected.length} file${rejected.length === 1 ? '' : 's'}`, { description: rejected.join(', ') });
+    }
+    if (accepted.length === 0) return;
+
+    const remaining = MAX_CERTIFICATES - certificates.length;
+    if (remaining <= 0) {
+      toast.error(`You can store up to ${MAX_CERTIFICATES} documents. Delete one before uploading more.`);
+      return;
+    }
+    let toUpload = accepted;
+    if (accepted.length > remaining) {
+      toUpload = accepted.slice(0, remaining);
+      toast.warning(`Only ${remaining} more document${remaining === 1 ? '' : 's'} can be stored — the rest were skipped.`);
+    }
+
+    const items: CertificateUpload[] = toUpload.map(file => ({
+      id: `${file.name}-${file.size}-${file.lastModified}-${Math.random().toString(36).slice(2, 9)}`,
+      file, status: 'queued', progress: 0,
+    }));
+    // Keep prior failures visible for retry.
+    setUploadQueue(prev => [...prev.filter(e => e.status === 'error'), ...items]);
+    setUploading(true);
+    const succeeded = await processUploadQueue(items);
+    const failed = items.length - succeeded;
+    setUploading(false);
+
+    if (succeeded > 0) {
+      await loadCertificates();
+      toast.success(`Uploaded ${succeeded} document${succeeded === 1 ? '' : 's'}`);
+      setUploadQueue(prev => prev.filter(e => e.status !== 'success'));
+    }
+    if (failed > 0) toast.error(`${failed} document${failed === 1 ? '' : 's'} failed. Use Retry to try again.`);
+  };
+
+  const retryUpload = async (id: string) => {
+    const item = uploadQueue.find(e => e.id === id);
+    if (!item || uploading) return;
+    setUploading(true);
+    const ok = await processUploadQueue([item]);
+    setUploading(false);
+    if (ok > 0) {
+      await loadCertificates();
+      toast.success(`Uploaded ${item.file.name}`);
+      setUploadQueue(prev => prev.filter(e => e.id !== id));
+    }
+  };
+
+  const dismissQueueItem = (id: string) => setUploadQueue(prev => prev.filter(e => e.id !== id));
+
+  const handleCertificateSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    e.target.value = ''; // allow re-selecting the same file
+    void enqueueCertificates(files);
+  };
+
+  const handleCertificateDrop = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    dragDepth.current = 0;
+    setIsDraggingFiles(false);
+    void enqueueCertificates(Array.from(e.dataTransfer.files || []));
+  };
+  const handleDragEnter = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    dragDepth.current += 1;
+    setIsDraggingFiles(true);
+  };
+  const handleDragLeave = (e: React.DragEvent<HTMLDivElement>) => {
+    e.preventDefault();
+    dragDepth.current = Math.max(0, dragDepth.current - 1);
+    if (dragDepth.current === 0) setIsDraggingFiles(false);
+  };
+
+  const downloadCertificate = async (documentId: string) => {
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/documents/${documentId}/download?userRole=tutor`,
+        { headers: { 'Authorization': `Bearer ${session.access_token}` } }
+      );
+      if (response.ok) {
+        const data = await response.json();
+        window.open(data.downloadUrl, '_blank', 'noopener,noreferrer');
+      } else {
+        toast.error('Failed to generate download link');
+      }
+    } catch (error) {
+      console.error('Error downloading certificate:', error);
+      toast.error('Failed to download document');
+    }
+  };
+
+  const deleteCertificate = async (documentId: string, label: string) => {
+    if (!confirm(`Delete "${label}"? This action cannot be undone.`)) return;
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/documents/${documentId}`,
+        { method: 'DELETE', headers: { 'Authorization': `Bearer ${session.access_token}` } }
+      );
+      if (response.ok) {
+        setCertificates(prev => prev.filter(d => d.id !== documentId));
+        toast.success('Document deleted');
+      } else {
+        const err = await response.json().catch(() => ({}));
+        toast.error(err.error || 'Failed to delete document');
+      }
+    } catch (error) {
+      console.error('Error deleting certificate:', error);
+      toast.error('Failed to delete document');
+    }
+  };
 
   useEffect(() => {
     if (currentProfile) {
@@ -933,52 +1176,86 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {/* Upload Area */}
-            <div className="border-2 border-dashed border-gray-300 rounded-lg p-6 hover:border-[#625d9c] transition-colors">
+            {/* Upload Area — click or drag & drop, multiple files at a time */}
+            <div
+              onDragEnter={handleDragEnter}
+              onDragOver={(e) => e.preventDefault()}
+              onDragLeave={handleDragLeave}
+              onDrop={handleCertificateDrop}
+              className={`border-2 border-dashed rounded-lg p-6 transition-colors ${
+                isDraggingFiles ? 'border-[#625d9c] bg-purple-50/60' : 'border-gray-300 hover:border-[#625d9c]'
+              }`}
+            >
               <div className="flex flex-col items-center gap-3">
                 <div className="p-3 bg-purple-50 rounded-full">
                   <Upload className="w-6 h-6 text-[#625d9c]" />
                 </div>
                 <div className="text-center">
                   <p className="text-sm font-medium text-gray-700 mb-1">
-                    Upload Certificates & Documents
+                    {isDraggingFiles ? 'Drop your files here' : 'Upload Certificates & Documents'}
                   </p>
                   <p className="text-xs text-gray-500 mb-3">
-                    PDF, PNG, JPG up to 5MB each
+                    Drag and drop or browse — PDF, PNG, JPG up to 5MB each. You can select several at once.
                   </p>
                 </div>
-                <label htmlFor="certificate-upload" className="cursor-pointer">
-                  <Button
-                    type="button"
-                    variant="outline"
-                    className="border-[#625d9c] text-[#625d9c] hover:bg-[#625d9c] hover:text-white"
-                    onClick={() => {
-                      const fileInput = document.getElementById('certificate-upload') as HTMLInputElement;
-                      if (fileInput) {
-                        fileInput.value = '';
-                        fileInput.click();
-                      }
-                    }}
-                  >
-                    <Upload className="w-4 h-4 mr-2" />
-                    Choose Files
-                  </Button>
-                </label>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={uploading}
+                  className="border-[#625d9c] text-[#625d9c] hover:bg-[#625d9c] hover:text-white"
+                  onClick={() => certificateInputRef.current?.click()}
+                >
+                  {uploading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}
+                  {uploading ? 'Uploading...' : 'Choose Files'}
+                </Button>
                 <input
+                  ref={certificateInputRef}
                   id="certificate-upload"
                   type="file"
-                  accept=".pdf,.png,.jpg,.jpeg"
+                  accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
                   multiple
                   className="hidden"
-                  onChange={(e) => {
-                    const files = e.target.files;
-                    if (files && files.length > 0) {
-                      setMessage({ type: 'success', text: `Selected ${files.length} file(s). Note: File upload functionality requires backend deployment.` });
-                    }
-                  }}
+                  onChange={handleCertificateSelect}
                 />
               </div>
             </div>
+
+            {/* Per-file upload progress; failed rows stay until retried or dismissed */}
+            {uploadQueue.length > 0 && (
+              <div className="space-y-2">
+                {uploadQueue.map((item) => (
+                  <div key={item.id} className={`p-3 rounded-lg border ${item.status === 'error' ? 'bg-red-50 border-red-200' : 'bg-white border-gray-200'}`}>
+                    <div className="flex items-center gap-3">
+                      {item.status === 'uploading' && <Loader2 className="w-4 h-4 text-[#625d9c] animate-spin flex-shrink-0" />}
+                      {item.status === 'queued' && <Clock className="w-4 h-4 text-gray-400 flex-shrink-0" />}
+                      {item.status === 'success' && <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />}
+                      {item.status === 'error' && <AlertCircle className="w-4 h-4 text-red-600 flex-shrink-0" />}
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm text-gray-800 truncate">{item.file.name}</p>
+                        <p className="text-xs text-gray-500">
+                          {item.status === 'error' ? item.error
+                            : item.status === 'queued' ? `Queued • ${formatFileSize(item.file.size)}`
+                            : `${item.progress}% • ${formatFileSize(item.file.size)}`}
+                        </p>
+                      </div>
+                      {item.status === 'error' && (
+                        <>
+                          <Button type="button" variant="ghost" size="sm" disabled={uploading} onClick={() => retryUpload(item.id)}>
+                            <RefreshCw className="w-4 h-4 mr-1" />Retry
+                          </Button>
+                          <Button type="button" variant="ghost" size="sm" onClick={() => dismissQueueItem(item.id)} aria-label={`Dismiss ${item.file.name}`}>
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </>
+                      )}
+                    </div>
+                    {(item.status === 'uploading' || item.status === 'queued') && (
+                      <Progress value={item.progress} className="h-1.5 mt-2" />
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
 
             {/* Info Notice */}
             <div className="bg-amber-50 border border-amber-200 p-4 rounded-lg">
@@ -996,12 +1273,44 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
               </div>
             </div>
 
-            {/* Sample Certificate List (for demonstration) */}
+            {/* Uploaded documents */}
             <div className="space-y-2">
-              <Label>Uploaded Documents (0)</Label>
-              <div className="text-sm text-gray-500 text-center py-6 bg-gray-50 rounded-lg border border-gray-200">
-                No documents uploaded yet. Upload your certificates to build trust with parents.
+              <div className="flex items-center justify-between">
+                <Label>Uploaded Documents ({certificates.length})</Label>
+                {certificates.length > 0 && (
+                  <span className="text-xs text-gray-500">{certificates.length} of {MAX_CERTIFICATES} slots used</span>
+                )}
               </div>
+              {loadingCertificates ? (
+                <div className="text-sm text-gray-500 text-center py-6 bg-gray-50 rounded-lg border border-gray-200">
+                  Loading documents...
+                </div>
+              ) : certificates.length === 0 ? (
+                <div className="text-sm text-gray-500 text-center py-6 bg-gray-50 rounded-lg border border-gray-200">
+                  No documents uploaded yet. Upload your certificates to speed up verification.
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {certificates.map((doc) => (
+                    <div key={doc.id} className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200">
+                      <FileText className="w-5 h-5 text-[#625d9c] flex-shrink-0" />
+                      <div className="min-w-0 flex-1">
+                        <p className="text-sm font-medium text-gray-800 truncate">{doc.title || doc.fileName}</p>
+                        <p className="text-xs text-gray-500">
+                          {formatFileSize(doc.fileSize)}
+                          {doc.createdAt ? ` • Uploaded ${new Date(doc.createdAt).toLocaleDateString()}` : ''}
+                        </p>
+                      </div>
+                      <Button type="button" variant="ghost" size="sm" onClick={() => downloadCertificate(doc.id)} aria-label={`Download ${doc.title || doc.fileName}`}>
+                        <Download className="w-4 h-4" />
+                      </Button>
+                      <Button type="button" variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => deleteCertificate(doc.id, doc.title || doc.fileName)} aria-label={`Delete ${doc.title || doc.fileName}`}>
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
 
             {/* Benefits Notice */}
