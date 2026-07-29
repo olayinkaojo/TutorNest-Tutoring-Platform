@@ -49,6 +49,8 @@ interface VerificationRecord {
   rejectionReason?: string;
   kycStatus?: string;
   dbsStatus?: string;
+  /** Verified tutor edited their profile — awaiting a re-check, still verified. */
+  reReviewRequested?: boolean;
 }
 
 const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
@@ -484,6 +486,10 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
                       <p className="font-medium text-sm truncate">{resolveName(v.profile)}</p>
                       <div className="flex items-center gap-1 flex-shrink-0">
                         {flags.length > 0 && <Flag className="w-3.5 h-3.5 text-red-500" />}
+                        {/* Verified tutor who edited their profile — awaiting re-check, still verified */}
+                        {v.reReviewRequested && (
+                          <Badge className="bg-blue-600 text-white text-xs">Re-review</Badge>
+                        )}
                         {/* Status badge in History and All Tutors views */}
                         {viewMode !== 'pending' && (v.status === 'verified' || v.status === 'approved') && (
                           <Badge className="bg-green-600 text-white text-xs">Verified</Badge>

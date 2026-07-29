@@ -56,6 +56,8 @@ export const adminVerificationExtraRoutes = (app: Hono, getUserId: Function) => 
           submittedAt: t.profileSubmittedAt || t.createdAt || null,
           status,
           verificationStatus: status,
+          // A verified tutor who edited their profile stays verified but is flagged.
+          reReviewRequested: t.reReviewRequested === true,
           verifiedAt: t.verifiedAt || null,
           reviewedAt: t.verifiedAt || t.rejectedAt || null,
           rejectionReason: t.rejectionReason || null,

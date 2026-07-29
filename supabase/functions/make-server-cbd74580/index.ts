@@ -1005,23 +1005,46 @@ app.put('/make-server-cbd74580/profiles/:userId', async (c) => {
         });
         console.log('Verification record created for new tutor');
       } else if (existingProfile?.onboardingComplete) {
-        // Existing tutor updating profile - reset to pending
-        console.log('Tutor profile updated - resetting verification status to pending');
-        updatedProfile.verificationStatus = 'pending';
+        const wasVerified = String(existingProfile?.verificationStatus || '').toLowerCase() === 'verified';
         updatedProfile.profileUpdatedAt = new Date().toISOString();
-        
-        await kv.set(`verification:${targetUserId}`, {
-          userId: targetUserId,
-          status: 'pending',
-          submittedAt: new Date().toISOString(),
-          reviewedAt: null,
-          reviewedBy: null,
-          rejectionReason: null,
-          previousStatus: existingVerification?.status || null,
-          isUpdate: true,
-          appeals: existingVerification?.appeals || [],
-        });
-        console.log('Verification record updated for tutor profile update');
+
+        if (wasVerified) {
+          // A verified tutor editing their profile is NOT downgraded — they stay
+          // verified (visible and bookable). The change is flagged for admin
+          // re-review instead, so editing a bio or rate no longer revokes access.
+          updatedProfile.verificationStatus = 'verified';
+          updatedProfile.reReviewRequested = true;
+
+          await kv.set(`verification:${targetUserId}`, {
+            ...(existingVerification || {}),
+            userId: targetUserId,
+            status: existingVerification?.status || 'approved',
+            needsReview: true,
+            isUpdate: true,
+            profileUpdatedAt: updatedProfile.profileUpdatedAt,
+            previousStatus: existingVerification?.status || null,
+            appeals: existingVerification?.appeals || [],
+          });
+          console.log('Verified tutor updated profile - kept verified, flagged for re-review');
+        } else {
+          // Not yet verified (pending / rejected): keep the re-submit → pending flow.
+          updatedProfile.verificationStatus = 'pending';
+          updatedProfile.reReviewRequested = false;
+
+          await kv.set(`verification:${targetUserId}`, {
+            userId: targetUserId,
+            status: 'pending',
+            submittedAt: new Date().toISOString(),
+            reviewedAt: null,
+            reviewedBy: null,
+            rejectionReason: null,
+            previousStatus: existingVerification?.status || null,
+            isUpdate: true,
+            needsReview: true,
+            appeals: existingVerification?.appeals || [],
+          });
+          console.log('Unverified tutor updated profile - status pending');
+        }
       }
     }
 

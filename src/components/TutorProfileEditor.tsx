@@ -786,7 +786,12 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
       );
 
       if (response.ok) {
-        setMessage({ type: 'success', text: 'Profile updated successfully! Your changes have been submitted for admin verification. You will be notified once reviewed.' });
+        setMessage({
+          type: 'success',
+          text: String(currentProfile?.verificationStatus || '').toLowerCase() === 'verified'
+            ? 'Profile updated successfully! You remain verified — our team will re-check your changes in the background.'
+            : 'Profile updated successfully! Your changes have been submitted for admin verification. You will be notified once reviewed.',
+        });
         if (onProfileUpdated) {
           onProfileUpdated();
         }

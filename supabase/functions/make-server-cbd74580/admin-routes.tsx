@@ -1672,24 +1672,30 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      // Get all tutors with pending verification
+      // Get tutors awaiting review: brand-new pending applications, plus already-
+      // verified tutors who edited their profile (flagged for re-review, not
+      // downgraded — they keep their verified status while awaiting a re-check).
       const allUsers = await kv.getByPrefix('user:');
-      const pendingTutors = allUsers.filter((u: any) => 
-        u.role === 'tutor' && u.verificationStatus === 'pending'
+      const pendingTutors = allUsers.filter((u: any) =>
+        u.role === 'tutor' &&
+        (u.verificationStatus === 'pending' || u.reReviewRequested === true)
       );
 
       // Get verification data for each tutor
       const verifications = [];
       for (const tutor of pendingTutors) {
         const verification = await kv.get(`verification:${tutor.id || tutor.userId}`) as any;
-        
+
         const resolvedName =
           tutor.full_name || tutor.fullName || tutor.name ||
           `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim() || 'Unknown Tutor';
 
         verifications.push({
           userId: tutor.id || tutor.userId,
-          submittedAt: tutor.createdAt,
+          submittedAt: tutor.profileUpdatedAt || tutor.createdAt,
+          // Distinguishes a re-review (verified tutor edited profile) from a new application.
+          reReviewRequested: tutor.reReviewRequested === true,
+          currentStatus: tutor.verificationStatus || 'pending',
           kycStatus: verification?.kycStatus || 'pending',
           dbsStatus: verification?.dbsStatus || 'pending',
           documents: {
@@ -1757,7 +1763,9 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       const allUsers = await kv.getByPrefix('user:');
       const tutors = allUsers.filter((u: any) => u.role === 'tutor');
 
-      const pending  = tutors.filter((u: any) => u.verificationStatus === 'pending').length;
+      // "Awaiting review" = new pending applications + verified tutors flagged for
+      // re-review after a profile edit (matches the pending list).
+      const pending  = tutors.filter((u: any) => u.verificationStatus === 'pending' || u.reReviewRequested === true).length;
       const approved = tutors.filter((u: any) => u.verificationStatus === 'verified').length;
       const rejected = tutors.filter((u: any) => u.verificationStatus === 'rejected').length;
       const total    = approved + rejected;
@@ -1901,7 +1909,9 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         }
       }
 
-      // Update verification status
+      // Update verification status. Either decision clears the re-review flag set
+      // when a verified tutor edited their profile.
+      tutor.reReviewRequested = false;
       if (action === 'approve') {
         tutor.verificationStatus = 'verified';
         tutor.verifiedAt = new Date().toISOString();
