@@ -15,9 +15,23 @@ const getUserId = async (accessToken: string | null): Promise<string | null> => 
   }
 };
 
-// Helper: Get subject-based rate — platform-fixed flat rate, same for every subject
-const getSubjectRate = (_subject: string): number => {
-  return 15000;
+// Helper: Get subject-based rate
+const getSubjectRate = (subject: string): number => {
+  const subjectRates: Record<string, number> = {
+    'Mathematics': 20000, 'Physics': 20000, 'Chemistry': 20000, 'Biology': 18000,
+    'Computer Science': 22000, 'Information Technology': 20000,
+    'English': 16000, 'Mandarin Chinese': 25000, 'Arabic': 22000, 'Spanish': 18000,
+    'French': 18000, 'German': 18000, 'Italian': 16000, 'Latin': 20000,
+    'A-Level Preparation': 22000, 'GCSE Preparation': 18000, '11+ Entrance Exams': 20000,
+    'SAT Preparation': 25000, 'ACT Preparation': 25000, 'IELTS': 20000, 'TOEFL': 20000,
+    'Special Educational Needs (SEN)': 25000, 'Dyslexia Support': 25000,
+    'ADHD Support': 25000, 'Autism Spectrum': 28000,
+    'Science': 16000, 'History': 15000, 'Geography': 15000, 'Economics': 18000,
+    'Business Studies': 16000, 'Accounting': 18000, 'Psychology': 16000,
+    'Sociology': 15000, 'Philosophy': 16000, 'Politics': 16000,
+    'Religious Studies': 14000, 'Art & Design': 15000, 'Music': 16000, 'Drama': 14000, 'Law': 22000,
+  };
+  return subjectRates[subject] || 16000;
 };
 
 // ============================================

@@ -121,9 +121,9 @@ app.post('/payments/initialize', async (c) => {
         },
         payment_options: 'card,banktransfer',
         customizations: {
-          title: 'Knowledge Fons Academy Session Booking',
+          title: 'TutorNest Session Booking',
           description: `Booking for ${subject ?? 'Tutoring Session'}`,
-          logo: 'https://app.knowledgefonsacademy.com/Logo.png',
+          logo: 'https://app.tutornest.org/logo.png',
         },
         meta: {
           bookingId,
@@ -133,7 +133,7 @@ app.post('/payments/initialize', async (c) => {
           userId,
           ...metadata,
         },
-        redirect_url: `${c.req.header('origin') ?? 'https://app.knowledgefonsacademy.com'}/payment/callback`,
+        redirect_url: `${c.req.header('origin') ?? 'https://app.tutornest.org'}/payment/callback`,
       }),
     });
 
@@ -282,7 +282,7 @@ app.post('/payments/verify/:reference', async (c) => {
     });
 
     const dashboardBase =
-      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
+      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
     const dashboardLink = `${dashboardBase}/dashboard`;
     const tutorDash = `${dashboardBase}/dashboard?tutor=1`;
 
@@ -611,7 +611,7 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
         account_bank: payout.bankDetails.bankCode,
         account_number: payout.bankDetails.accountNumber,
         amount: payout.amount,
-        narration: `Knowledge Fons Academy payout - ${payoutId}`,
+        narration: `TutorNest payout - ${payoutId}`,
         currency: 'NGN',
         reference: `PAYOUT_${payoutId}_${Date.now()}`,
         beneficiary_name: payout.bankDetails.accountName || 'Tutor',
@@ -755,7 +755,7 @@ app.get('/payments/:paymentId/invoice', async (c) => {
       dueDate: payment.createdAt || new Date().toISOString(),
       paidDate: payment.verifiedAt || payment.confirmedAt || null,
       status: payment.status,
-      from: { name: 'Knowledge Fons Academy', address: 'Lagos, Nigeria', email: 'billing@knowledgefonsacademy.com' },
+      from: { name: 'TutorNest', address: 'Lagos, Nigeria', email: 'billing@tutornest.org' },
       to: { name: payerName, email: payerEmail },
       items: [
         {
@@ -772,7 +772,7 @@ app.get('/payments/:paymentId/invoice', async (c) => {
       subtotal: payment.amount,
       tax: 0,
       total: payment.amount,
-      notes: 'Thank you for investing in quality education with Knowledge Fons Academy!',
+      notes: 'Thank you for investing in quality education with TutorNest!',
     };
 
     return c.json({ invoice });
@@ -926,7 +926,7 @@ async function createMeetEvent(
 ): Promise<string | null> {
   const tz = 'Africa/Lagos';
   const event = {
-    summary: `Knowledge Fons Academy: ${opts.subject ?? 'Tutoring Session'}`,
+    summary: `TutorNest: ${opts.subject ?? 'Tutoring Session'}`,
     description: opts.sessionLabel,
     start: { dateTime: `${opts.date}T${opts.startTime}:00`, timeZone: tz },
     end:   { dateTime: `${opts.date}T${opts.endTime}:00`,   timeZone: tz },
@@ -1061,7 +1061,7 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
         startTime: payment.startTime,
         endTime,
         subject: payment.subject,
-        sessionLabel: `${plan.name} (${plan.sessions} sessions) — Knowledge Fons Academy`,
+        sessionLabel: `${plan.name} (${plan.sessions} sessions) — TutorNest`,
       });
     }
   } catch (calendarErr: any) {
@@ -1071,7 +1071,7 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
   // Jitsi fallback — always available, no account needed
   if (!meetLink) {
     const roomSlug = payment.reference.replace('TNP_', '').slice(0, 16).toLowerCase();
-    meetLink = `https://meet.jit.si/Knowledge Fons Academy-${roomSlug}`;
+    meetLink = `https://meet.jit.si/TutorNest-${roomSlug}`;
     console.log('Using Jitsi fallback meet link:', meetLink);
   }
 
@@ -1114,7 +1114,7 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
     const subjectLabel = payment.subject || 'General Tutoring';
     const formattedAmount = `₦${payment.amount.toLocaleString()}`;
     const tutorEarnings   = `₦${tutorAmount.toLocaleString()}`;
-    const dashboardLink   = 'https://app.knowledgefonsacademy.com/dashboard';
+    const dashboardLink   = 'https://app.tutornest.org/dashboard';
 
     // Format start date nicely — e.g. "Monday, 21 April 2026"
     const startDateObj = new Date(payment.startDate + 'T12:00:00');
@@ -1225,7 +1225,7 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
       dueDate: now,
       paidDate: now,
       createdAt: now,
-      issuedBy: 'Knowledge Fons Academy Platform',
+      issuedBy: 'TutorNest Platform',
     };
 
     await kv.set(`invoice:${invoiceId}`, invoice);
@@ -1487,7 +1487,7 @@ app.post('/payments/:paymentId/refund', async (c) => {
       const userEmail = userProfile?.email;
 
       if (userEmail) {
-        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
+        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
         const sessionDate = booking?.date
           ? new Date(`${booking.date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
           : '';

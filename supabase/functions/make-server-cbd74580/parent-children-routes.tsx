@@ -113,13 +113,13 @@ parentChildrenRoutes.post('/add-child', async (c) => {
       if (parentEmail) {
         const childName = `${firstName} ${lastName}`.trim() || 'your child';
         const parentName = parentProfile?.firstName || parentProfile?.name || 'there';
-        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
-        const subject = `${childName} has been added to Knowledge Fons Academy`;
+        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
+        const subject = `${childName} has been added to TutorNest`;
         const html = `
           <p>Hi ${parentName},</p>
-          <p>You've successfully added <strong>${childName}</strong> to your Knowledge Fons Academy account.</p>
+          <p>You've successfully added <strong>${childName}</strong> to your TutorNest account.</p>
           <p>You can now <a href="${dashboardBase}/dashboard/parent">search for tutors</a> and book sessions for ${childName}.</p>
-          <p>The Knowledge Fons Academy Team</p>
+          <p>The TutorNest Team</p>
         `;
         await sendEmail({ to: parentEmail, subject, html }).catch(e => console.warn('child added email:', e));
       }

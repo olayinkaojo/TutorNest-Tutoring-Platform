@@ -36,6 +36,8 @@ yarn-error.log*
 # OS
 .DS_Store
 Thumbs.db
+# macOS custom folder icons (literal filename is "Icon" + carriage return)
+Icon[]
 
 # TypeScript
 *.tsbuildinfo

@@ -172,7 +172,7 @@ app.post('/', async (c) => {
       }
 
       if (parentEmail) {
-        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
+        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
         const reportLink = `${dashboardBase}/dashboard?tab=reports&reportId=${reportId}`;
         const formattedDate = report.date
           ? new Date(`${report.date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })

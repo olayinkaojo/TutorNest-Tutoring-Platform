@@ -252,7 +252,7 @@ async function createGoogleCalendarEvent(userId: string, eventData: any) {
       dateTime: eventData.endDateTime,
       timeZone: 'Africa/Lagos',
     },
-    location: eventData.location || 'Knowledge Fons Academy Virtual Classroom',
+    location: eventData.location || 'TutorNest Virtual Classroom',
     reminders: {
       useDefault: false,
       overrides: [
@@ -1240,12 +1240,12 @@ app.post('/make-server-cbd74580/profile/complete', async (c) => {
       try {
         const profileEmail = profile.email || updatedProfile.email;
         const profileName = updatedProfile.fullName || updatedProfile.name || profile.name || 'Tutor';
-        const appBase = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
+        const appBase = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
         if (profileEmail) {
           const submittedTpl = emailTemplates.tutorProfileSubmitted(profileName, `${appBase}/dashboard`);
           await sendEmail({ to: profileEmail, subject: submittedTpl.subject, html: submittedTpl.html }).catch(() => {});
         }
-        const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'admin@knowledgefonsacademy.com';
+        const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'admin@tutornest.org';
         const adminTpl = emailTemplates.adminTutorApplicationAlert(profileName, profileEmail || 'unknown', `${appBase}/admin/verifications`);
         await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch(() => {});
       } catch (_e) {}
@@ -1406,16 +1406,16 @@ app.post('/make-server-cbd74580/admin/verifications/:userId/review', async (c) =
     // Send outcome email to the tutor
     const tutorEmail = userProfile.email;
     const tutorName = userProfile.fullName || userProfile.full_name || userProfile.name || 'Tutor';
-    const _appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
+    const _appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
     if (tutorEmail) {
       try {
         if (action === 'approve') {
           const approveTpl = emailTemplates.tutorVerificationApproved(tutorName, `${_appUrl}/dashboard`);
-          await sendEmail({ to: tutorEmail, subject: approveTpl.subject, html: approveTpl.html, replyTo: 'support@knowledgefonsacademy.com' });
+          await sendEmail({ to: tutorEmail, subject: approveTpl.subject, html: approveTpl.html, replyTo: 'support@tutornest.org' });
           console.log('✅ Approval email sent to tutor:', tutorEmail);
         } else if (action === 'reject') {
           const rejectTpl = emailTemplates.tutorVerificationRejected(tutorName, rejectionReason || 'Please see the notes in your dashboard.', `${_appUrl}/dashboard`);
-          await sendEmail({ to: tutorEmail, subject: rejectTpl.subject, html: rejectTpl.html, replyTo: 'support@knowledgefonsacademy.com' });
+          await sendEmail({ to: tutorEmail, subject: rejectTpl.subject, html: rejectTpl.html, replyTo: 'support@tutornest.org' });
           console.log('✅ Rejection email sent to tutor:', tutorEmail);
         }
       } catch (emailErr: any) {
@@ -1717,7 +1717,7 @@ app.get('/make-server-cbd74580/availability/:tutorId/slots', async (c) => {
 
     const daySchedule = availability.schedule[dayOfWeek];
     
-    // Get all Knowledge Fons Academy bookings for this tutor on this date
+    // Get all TutorNest bookings for this tutor on this date
     const allBookings = await kv.getByPrefix('booking:');
     const dateBookings = allBookings.filter((b: any) => 
       b.tutorId === tutorId && 
@@ -1778,8 +1778,8 @@ app.get('/make-server-cbd74580/availability/:tutorId/slots', async (c) => {
         const slotStart = `${String(Math.floor(minutes / 60)).padStart(2, '0')}:${String(minutes % 60).padStart(2, '0')}`;
         const slotEnd = `${String(Math.floor((minutes + 60) / 60)).padStart(2, '0')}:${String((minutes + 60) % 60).padStart(2, '0')}`;
 
-        // Check if slot is booked in Knowledge Fons Academy
-        const isKnowledge Fons AcademyBooked = dateBookings.some((b: any) => {
+        // Check if slot is booked in TutorNest
+        const isTutorNestBooked = dateBookings.some((b: any) => {
           const bookingStart = b.startTime;
           const bookingEnd = b.endTime;
           return !(slotEnd <= bookingStart || slotStart >= bookingEnd);
@@ -1794,7 +1794,7 @@ app.get('/make-server-cbd74580/availability/:tutorId/slots', async (c) => {
           date: dateParam,
           startTime: slotStart,
           endTime: slotEnd,
-          available: !isKnowledge Fons AcademyBooked && !isGoogleCalendarBusy,
+          available: !isTutorNestBooked && !isGoogleCalendarBusy,
         });
       }
     }
@@ -1921,10 +1921,10 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
           accessToken: parentAccessToken,
           event: {
             summary: `Tutoring Session with ${booking.tutorName}`,
-            description: `Knowledge Fons Academy tutoring session for ${booking.studentName}\n\nSubject: ${tutorProfile?.subjects?.[0] || 'General'}\nPrice: £${price}`,
+            description: `TutorNest tutoring session for ${booking.studentName}\n\nSubject: ${tutorProfile?.subjects?.[0] || 'General'}\nPrice: £${price}`,
             startDateTime: `${date}T${startTime}:00`,
             endDateTime: `${date}T${endTime}:00`,
-            location: 'Knowledge Fons Academy Virtual Classroom',
+            location: 'TutorNest Virtual Classroom',
             attendees: attendeeEmails,
           }
         });
@@ -1941,10 +1941,10 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
           accessToken: tutorAccessToken,
           event: {
             summary: `Tutoring Session with ${booking.studentName}`,
-            description: `Knowledge Fons Academy tutoring session\n\nStudent: ${booking.studentName}\nParent: ${parentProfile?.firstName || 'Parent'}\nPrice: £${price}`,
+            description: `TutorNest tutoring session\n\nStudent: ${booking.studentName}\nParent: ${parentProfile?.firstName || 'Parent'}\nPrice: £${price}`,
             startDateTime: `${date}T${startTime}:00`,
             endDateTime: `${date}T${endTime}:00`,
-            location: 'Knowledge Fons Academy Virtual Classroom',
+            location: 'TutorNest Virtual Classroom',
             attendees: attendeeEmails,
           }
         });
@@ -2035,7 +2035,7 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
 
     try {
       const dashboardBase =
-        Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
+        Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
       const parentName = resolveDisplayName(parentProfile, 'Parent');
       const studentName = resolveDisplayName(studentRecord, 'Student');
       const tutorName = resolveDisplayName(tutorProfile, 'Tutor');
@@ -2058,7 +2058,7 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
       });
       const timeOnly = String(startTime).replace(/\s*WAT\s*$/i, '').trim();
       const roomSafe = encodeURIComponent(bookingId.replace(/[^a-zA-Z0-9]/g, '').slice(-24));
-      const meetLink = `https://meet.jit.si/kfa-${roomSafe}`;
+      const meetLink = `https://meet.jit.si/tutornest-${roomSafe}`;
       const dashboardLink = `${dashboardBase}/dashboard`;
 
       if (parentEmailAddr) {
@@ -2440,16 +2440,70 @@ app.get('/make-server-cbd74580/payouts/dashboard', async (c) => {
       b.tutorId === userId && b.status === 'completed'
     );
 
-    // Helper function to get payout rate based on subject — platform-fixed flat rate
-    const getSubjectRate = (_subject: string): number => {
-      return 15000;
+    // Helper function to get payout rate based on subject
+    const getSubjectRate = (subject: string): number => {
+      // Subject-based pricing tiers (in NGN per session)
+      const subjectRates: Record<string, number> = {
+        // High-demand STEM subjects
+        'Mathematics': 20000,
+        'Physics': 20000,
+        'Chemistry': 20000,
+        'Biology': 18000,
+        'Computer Science': 22000,
+        'Information Technology': 20000,
+        
+        // Languages (higher for specialized ones)
+        'English': 16000,
+        'Mandarin Chinese': 25000,
+        'Arabic': 22000,
+        'Spanish': 18000,
+        'French': 18000,
+        'German': 18000,
+        'Italian': 16000,
+        'Latin': 20000,
+        
+        // Advanced/Test Prep
+        'A-Level Preparation': 22000,
+        'GCSE Preparation': 18000,
+        '11+ Entrance Exams': 20000,
+        'SAT Preparation': 25000,
+        'ACT Preparation': 25000,
+        'IELTS': 20000,
+        'TOEFL': 20000,
+        
+        // Special Needs (premium rates)
+        'Special Educational Needs (SEN)': 25000,
+        'Dyslexia Support': 25000,
+        'ADHD Support': 25000,
+        'Autism Spectrum': 28000,
+        
+        // Other subjects
+        'Science': 16000,
+        'History': 15000,
+        'Geography': 15000,
+        'Economics': 18000,
+        'Business Studies': 16000,
+        'Accounting': 18000,
+        'Psychology': 16000,
+        'Sociology': 15000,
+        'Philosophy': 16000,
+        'Politics': 16000,
+        'Religious Studies': 14000,
+        'Art & Design': 15000,
+        'Music': 16000,
+        'Drama': 14000,
+        'Law': 22000,
+      };
+      
+      // Default rate for subjects not specifically listed
+      return subjectRates[subject] || 16000;
     };
 
     const earnings = tutorBookings.map((booking: any) => {
       // Use the actual booking price if available, otherwise fall back to subject rate
       const grossAmount = booking.price ? parseFloat(booking.price) : getSubjectRate(booking.subject || '');
 
-      // Tutor receives 80%, Knowledge Fons Academy takes 20%
+      // Tutor receives 80%, TutorNest takes 20%
       const platformFee = (grossAmount * 0.20).toFixed(2);
       const netAmount = (grossAmount * 0.80).toFixed(2);
 
@@ -2992,11 +3046,11 @@ app.post('/make-server-cbd74580/test-email', async (c: any) => {
 
     const result = await sendEmail({
       to: toEmail,
-      subject: 'Knowledge Fons Academy — Email Delivery Test',
+      subject: 'TutorNest — Email Delivery Test',
       html: `
         <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px">
           <h2 style="color:#625d9c">Email is working!</h2>
-          <p>This is a test email from Knowledge Fons Academy to confirm that email delivery is functioning correctly.</p>
+          <p>This is a test email from TutorNest to confirm that email delivery is functioning correctly.</p>
           <p style="color:#888;font-size:12px">Sent at ${new Date().toISOString()}</p>
         </div>
       `,
@@ -3018,7 +3072,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
     const supabase = getSupabaseClient();
     const testTutors = [
       {
-        email: 'sarah.mathematics@knowledgefonsacademy.com',
+        email: 'sarah.mathematics@tutornest.org',
         password: 'test1234',
         firstName: 'Sarah',
         lastName: 'Thompson',
@@ -3033,7 +3087,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 245
       },
       {
-        email: 'james.physics@knowledgefonsacademy.com',
+        email: 'james.physics@tutornest.org',
         password: 'test1234',
         firstName: 'James',
         lastName: 'Chen',
@@ -3048,7 +3102,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 189
       },
       {
-        email: 'emily.english@knowledgefonsacademy.com',
+        email: 'emily.english@tutornest.org',
         password: 'test1234',
         firstName: 'Emily',
         lastName: 'Parker',
@@ -3063,7 +3117,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 312
       },
       {
-        email: 'david.science@knowledgefonsacademy.com',
+        email: 'david.science@tutornest.org',
         password: 'test1234',
         firstName: 'David',
         lastName: 'Williams',
@@ -3078,7 +3132,7 @@ app.post('/make-server-cbd74580/test/create-tutors', async (c) => {
         totalLessons: 156
       },
       {
-        email: 'maria.languages@knowledgefonsacademy.com',
+        email: 'maria.languages@tutornest.org',
         password: 'test1234',
         firstName: 'Maria',
         lastName: 'Rodriguez',

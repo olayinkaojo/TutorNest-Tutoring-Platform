@@ -153,7 +153,7 @@ invitationRoutes.post('/invitations/send', async (c) => {
       const studentName = studentInfo?.full_name || studentInfo?.name || 'A student';
 
       if (tutorEmail) {
-        const acceptLink = `${Deno.env.get('FRONTEND_URL') || 'https://app.knowledgefonsacademy.com'}/invitations`;
+        const acceptLink = `${Deno.env.get('FRONTEND_URL') || 'https://app.tutornest.org'}/invitations`;
         const emailData = emailTemplates.tutorBookingNotification(
           tutorData?.full_name || 'Tutor',
           parentName,

@@ -140,7 +140,7 @@ app.get('/bookings', async (c) => {
         parentName:     resolveName(parent,  ''),
         parentId:       b.userId,
         googleMeetLink: b.meetLink ?? null,
-        price:          String(15000),
+        price:          String(20000),
         createdAt:      new Date().toISOString(),
       };
     });
@@ -251,7 +251,7 @@ app.get('/tutors', async (c) => {
 
         // ── Engagement ───────────────────────────────────────────────────────
         rating:        tutor.rating ?? tutor.averageRating ?? null,
-        hourlyRate:    15000,   // platform-fixed
+        hourlyRate:    20000,   // platform-fixed
         availability:  tutor.availability || {},
       }));
 
@@ -362,7 +362,7 @@ app.post('/bookings', async (c) => {
     const timeOnly = String(startTime).replace(/\s*WAT\s*$/i, '').trim();
     const subject = notes || 'Tutoring Session'; // Use notes as subject if provided
     const dashboardBase =
-      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
+      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
     const dashboardLink = `${dashboardBase}/dashboard`;
     const meet = meetLink || 'https://meet.google.com/new';
 
@@ -748,7 +748,7 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
 
     const finalRecord = { ...booking, ...(updated || {}) };
     const dashboardBase =
-      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
+      Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.tutornest.org';
     const dashboardLink = `${dashboardBase}/dashboard`;
     const meetLink =
       (finalRecord as any).googleMeetLink ||
@@ -964,8 +964,8 @@ async function createCalendarEventForBooking(
     if (parentEmail) attendees.push({ email: parentEmail });
 
     const event = {
-      summary: `Knowledge Fons Academy: ${tutorName} & ${studentName}`,
-      description: `Knowledge Fons Academy tutoring session\n\nStudent: ${studentName}\nTutor: ${tutorName}${notes ? `\n\nNotes: ${notes}` : ''}`,
+      summary: `TutorNest: ${tutorName} & ${studentName}`,
+      description: `TutorNest tutoring session\n\nStudent: ${studentName}\nTutor: ${tutorName}${notes ? `\n\nNotes: ${notes}` : ''}`,
       start: { dateTime: `${date}T${startTime}:00`, timeZone: 'Africa/Lagos' },
       end: { dateTime: `${date}T${endTime}:00`, timeZone: 'Africa/Lagos' },
       attendees,

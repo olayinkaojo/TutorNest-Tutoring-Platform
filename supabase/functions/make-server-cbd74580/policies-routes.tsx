@@ -44,7 +44,7 @@ All strikes expire after 90 days of good behavior.
 ## Prohibited Content Policy
 
 ### Strictly Prohibited
-The following content is not allowed on Knowledge Fons Academy:
+The following content is not allowed on TutorNest:
 
 #### Contact Sharing
 - Email addresses, phone numbers, or social media handles
@@ -141,8 +141,8 @@ All decisions may be appealed through our appeals process.
 - Legal requirements: Some data retained for 7 years
 
 ### Contact
-For data requests: privacy@knowledgefonsacademy.com
-For DPO: dpo@knowledgefonsacademy.com
+For data requests: privacy@tutornest.org
+For DPO: dpo@tutornest.org
     `,
     category: 'legal',
   },

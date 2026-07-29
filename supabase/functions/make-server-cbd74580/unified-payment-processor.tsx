@@ -74,9 +74,9 @@ export async function initializeFlutterwavePayment(
       },
       payment_options: 'card,banktransfer,ussd,mobile_money',
       customizations: {
-        title: `Knowledge Fons Academy - ${getPaymentTypeDisplayName(request.type)}`,
+        title: `TutorNest - ${getPaymentTypeDisplayName(request.type)}`,
         description: request.description,
-        logo: 'https://app.knowledgefonsacademy.com/Logo.png',
+        logo: 'https://app.tutornest.org/logo.png',
       },
       meta: {
         paymentId,
@@ -84,7 +84,7 @@ export async function initializeFlutterwavePayment(
         userId: request.userId,
         ...request.metadata,
       },
-      redirect_url: request.redirectUrl || 'https://app.knowledgefonsacademy.com/payment/callback',
+      redirect_url: request.redirectUrl || 'https://app.tutornest.org/payment/callback',
     };
 
     console.log(`[UnifiedPaymentProcessor] Initializing ${request.type} payment`, {
