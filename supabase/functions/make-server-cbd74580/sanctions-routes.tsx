@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { requireAdmin, requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
 
 const app = new Hono();
 
@@ -52,6 +53,8 @@ const SANCTION_REASONS = [
 // Create sanction
 app.post('/', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -115,6 +118,8 @@ app.post('/', async (c) => {
 // Get user sanctions
 app.get('/user/:userId', async (c) => {
   try {
+    const auth = await requireSelfOrAdmin(c, c.req.param('userId'));
+    if (auth instanceof Response) return auth;
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -153,6 +158,9 @@ app.get('/user/:userId', async (c) => {
 // Check if user can perform action
 app.post('/check-restriction', async (c) => {
   try {
+    const authBody = await c.req.json();
+    const auth = await requireSelfOrAdmin(c, authBody?.userId);
+    if (auth instanceof Response) return auth;
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -202,6 +210,8 @@ app.post('/check-restriction', async (c) => {
 // Appeal sanction
 app.post('/:sanctionId/appeal', async (c) => {
   try {
+    const callerId = await verifyUser(c);
+    if (!callerId) return c.json({ success: false, error: 'Unauthorized' }, 401);
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -234,6 +244,8 @@ app.post('/:sanctionId/appeal', async (c) => {
 // Review appeal
 app.post('/:sanctionId/appeal/review', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
@@ -281,6 +293,8 @@ app.post('/:sanctionId/appeal/review', async (c) => {
 // Get all sanctions (admin)
 app.get('/', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);

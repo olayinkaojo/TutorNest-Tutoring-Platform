@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
+import { requireAdmin, requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
 
 const app = new Hono();
 
@@ -295,6 +296,8 @@ app.delete('/reviews/:reviewId', async (c) => {
 // PATCH /reviews/:reviewId/resolve — Mark as resolved
 app.patch('/reviews/:reviewId/resolve', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const { reviewId } = c.req.param();
     const review = await kv.get(`review:${reviewId}`);
     if (!review) return c.json({ error: 'Review not found' }, 404);
@@ -382,7 +385,13 @@ async function updateTutorRating(tutorId: string) {
 // POST /disputes — Create a dispute
 app.post('/disputes', async (c) => {
   try {
+    const callerId = await verifyUser(c);
+    if (!callerId) return c.json({ error: 'Unauthorized' }, 401);
     const body = await c.req.json();
+    // A dispute is filed under the caller's own identity.
+    if (body?.submittedBy && body.submittedBy !== callerId) {
+      return c.json({ error: 'Can only file disputes under your own account' }, 403);
+    }
     const {
       type,
       sessionId,
@@ -441,6 +450,14 @@ app.post('/disputes', async (c) => {
 // GET /disputes — Fetch disputes for a user or admin
 app.get('/disputes', async (c) => {
   try {
+    const filterUserId = c.req.query('userId');
+    if (filterUserId) {
+      const auth = await requireSelfOrAdmin(c, filterUserId);
+      if (auth instanceof Response) return auth;
+    } else {
+      const auth = await requireAdmin(c);
+      if (auth instanceof Response) return auth;
+    }
     const userId = c.req.query('userId');
     const status = c.req.query('status');
     const role = c.req.query('role');
@@ -481,6 +498,8 @@ app.get('/disputes', async (c) => {
 // PATCH /disputes/:disputeId — Update dispute (admin)
 app.patch('/disputes/:disputeId', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const { disputeId } = c.req.param();
     const body = await c.req.json();
     const { status, outcome, outcomeDetails, assignedTo, note } = body;
@@ -525,6 +544,8 @@ app.patch('/disputes/:disputeId', async (c) => {
 // POST /disputes/:disputeId/evidence — Add evidence
 app.post('/disputes/:disputeId/evidence', async (c) => {
   try {
+    const callerId = await verifyUser(c);
+    if (!callerId) return c.json({ error: 'Unauthorized' }, 401);
     const { disputeId } = c.req.param();
     const { type, description, url } = await c.req.json();
 

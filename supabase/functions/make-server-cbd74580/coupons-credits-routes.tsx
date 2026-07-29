@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { requireAdmin, requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
 
 const app = new Hono();
 
@@ -77,6 +78,8 @@ const RATE_LIMIT_DURATION = 60 * 60 * 1000; // 1 hour in ms
 // Create a new coupon (admin only)
 app.post('/coupons/create', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const { 
       code, 
       type, 
@@ -151,6 +154,8 @@ app.post('/coupons/create', async (c) => {
 // Get all coupons (admin only)
 app.get('/coupons/all', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const couponsData = await kv.getByPrefix('coupon_cpn_');
     const coupons = couponsData.map(item => item.value);
 
@@ -167,6 +172,8 @@ app.get('/coupons/all', async (c) => {
 // Update coupon (admin only)
 app.put('/coupons/:couponId', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const couponId = c.req.param('couponId');
     const updates = await c.req.json();
 
@@ -200,6 +207,8 @@ app.put('/coupons/:couponId', async (c) => {
 // Deactivate coupon (admin only)
 app.post('/coupons/:couponId/deactivate', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const couponId = c.req.param('couponId');
 
     const coupon = await kv.get(`coupon_${couponId}`);
@@ -287,6 +296,8 @@ async function checkRateLimit(identifier: string): Promise<{ allowed: boolean; m
 // Validate coupon code
 app.post('/coupons/validate', async (c) => {
   try {
+    const callerId = await verifyUser(c);
+    if (!callerId) return c.json({ success: false, error: 'Unauthorized' }, 401);
     const { code, tierId, userId, userEmail, userIp } = await c.req.json();
 
     if (!code || !tierId || !userId) {
@@ -362,6 +373,9 @@ app.post('/coupons/validate', async (c) => {
 // Apply coupon to subscription
 app.post('/coupons/apply', async (c) => {
   try {
+    const authBody = await c.req.json();
+    const auth = await requireSelfOrAdmin(c, authBody?.userId);
+    if (auth instanceof Response) return auth;
     const { code, tierId, tierPrice, userId, userEmail } = await c.req.json();
 
     if (!code || !tierId || !tierPrice || !userId || !userEmail) {
@@ -430,6 +444,8 @@ app.post('/coupons/apply', async (c) => {
 // Create referral (when user invites someone)
 app.post('/referrals/create', async (c) => {
   try {
+    const callerId = await verifyUser(c);
+    if (!callerId) return c.json({ success: false, error: 'Unauthorized' }, 401);
     const { inviterId, inviterEmail, inviteeEmail } = await c.req.json();
 
     if (!inviterId || !inviterEmail || !inviteeEmail) {
@@ -486,6 +502,8 @@ app.post('/referrals/create', async (c) => {
 // Complete referral (when invitee signs up and subscribes)
 app.post('/referrals/complete', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const { inviteeId, inviteeEmail } = await c.req.json();
 
     if (!inviteeId || !inviteeEmail) {
@@ -539,6 +557,8 @@ app.post('/referrals/complete', async (c) => {
 // Get user's referrals
 app.get('/referrals/user/:userId', async (c) => {
   try {
+    const auth = await requireSelfOrAdmin(c, c.req.param('userId'));
+    if (auth instanceof Response) return auth;
     const userId = c.req.param('userId');
 
     const referralIds = await kv.get(`user_referrals_${userId}`) || [];
@@ -600,6 +620,8 @@ async function addCredit(
 // Get user's credits
 app.get('/credits/:userId', async (c) => {
   try {
+    const auth = await requireSelfOrAdmin(c, c.req.param('userId'));
+    if (auth instanceof Response) return auth;
     const userId = c.req.param('userId');
 
     const userCredits: UserCredit | null = await kv.get(`user_credits_${userId}`);
@@ -630,6 +652,9 @@ app.get('/credits/:userId', async (c) => {
 // Apply credits to payment
 app.post('/credits/apply', async (c) => {
   try {
+    const authBody = await c.req.json();
+    const auth = await requireSelfOrAdmin(c, authBody?.userId);
+    if (auth instanceof Response) return auth;
     const { userId, amount, description } = await c.req.json();
 
     if (!userId || !amount) {
@@ -674,6 +699,8 @@ app.post('/credits/apply', async (c) => {
 // Add manual credit (admin only - for compensation, promotions, etc.)
 app.post('/credits/add', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
     const { userId, amount, source, description, adminId } = await c.req.json();
 
     if (!userId || !amount || !source || !description || !adminId) {
