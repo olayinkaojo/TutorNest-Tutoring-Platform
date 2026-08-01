@@ -1,4 +1,4 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { projectId } from '../utils/supabase/info';
 
@@ -7,12 +7,21 @@ interface AvatarUploadProps {
   photoUrl?: string;
   name: string;
   size?: 'sm' | 'md' | 'lg';
+  /** Notified with the new URL after a successful upload so the parent can
+   *  update its own profile state (and not overwrite it on the next refetch). */
+  onUploaded?: (photoUrl: string) => void;
 }
 
-export function AvatarUpload({ session, photoUrl: initialPhotoUrl, name, size = 'sm' }: AvatarUploadProps) {
+export function AvatarUpload({ session, photoUrl: initialPhotoUrl, name, size = 'sm', onUploaded }: AvatarUploadProps) {
   const [photoUrl, setPhotoUrl] = useState(initialPhotoUrl);
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
+
+  // Keep in sync when the parent supplies a new URL (e.g. after a profile refetch),
+  // so the displayed photo doesn't get stuck on a stale value.
+  useEffect(() => {
+    setPhotoUrl(initialPhotoUrl);
+  }, [initialPhotoUrl]);
 
   const initials = name
     .split(' ')
@@ -38,7 +47,10 @@ export function AvatarUpload({ session, photoUrl: initialPhotoUrl, name, size = 
       );
       if (res.ok) {
         const data = await res.json();
-        if (data.photoUrl) setPhotoUrl(data.photoUrl);
+        if (data.photoUrl) {
+          setPhotoUrl(data.photoUrl);
+          onUploaded?.(data.photoUrl);
+        }
       }
     } catch (err) {
       console.error('Avatar upload failed:', err);

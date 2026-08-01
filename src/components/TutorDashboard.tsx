@@ -106,6 +106,9 @@ export function TutorDashboard({
     earnings: 0
   });
   const [loading, setLoading] = useState(true);
+  // Reflects a just-uploaded avatar across the dashboard immediately, before the
+  // app-level profile refetch catches up.
+  const [livePhotoUrl, setLivePhotoUrl] = useState<string | undefined>(undefined);
   const [notificationCount, setNotificationCount] = useState(0);
   const [subscriptionTier, setSubscriptionTier] = useState('basic');
   const [isAddingParentRole, setIsAddingParentRole] = useState(false);
@@ -719,8 +722,9 @@ export function TutorDashboard({
             )}
             <AvatarUpload
               session={session}
-              photoUrl={profile.photoUrl}
+              photoUrl={livePhotoUrl ?? profile.photoUrl}
               name={profile.full_name || profile.firstName || profile.name || 'Tutor'}
+              onUploaded={setLivePhotoUrl}
             />
             <span className="text-sm text-gray-600">Welcome, {(profile.full_name || profile.firstName || profile.name || 'Tutor').split(' ')[0]}</span>
             {verificationInfo && (
@@ -761,8 +765,9 @@ export function TutorDashboard({
               <div className="lg:hidden">
                 <AvatarUpload
                   session={session}
-                  photoUrl={profile.photoUrl}
+                  photoUrl={livePhotoUrl ?? profile.photoUrl}
                   name={profile.full_name || profile.firstName || profile.name || 'Tutor'}
+                  onUploaded={setLivePhotoUrl}
                 />
               </div>
               <h1 className="text-2xl lg:text-3xl">Tutor Dashboard</h1>
@@ -1105,9 +1110,10 @@ export function TutorDashboard({
                     <div className="flex items-center gap-4">
                       <AvatarUpload
                         session={session}
-                        photoUrl={profile.photoUrl}
+                        photoUrl={livePhotoUrl ?? profile.photoUrl}
                         name={profile.full_name || profile.firstName || profile.name || 'Tutor'}
                         size="lg"
+                        onUploaded={setLivePhotoUrl}
                       />
                       <div>
                         <p className="font-semibold text-gray-800">{profile.full_name || profile.firstName || profile.name || 'Tutor'}</p>

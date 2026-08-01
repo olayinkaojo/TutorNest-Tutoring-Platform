@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as db from './db.tsx';
+import * as kv from './kv_store.tsx';
 
 const profileAvatarRoutes = new Hono();
 
@@ -62,8 +63,28 @@ profileAvatarRoutes.post('/profile/avatar', async (c) => {
   const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
   const photoUrl = urlData.publicUrl;
 
+  // Persist to Postgres (kept for consistency)…
   const existingProfile = await db.getProfile(userId);
-  await db.upsertProfile(userId, { ...(existingProfile ?? {}), photoUrl });
+  await db.upsertProfile(userId, { ...(existingProfile ?? {}), photoUrl, photo_url: photoUrl });
+
+  // …AND to the KV store, which is what GET /profile actually returns. Without
+  // this the photo vanished on the next profile fetch. Written under both
+  // field-name conventions the app reads (photoUrl and photo_url), on the main
+  // profile and any role-specific profile so a role switch keeps it.
+  const patchPhoto = async (key: string) => {
+    try {
+      const p = (await kv.get(key)) as Record<string, unknown> | null;
+      if (p) await kv.set(key, { ...p, photoUrl, photo_url: photoUrl });
+    } catch (err) {
+      console.error(`avatar: failed to update ${key}:`, err);
+    }
+  };
+  await patchPhoto(`user:${userId}`);
+  await Promise.all([
+    patchPhoto(`profile_tutor_${userId}`),
+    patchPhoto(`profile_parent_${userId}`),
+    patchPhoto(`profile_student_${userId}`),
+  ]);
 
   return c.json({ photoUrl });
 });
