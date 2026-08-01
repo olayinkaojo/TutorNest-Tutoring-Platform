@@ -126,13 +126,15 @@ function formatValue(value: any): string {
 
 // ─── Presentational helpers for the profile dialog ──────────────────────────
 
-/** A label/value pair; renders nothing when the value is empty. */
+/** A label/value row; renders nothing when the value is empty. Label sits to the
+ *  left, value fills the rest — a single-column definition-list style that reads
+ *  cleanly at full width. Stacks on very small screens. */
 function InfoField({ label, value }: { label: string; value: any }) {
   if (value === undefined || value === null || value === '') return null;
   return (
-    <div className="min-w-0">
-      <p className="text-[11px] uppercase tracking-wide text-gray-400 mb-0.5">{label}</p>
-      <p className="text-sm font-medium text-gray-900 break-words whitespace-pre-wrap">{formatValue(value)}</p>
+    <div className="flex flex-col sm:flex-row sm:items-baseline gap-0.5 sm:gap-4 py-2.5">
+      <p className="text-sm text-gray-500 sm:w-52 sm:flex-shrink-0">{label}</p>
+      <p className="text-sm font-medium text-gray-900 break-words whitespace-pre-wrap sm:flex-1">{formatValue(value)}</p>
     </div>
   );
 }
@@ -163,16 +165,6 @@ function SectionCard({ title, icon: Icon, children }: { title: string; icon: any
         <h4 className="text-sm font-semibold text-gray-800">{title}</h4>
       </div>
       <div className="p-4">{children}</div>
-    </div>
-  );
-}
-
-/** A compact stat tile for the sidebar. */
-function StatTile({ label, value }: { label: string; value: ReactNode }) {
-  return (
-    <div className="rounded-lg border border-gray-200 bg-white px-3 py-2.5">
-      <p className="text-[11px] uppercase tracking-wide text-gray-400">{label}</p>
-      <p className="text-sm font-semibold text-gray-900 mt-0.5">{value}</p>
     </div>
   );
 }
@@ -695,7 +687,7 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
       </div>
 
       <Dialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
-        <DialogContent className="max-w-4xl max-h-[90vh] overflow-y-auto p-0 gap-0">
+        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0">
           {selectedUser && (
             <>
               <DialogHeader className="sr-only">
@@ -766,89 +758,80 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
                 </div>
               </div>
 
-              {/* Body */}
-              <div className="grid gap-5 p-6 md:grid-cols-[1.5fr_1fr] bg-gray-50/40">
-                {/* Main column */}
-                <div className="space-y-4 min-w-0">
-                  {tutorSections.map((section) => {
-                    const fields = (section.fields || []).filter(
-                      (f) => f.value !== undefined && f.value !== null && f.value !== '',
-                    );
-                    const chips = (section.chipGroups || []).filter((g) => g.items.length > 0);
-                    if (fields.length === 0 && chips.length === 0) return null;
-                    return (
-                      <SectionCard key={section.title} title={section.title} icon={section.icon}>
-                        {fields.length > 0 && (
-                          <div className="grid gap-4 sm:grid-cols-2">
-                            {fields.map((f) => (
-                              <InfoField key={f.label} label={f.label} value={f.value} />
-                            ))}
-                          </div>
-                        )}
-                        {chips.length > 0 && (
-                          <div className={`space-y-3 ${fields.length ? 'mt-4 pt-4 border-t border-gray-100' : ''}`}>
-                            {chips.map((g) => (
-                              <ChipRow key={g.label} label={g.label} items={g.items} />
-                            ))}
-                          </div>
-                        )}
-                      </SectionCard>
-                    );
-                  })}
-
-                  {selectedUser.role === 'tutor' && (pick(ps.bio, su.bio)) && (
-                    <SectionCard title="Bio" icon={FileText}>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{pick(ps.bio, su.bio)}</p>
-                    </SectionCard>
-                  )}
-
-                  {selectedUser.role === 'tutor' && (pick(ps.qualifications, su.qualifications)) && (
-                    <SectionCard title="Qualifications" icon={GraduationCap}>
-                      <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{pick(ps.qualifications, su.qualifications)}</p>
-                    </SectionCard>
-                  )}
-
-                  {selectedUser.role !== 'tutor' && (
-                    <SectionCard title="Contact" icon={Mail}>
-                      <div className="grid gap-4 sm:grid-cols-2">
-                        <InfoField label="Email" value={selectedUser.email} />
-                        <InfoField label="Phone" value={pick(ps.phone, su.phone)} />
-                        <InfoField label="Location" value={pick(ps.location, su.location)} />
-                      </div>
-                    </SectionCard>
-                  )}
-                </div>
-
-                {/* Sidebar */}
-                <div className="space-y-4 min-w-0">
-                  <SectionCard title="Account & activity" icon={Award}>
-                    <div className="grid grid-cols-2 gap-2.5">
-                      <StatTile label="Role" value={selectedUser.role ? selectedUser.role.charAt(0).toUpperCase() + selectedUser.role.slice(1) : '—'} />
-                      <StatTile label="Status" value={<span className="capitalize">{selectedUser.status || 'active'}</span>} />
-                      <StatTile label="Total sessions" value={selectedUser.totalSessions || 0} />
-                      <StatTile label="Total spent" value={selectedUser.totalSpent ? `₦${Number(selectedUser.totalSpent).toLocaleString()}` : '₦0'} />
-                      {selectedUser.role === 'tutor' && (
-                        <StatTile
-                          label="Verification"
-                          value={<span className="capitalize">{selectedUser.verificationStatus || 'pending'}</span>}
-                        />
+              {/* Body — a single column of full-width sections so each one can breathe */}
+              <div className="space-y-4 p-6 bg-gray-50/40">
+                {tutorSections.map((section) => {
+                  const fields = (section.fields || []).filter(
+                    (f) => f.value !== undefined && f.value !== null && f.value !== '',
+                  );
+                  const chips = (section.chipGroups || []).filter((g) => g.items.length > 0);
+                  if (fields.length === 0 && chips.length === 0) return null;
+                  return (
+                    <SectionCard key={section.title} title={section.title} icon={section.icon}>
+                      {fields.length > 0 && (
+                        <div className="divide-y divide-gray-100">
+                          {fields.map((f) => (
+                            <InfoField key={f.label} label={f.label} value={f.value} />
+                          ))}
+                        </div>
                       )}
-                      {selectedUser.updatedAt && (
-                        <StatTile label="Updated" value={new Date(selectedUser.updatedAt).toLocaleDateString()} />
+                      {chips.length > 0 && (
+                        <div className={`space-y-3 ${fields.length ? 'mt-4 pt-4 border-t border-gray-100' : ''}`}>
+                          {chips.map((g) => (
+                            <ChipRow key={g.label} label={g.label} items={g.items} />
+                          ))}
+                        </div>
                       )}
+                    </SectionCard>
+                  );
+                })}
+
+                {selectedUser.role === 'tutor' && (pick(ps.bio, su.bio)) && (
+                  <SectionCard title="Bio" icon={FileText}>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{pick(ps.bio, su.bio)}</p>
+                  </SectionCard>
+                )}
+
+                {selectedUser.role === 'tutor' && (pick(ps.qualifications, su.qualifications)) && (
+                  <SectionCard title="Qualifications" icon={GraduationCap}>
+                    <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{pick(ps.qualifications, su.qualifications)}</p>
+                  </SectionCard>
+                )}
+
+                {selectedUser.role !== 'tutor' && (
+                  <SectionCard title="Contact" icon={Mail}>
+                    <div className="divide-y divide-gray-100">
+                      <InfoField label="Email" value={selectedUser.email} />
+                      <InfoField label="Phone" value={pick(ps.phone, su.phone)} />
+                      <InfoField label="Location" value={pick(ps.location, su.location)} />
                     </div>
                   </SectionCard>
+                )}
 
-                  <SectionCard title="Admin notes" icon={FileText}>
-                    <p className="text-sm text-gray-600 whitespace-pre-wrap min-h-[3rem] leading-relaxed">
-                      {selectedUser.notes || 'No admin notes available.'}
-                    </p>
-                  </SectionCard>
+                <SectionCard title="Account & activity" icon={Award}>
+                  <div className="divide-y divide-gray-100">
+                    <InfoField label="Role" value={selectedUser.role ? selectedUser.role.charAt(0).toUpperCase() + selectedUser.role.slice(1) : undefined} />
+                    <InfoField label="Status" value={(selectedUser.status || 'active').charAt(0).toUpperCase() + (selectedUser.status || 'active').slice(1)} />
+                    {selectedUser.role === 'tutor' && (
+                      <InfoField label="Verification" value={(selectedUser.verificationStatus || 'pending').charAt(0).toUpperCase() + (selectedUser.verificationStatus || 'pending').slice(1)} />
+                    )}
+                    <InfoField label="Total sessions" value={selectedUser.totalSessions || 0} />
+                    <InfoField label="Total spent" value={selectedUser.totalSpent ? `₦${Number(selectedUser.totalSpent).toLocaleString()}` : '₦0'} />
+                    {selectedUser.updatedAt && (
+                      <InfoField label="Last updated" value={new Date(selectedUser.updatedAt).toLocaleDateString()} />
+                    )}
+                  </div>
+                </SectionCard>
 
-                  <Button className="w-full" variant="outline" onClick={() => setSelectedUser(null)}>
-                    Close
-                  </Button>
-                </div>
+                <SectionCard title="Admin notes" icon={FileText}>
+                  <p className="text-sm text-gray-600 whitespace-pre-wrap min-h-[3rem] leading-relaxed">
+                    {selectedUser.notes || 'No admin notes available.'}
+                  </p>
+                </SectionCard>
+
+                <Button className="w-full" variant="outline" onClick={() => setSelectedUser(null)}>
+                  Close
+                </Button>
               </div>
             </>
           )}
