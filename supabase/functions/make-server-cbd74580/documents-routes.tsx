@@ -130,17 +130,9 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         return c.json({ error: 'File size exceeds 25MB limit' }, 400);
       }
 
-      // Validate file type: ONLY images, PDF, and safe documents
-      const ALLOWED_MIME_TYPES = new Set([
-        'application/pdf',                                                    // PDF
-        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',  // Images
-        'application/msword',                                                 // .doc
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  // .docx
-      ]);
-
-      if (!ALLOWED_MIME_TYPES.has(file.type)) {
-        return c.json({ error: 'Invalid file type. Only PDF, images (.jpg, .png, .gif, .webp), and documents (.doc, .docx) are allowed.' }, 400);
-      }
+      // File-type validation is done below, extension-first (see ALLOWED_EXTENSIONS).
+      // MIME alone is unreliable — phones report 'image/jpg', some browsers send an
+      // empty type — so it must not be the hard gate or valid uploads get rejected.
 
       if (!['parent', 'tutor', 'student', 'admin'].includes(uploadedByRole)) {
         return c.json({ error: 'Invalid uploadedByRole' }, 400);
@@ -162,21 +154,40 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         return c.json({ error: 'File type not allowed. Executable and archive files are prohibited.' }, 400);
       }
 
-      // Additional validation: check that the MIME type matches the file extension
-      const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
-      const validExtensions: Record<string, string[]> = {
-        'application/pdf': ['.pdf'],
-        'image/jpeg': ['.jpg', '.jpeg'],
-        'image/png': ['.png'],
-        'image/gif': ['.gif'],
-        'image/webp': ['.webp'],
-        'application/msword': ['.doc'],
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      // Extension-first type validation. The extension whitelist is the real gate;
+      // MIME is only used to reject an obvious mismatch (e.g. an executable MIME on
+      // a .jpg), while tolerating the common variance browsers/phones produce.
+      const ALLOWED_EXTENSIONS: Record<string, string[]> = {
+        '.pdf': ['application/pdf'],
+        '.jpg': ['image/jpeg', 'image/jpg', 'image/pjpeg'],
+        '.jpeg': ['image/jpeg', 'image/jpg', 'image/pjpeg'],
+        '.png': ['image/png'],
+        '.gif': ['image/gif'],
+        '.webp': ['image/webp'],
+        '.doc': ['application/msword'],
+        '.docx': [
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/msword',
+        ],
       };
 
-      const allowedExts = validExtensions[file.type] || [];
-      if (!allowedExts.includes(fileExt)) {
-        return c.json({ error: 'File extension does not match file type. Possible security risk.' }, 400);
+      const fileExt = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
+      const expectedMimes = ALLOWED_EXTENSIONS[fileExt];
+      if (!expectedMimes) {
+        return c.json({
+          error: 'Invalid file type. Please upload a PDF, image (.jpg, .png, .gif, .webp), or document (.doc, .docx).',
+        }, 400);
+      }
+
+      // MIME advisory: accept when empty or in the expected set; otherwise accept only
+      // if it's the same broad family (image/* for images, application/* for docs).
+      const mime = (file.type || '').toLowerCase();
+      if (mime && !expectedMimes.includes(mime)) {
+        const isImageExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(fileExt);
+        const familyOk = isImageExt ? mime.startsWith('image/') : mime.startsWith('application/');
+        if (!familyOk) {
+          return c.json({ error: 'File content does not match its extension.' }, 400);
+        }
       }
 
       // Create bucket if it doesn't exist
