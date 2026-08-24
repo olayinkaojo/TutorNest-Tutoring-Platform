@@ -10,6 +10,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Progress } from './ui/progress';
+import { COUNTRIES } from '../constants/countries';
 import { CheckCircle, AlertCircle, User, BookOpen, Award, Shield, RotateCcw } from 'lucide-react';
 import KFALogo from './KFALogo';
 import {
@@ -1139,15 +1140,18 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                     <p className="text-xs text-gray-500 mt-1">Include your country code (e.g., +1, +44, +91)</p>
                   </div>
                   <div>
-                    <Label htmlFor="location">Location (City, Country) *</Label>
-                    <Input
-                      id="location"
-                      value={location}
-                      onChange={(e) => setLocation(e.target.value)}
-                      placeholder="e.g., London, UK or New York, USA"
-                      required
-                    />
-                    <p className="text-xs text-gray-500 mt-1">Where are you based?</p>
+                    <Label htmlFor="location">Country *</Label>
+                    <Select value={location} onValueChange={setLocation}>
+                      <SelectTrigger id="location">
+                        <SelectValue placeholder="Select your country" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {COUNTRIES.map((c) => (
+                          <SelectItem key={c} value={c}>{c}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <p className="text-xs text-gray-500 mt-1">The country you're based in</p>
                   </div>
                 </div>
 

@@ -10,6 +10,7 @@ import { Progress } from './ui/progress';
 import { User, Mail, Phone, MapPin, DollarSign, BookOpen, Award, CheckCircle, AlertCircle, CreditCard, Upload, FileText, X, Download, RefreshCw, Loader2, Clock } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
+import { COUNTRIES } from '../constants/countries';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { toast } from 'sonner@2.0.3';
 
@@ -869,13 +870,17 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
                 />
               </div>
               <div>
-                <Label htmlFor="location">Location</Label>
-                <Input
-                  id="location"
-                  value={formData.location}
-                  onChange={(e) => handleChange('location', e.target.value)}
-                  placeholder="London, UK"
-                />
+                <Label htmlFor="location">Country</Label>
+                <Select value={formData.location} onValueChange={(v) => handleChange('location', v)}>
+                  <SelectTrigger id="location">
+                    <SelectValue placeholder="Select your country" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {COUNTRIES.map((c) => (
+                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
           </CardContent>

@@ -61,6 +61,7 @@ import { DocumentManager } from './DocumentManager';
 import tutorAPI from '../utils/tutor-api-client';
 import { parseWAT, bookingDateLabel, formatRawTimeWAT, WAT_TIMEZONE } from '../utils/timezone';
 import { AvatarUpload } from './AvatarUpload';
+import { TutorVerificationGate } from './TutorVerificationGate';
 
 interface UserProfile {
   id: string;
@@ -109,6 +110,8 @@ export function TutorDashboard({
   // Reflects a just-uploaded avatar across the dashboard immediately, before the
   // app-level profile refetch catches up.
   const [livePhotoUrl, setLivePhotoUrl] = useState<string | undefined>(undefined);
+  // Whether the tutor has cleared the registration gate (photo + a document).
+  const [gateComplete, setGateComplete] = useState(false);
   const [notificationCount, setNotificationCount] = useState(0);
   const [subscriptionTier, setSubscriptionTier] = useState('basic');
   const [isAddingParentRole, setIsAddingParentRole] = useState(false);
@@ -675,10 +678,24 @@ export function TutorDashboard({
     console.log('  Show button?', session && canBecomeParent);
   }, [availableRoles, canBecomeParent, session]);
 
+  // Registration gate: every tutor must have a profile photo and at least one
+  // document before they can use the dashboard. The gate checks on mount and
+  // lets already-complete tutors straight through.
+  if (session && !gateComplete) {
+    return (
+      <TutorVerificationGate
+        session={session}
+        profile={profile}
+        onComplete={() => setGateComplete(true)}
+        onSignOut={onSignOut}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Mobile Navigation */}
-      <MobileNavigation 
+      <MobileNavigation
         userType="tutor"
         activeTab={mapTabToNav(activeTab)}
         onTabChange={handleNavChange}
