@@ -143,8 +143,16 @@ export function EnhancedTutorProfileForm({ session, onComplete }: EnhancedTutorP
         setError('Photo must be less than 5MB');
         return;
       }
+      const name = (file.name || '').toLowerCase();
+      const ext = '.' + (name.split('.').pop() || '');
+      const isImg = file.type ? (file.type.startsWith('image/') || file.type.includes('heic') || file.type.includes('heif')) : ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'].includes(ext);
+      if (!isImg) {
+        setError('Please upload an image file (JPG, PNG, WebP, HEIC)');
+        return;
+      }
       setPhoto(file);
       setPhotoPreview(URL.createObjectURL(file));
+      setError('');
     }
   };
 
@@ -849,7 +857,7 @@ export function EnhancedTutorProfileForm({ session, onComplete }: EnhancedTutorP
             <input
               ref={idInputRef}
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/*"
               onChange={(e) => setIdDocument(e.target.files?.[0] || null)}
               className="hidden"
             />
@@ -896,7 +904,7 @@ export function EnhancedTutorProfileForm({ session, onComplete }: EnhancedTutorP
                   <input
                     ref={dbsInputRef}
                     type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
+                    accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/*"
                     onChange={(e) => setDbsDocument(e.target.files?.[0] || null)}
                     className="hidden"
                   />
@@ -918,7 +926,7 @@ export function EnhancedTutorProfileForm({ session, onComplete }: EnhancedTutorP
             <input
               ref={certificateInputRef}
               type="file"
-              accept=".pdf,.jpg,.jpeg,.png"
+              accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx,application/pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               multiple
               onChange={handleCertificateAdd}
               className="hidden"

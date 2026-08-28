@@ -158,12 +158,14 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       // MIME is only used to reject an obvious mismatch (e.g. an executable MIME on
       // a .jpg), while tolerating the common variance browsers/phones produce.
       const ALLOWED_EXTENSIONS: Record<string, string[]> = {
-        '.pdf': ['application/pdf'],
+        '.pdf': ['application/pdf', 'application/x-pdf'],
         '.jpg': ['image/jpeg', 'image/jpg', 'image/pjpeg'],
         '.jpeg': ['image/jpeg', 'image/jpg', 'image/pjpeg'],
         '.png': ['image/png'],
         '.gif': ['image/gif'],
         '.webp': ['image/webp'],
+        '.heic': ['image/heic', 'image/heif', 'image/heic-sequence', 'application/octet-stream'],
+        '.heif': ['image/heic', 'image/heif', 'image/heif-sequence', 'application/octet-stream'],
         '.doc': ['application/msword'],
         '.docx': [
           'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
@@ -175,7 +177,7 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       const expectedMimes = ALLOWED_EXTENSIONS[fileExt];
       if (!expectedMimes) {
         return c.json({
-          error: 'Invalid file type. Please upload a PDF, image (.jpg, .png, .gif, .webp), or document (.doc, .docx).',
+          error: 'Invalid file type. Please upload a PDF, image (.jpg, .png, .gif, .webp, .heic), or document (.doc, .docx).',
         }, 400);
       }
 
@@ -183,8 +185,8 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       // if it's the same broad family (image/* for images, application/* for docs).
       const mime = (file.type || '').toLowerCase();
       if (mime && !expectedMimes.includes(mime)) {
-        const isImageExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(fileExt);
-        const familyOk = isImageExt ? mime.startsWith('image/') : mime.startsWith('application/');
+        const isImageExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'].includes(fileExt);
+        const familyOk = isImageExt ? (mime.startsWith('image/') || mime === 'application/octet-stream') : mime.startsWith('application/');
         if (!familyOk) {
           return c.json({ error: 'File content does not match its extension.' }, 400);
         }

@@ -103,29 +103,6 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         return c.json({ error: 'File size exceeds 25MB limit' }, 400);
       }
 
-      // Validate file type: ONLY images, PDF, and safe documents
-      const ALLOWED_MIME_TYPES = new Set([
-        'application/pdf',                                                    // PDF
-        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',  // Images
-        'application/msword',                                                 // .doc
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  // .docx
-      ]);
-
-      if (!ALLOWED_MIME_TYPES.has(file.type)) {
-        return c.json({ error: 'Invalid file type. Only PDF, images (.jpg, .png, .gif, .webp), and documents (.doc, .docx) are allowed.' }, 400);
-      }
-
-      if (!['parent', 'tutor', 'student', 'admin'].includes(uploadedByRole)) {
-        return c.json({ error: 'Invalid uploadedByRole' }, 400);
-      }
-
-      if (sharedWithId) {
-        const gate = await assertDocumentShareAllowed(userId, uploadedByRole, sharedWithId, sharedWithType);
-        if (!gate.ok) {
-          return c.json({ error: gate.error, code: 'DOCUMENT_SHARE_NOT_ALLOWED' }, 403);
-        }
-      }
-
       // Validate filename to prevent malicious files
       const lowerOriginalName = file.name.toLowerCase();
       const dangerousExtensions = ['.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js', '.jar', '.zip', '.rar', '.7z', '.tar', '.gz'];
@@ -135,21 +112,39 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         return c.json({ error: 'File type not allowed. Executable and archive files are prohibited.' }, 400);
       }
 
-      // Additional validation: check that the MIME type matches the file extension
-      const fileExt = '.' + file.name.split('.').pop()?.toLowerCase();
-      const validExtensions: Record<string, string[]> = {
-        'application/pdf': ['.pdf'],
-        'image/jpeg': ['.jpg', '.jpeg'],
-        'image/png': ['.png'],
-        'image/gif': ['.gif'],
-        'image/webp': ['.webp'],
-        'application/msword': ['.doc'],
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'],
+      // Extension-first type validation
+      const ALLOWED_EXTENSIONS: Record<string, string[]> = {
+        '.pdf': ['application/pdf', 'application/x-pdf'],
+        '.jpg': ['image/jpeg', 'image/jpg', 'image/pjpeg'],
+        '.jpeg': ['image/jpeg', 'image/jpg', 'image/pjpeg'],
+        '.png': ['image/png'],
+        '.gif': ['image/gif'],
+        '.webp': ['image/webp'],
+        '.heic': ['image/heic', 'image/heif', 'image/heic-sequence', 'application/octet-stream'],
+        '.heif': ['image/heic', 'image/heif', 'image/heif-sequence', 'application/octet-stream'],
+        '.doc': ['application/msword'],
+        '.docx': [
+          'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+          'application/msword',
+        ],
       };
 
-      const allowedExts = validExtensions[file.type] || [];
-      if (!allowedExts.includes(fileExt)) {
-        return c.json({ error: 'File extension does not match file type. Possible security risk.' }, 400);
+      const fileExt = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
+      const expectedMimes = ALLOWED_EXTENSIONS[fileExt];
+      if (!expectedMimes) {
+        return c.json({
+          error: 'Invalid file type. Please upload a PDF, image (.jpg, .png, .gif, .webp, .heic), or document (.doc, .docx).',
+        }, 400);
+      }
+
+      // MIME advisory check
+      const mime = (file.type || '').toLowerCase();
+      if (mime && !expectedMimes.includes(mime)) {
+        const isImageExt = ['.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'].includes(fileExt);
+        const familyOk = isImageExt ? (mime.startsWith('image/') || mime === 'application/octet-stream') : mime.startsWith('application/');
+        if (!familyOk) {
+          return c.json({ error: 'File content does not match its extension.' }, 400);
+        }
       }
 
       // Create bucket if it doesn't exist

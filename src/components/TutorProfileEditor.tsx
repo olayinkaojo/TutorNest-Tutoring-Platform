@@ -16,11 +16,23 @@ import { toast } from 'sonner@2.0.3';
 
 // Certificate/document upload settings
 const CERTIFICATE_DOCUMENT_TYPE = 'tutor_certificate';
-const MAX_CERTIFICATE_SIZE = 5 * 1024 * 1024; // 5MB
+const MAX_CERTIFICATE_SIZE = 10 * 1024 * 1024; // 10MB
 const MAX_CERTIFICATES = 20;
 const UPLOAD_CONCURRENCY = 3; // upload a few at a time; responsive without hammering the edge fn
-const ACCEPTED_CERTIFICATE_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
-const ACCEPTED_CERTIFICATE_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg'];
+const ACCEPTED_CERTIFICATE_TYPES = [
+  'application/pdf',
+  'application/x-pdf',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/pjpeg',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
+const ACCEPTED_CERTIFICATE_EXTENSIONS = ['.pdf', '.png', '.jpg', '.jpeg', '.webp', '.heic', '.heif', '.doc', '.docx'];
 
 const formatFileSize = (bytes: number) => {
   if (!bytes) return '';
@@ -29,12 +41,18 @@ const formatFileSize = (bytes: number) => {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 };
 
-// Some browsers report an empty MIME type (notably PDFs from certain file
-// managers), so fall back to the extension before rejecting a file.
+// Check file extension first, then tolerate mobile MIME variations
 const hasAcceptedCertificateType = (file: File) => {
-  if (file.type) return ACCEPTED_CERTIFICATE_TYPES.includes(file.type);
-  const name = file.name.toLowerCase();
-  return ACCEPTED_CERTIFICATE_EXTENSIONS.some(ext => name.endsWith(ext));
+  const name = (file.name || '').toLowerCase();
+  const ext = '.' + (name.split('.').pop() || '');
+  if (ACCEPTED_CERTIFICATE_EXTENSIONS.includes(ext)) return true;
+
+  if (file.type) {
+    const mime = file.type.toLowerCase();
+    if (ACCEPTED_CERTIFICATE_TYPES.includes(mime)) return true;
+    if (mime.startsWith('image/') || mime === 'application/pdf' || mime.includes('word')) return true;
+  }
+  return false;
 };
 
 type CertificateUpload = {
@@ -449,7 +467,7 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
     const accepted: File[] = [];
     for (const file of fileList) {
       if (!hasAcceptedCertificateType(file)) rejected.push(`${file.name} (unsupported format)`);
-      else if (file.size > MAX_CERTIFICATE_SIZE) rejected.push(`${file.name} (over 5MB)`);
+      else if (file.size > MAX_CERTIFICATE_SIZE) rejected.push(`${file.name} (over 10MB)`);
       else accepted.push(file);
     }
     if (rejected.length > 0) {
@@ -1205,7 +1223,7 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
                     {isDraggingFiles ? 'Drop your files here' : 'Upload Certificates & Documents'}
                   </p>
                   <p className="text-xs text-gray-500 mb-3">
-                    Drag and drop or browse — PDF, PNG, JPG up to 5MB each. You can select several at once.
+                    Drag and drop or browse — PDF, PNG, JPG, WebP, HEIC or DOC up to 10MB each. You can select several at once.
                   </p>
                 </div>
                 <Button
@@ -1222,7 +1240,7 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
                   ref={certificateInputRef}
                   id="certificate-upload"
                   type="file"
-                  accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+                  accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.heif,.doc,.docx,application/pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                   multiple
                   className="hidden"
                   onChange={handleCertificateSelect}

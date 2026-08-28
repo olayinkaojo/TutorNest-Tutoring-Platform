@@ -441,8 +441,12 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   const handlePhotoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!['image/jpeg', 'image/png', 'image/webp'].includes(file.type)) {
-      setError('Please upload a JPG, PNG, or WebP image.');
+    const name = (file.name || '').toLowerCase();
+    const ext = '.' + (name.split('.').pop() || '');
+    const isAllowedExt = ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'].includes(ext);
+    const isAllowedMime = file.type ? (file.type.startsWith('image/') || file.type.includes('heic') || file.type.includes('heif')) : false;
+    if (!isAllowedExt && !isAllowedMime) {
+      setError('Please upload a JPG, PNG, WebP, or HEIC image.');
       return;
     }
     if (file.size > 5 * 1024 * 1024) {
@@ -1242,7 +1246,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                         <input
                           id="photoUpload"
                           type="file"
-                          accept="image/jpeg,image/png,image/webp"
+                          accept="image/*,.heic,.heif"
                           className="hidden"
                           onChange={handlePhotoChange}
                         />

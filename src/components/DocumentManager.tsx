@@ -281,19 +281,6 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
         return;
       }
 
-      // Validate file type: ONLY images, PDF, and safe documents
-      const ALLOWED_MIME_TYPES = new Set([
-        'application/pdf',                                                    // PDF
-        'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp',  // Images
-        'application/msword',                                                 // .doc
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',  // .docx
-      ]);
-
-      if (!ALLOWED_MIME_TYPES.has(file.type)) {
-        toast.error('Only PDF, images (.jpg, .png, .gif, .webp), and documents (.doc, .docx) are allowed');
-        return;
-      }
-
       // Validate filename to prevent malicious files
       const fileName = file.name.toLowerCase();
       const dangerousExtensions = ['.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js', '.jar', '.zip', '.rar', '.7z', '.tar', '.gz'];
@@ -301,6 +288,25 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
       
       if (hasDangerousExt) {
         toast.error('Executable and archive files are not allowed');
+        return;
+      }
+
+      // Extension-first validation + MIME fallback
+      const ALLOWED_EXTS = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.doc', '.docx'];
+      const ALLOWED_MIME_TYPES = new Set([
+        'application/pdf',
+        'application/x-pdf',
+        'image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
+        'application/msword',
+        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+      ]);
+
+      const fileExt = '.' + (fileName.split('.').pop() || '');
+      const isAllowedExt = ALLOWED_EXTS.includes(fileExt);
+      const isAllowedMime = file.type ? (ALLOWED_MIME_TYPES.has(file.type) || file.type.startsWith('image/')) : false;
+
+      if (!isAllowedExt && !isAllowedMime) {
+        toast.error('Only PDF, images (.jpg, .png, .gif, .webp, .heic), and documents (.doc, .docx) are allowed');
         return;
       }
 
@@ -650,7 +656,7 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
                 type="file"
                 ref={fileInputRef}
                 onChange={handleFileSelect}
-                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.doc,.docx"
+                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.doc,.docx,application/pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               />
               {uploadFile && (
                 <p className="text-sm text-gray-600 mt-1">

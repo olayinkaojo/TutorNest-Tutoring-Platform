@@ -35,9 +35,10 @@ profileAvatarRoutes.post('/profile/avatar', async (c) => {
   }
 
   const photo = formData.get('photo') as File | null;
-  if (!photo || !(photo instanceof File)) return c.json({ error: 'Photo file required' }, 400);
-  if (photo.size > 2 * 1024 * 1024) return c.json({ error: 'Photo must be under 2MB' }, 400);
-  if (!photo.type.startsWith('image/')) return c.json({ error: 'File must be an image' }, 400);
+  const ext = photo.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const isImageExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'].includes(ext);
+  const isImageMime = photo.type && (photo.type.startsWith('image/') || photo.type.includes('heic') || photo.type.includes('heif'));
+  if (!isImageExt && !isImageMime) return c.json({ error: 'File must be an image' }, 400);
 
   const supabase = getSupabaseClient();
   const bucketName = 'tutornest-avatars';
@@ -50,7 +51,6 @@ profileAvatarRoutes.post('/profile/avatar', async (c) => {
     });
   }
 
-  const ext = photo.name.split('.').pop()?.toLowerCase() || 'jpg';
   const filePath = `${userId}/${Date.now()}.${ext}`;
   const buffer = await photo.arrayBuffer();
 

@@ -122,8 +122,13 @@ export function ResourcesUploader({ accessToken }: ResourcesUploaderProps) {
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (allowedTypes.includes(file.type)) {
+      const name = (file.name || '').toLowerCase();
+      const ext = '.' + (name.split('.').pop() || '');
+      const allowedExts = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
+      const allowedTypes = ['application/pdf', 'application/x-pdf', 'image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
+      const isAllowed = allowedExts.includes(ext) || (file.type ? (allowedTypes.includes(file.type) || file.type.startsWith('image/')) : false);
+      
+      if (isAllowed) {
         setSelectedFile(file);
         setUploadError(null);
         // Auto-fill title if empty
@@ -132,7 +137,7 @@ export function ResourcesUploader({ accessToken }: ResourcesUploaderProps) {
           setTitle(fileNameWithoutExt);
         }
       } else {
-        setUploadError('Please select a PDF or image file (JPEG, PNG, GIF, WebP)');
+        setUploadError('Please select a PDF or image file (JPEG, PNG, GIF, WebP, HEIC)');
         setSelectedFile(null);
       }
     }
@@ -278,12 +283,12 @@ export function ResourcesUploader({ accessToken }: ResourcesUploaderProps) {
               <Input
                 id="resource-file-upload"
                 type="file"
-                accept=".pdf,image/jpeg,image/png,image/gif,image/webp"
+                accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,application/pdf,image/*"
                 onChange={handleFileChange}
                 disabled={uploading}
               />
               <p className="text-xs text-gray-500">
-                Accepted formats: PDF, JPEG, PNG, GIF, WebP (Max 10MB)
+                Accepted formats: PDF, JPEG, PNG, GIF, WebP, HEIC (Max 10MB)
               </p>
             </div>
 

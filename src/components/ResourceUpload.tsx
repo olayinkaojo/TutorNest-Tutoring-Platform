@@ -90,9 +90,15 @@ export function ResourceUpload({ session, userRole, sessionId, studentId }: Reso
   };
 
   const validateFile = (file: File): string | null => {
+    const name = (file.name || '').toLowerCase();
+    const ext = '.' + (name.split('.').pop() || '');
+    const allowedExts = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'];
+    const isAllowedExt = allowedExts.includes(ext);
+    const isAllowedMime = file.type ? (ALLOWED_TYPES.includes(file.type) || file.type.startsWith('image/')) : false;
+
     // Check file type
-    if (!ALLOWED_TYPES.includes(file.type)) {
-      return 'File type not allowed. Please upload PDF or image files (JPEG, PNG, GIF, WebP).';
+    if (!isAllowedExt && !isAllowedMime) {
+      return 'File type not allowed. Please upload PDF or image files (JPEG, PNG, GIF, WebP, HEIC).';
     }
 
     // Check file size

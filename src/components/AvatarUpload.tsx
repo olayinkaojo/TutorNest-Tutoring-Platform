@@ -34,8 +34,10 @@ export function AvatarUpload({ session, photoUrl: initialPhotoUrl, name, size = 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (file.size > 2 * 1024 * 1024) return;
-    if (!file.type.startsWith('image/')) return;
+    const name = (file.name || '').toLowerCase();
+    const ext = '.' + (name.split('.').pop() || '');
+    const isImg = file.type ? (file.type.startsWith('image/') || file.type.includes('heic') || file.type.includes('heif')) : ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif'].includes(ext);
+    if (!isImg) return;
 
     setUploading(true);
     try {
@@ -70,7 +72,7 @@ export function AvatarUpload({ session, photoUrl: initialPhotoUrl, name, size = 
       title="Click to change profile photo"
       onClick={() => !uploading && inputRef.current?.click()}
     >
-      <input ref={inputRef} type="file" accept="image/*" className="hidden" onChange={handleFileChange} />
+      <input ref={inputRef} type="file" accept="image/*,.heic,.heif" className="hidden" onChange={handleFileChange} />
       <Avatar className={`${sz} ring-2 ring-white`}>
         {photoUrl && <AvatarImage src={photoUrl} alt={name} className="object-cover" />}
         <AvatarFallback

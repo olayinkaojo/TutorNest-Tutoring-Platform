@@ -15,9 +15,21 @@ import {
 } from 'lucide-react';
 
 const CERTIFICATE_DOCUMENT_TYPE = 'tutor_certificate';
-const MAX_SIZE = 5 * 1024 * 1024; // 5MB
-const ACCEPTED_TYPES = ['application/pdf', 'image/png', 'image/jpeg'];
-const ACCEPTED_EXTS = ['.pdf', '.png', '.jpg', '.jpeg'];
+const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+const ACCEPTED_EXTS = ['.pdf', '.png', '.jpg', '.jpeg', '.webp', '.heic', '.heif', '.doc', '.docx'];
+const ACCEPTED_TYPES = [
+  'application/pdf',
+  'application/x-pdf',
+  'image/png',
+  'image/jpeg',
+  'image/jpg',
+  'image/pjpeg',
+  'image/webp',
+  'image/heic',
+  'image/heif',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+];
 
 const BASE = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580`;
 
@@ -31,9 +43,16 @@ interface TutorVerificationGateProps {
 type UploadedDoc = { id: string; title?: string; fileName: string; fileSize?: number };
 
 const accepts = (file: File) => {
-  if (file.type) return ACCEPTED_TYPES.includes(file.type);
-  const name = file.name.toLowerCase();
-  return ACCEPTED_EXTS.some((e) => name.endsWith(e));
+  const name = (file.name || '').toLowerCase();
+  const ext = '.' + (name.split('.').pop() || '');
+  if (ACCEPTED_EXTS.includes(ext)) return true;
+
+  if (file.type) {
+    const mime = file.type.toLowerCase();
+    if (ACCEPTED_TYPES.includes(mime)) return true;
+    if (mime.startsWith('image/') || mime === 'application/pdf' || mime.includes('word')) return true;
+  }
+  return false;
 };
 
 const formatSize = (bytes?: number) => {
@@ -117,7 +136,7 @@ export function TutorVerificationGate({ session, profile, onComplete, onSignOut 
     const rejected = files.filter((f) => !accepts(f) || f.size > MAX_SIZE);
     if (rejected.length > 0) {
       toast.error(`Skipped ${rejected.length} file(s)`, {
-        description: 'Only PDF, PNG or JPG up to 5MB each are accepted.',
+        description: 'Only PDF, images (JPG, PNG, WebP, HEIC) or documents (DOC, DOCX) up to 10MB each are accepted.',
       });
     }
     if (valid.length === 0) return;
@@ -246,12 +265,12 @@ export function TutorVerificationGate({ session, profile, onComplete, onSignOut 
             <p className="text-sm font-medium text-gray-700 mt-2">
               {uploading ? 'Uploading…' : 'Upload documents'}
             </p>
-            <p className="text-xs text-gray-500 mt-1">PDF, PNG or JPG up to 5MB each. You can add several.</p>
+            <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG, WebP, HEIC or DOC up to 10MB each. You can add several.</p>
           </button>
           <input
             ref={fileRef}
             type="file"
-            accept=".pdf,.png,.jpg,.jpeg,application/pdf,image/png,image/jpeg"
+            accept=".pdf,.png,.jpg,.jpeg,.webp,.heic,.heif,.doc,.docx,application/pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
             multiple
             className="hidden"
             onChange={(e) => {

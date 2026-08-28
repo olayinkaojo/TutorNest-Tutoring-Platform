@@ -97,8 +97,11 @@ export function TutorProfileForm({ session, onComplete }: TutorProfileFormProps)
         setError('Photo must be less than 5MB');
         return;
       }
-      if (!file.type.startsWith('image/')) {
-        setError('Please upload an image file');
+      const name = (file.name || '').toLowerCase();
+      const ext = '.' + (name.split('.').pop() || '');
+      const isImg = file.type ? (file.type.startsWith('image/') || file.type.includes('heic') || file.type.includes('heif')) : ['.jpg', '.jpeg', '.png', '.webp', '.heic', '.heif'].includes(ext);
+      if (!isImg) {
+        setError('Please upload an image file (JPG, PNG, WebP, HEIC)');
         return;
       }
       setPhoto(file);
@@ -475,7 +478,7 @@ export function TutorProfileForm({ session, onComplete }: TutorProfileFormProps)
               <input
                 ref={certificateInputRef}
                 type="file"
-                accept=".pdf,.jpg,.jpeg,.png"
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,.doc,.docx,application/pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
                 multiple
                 onChange={handleCertificateChange}
                 className="hidden"
@@ -487,7 +490,7 @@ export function TutorProfileForm({ session, onComplete }: TutorProfileFormProps)
                 className="mt-2 h-12 w-full"
               >
                 <Upload className="w-4 h-4 mr-2" />
-                Upload Certificates (PDF, JPG, PNG - Max 10MB each)
+                Upload Certificates (PDF, JPG, PNG, WebP, HEIC, DOC - Max 10MB each)
               </Button>
               {certificates.length > 0 && (
                 <div className="mt-3 space-y-2">
@@ -519,7 +522,7 @@ export function TutorProfileForm({ session, onComplete }: TutorProfileFormProps)
                 <input
                   ref={idInputRef}
                   type="file"
-                  accept=".pdf,.jpg,.jpeg,.png"
+                  accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/*"
                   onChange={handleIdDocumentChange}
                   className="hidden"
                 />
@@ -596,7 +599,7 @@ export function TutorProfileForm({ session, onComplete }: TutorProfileFormProps)
                     <input
                       ref={dbsInputRef}
                       type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
+                      accept=".pdf,.jpg,.jpeg,.png,.webp,.heic,.heif,application/pdf,image/*"
                       onChange={handleDbsDocumentChange}
                       className="hidden"
                     />

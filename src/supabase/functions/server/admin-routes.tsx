@@ -2069,8 +2069,10 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       // Validate file type
-      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/png', 'image/gif', 'image/webp'];
-      if (!allowedTypes.includes(file.type)) {
+      const allowedTypes = ['application/pdf', 'application/x-pdf', 'image/jpeg', 'image/jpg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif'];
+      const fileExt = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
+      const isAllowedExt = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif'].includes(fileExt);
+      if (!isAllowedExt && !allowedTypes.includes(file.type) && !file.type.startsWith('image/')) {
         return c.json({ 
           error: 'Invalid file type. Only PDF and image files are allowed.' 
         }, 400);
@@ -2084,10 +2086,15 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         }, 400);
       }
 
-      // Convert file to base64 for storage
+      // Convert file to base64 for storage safely in chunks (prevents call stack overflow on large files)
       const arrayBuffer = await file.arrayBuffer();
-      const uint8Array = new Uint8Array(arrayBuffer);
-      const base64Data = btoa(String.fromCharCode(...uint8Array));
+      const bytes = new Uint8Array(arrayBuffer);
+      let binary = '';
+      const chunkSize = 8192;
+      for (let i = 0; i < bytes.length; i += chunkSize) {
+        binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunkSize) as unknown as number[]);
+      }
+      const base64Data = btoa(binary);
 
       const resourceId = `resource_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       
