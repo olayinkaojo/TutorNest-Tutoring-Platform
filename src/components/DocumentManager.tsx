@@ -3,9 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
-import { 
-  Upload, 
-  FileText, 
+import {
+  Upload,
+  FileText,
   Download,
   Trash2,
   File,
@@ -13,6 +13,7 @@ import {
   FileQuestion,
   Filter,
   Search,
+  X,
 } from 'lucide-react';
 import { edgeFunctionBaseUrl, edgeFunctionHeaders } from '../utils/supabase-edge-fetch';
 import { toast } from 'sonner@2.0.3';
@@ -85,7 +86,7 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
   const [bookedParentsForTutor, setBookedParentsForTutor] = useState<Recipient[]>([]);
 
   // Upload form state
-  const [uploadFile, setUploadFile] = useState<File | null>(null);
+  const [uploadFiles, setUploadFiles] = useState<File[]>([]);
   const [uploadTitle, setUploadTitle] = useState('');
   const [uploadDescription, setUploadDescription] = useState('');
   const [uploadDocType, setUploadDocType] = useState<'assignment' | 'review' | 'resource' | 'other'>('assignment');
@@ -272,66 +273,69 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
     }
   };
 
+  const isAllowedDocumentFile = (file: File): boolean => {
+    const fileName = file.name.toLowerCase();
+    const dangerousExtensions = ['.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js', '.jar', '.zip', '.rar', '.7z', '.tar', '.gz'];
+    if (dangerousExtensions.some(ext => fileName.endsWith(ext))) return false;
+
+    // Extension-first validation + MIME fallback
+    const ALLOWED_EXTS = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.doc', '.docx'];
+    const ALLOWED_MIME_TYPES = new Set([
+      'application/pdf',
+      'application/x-pdf',
+      'image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
+      'application/msword',
+      'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    ]);
+
+    const fileExt = '.' + (fileName.split('.').pop() || '');
+    const isAllowedExt = ALLOWED_EXTS.includes(fileExt);
+    const isAllowedMime = file.type ? (ALLOWED_MIME_TYPES.has(file.type) || file.type.startsWith('image/')) : false;
+
+    return isAllowedExt || isAllowedMime;
+  };
+
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      // Check file size (25MB limit)
+    const files = Array.from(e.target.files || []);
+    e.target.value = ''; // allow re-selecting the same file(s)
+    if (files.length === 0) return;
+
+    const accepted: File[] = [];
+    const rejected: string[] = [];
+    for (const file of files) {
       if (file.size > 25 * 1024 * 1024) {
-        toast.error('File size must be less than 25MB');
-        return;
+        rejected.push(`${file.name} (over 25MB)`);
+      } else if (!isAllowedDocumentFile(file)) {
+        rejected.push(`${file.name} (unsupported format)`);
+      } else {
+        accepted.push(file);
       }
+    }
 
-      // Validate filename to prevent malicious files
-      const fileName = file.name.toLowerCase();
-      const dangerousExtensions = ['.exe', '.bat', '.cmd', '.sh', '.ps1', '.vbs', '.js', '.jar', '.zip', '.rar', '.7z', '.tar', '.gz'];
-      const hasDangerousExt = dangerousExtensions.some(ext => fileName.endsWith(ext));
-      
-      if (hasDangerousExt) {
-        toast.error('Executable and archive files are not allowed');
-        return;
-      }
+    if (rejected.length > 0) {
+      toast.error(`Skipped ${rejected.length} file${rejected.length === 1 ? '' : 's'}`, {
+        description: rejected.join(', '),
+      });
+    }
+    if (accepted.length === 0) return;
 
-      // Extension-first validation + MIME fallback
-      const ALLOWED_EXTS = ['.pdf', '.jpg', '.jpeg', '.png', '.gif', '.webp', '.heic', '.heif', '.doc', '.docx'];
-      const ALLOWED_MIME_TYPES = new Set([
-        'application/pdf',
-        'application/x-pdf',
-        'image/jpeg', 'image/jpg', 'image/pjpeg', 'image/png', 'image/gif', 'image/webp', 'image/heic', 'image/heif',
-        'application/msword',
-        'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
-      ]);
-
-      const fileExt = '.' + (fileName.split('.').pop() || '');
-      const isAllowedExt = ALLOWED_EXTS.includes(fileExt);
-      const isAllowedMime = file.type ? (ALLOWED_MIME_TYPES.has(file.type) || file.type.startsWith('image/')) : false;
-
-      if (!isAllowedExt && !isAllowedMime) {
-        toast.error('Only PDF, images (.jpg, .png, .gif, .webp, .heic), and documents (.doc, .docx) are allowed');
-        return;
-      }
-
-      setUploadFile(file);
-      setUploadTitle(file.name);
+    setUploadFiles(prev => [...prev, ...accepted]);
+    // Title only applies when a single file is selected; with several files each
+    // keeps its own filename as the title.
+    if (uploadFiles.length === 0 && accepted.length === 1) {
+      setUploadTitle(accepted[0].name);
     }
   };
 
-  const uploadDocument = async () => {
-    if (!uploadFile) {
-      toast.error('Please select a file');
-      return;
-    }
+  const removeUploadFile = (index: number) => {
+    setUploadFiles(prev => prev.filter((_, i) => i !== index));
+  };
 
-    if (!uploadTitle.trim()) {
-      toast.error('Please enter a title');
-      return;
-    }
-
-    setUploading(true);
-
+  const uploadOneDocument = async (file: File, title: string): Promise<{ ok: boolean; error?: string }> => {
     try {
       const formData = new FormData();
-      formData.append('file', uploadFile);
-      formData.append('title', uploadTitle);
+      formData.append('file', file);
+      formData.append('title', title);
       formData.append('description', uploadDescription);
       formData.append('documentType', uploadDocType);
       formData.append('uploadedByRole', userRole);
@@ -350,26 +354,64 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
         body: formData,
       });
 
-      if (response.ok) {
-        toast.success('Document uploaded successfully');
-        setShowUploadDialog(false);
-        resetUploadForm();
-        loadDocuments();
-      } else {
-        let message = 'Failed to upload document';
-        try {
-          const err = await response.json();
-          message = err.error || message;
-        } catch {
-          /* non-JSON body */
-        }
-        toast.error(message);
+      if (response.ok) return { ok: true };
+
+      let message = 'Failed to upload document';
+      try {
+        const err = await response.json();
+        message = err.error || message;
+      } catch {
+        /* non-JSON body */
       }
+      return { ok: false, error: message };
     } catch (error) {
       console.error('Error uploading document:', error);
-      toast.error('Failed to upload document');
-    } finally {
-      setUploading(false);
+      return { ok: false, error: 'Failed to upload document' };
+    }
+  };
+
+  const uploadDocument = async () => {
+    if (uploadFiles.length === 0) {
+      toast.error('Please select at least one file');
+      return;
+    }
+
+    // A custom title only makes sense for a single file; with several files,
+    // each keeps its own filename as the title.
+    if (uploadFiles.length === 1 && !uploadTitle.trim()) {
+      toast.error('Please enter a title');
+      return;
+    }
+
+    setUploading(true);
+
+    let succeeded = 0;
+    const failed: { file: File; error: string }[] = [];
+    for (const file of uploadFiles) {
+      const title = uploadFiles.length === 1 ? uploadTitle.trim() : file.name;
+      const result = await uploadOneDocument(file, title);
+      if (result.ok) succeeded++;
+      else failed.push({ file, error: result.error || 'Failed to upload document' });
+    }
+
+    setUploading(false);
+
+    if (succeeded > 0) {
+      toast.success(`Uploaded ${succeeded} document${succeeded === 1 ? '' : 's'}`);
+      loadDocuments();
+    }
+    if (failed.length > 0) {
+      toast.error(`${failed.length} upload${failed.length === 1 ? '' : 's'} failed`, {
+        description: failed.map(f => `${f.file.name}: ${f.error}`).join(', '),
+      });
+    }
+
+    if (failed.length === 0) {
+      setShowUploadDialog(false);
+      resetUploadForm();
+    } else {
+      // Keep the dialog open with just the failed files so the user can retry.
+      setUploadFiles(failed.map(f => f.file));
     }
   };
 
@@ -422,7 +464,7 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
   };
 
   const resetUploadForm = () => {
-    setUploadFile(null);
+    setUploadFiles([]);
     setUploadTitle('');
     setUploadDescription('');
     setUploadDocType('assignment');
@@ -643,37 +685,62 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
           <DialogHeader>
             <DialogTitle>Upload Document</DialogTitle>
             <DialogDescription>
-              PDF, images, or Word documents up to 25&nbsp;MB. Choose who this file is for — only people linked through
-              your sessions can receive shares.
+              PDF, images, or Word documents up to 25&nbsp;MB each. You can select several at once. Choose who this is
+              for — only people linked through your sessions can receive shares.
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div>
-              <Label htmlFor="file">File *</Label>
+              <Label htmlFor="file">File{uploadFiles.length === 1 ? '' : 's'} *</Label>
               <Input
                 id="file"
                 type="file"
+                multiple
                 ref={fileInputRef}
                 onChange={handleFileSelect}
                 accept=".pdf,.jpg,.jpeg,.png,.gif,.webp,.heic,.heif,.doc,.docx,application/pdf,image/*,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
               />
-              {uploadFile && (
-                <p className="text-sm text-gray-600 mt-1">
-                  Selected: {uploadFile.name} ({formatFileSize(uploadFile.size)})
-                </p>
+              {uploadFiles.length > 0 && (
+                <div className="mt-2 space-y-1.5">
+                  {uploadFiles.map((f, i) => (
+                    <div
+                      key={`${f.name}-${f.size}-${f.lastModified}-${i}`}
+                      className="flex items-center justify-between gap-2 text-sm bg-gray-50 border rounded-md px-2.5 py-1.5"
+                    >
+                      <span className="truncate text-gray-700">
+                        {f.name} <span className="text-gray-400">({formatFileSize(f.size)})</span>
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => removeUploadFile(i)}
+                        className="text-gray-400 hover:text-red-500 shrink-0"
+                        aria-label={`Remove ${f.name}`}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    </div>
+                  ))}
+                </div>
               )}
             </div>
 
-            <div>
-              <Label htmlFor="title">Title *</Label>
-              <Input
-                id="title"
-                value={uploadTitle}
-                onChange={(e) => setUploadTitle(e.target.value)}
-                placeholder="Document title"
-              />
-            </div>
+            {uploadFiles.length <= 1 && (
+              <div>
+                <Label htmlFor="title">Title *</Label>
+                <Input
+                  id="title"
+                  value={uploadTitle}
+                  onChange={(e) => setUploadTitle(e.target.value)}
+                  placeholder="Document title"
+                />
+              </div>
+            )}
+            {uploadFiles.length > 1 && (
+              <p className="text-xs text-gray-500">
+                Each file will be uploaded as its own document, titled from its filename.
+              </p>
+            )}
 
             <div>
               <Label htmlFor="description">Description</Label>
@@ -804,12 +871,16 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
             <Button
               type="button"
               onClick={() => void uploadDocument()}
-              disabled={!uploadFile || !uploadTitle.trim() || uploading}
+              disabled={uploadFiles.length === 0 || (uploadFiles.length === 1 && !uploadTitle.trim()) || uploading}
               className="text-white"
               style={{ backgroundColor: '#5d9827' }}
             >
               <Upload className="w-4 h-4 mr-2" />
-              {uploading ? 'Uploading...' : 'Upload'}
+              {uploading
+                ? 'Uploading...'
+                : uploadFiles.length > 1
+                  ? `Upload ${uploadFiles.length} documents`
+                  : 'Upload'}
             </Button>
           </DialogFooter>
         </DialogContent>
