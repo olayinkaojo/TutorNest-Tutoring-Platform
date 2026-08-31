@@ -196,6 +196,9 @@ app.get('/:curriculumId/view', async (c) => {
 // Get all curricula (for admin)
 app.get('/all', async (c) => {
   try {
+    const auth = await requireAdmin(c);
+    if (auth instanceof Response) return auth;
+
     const { data, error } = await supabase
       .from('kv_store_cbd74580')
       .select('*')
