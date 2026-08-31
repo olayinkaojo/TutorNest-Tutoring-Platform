@@ -1219,64 +1219,64 @@ app.post('/make-server-cbd74580/profile/complete', async (c) => {
         dbsDocument: null,
         certificates: [],
       };
+      // Any file that fails validation or the storage write is recorded here and
+      // returned to the client — previously these were silently dropped and the
+      // response still said `success: true`, so tutors believed everything saved
+      // and only discovered a document was missing much later at verification.
+      const uploadWarnings: string[] = [];
+
+      const MAX_PROFILE_FILE_SIZE = 25 * 1024 * 1024; // 25MB — matches documents-routes.tsx
+      const ALLOWED_PROFILE_EXTS = ['.pdf', '.png', '.jpg', '.jpeg', '.webp', '.heic', '.heif', '.doc', '.docx'];
+      const validateProfileFile = (file: File | null, label: string): string | null => {
+        if (!file) return null;
+        if (file.size > MAX_PROFILE_FILE_SIZE) return `${label}: file exceeds 25MB`;
+        const ext = '.' + (file.name.split('.').pop()?.toLowerCase() || '');
+        if (!ALLOWED_PROFILE_EXTS.includes(ext)) return `${label}: unsupported file type`;
+        return null;
+      };
+
+      const uploadProfileFile = async (
+        file: File | null,
+        label: string,
+        pathPrefix: string,
+      ): Promise<string | null> => {
+        if (!file) return null;
+        const validationError = validateProfileFile(file, label);
+        if (validationError) {
+          uploadWarnings.push(validationError);
+          return null;
+        }
+        const path = `${userId}/${pathPrefix}_${Date.now()}_${file.name}`;
+        const buffer = await file.arrayBuffer();
+        const { error } = await supabase.storage
+          .from(bucketName)
+          .upload(path, buffer, { contentType: file.type });
+        if (error) {
+          console.error(`profile/complete: ${label} upload failed:`, error);
+          uploadWarnings.push(`${label}: upload failed — ${error.message || 'please try again'}`);
+          return null;
+        }
+        return path;
+      };
 
       // Upload photo
-      const photo = formData.get('photo') as File;
-      if (photo) {
-        const photoPath = `${userId}/photo_${Date.now()}_${photo.name}`;
-        const photoBuffer = await photo.arrayBuffer();
-        const { error: photoError } = await supabase.storage
-          .from(bucketName)
-          .upload(photoPath, photoBuffer, { contentType: photo.type });
-        
-        if (!photoError) {
-          uploadedFiles.photo = photoPath;
-        }
-      }
+      const photo = formData.get('photo') as File | null;
+      uploadedFiles.photo = await uploadProfileFile(photo, 'Profile photo', 'photo');
 
       // Upload ID document
-      const idDocument = formData.get('idDocument') as File;
-      if (idDocument) {
-        const idPath = `${userId}/id_${Date.now()}_${idDocument.name}`;
-        const idBuffer = await idDocument.arrayBuffer();
-        const { error: idError } = await supabase.storage
-          .from(bucketName)
-          .upload(idPath, idBuffer, { contentType: idDocument.type });
-        
-        if (!idError) {
-          uploadedFiles.idDocument = idPath;
-        }
-      }
+      const idDocument = formData.get('idDocument') as File | null;
+      uploadedFiles.idDocument = await uploadProfileFile(idDocument, 'ID document', 'id');
 
       // Upload DBS document
-      const dbsDocument = formData.get('dbsDocument') as File;
-      if (dbsDocument) {
-        const dbsPath = `${userId}/dbs_${Date.now()}_${dbsDocument.name}`;
-        const dbsBuffer = await dbsDocument.arrayBuffer();
-        const { error: dbsError } = await supabase.storage
-          .from(bucketName)
-          .upload(dbsPath, dbsBuffer, { contentType: dbsDocument.type });
-        
-        if (!dbsError) {
-          uploadedFiles.dbsDocument = dbsPath;
-        }
-      }
+      const dbsDocument = formData.get('dbsDocument') as File | null;
+      uploadedFiles.dbsDocument = await uploadProfileFile(dbsDocument, 'DBS document', 'dbs');
 
       // Upload certificates
       let certIndex = 0;
       while (formData.has(`certificate_${certIndex}`)) {
-        const cert = formData.get(`certificate_${certIndex}`) as File;
-        if (cert) {
-          const certPath = `${userId}/cert_${certIndex}_${Date.now()}_${cert.name}`;
-          const certBuffer = await cert.arrayBuffer();
-          const { error: certError } = await supabase.storage
-            .from(bucketName)
-            .upload(certPath, certBuffer, { contentType: cert.type });
-          
-          if (!certError) {
-            uploadedFiles.certificates.push(certPath);
-          }
-        }
+        const cert = formData.get(`certificate_${certIndex}`) as File | null;
+        const certPath = await uploadProfileFile(cert, `Certificate ${certIndex + 1}`, `cert_${certIndex}`);
+        if (certPath) uploadedFiles.certificates.push(certPath);
         certIndex++;
       }
 
@@ -1321,7 +1321,11 @@ app.post('/make-server-cbd74580/profile/complete', async (c) => {
         await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch(() => {});
       } catch (_e) {}
 
-      return c.json({ success: true, profile: updatedProfile });
+      return c.json({
+        success: true,
+        profile: updatedProfile,
+        ...(uploadWarnings.length > 0 ? { uploadWarnings } : {}),
+      });
     } else {
       // Handle parent/student profile (JSON only)
       const profileData = await c.req.json();

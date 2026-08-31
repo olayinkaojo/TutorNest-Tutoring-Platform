@@ -16,7 +16,10 @@ import { toast } from 'sonner@2.0.3';
 
 // Certificate/document upload settings
 const CERTIFICATE_DOCUMENT_TYPE = 'tutor_certificate';
-const MAX_CERTIFICATE_SIZE = 10 * 1024 * 1024; // 10MB
+// Match the server's hard cap (documents-routes.tsx) — certificate scans commonly
+// land between 10-25MB, and a tighter client cap here just meant valid files got
+// silently dropped before ever reaching the server.
+const MAX_CERTIFICATE_SIZE = 25 * 1024 * 1024; // 25MB
 const MAX_CERTIFICATES = 20;
 const UPLOAD_CONCURRENCY = 3; // upload a few at a time; responsive without hammering the edge fn
 const ACCEPTED_CERTIFICATE_TYPES = [
@@ -467,7 +470,7 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
     const accepted: File[] = [];
     for (const file of fileList) {
       if (!hasAcceptedCertificateType(file)) rejected.push(`${file.name} (unsupported format)`);
-      else if (file.size > MAX_CERTIFICATE_SIZE) rejected.push(`${file.name} (over 10MB)`);
+      else if (file.size > MAX_CERTIFICATE_SIZE) rejected.push(`${file.name} (over 25MB)`);
       else accepted.push(file);
     }
     if (rejected.length > 0) {
@@ -1223,7 +1226,7 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
                     {isDraggingFiles ? 'Drop your files here' : 'Upload Certificates & Documents'}
                   </p>
                   <p className="text-xs text-gray-500 mb-3">
-                    Drag and drop or browse — PDF, PNG, JPG, WebP, HEIC or DOC up to 10MB each. You can select several at once.
+                    Drag and drop or browse — PDF, PNG, JPG, WebP, HEIC or DOC up to 25MB each. You can select several at once.
                   </p>
                 </div>
                 <Button
@@ -1293,7 +1296,7 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
                   <p className="font-medium mb-1">Upload Instructions</p>
                   <ul className="text-xs space-y-1 list-disc list-inside">
                     <li>Upload clear, legible copies of your certificates</li>
-                    <li>Accepted formats: PDF, PNG, JPG (max 5MB per file)</li>
+                    <li>Accepted formats: PDF, PNG, JPG, WebP, HEIC or DOC (max 25MB per file)</li>
                     <li>Recommended: Degree certificates, teaching qualifications, DBS certificate</li>
                     <li>Documents help parents verify your credentials and increase bookings</li>
                   </ul>

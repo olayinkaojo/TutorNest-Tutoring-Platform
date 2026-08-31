@@ -15,7 +15,10 @@ import {
 } from 'lucide-react';
 
 const CERTIFICATE_DOCUMENT_TYPE = 'tutor_certificate';
-const MAX_SIZE = 10 * 1024 * 1024; // 10MB
+// Match the server's hard cap (documents-routes.tsx) — certificate scans and phone
+// photos routinely land between 10-25MB, and a tighter client cap here just meant
+// valid files got silently dropped before ever reaching the server.
+const MAX_SIZE = 25 * 1024 * 1024; // 25MB
 const ACCEPTED_EXTS = ['.pdf', '.png', '.jpg', '.jpeg', '.webp', '.heic', '.heif', '.doc', '.docx'];
 const ACCEPTED_TYPES = [
   'application/pdf',
@@ -136,13 +139,14 @@ export function TutorVerificationGate({ session, profile, onComplete, onSignOut 
     const rejected = files.filter((f) => !accepts(f) || f.size > MAX_SIZE);
     if (rejected.length > 0) {
       toast.error(`Skipped ${rejected.length} file(s)`, {
-        description: 'Only PDF, images (JPG, PNG, WebP, HEIC) or documents (DOC, DOCX) up to 10MB each are accepted.',
+        description: 'Only PDF, images (JPG, PNG, WebP, HEIC) or documents (DOC, DOCX) up to 25MB each are accepted.',
       });
     }
     if (valid.length === 0) return;
 
     setUploading(true);
     let ok = 0;
+    const failures: { name: string; error: string }[] = [];
     for (const file of valid) {
       try {
         const form = new FormData();
@@ -162,15 +166,21 @@ export function TutorVerificationGate({ session, profile, onComplete, onSignOut 
         else {
           const e = await res.json().catch(() => ({}));
           console.error('Gate upload failed', e);
+          failures.push({ name: file.name, error: e.error || 'Upload failed' });
         }
-      } catch (err) {
+      } catch (err: any) {
         console.error('Gate upload error', err);
+        failures.push({ name: file.name, error: 'Network error' });
       }
     }
     setUploading(false);
     setDocuments(await loadDocuments());
     if (ok > 0) toast.success(`Uploaded ${ok} document${ok === 1 ? '' : 's'}`);
-    else toast.error('Upload failed. Please try again.');
+    if (failures.length > 0) {
+      toast.error(`${failures.length} document${failures.length === 1 ? '' : 's'} failed to upload`, {
+        description: failures.map((f) => `${f.name}: ${f.error}`).join(', '),
+      });
+    }
   };
 
   const deleteDocument = async (id: string) => {
@@ -265,7 +275,7 @@ export function TutorVerificationGate({ session, profile, onComplete, onSignOut 
             <p className="text-sm font-medium text-gray-700 mt-2">
               {uploading ? 'Uploading…' : 'Upload documents'}
             </p>
-            <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG, WebP, HEIC or DOC up to 10MB each. You can add several.</p>
+            <p className="text-xs text-gray-500 mt-1">PDF, JPG, PNG, WebP, HEIC or DOC up to 25MB each. You can add several.</p>
           </button>
           <input
             ref={fileRef}

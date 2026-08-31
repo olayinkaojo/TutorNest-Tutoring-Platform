@@ -9,6 +9,7 @@ import { Checkbox } from './ui/checkbox';
 import { Alert, AlertDescription } from './ui/alert';
 import { Progress } from './ui/progress';
 import { AlertCircle, Upload, X, CheckCircle, Clock } from 'lucide-react';
+import { toast } from 'sonner';
 
 interface TutorProfileFormProps {
   session: any;
@@ -113,8 +114,8 @@ export function TutorProfileForm({ session, onComplete }: TutorProfileFormProps)
   const handleCertificateChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     const validFiles = files.filter((file) => {
-      if (file.size > 10 * 1024 * 1024) {
-        setError('Each certificate must be less than 10MB');
+      if (file.size > 25 * 1024 * 1024) {
+        setError('Each certificate must be less than 25MB');
         return false;
       }
       return true;
@@ -126,8 +127,8 @@ export function TutorProfileForm({ session, onComplete }: TutorProfileFormProps)
   const handleDbsDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        setError('DBS document must be less than 10MB');
+      if (file.size > 25 * 1024 * 1024) {
+        setError('DBS document must be less than 25MB');
         return;
       }
       setDbsDocument(file);
@@ -138,8 +139,8 @@ export function TutorProfileForm({ session, onComplete }: TutorProfileFormProps)
   const handleIdDocumentChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      if (file.size > 10 * 1024 * 1024) {
-        setError('ID document must be less than 10MB');
+      if (file.size > 25 * 1024 * 1024) {
+        setError('ID document must be less than 25MB');
         return;
       }
       setIdDocument(file);
@@ -231,9 +232,19 @@ export function TutorProfileForm({ session, onComplete }: TutorProfileFormProps)
 
       setUploadProgress(80);
 
+      const data = await response.json();
+
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || 'Failed to save profile');
+      }
+
+      // The profile itself saved, but one or more files may not have (wrong
+      // format, too large, or a storage hiccup) — tell the tutor which ones so
+      // they don't assume everything went through and get stuck later.
+      if (Array.isArray(data.uploadWarnings) && data.uploadWarnings.length > 0) {
+        toast.error("Profile saved, but some files didn't upload", {
+          description: data.uploadWarnings.join(' · '),
+        });
       }
 
       setUploadProgress(100);
@@ -490,7 +501,7 @@ export function TutorProfileForm({ session, onComplete }: TutorProfileFormProps)
                 className="mt-2 h-12 w-full"
               >
                 <Upload className="w-4 h-4 mr-2" />
-                Upload Certificates (PDF, JPG, PNG, WebP, HEIC, DOC - Max 10MB each)
+                Upload Certificates (PDF, JPG, PNG, WebP, HEIC, DOC - Max 25MB each)
               </Button>
               {certificates.length > 0 && (
                 <div className="mt-3 space-y-2">

@@ -35,19 +35,35 @@ profileAvatarRoutes.post('/profile/avatar', async (c) => {
   }
 
   const photo = formData.get('photo') as File | null;
+  if (!photo) return c.json({ error: 'No photo provided' }, 400);
+
   const ext = photo.name.split('.').pop()?.toLowerCase() || 'jpg';
   const isImageExt = ['jpg', 'jpeg', 'png', 'webp', 'gif', 'heic', 'heif'].includes(ext);
   const isImageMime = photo.type && (photo.type.startsWith('image/') || photo.type.includes('heic') || photo.type.includes('heif'));
   if (!isImageExt && !isImageMime) return c.json({ error: 'File must be an image' }, 400);
 
+  // Every profile-photo prompt in the app advertises "up to 5MB" — enforce that
+  // here with a clear error instead of letting an oversized upload fail opaquely
+  // against the storage bucket's own limit below.
+  const MAX_AVATAR_SIZE = 5 * 1024 * 1024;
+  if (photo.size > MAX_AVATAR_SIZE) {
+    return c.json({ error: 'Photo must be under 5MB' }, 400);
+  }
+
   const supabase = getSupabaseClient();
   const bucketName = 'tutornest-avatars';
 
+  // fileSizeLimit is set (or corrected) on every request, not just bucket creation —
+  // an earlier version created this bucket with a 2MB limit while every client screen
+  // advertised 5MB, so photos between 2-5MB were silently rejected by storage with no
+  // error surfaced to the user. Give a little headroom above the app's own 5MB check.
+  const bucketOpts = { public: true, fileSizeLimit: 6 * 1024 * 1024 };
   const { data: buckets } = await supabase.storage.listBuckets();
   if (!buckets?.some((b) => b.name === bucketName)) {
-    await supabase.storage.createBucket(bucketName, {
-      public: true,
-      fileSizeLimit: 2097152,
+    await supabase.storage.createBucket(bucketName, bucketOpts);
+  } else {
+    await supabase.storage.updateBucket(bucketName, bucketOpts).catch((err) => {
+      console.error('avatar: failed to normalize bucket limits:', err);
     });
   }
 
@@ -58,7 +74,10 @@ profileAvatarRoutes.post('/profile/avatar', async (c) => {
     .from(bucketName)
     .upload(filePath, buffer, { contentType: photo.type, upsert: true });
 
-  if (uploadError) return c.json({ error: uploadError.message }, 500);
+  if (uploadError) {
+    console.error('avatar: storage upload failed:', uploadError);
+    return c.json({ error: uploadError.message || 'Failed to upload photo' }, 500);
+  }
 
   const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(filePath);
   const photoUrl = urlData.publicUrl;

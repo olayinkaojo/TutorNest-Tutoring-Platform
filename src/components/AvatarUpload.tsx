@@ -1,6 +1,9 @@
 import { useState, useRef, useEffect } from 'react';
 import { Avatar, AvatarImage, AvatarFallback } from './ui/avatar';
 import { projectId } from '../utils/supabase/info';
+import { toast } from 'sonner';
+
+const MAX_AVATAR_SIZE = 5 * 1024 * 1024; // 5MB — matches the server's limit
 
 interface AvatarUploadProps {
   session: any;
@@ -33,11 +36,19 @@ export function AvatarUpload({ session, photoUrl: initialPhotoUrl, name, size = 
 
   const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
+    if (inputRef.current) inputRef.current.value = ''; // allow re-selecting the same file after a failure
     if (!file) return;
     const name = (file.name || '').toLowerCase();
     const ext = '.' + (name.split('.').pop() || '');
     const isImg = file.type ? (file.type.startsWith('image/') || file.type.includes('heic') || file.type.includes('heif')) : ['.jpg', '.jpeg', '.png', '.webp', '.gif', '.heic', '.heif'].includes(ext);
-    if (!isImg) return;
+    if (!isImg) {
+      toast.error('Please choose a JPG, PNG, WebP or HEIC image.');
+      return;
+    }
+    if (file.size > MAX_AVATAR_SIZE) {
+      toast.error('Photo is too large', { description: 'Please choose an image under 5MB.' });
+      return;
+    }
 
     setUploading(true);
     try {
@@ -53,12 +64,16 @@ export function AvatarUpload({ session, photoUrl: initialPhotoUrl, name, size = 
           setPhotoUrl(data.photoUrl);
           onUploaded?.(data.photoUrl);
         }
+      } else {
+        const err = await res.json().catch(() => ({}));
+        console.error('Avatar upload failed:', err);
+        toast.error('Photo upload failed', { description: err.error || 'Please try again.' });
       }
     } catch (err) {
       console.error('Avatar upload failed:', err);
+      toast.error('Photo upload failed', { description: 'Check your connection and try again.' });
     } finally {
       setUploading(false);
-      if (inputRef.current) inputRef.current.value = '';
     }
   };
 

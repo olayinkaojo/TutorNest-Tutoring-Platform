@@ -65,8 +65,6 @@ function draftHasProgress(d: Partial<TutorOnboardingDraft>): boolean {
   return false;
 }
 
-const supabase = getSupabaseClient();
-
 const AVAILABLE_SUBJECTS = [
   'Mathematics', 'English', 'Science', 'Physics', 'Chemistry', 'Biology',
   'Computer Science', 'Information Technology', 'Spanish', 'French', 'German',
@@ -458,24 +456,32 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
     setError('');
   };
 
-  const uploadPhoto = async (userId: string): Promise<string | null> => {
+  // Uploads via the hardened /profile/avatar server route (same one AvatarUpload uses)
+  // rather than talking to Supabase Storage directly from the browser. The old version
+  // called `supabase.storage.createBucket()` from the client, which requires
+  // service-role privileges the browser doesn't have — so it silently failed on most
+  // setups (caught below, logged, and swallowed) and wrote to a bucket
+  // ('tutor-photos') that the rest of the app never reads photoUrl from anyway.
+  // Requires a real access token, so this only runs for already-authenticated callers
+  // (the existing-user edit path below); a brand-new signup has no session yet — see
+  // the call site for why that's fine.
+  const uploadPhoto = async (accessToken: string): Promise<string | null> => {
     if (!photoFile) return null;
     setPhotoUploading(true);
     try {
-      const ext = photoFile.name.split('.').pop();
-      const path = `${userId}/passport.${ext}`;
-      const bucketName = 'tutor-photos';
-      const { data: buckets } = await supabase.storage.listBuckets();
-      const exists = buckets?.some((b: any) => b.name === bucketName);
-      if (!exists) {
-        await supabase.storage.createBucket(bucketName, { public: true });
+      const form = new FormData();
+      form.append('photo', photoFile);
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profile/avatar`,
+        { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: form },
+      );
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}));
+        console.warn('Photo upload failed:', err.error || res.statusText);
+        return null;
       }
-      const { error: upErr } = await supabase.storage
-        .from(bucketName)
-        .upload(path, photoFile, { upsert: true, contentType: photoFile.type });
-      if (upErr) throw upErr;
-      const { data: urlData } = supabase.storage.from(bucketName).getPublicUrl(path);
-      return urlData.publicUrl ?? null;
+      const data = await res.json();
+      return data.photoUrl ?? null;
     } catch (err: any) {
       console.warn('Photo upload failed:', err.message);
       return null;
@@ -744,21 +750,12 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
           throw new Error('Failed to create account');
         }
 
-        // If a photo was selected, upload it now using the new userId
-        if (photoFile && signupData.userId) {
-          const photoUrl = await uploadPhoto(signupData.userId);
-          if (photoUrl && signupData.accessToken) {
-            // Patch the profile with the photo URL
-            await fetch(
-              `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/profiles/${signupData.userId}`,
-              {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${signupData.accessToken}` },
-                body: JSON.stringify({ photo_url: photoUrl }),
-              }
-            ).catch(() => {});
-          }
-        }
+        // A photo picked at signup can't be uploaded yet: /signup returns no session
+        // (`session: null` — email confirmation happens before one exists), and the
+        // upload endpoint requires a real access token. The verification gate the
+        // tutor lands on right after confirming their email re-prompts for the photo
+        // and uploads it through the same working, authenticated path — so nothing is
+        // lost, it just happens one screen later instead of failing silently here.
 
         clearOnboardingDraft();
         // Email confirmation required — show the "check your email" screen
@@ -777,10 +774,10 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         throw new Error('No access token available to create profile');
       }
 
-      // Upload photo for existing users (userId is already known)
+      // Upload photo for existing users (already authenticated, so a real token exists)
       let existingUserPhotoUrl: string | null = null;
       if (photoFile && userId) {
-        existingUserPhotoUrl = await uploadPhoto(userId);
+        existingUserPhotoUrl = await uploadPhoto(tutorSession.access_token);
       }
 
       // Existing user: update profile via backend
