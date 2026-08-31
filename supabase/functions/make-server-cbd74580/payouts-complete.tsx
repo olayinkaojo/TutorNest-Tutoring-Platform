@@ -216,6 +216,25 @@ payoutsComplete.post('/request', async (c) => {
       return c.json({ error: 'Please add a bank account before requesting payout' }, 400);
     }
 
+    // Requested amount must not exceed what the tutor has actually earned and
+    // cleared, and is reserved out of availableBalance immediately — not just
+    // checked — so a second request submitted before this one is approved
+    // can't also pass against the same funds. This route previously had no
+    // check at all: a tutor could request any amount and it would go
+    // straight to "pending admin approval" with nothing tying it back to
+    // their real tutor_balance record, and approving it didn't touch balance
+    // either. Refunded back to availableBalance on rejection (see below).
+    const balanceKey = `tutor_balance:${userId}`;
+    const balance = (await kv.get(balanceKey)) as any;
+    const availableBalance = balance?.availableBalance ?? 0;
+    const requestedAmount = parseFloat(amount);
+    if (requestedAmount > availableBalance) {
+      return c.json({ error: `Insufficient available balance. You have ₦${availableBalance.toLocaleString()} available.` }, 400);
+    }
+    balance.availableBalance = availableBalance - requestedAmount;
+    balance.lastUpdated = new Date().toISOString();
+    await kv.set(balanceKey, balance);
+
     // Get tutor profile for name
     const tutorProfile = (await kv.get(`user:${userId}`)) as any || {};
 
@@ -404,6 +423,19 @@ payoutsComplete.post('/admin/approve/:requestId', async (c) => {
 
     await kv.set(requestId, payoutRequest);
 
+    // The requested amount was already reserved out of availableBalance when
+    // the request was submitted (see /request above) — finalize it here by
+    // moving it into totalPayouts, so the tutor's earnings-vs-paid-out totals
+    // stay accurate once you actually wire the funds via your bank.
+    const approvedTutorId = payoutRequest.tutorId;
+    const approvedBalanceKey = `tutor_balance:${approvedTutorId}`;
+    const approvedBalance = (await kv.get(approvedBalanceKey)) as any;
+    if (approvedBalance) {
+      approvedBalance.totalPayouts = (approvedBalance.totalPayouts || 0) + parseFloat(payoutRequest.amount);
+      approvedBalance.lastUpdated = new Date().toISOString();
+      await kv.set(approvedBalanceKey, approvedBalance);
+    }
+
     // Remove from pending
     const pendingIds = ((await kv.get(`admin_payout_pending`)) as any) || [];
     const updatedPending = pendingIds.filter((id: string) => id !== requestId);
@@ -480,6 +512,18 @@ payoutsComplete.post('/admin/reject/:requestId', async (c) => {
     payoutRequest.rejectedBy = userId;
 
     await kv.set(requestId, payoutRequest);
+
+    // Refund the amount reserved out of availableBalance when this request
+    // was submitted (see /request above) — a rejection shouldn't leave the
+    // tutor's funds stuck in limbo.
+    const rejectedTutorId = payoutRequest.tutorId;
+    const rejectedBalanceKey = `tutor_balance:${rejectedTutorId}`;
+    const rejectedBalance = (await kv.get(rejectedBalanceKey)) as any;
+    if (rejectedBalance) {
+      rejectedBalance.availableBalance = (rejectedBalance.availableBalance || 0) + parseFloat(payoutRequest.amount);
+      rejectedBalance.lastUpdated = new Date().toISOString();
+      await kv.set(rejectedBalanceKey, rejectedBalance);
+    }
 
     // Remove from pending
     const pendingIds = ((await kv.get(`admin_payout_pending`)) as any) || [];

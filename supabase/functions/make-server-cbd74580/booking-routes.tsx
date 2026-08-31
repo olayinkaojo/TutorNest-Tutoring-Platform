@@ -263,6 +263,25 @@ app.get('/tutors', async (c) => {
 });
 
 // Create a new booking
+// Disabled pending a payment gate: this created a fully confirmed booking —
+// real Google Calendar event on the tutor's calendar, confirmation emails to
+// parent/tutor/student — straight off client-supplied fields, with no payment
+// check anywhere in the handler. No live screen calls this (the real booking
+// flow is BookSessionWithPayment.tsx -> /payments/initiate-plan ->
+// /payments/confirm-plan, which does verify payment before creating
+// bookings), but the route itself was still directly callable by anyone with
+// a valid token, creating real confirmed sessions for free. Re-enable by
+// restoring the body below once it verifies payment first, the same way
+// confirmPlanPayment() does.
+app.post('/bookings', async (c) => {
+  return c.json(
+    { error: 'Direct booking creation is not available. Please book and pay through the app.' },
+    503,
+  );
+});
+
+/* Previous implementation, kept for when this is rebuilt behind a payment check:
+
 app.post('/bookings', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
@@ -287,7 +306,7 @@ app.post('/bookings', async (c) => {
 
     // Check if the slot is still available
     const allBookings = await kv.getByPrefix('booking:');
-    const conflictingBooking = allBookings.find((b: any) => 
+    const conflictingBooking = allBookings.find((b: any) =>
       (b.tutorId === tutorId || b.studentId === studentId) &&
       b.date === date &&
       b.status === 'confirmed' &&
@@ -435,6 +454,8 @@ app.post('/bookings', async (c) => {
     return c.json({ error: error.message || 'Failed to create booking' }, 500);
   }
 });
+
+*/
 
 // Calculate refund for a booking (extracted logic, used before cancellation)
 app.post('/bookings/:bookingId/calculate-refund', async (c) => {
