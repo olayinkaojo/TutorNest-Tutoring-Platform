@@ -147,6 +147,24 @@ app.get('/subscription/:parentId', async (c) => {
 });
 
 // Subscribe to a tier (new subscription)
+// Disabled pending real payment integration: this used to activate a paid
+// tier off a client-supplied `paymentMethodId` (a hardcoded 'pm_demo_...'
+// string — nothing was ever actually charged or verified). The UI path that
+// reached this is already unreachable (ParentContentLibrary, its only
+// renderer, isn't mounted anywhere), but the route itself was still directly
+// callable by anyone with a valid token, handing out paid entitlements for
+// free. Re-enable by restoring the body below once this charges via
+// Flutterwave and verifies the charge server-side before activating, the
+// same way session bookings do.
+app.post('/subscription/subscribe', async (c) => {
+  return c.json(
+    { success: false, error: 'Subscriptions are not available yet.' },
+    503,
+  );
+});
+
+/* Previous implementation, kept for when real payment is wired in:
+
 app.post('/subscription/subscribe', async (c) => {
   try {
     const authBody = await c.req.json();
@@ -215,6 +233,8 @@ app.post('/subscription/subscribe', async (c) => {
     return c.json({ success: false, error: 'Failed to create subscription' }, 500);
   }
 });
+
+*/
 
 // Calculate pro-rata charge for upgrade
 function calculateProRataCharge(currentTier: any, newTier: any, daysRemaining: number, totalDaysInCycle: number) {
