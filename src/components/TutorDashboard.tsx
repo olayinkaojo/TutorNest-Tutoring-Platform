@@ -50,6 +50,7 @@ import { BookingManager } from './BookingManager';
 import { TutorPerformanceDashboard } from './TutorPerformanceDashboard';
 import { TutorPayoutDashboard } from './TutorPayoutDashboard';
 import { ResourcesHub } from './ResourcesHub';
+import { TutorCurriculumViewer } from './TutorCurriculumViewer';
 import { AdvancedReporting } from './AdvancedReporting';
 import { TutorReviewsTab } from './TutorReviewsTab';
 import { TutorSessionReports } from './TutorSessionReports';
@@ -138,6 +139,7 @@ export function TutorDashboard({
     'performance',
     'payouts',
     'resources',
+    'curriculum',
     'reporting',
     'reviews',
     'bookshop',
@@ -1097,6 +1099,7 @@ export function TutorDashboard({
             <TabsTrigger value="performance">Performance</TabsTrigger>
             <TabsTrigger value="payouts">Payouts</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
+            <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
             <TabsTrigger value="reporting">Reporting</TabsTrigger>
             <TabsTrigger value="reviews">Reviews</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
@@ -1347,6 +1350,10 @@ export function TutorDashboard({
 
           <TabsContent value="resources">
             <ResourcesHub session={session} userId={profile.id || profile.userId || ''} userRole="tutor" />
+          </TabsContent>
+
+          <TabsContent value="curriculum">
+            <TutorCurriculumViewer session={session} />
           </TabsContent>
 
           <TabsContent value="reporting">

@@ -10,6 +10,39 @@ const supabase = createClient(
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
 );
 
+/**
+ * Curriculum documents are always stored keyed by the admin uploader's
+ * 'year_1'..'year_13' values (CurriculumUploader.tsx). But a student/child's own
+ * gradeLevel field is written by several different forms that never agreed on a
+ * format — 'primary_5', 'secondary_8', 'sixth_form_12', or literal 'Year 5' all
+ * mean the same thing as 'year_5' but none of them match the KV key prefix used
+ * on upload. Without this, /grade/:gradeLevel silently returns nothing for any
+ * caller using one of those other formats, even though matching curricula exist.
+ */
+function normalizeGradeLevel(input: string): string {
+  const raw = (input || '').trim().toLowerCase().replace(/\s+/g, '_');
+  if (/^year_\d{1,2}$/.test(raw)) return raw;
+
+  // primary_1..primary_6 -> year_1..year_6
+  let m = raw.match(/^primary_(\d{1,2})$/);
+  if (m) return `year_${m[1]}`;
+
+  // secondary_7..secondary_11 -> year_7..year_11
+  m = raw.match(/^secondary_(\d{1,2})$/);
+  if (m) return `year_${m[1]}`;
+
+  // sixth_form_12 / sixth_form_13 -> year_12 / year_13
+  m = raw.match(/^sixth_form_(\d{1,2})$/);
+  if (m) return `year_${m[1]}`;
+
+  // bare number, e.g. '5' -> year_5
+  if (/^\d{1,2}$/.test(raw)) return `year_${raw}`;
+
+  // nursery_1/2/3 and anything else have no curriculum equivalent — return as-is
+  // so the lookup below simply (and correctly) finds nothing.
+  return raw;
+}
+
 // Upload curriculum PDF for a specific grade level
 app.post('/upload', async (c) => {
   try {
@@ -97,7 +130,7 @@ app.post('/upload', async (c) => {
 // Get all curricula for a specific grade level
 app.get('/grade/:gradeLevel', async (c) => {
   try {
-    const gradeLevel = c.req.param('gradeLevel');
+    const gradeLevel = normalizeGradeLevel(c.req.param('gradeLevel'));
 
     // Query KV store for curricula with this grade level
     const { data, error } = await supabase
