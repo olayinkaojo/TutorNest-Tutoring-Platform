@@ -212,6 +212,28 @@ app.post('/payments/verify/:reference', async (c) => {
       return c.json({ error: 'Payment not found' }, 404);
     }
 
+    // Idempotency guard — without this, a second call for the same reference
+    // (page refresh after redirect, a retried request on a flaky connection, a
+    // double-tapped "confirm" button) re-runs everything below: it re-credits
+    // the tutor's balance a second time, writes a duplicate earnings record,
+    // and re-sends the "payment received" emails. Every other verify path in
+    // this file (confirmPlanPayment, used by the webhook + confirm-plan route)
+    // already guards this; this older route didn't.
+    if (payment.status === 'successful') {
+      const tutorAmountAlready = payment.amount * 0.8;
+      const platformAmountAlready = payment.amount * 0.2;
+      return c.json({
+        success: true,
+        payment: {
+          id: payment.id,
+          status: 'successful',
+          amount: payment.amount,
+          tutorEarnings: tutorAmountAlready,
+          platformFee: platformAmountAlready,
+        },
+      });
+    }
+
     // Update payment status
     payment.status = 'successful';
     payment.verifiedAt = new Date().toISOString();

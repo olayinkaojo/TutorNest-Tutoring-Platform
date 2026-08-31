@@ -148,6 +148,15 @@ export function BookSessionWithPayment({
       }
 
       const { reference } = initData;
+      // In production, a missing VITE_FLUTTERWAVE_PUBLIC_KEY must fail loudly —
+      // silently falling back to the test-mode key would let real users get all
+      // the way through checkout on a sandbox key that never charges (or rejects)
+      // a real card, with nothing telling anyone why payments are "broken".
+      // The test-key fallback only applies to local/dev builds where the env var
+      // is legitimately unset.
+      if (!import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY && import.meta.env.PROD) {
+        throw new Error('Payments are not configured. Please contact support.');
+      }
       const publicKey =
         import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ||
         'FLWPUBK_TEST-faf29eb495805d5a046cac66366b2eae-X';
