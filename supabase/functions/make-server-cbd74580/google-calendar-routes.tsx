@@ -54,6 +54,10 @@ app.get('/make-server-cbd74580/google-calendar/auth-url', async (c) => {
 
 // Server-side OAuth callback — Google redirects here, we exchange the code and redirect back to the app.
 // This avoids Supabase JS intercepting the ?code= param and logging the user out.
+//
+// This is a plain browser navigation from Google, not a fetch() call, so it can't
+// carry an Authorization header — see verify_jwt = false for this function in
+// supabase/config.toml, which is what lets this request reach here at all.
 app.get('/make-server-cbd74580/google-calendar/callback', async (c) => {
   const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
   const profileUrl = `${appUrl}/dashboard/tutor/profile`;

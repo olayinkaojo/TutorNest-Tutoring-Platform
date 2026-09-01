@@ -375,6 +375,16 @@ deno_version = 2
 # [edge_runtime.secrets]
 # secret_key = "env(SECRET_VALUE)"
 
+# Google's OAuth redirect lands on GET /google-calendar/callback as a plain
+# browser navigation, which can't carry an Authorization header — the gateway's
+# default JWT check was rejecting it with UNAUTHORIZED_NO_AUTH_HEADER before our
+# code ever ran. Every route in this function already validates its own
+# Authorization header in-app (see getUserId() calls throughout
+# google-calendar-routes.tsx and friends), so the gateway-level check is
+# redundant for callers that do send one, and blocking for the one that can't.
+[functions.make-server-cbd74580]
+verify_jwt = false
+
 [analytics]
 enabled = true
 port = 54327
