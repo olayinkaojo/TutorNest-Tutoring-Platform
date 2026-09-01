@@ -13,9 +13,9 @@ const PLATFORM_FEE_PERCENTAGE = 20;
 
 // Fixed payment plan definitions (prices in NGN)
 const PAYMENT_PLANS: Record<string, { price: number; sessions: number; sessionsPerWeek: number; weeks: number; name: string }> = {
-  trial:        { price: 20_000,  sessions: 1,  sessionsPerWeek: 1, weeks: 1,  name: 'Trial Session' },
-  once_weekly:  { price: 260_000, sessions: 13, sessionsPerWeek: 1, weeks: 13, name: 'Once a Week (1 Term)' },
-  twice_weekly: { price: 520_000, sessions: 26, sessionsPerWeek: 2, weeks: 13, name: 'Twice a Week (1 Term)' },
+  trial:        { price: 15_000,  sessions: 1,  sessionsPerWeek: 1, weeks: 1,  name: 'Trial Session' },
+  once_weekly:  { price: 195_000, sessions: 13, sessionsPerWeek: 1, weeks: 13, name: 'Once a Week (1 Term)' },
+  twice_weekly: { price: 390_000, sessions: 26, sessionsPerWeek: 2, weeks: 13, name: 'Twice a Week (1 Term)' },
 };
 
 function addMinutesToTime(time: string, mins: number): string {
