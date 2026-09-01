@@ -5,7 +5,6 @@ import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Calendar } from './ui/calendar';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
-import { Label } from './ui/label';
 import { projectId } from '../utils/supabase/info';
 import { todayStringWAT, WAT_TIMEZONE } from '../utils/timezone';
 import { formatNaira } from '../utils/currency';
@@ -109,7 +108,6 @@ export function SessionBookingCalendar({
 
   // Subject + filter state
   const [activeSubject, setActiveSubject] = useState<string>('');
-  const [maxRate, setMaxRate] = useState<string>('all');
   const [dbsOnly, setDbsOnly] = useState(false);
   const [showFilters, setShowFilters] = useState(false);
 
@@ -294,7 +292,6 @@ export function SessionBookingCalendar({
   // ── Filtered tutors ──────────────────────────────────────────────────────────
   const filteredTutors = tutors.filter(t => {
     if (activeSubject && !t.subjects.some(s => s.toLowerCase() === activeSubject.toLowerCase())) return false;
-    if (maxRate !== 'all' && t.hourlyRate > Number(maxRate)) return false;
     if (dbsOnly && !t.dbsChecked) return false;
     return true;
   });
@@ -802,22 +799,6 @@ export function SessionBookingCalendar({
         {/* Extra filters panel */}
         {showFilters && (
           <div className="flex flex-wrap gap-4 p-3 bg-gray-50 rounded-lg border border-gray-200 mt-1">
-            <div className="flex items-center gap-2">
-              <Label className="text-xs text-gray-600 whitespace-nowrap">Max rate:</Label>
-              <Select value={maxRate} onValueChange={setMaxRate}>
-                <SelectTrigger className="h-8 text-xs w-36">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Any price</SelectItem>
-                  <SelectItem value="5000">Up to ₦5,000/hr</SelectItem>
-                  <SelectItem value="10000">Up to ₦10,000/hr</SelectItem>
-                  <SelectItem value="20000">Up to ₦20,000/hr</SelectItem>
-                  <SelectItem value="50000">Up to ₦50,000/hr</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
             <label className="flex items-center gap-2 cursor-pointer">
               <input
                 type="checkbox"
@@ -830,9 +811,9 @@ export function SessionBookingCalendar({
               </span>
             </label>
 
-            {(maxRate !== 'all' || dbsOnly || activeSubject) && (
+            {(dbsOnly || activeSubject) && (
               <button
-                onClick={() => { setMaxRate('all'); setDbsOnly(false); setActiveSubject(''); }}
+                onClick={() => { setDbsOnly(false); setActiveSubject(''); }}
                 className="text-xs text-red-500 hover:text-red-700 underline"
               >
                 Clear all

@@ -82,7 +82,6 @@ export function TutorSearch({
   const [filters, setFilters] = useState({
     level: 'all-levels',
     availability: 'any-time',
-    maxRate: 'any-price',
     minRating: 'any-rating',
     dbsOnly: false,
   });
@@ -197,11 +196,6 @@ export function TutorSearch({
         const avail = (t.availability || '').toLowerCase();
         return avail.includes(filters.availability) || avail.includes('flexible');
       });
-    }
-
-    if (filters.maxRate !== 'any-price') {
-      const max = parseInt(filters.maxRate);
-      list = list.filter(t => !t.hourlyRate || t.hourlyRate <= max);
     }
 
     if (filters.minRating !== 'any-rating') {
@@ -487,22 +481,6 @@ export function TutorSearch({
               </div>
 
               <div>
-                <Label className="text-xs text-gray-600 mb-1.5 block">Max Rate/hr</Label>
-                <Select value={filters.maxRate} onValueChange={v => setFilters(f => ({ ...f, maxRate: v }))}>
-                  <SelectTrigger className="h-9">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="any-price">Any Price</SelectItem>
-                    <SelectItem value="5000">Up to ₦5,000</SelectItem>
-                    <SelectItem value="10000">Up to ₦10,000</SelectItem>
-                    <SelectItem value="20000">Up to ₦20,000</SelectItem>
-                    <SelectItem value="50000">Up to ₦50,000</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
-              <div>
                 <Label className="text-xs text-gray-600 mb-1.5 block">Min Rating</Label>
                 <Select value={filters.minRating} onValueChange={v => setFilters(f => ({ ...f, minRating: v }))}>
                   <SelectTrigger className="h-9">
@@ -530,7 +508,7 @@ export function TutorSearch({
               </label>
               <button
                 className="ml-auto text-xs text-gray-500 hover:text-gray-700 underline"
-                onClick={() => setFilters({ level: 'all-levels', availability: 'any-time', maxRate: 'any-price', minRating: 'any-rating', dbsOnly: false })}
+                onClick={() => setFilters({ level: 'all-levels', availability: 'any-time', minRating: 'any-rating', dbsOnly: false })}
               >
                 Reset filters
               </button>
@@ -570,7 +548,7 @@ export function TutorSearch({
             <Button variant="outline" size="sm" onClick={() => {
               setKeyword('');
               setSelectedSubject('');
-              setFilters({ level: 'all-levels', availability: 'any-time', maxRate: 'any-price', minRating: 'any-rating', dbsOnly: false });
+              setFilters({ level: 'all-levels', availability: 'any-time', minRating: 'any-rating', dbsOnly: false });
             }}>
               Clear All Filters
             </Button>
