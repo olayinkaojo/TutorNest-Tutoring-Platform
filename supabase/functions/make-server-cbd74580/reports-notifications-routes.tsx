@@ -1,5 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
+import { processSessionAttendance } from './payment-routes.tsx';
 
 // Create a route handler function that can receive getUserId
 export function reportsNotificationsRoutes(app: Hono, getUserId: Function) {
@@ -37,8 +39,17 @@ app.post('/make-server-cbd74580/bookings/:bookingId/report', async (c) => {
       return c.json({ error: validationError }, 400);
     }
 
-    // Get the booking
-    const booking = await kv.get(`booking:${bookingId}`) as any;
+    // Get the booking — single-session bookings live in KV, plan bookings
+    // (the flow BookingManager.tsx/PostSessionReport.tsx actually use today,
+    // since GET /bookings?tutorId= sources from db.getBookingsByTutorId)
+    // live in Postgres. This only ever checked KV, so submitting a report
+    // for any real, live booking 404'd here.
+    let booking: any = await kv.get(`booking:${bookingId}`);
+    let isDbBooking = false;
+    if (!booking) {
+      const dbBooking = await db.getBooking(bookingId);
+      if (dbBooking) { booking = dbBooking; isDbBooking = true; }
+    }
     if (!booking) {
       return c.json({ error: 'Booking not found' }, 404);
     }
@@ -48,6 +59,11 @@ app.post('/make-server-cbd74580/bookings/:bookingId/report', async (c) => {
       console.warn(`⚠️ Unauthorized report submission attempt - User ${currentUserId} tried to submit report for tutor ${booking.tutorId}`);
       return c.json({ error: 'Only the tutor assigned to this booking can submit reports' }, 403);
     }
+
+    // DB bookings don't carry parentId/tutorName/studentName the way KV
+    // booking objects do — the paying party is userId, and display names get
+    // resolved below only where actually needed (best-effort, non-fatal).
+    const parentId = isDbBooking ? booking.userId : booking.parentId;
 
     // Sanitize text fields to prevent XSS
     const sanitizedData = {
@@ -69,42 +85,86 @@ app.post('/make-server-cbd74580/bookings/:bookingId/report', async (c) => {
 
     await kv.set(`report:${bookingId}`, report);
 
-    // Update booking with report flag
-    booking.hasReport = true;
-    await kv.set(`booking:${bookingId}`, booking);
+    if (isDbBooking) {
+      // DB bookings have no KV object to flag — the release/no-show status
+      // flip below (via processSessionAttendance) is what marks this
+      // resolved, so there's nothing to write back here.
+    } else {
+      // Update booking with report flag
+      booking.hasReport = true;
+      await kv.set(`booking:${bookingId}`, booking);
+    }
 
-    // Create notification for parent
-    await createNotification({
-      userId: booking.parentId,
-      type: 'report',
-      title: 'New Session Report',
-      message: `${booking.tutorName} has submitted a report for ${booking.studentName}'s session.`,
-      actionUrl: `#bookings-report-${bookingId}`,
-      metadata: { bookingId, reportId: report.id }
-    });
+    // This is the actual attendance signal payouts wait for — see
+    // processSessionAttendance in payment-routes.tsx. studentAttended
+    // defaults to true (matching the frontend form's default) unless
+    // explicitly reported false. Only meaningful for plan-based (DB)
+    // bookings — the KV single-session flow has no live release path to
+    // hook into.
+    let attendanceResult: { released: boolean; amount?: number; reason?: string } | null = null;
+    if (isDbBooking) {
+      const attended = reportData.studentAttended !== false;
+      try {
+        attendanceResult = await processSessionAttendance(bookingId, booking.tutorId, attended);
+      } catch (e: any) {
+        console.warn('processSessionAttendance failed (non-fatal, releaseMaturedEarnings will retry later):', e.message);
+      }
+    }
 
-    // Create notification for student
-    await createNotification({
-      userId: booking.studentId,
-      type: 'report',
-      title: 'Session Report Submitted',
-      message: `${booking.tutorName} has submitted a report for your session.`,
-      actionUrl: `#report-${bookingId}`,
-      metadata: { bookingId, reportId: report.id }
-    });
+    // Notifications/emails are best-effort — a failure here shouldn't undo
+    // the report (and, more importantly, the attendance/payout processing)
+    // that already succeeded above.
+    try {
+      let tutorName = booking.tutorName;
+      let studentName = booking.studentName;
+      if (isDbBooking) {
+        const resolveName = (p: any, fb: string): string =>
+          p?.fullName || p?.full_name || p?.name ||
+          (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) || fb;
+        const [tutorProfile, studentProfile] = await Promise.all([
+          db.getProfile(booking.tutorId).catch(() => null),
+          db.getProfile(booking.studentId).catch(() => null),
+        ]);
+        tutorName = resolveName(tutorProfile, 'Your tutor');
+        studentName = resolveName(studentProfile ?? await kv.get(`child:${booking.studentId}`).catch(() => null), 'the student');
+      }
 
-    // Send email notification
-    await sendEmailNotification({
-      to: booking.parentId,
-      subject: 'New Session Report Available',
-      template: 'session-report',
-      data: { booking, report }
-    });
+      // Create notification for parent
+      await createNotification({
+        userId: parentId,
+        type: 'report',
+        title: 'New Session Report',
+        message: `${tutorName} has submitted a report for ${studentName}'s session.`,
+        actionUrl: `#bookings-report-${bookingId}`,
+        metadata: { bookingId, reportId: report.id }
+      });
 
-    return c.json({ 
-      success: true, 
+      // Create notification for student
+      await createNotification({
+        userId: booking.studentId,
+        type: 'report',
+        title: 'Session Report Submitted',
+        message: `${tutorName} has submitted a report for your session.`,
+        actionUrl: `#report-${bookingId}`,
+        metadata: { bookingId, reportId: report.id }
+      });
+
+      // Send email notification
+      await sendEmailNotification({
+        to: parentId,
+        subject: 'New Session Report Available',
+        template: 'session-report',
+        data: { booking, report }
+      });
+    } catch (e: any) {
+      console.warn('Report notification/email (non-fatal):', e.message);
+    }
+
+    return c.json({
+      success: true,
       report,
-      message: 'Report submitted successfully' 
+      attendance: attendanceResult,
+      message: 'Report submitted successfully'
     });
   } catch (error: any) {
     console.error('Error submitting report:', error);

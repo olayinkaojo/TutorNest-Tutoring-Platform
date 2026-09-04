@@ -893,11 +893,16 @@ app.get('/bookings/:ids/reports', async (c) => {
       return c.json({ error: 'No booking IDs provided' }, 400);
     }
 
-    // Fetch all reports concurrently
+    // Fetch all reports concurrently. Reports submitted via POST
+    // /bookings/:bookingId/report (reports-notifications-routes.tsx) are
+    // stored at `report:<bookingId>` — this used to look under
+    // `session_report_<bookingId>` (an unrelated key from a different report
+    // system), so every report ever submitted through the live "View Report"
+    // flow came back as "not found".
     const reports = await Promise.all(
       bookingIds.map(async (bookingId) => {
         try {
-          const report = await kv.get(`session_report_${bookingId}`) as any;
+          const report = await kv.get(`report:${bookingId}`) as any;
           return report || { bookingId, error: 'Report not found' };
         } catch (err) {
           return { bookingId, error: 'Failed to fetch report' };

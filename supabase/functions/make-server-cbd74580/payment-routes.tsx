@@ -81,11 +81,18 @@ async function getUserFromToken(accessToken: string | undefined): Promise<any | 
 // in the live app renders. Sessions were paid for and taught, but a tutor's
 // earnings from them could never become withdrawable.
 //
-// This runs lazily (called wherever a tutor's balance/payout eligibility is
-// checked) instead of on a schedule: once a booking's session time has
-// passed, its per-session share of the plan is released and the booking is
-// marked 'completed'. Idempotent — a booking only gets processed once,
-// because the status flip out of 'confirmed' is what excludes it next time.
+// Release is attendance-based, not just time-based: the real signal is the
+// tutor's post-session report (POST /bookings/:bookingId/report in
+// reports-notifications-routes.tsx, via processSessionAttendance below),
+// which fires the moment it's submitted. This function is the fallback —
+// called lazily (wherever a tutor's balance/payout eligibility is checked)
+// instead of on a schedule, since there's no cron here — for sessions whose
+// time has passed with no report filed. It waits out a grace period first so
+// a tutor has a real window to confirm what happened before pay is released
+// on an unconfirmed basis; a booking already resolved by a report (status
+// flipped to 'completed' or 'no_show') is excluded by the status check below.
+const ATTENDANCE_REPORT_GRACE_HOURS = 72;
+
 async function releaseMaturedEarnings(tutorId: string): Promise<void> {
   let bookings: any[];
   try {
@@ -106,14 +113,73 @@ async function releaseMaturedEarnings(tutorId: string): Promise<void> {
     const endDateTime = new Date(`${booking.date}T${booking.endTime}:00+01:00`).getTime();
     if (Number.isNaN(endDateTime) || endDateTime > now) continue;
 
+    const hoursSinceEnd = (now - endDateTime) / (1000 * 60 * 60);
+    if (hoursSinceEnd < ATTENDANCE_REPORT_GRACE_HOURS) continue; // give the tutor a window to report first
+
+    // Grace period elapsed with no report filed — release anyway so a
+    // forgotten report doesn't hold pay hostage indefinitely, but log it as
+    // unconfirmed (distinct from a report-confirmed release) so it's visible
+    // in the audit trail, not silently identical to a verified one.
     const perSessionTutorAmount = (plan.price * 0.8) / booking.totalSessions;
     try {
       await db.releaseTutorBalance(tutorId, perSessionTutorAmount);
       await db.updateBookingStatus(booking.id, 'completed');
+      await logAuditEvent({
+        userId: tutorId,
+        action: 'earnings_released_unconfirmed',
+        category: 'payments',
+        description: `Earnings of ${formatNaira(perSessionTutorAmount)} released for session ${booking.id} after ${ATTENDANCE_REPORT_GRACE_HOURS}h with no session report filed.`,
+        severity: 'warning',
+        metadata: { bookingId: booking.id, amount: perSessionTutorAmount },
+      });
     } catch (e: any) {
       console.warn(`releaseMaturedEarnings: failed for booking ${booking.id} (non-fatal):`, e.message);
     }
   }
+}
+
+// Releases one booking's earnings — or marks it a no-show and withholds them
+// — the moment a tutor's post-session report confirms what actually
+// happened. Exported so POST /bookings/:bookingId/report
+// (reports-notifications-routes.tsx) can call this immediately on submit
+// instead of waiting for the next releaseMaturedEarnings sweep.
+async function processSessionAttendance(
+  bookingId: string,
+  tutorId: string,
+  attended: boolean,
+): Promise<{ released: boolean; amount?: number; reason?: string }> {
+  const booking = await db.getBooking(bookingId).catch(() => null);
+  if (!booking || booking.tutorId !== tutorId) return { released: false, reason: 'booking_not_found' };
+  if (booking.status !== 'confirmed') return { released: false, reason: 'already_processed' };
+  if (!booking.planType || !booking.totalSessions) return { released: false, reason: 'not_plan_based' };
+
+  const plan = PAYMENT_PLANS[booking.planType];
+  if (!plan) return { released: false, reason: 'unknown_plan' };
+
+  if (!attended) {
+    await db.updateBookingStatus(bookingId, 'no_show');
+    await logAuditEvent({
+      userId: tutorId,
+      action: 'session_marked_no_show',
+      category: 'bookings',
+      description: `Session ${bookingId} reported as not attended by the tutor — earnings withheld pending review.`,
+      severity: 'warning',
+      metadata: { bookingId },
+    });
+    return { released: false, reason: 'no_show' };
+  }
+
+  const perSessionTutorAmount = (plan.price * 0.8) / booking.totalSessions;
+  await db.releaseTutorBalance(tutorId, perSessionTutorAmount);
+  await db.updateBookingStatus(bookingId, 'completed');
+  await logAuditEvent({
+    userId: tutorId,
+    action: 'earnings_released_report_confirmed',
+    category: 'payments',
+    description: `Earnings of ${formatNaira(perSessionTutorAmount)} released for session ${bookingId} — attendance confirmed via tutor session report.`,
+    metadata: { bookingId, amount: perSessionTutorAmount },
+  });
+  return { released: true, amount: perSessionTutorAmount };
 }
 
 // Validate payment initialization body
@@ -1986,5 +2052,5 @@ function formatNaira(amount: number): string {
   return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
-export { releaseMaturedEarnings };
+export { releaseMaturedEarnings, processSessionAttendance };
 export default app;

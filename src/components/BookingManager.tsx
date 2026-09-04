@@ -307,6 +307,8 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
         return <Badge variant="destructive">Cancelled</Badge>;
       case 'completed':
         return <Badge variant="secondary">Completed</Badge>;
+      case 'no_show':
+        return <Badge variant="destructive">Not Attended</Badge>;
       case 'rescheduled':
         return <Badge variant="outline">Rescheduled</Badge>;
       default:
@@ -321,6 +323,7 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
   const pastBookings = bookings.filter(
     (b) => b.status === 'completed' ||
            b.status === 'cancelled' ||
+           b.status === 'no_show' ||
            parseWAT(b.date, b.startTime) < new Date()
   );
 
