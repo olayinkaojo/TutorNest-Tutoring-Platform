@@ -44,6 +44,21 @@ function normalizeGradeLevel(input: string): string {
   return raw;
 }
 
+/**
+ * Escapes a literal string for safe use inside a Postgres LIKE pattern.
+ *
+ * `_` and `%` are wildcards in LIKE, not literal characters — `_` matches
+ * ANY single character. Every grade-level key here (curriculum_year_1_...)
+ * contains underscores that were meant as literal separators, so an
+ * unescaped `.like('key', 'curriculum_year_1_%')` doesn't just match
+ * year_1 — the `_` right after "year_1" also happily consumes the extra "0"
+ * in "year_10", or the extra digit in "year_11"/"year_12"/"year_13", so
+ * selecting Year 1 silently pulled in Year 10-13's curricula too.
+ */
+function escapeLikeLiteral(value: string): string {
+  return value.replace(/[\\%_]/g, (ch) => `\\${ch}`);
+}
+
 // Upload curriculum PDF for a specific grade level
 app.post('/upload', async (c) => {
   try {
@@ -141,11 +156,12 @@ app.get('/grade/:gradeLevel', async (c) => {
   try {
     const gradeLevel = normalizeGradeLevel(c.req.param('gradeLevel'));
 
-    // Query KV store for curricula with this grade level
+    // Query KV store for curricula with this grade level. Escaped so
+    // year_1 can't match year_10/11/12/13 — see escapeLikeLiteral above.
     const { data, error } = await supabase
       .from('kv_store_cbd74580')
       .select('*')
-      .like('key', `curriculum_${gradeLevel}_%`);
+      .like('key', `${escapeLikeLiteral(`curriculum_${gradeLevel}_`)}%`);
 
     if (error) {
       console.error('Error fetching curricula:', error);
@@ -173,7 +189,7 @@ app.get('/:curriculumId/view', async (c) => {
     const { data, error } = await supabase
       .from('kv_store_cbd74580')
       .select('*')
-      .like('key', `%${curriculumId}`);
+      .like('key', `%${escapeLikeLiteral(curriculumId)}`);
 
     if (error || !data || data.length === 0) {
       return c.json({ error: 'Curriculum not found' }, 404);
@@ -250,7 +266,7 @@ app.delete('/:curriculumId', async (c) => {
     const { data, error } = await supabase
       .from('kv_store_cbd74580')
       .select('*')
-      .like('key', `%${curriculumId}`);
+      .like('key', `%${escapeLikeLiteral(curriculumId)}`);
 
     if (error || !data || data.length === 0) {
       return c.json({ error: 'Curriculum not found' }, 404);
