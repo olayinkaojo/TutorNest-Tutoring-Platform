@@ -3,6 +3,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
+import { logAuditEvent } from './activity-log.tsx';
 
 const app = new Hono();
 
@@ -560,14 +561,11 @@ app.post('/tutors/payouts/request', async (c) => {
 
     // Audit log — a tutor moving money out of the platform is worth a record
     // even before an admin acts on it.
-    const requestAuditId = `audit:${tutorId}:${Date.now()}`;
-    await kv.set(requestAuditId, {
-      id: requestAuditId,
+    await logAuditEvent({
       userId: tutorId,
       action: 'payout_requested',
+      category: 'payments',
       description: `Payout requested: ${formatNaira(amount)} to account ending ${String(bankDetails.accountNumber).slice(-4)}`,
-      timestamp: new Date().toISOString(),
-      severity: 'info',
       metadata: { payoutId, amount, bankCode: bankDetails.bankCode },
     });
 
@@ -671,15 +669,12 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
 
     // Audit log — real money leaving the platform via an admin action is the
     // single highest-value thing to have a record of.
-    const processAuditId = `audit:${payout.tutorId}:${Date.now()}`;
-    await kv.set(processAuditId, {
-      id: processAuditId,
+    await logAuditEvent({
       userId: payout.tutorId,
       adminId,
       action: 'payout_processed',
+      category: 'payments',
       description: `Payout of ${formatNaira(payout.amount)} processed to tutor ${payout.tutorId} via Flutterwave (ref: ${transferData.data.reference})`,
-      timestamp: new Date().toISOString(),
-      severity: 'info',
       metadata: { payoutId, amount: payout.amount, reference: transferData.data.reference, transferId: transferData.data.id },
     });
     db.createAdminAuditLog({
@@ -1530,14 +1525,11 @@ app.post('/payments/:paymentId/refund', async (c) => {
     // no admin action anywhere that approves/processes a refund via
     // Flutterwave, so a request stays status: 'pending' indefinitely. That's
     // a real functional gap, not just a logging one.
-    const refundAuditId = `audit:${userId}:${Date.now()}`;
-    await kv.set(refundAuditId, {
-      id: refundAuditId,
+    await logAuditEvent({
       userId,
       action: 'refund_requested',
+      category: 'payments',
       description: `Refund requested: ${formatNaira(refundAmount)} (${refundPercentage}%) for payment ${paymentId}. Reason: ${reason || 'Customer requested refund'}`,
-      timestamp: new Date().toISOString(),
-      severity: 'info',
       metadata: { paymentId, refundId, amount: refundAmount, refundPercentage, reason },
     });
 

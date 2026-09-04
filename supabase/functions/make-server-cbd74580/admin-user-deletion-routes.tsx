@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { logAuditEvent } from './activity-log.tsx';
 
 /**
  * Hard-deletes a user's own identity/account data.
@@ -72,14 +73,12 @@ export const adminUserDeletionRoutes = (app: Hono, getUserId: Function, supabase
     // Audit log first — this survives independently of the user's own data,
     // so the record of who deleted this account and why exists even if a
     // later step below fails partway through.
-    const auditId = `audit:${targetUserId}:${Date.now()}`;
-    await kv.set(auditId, {
-      id: auditId,
+    await logAuditEvent({
       userId: targetUserId,
       adminId,
       action: 'account_deleted',
+      category: 'account',
       description: `Account permanently deleted. Email: ${targetUser.email || 'unknown'}. Reason: ${reason}`,
-      timestamp: new Date().toISOString(),
       severity: 'warning',
       metadata: { reason, email: targetUser.email, role: targetUser.role },
     });

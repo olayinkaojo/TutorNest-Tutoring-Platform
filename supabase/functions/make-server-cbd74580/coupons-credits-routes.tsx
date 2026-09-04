@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import { requireAdmin, requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
+import { logAuditEvent } from './activity-log.tsx';
 
 const app = new Hono();
 
@@ -141,6 +142,14 @@ app.post('/coupons/create', async (c) => {
 
     console.log(`Coupon created: ${coupon.code} by admin ${createdBy}`);
 
+    await logAuditEvent({
+      userId: auth as string,
+      action: 'coupon_created',
+      category: 'coupons',
+      description: `Coupon created: ${coupon.code} (${type === 'percentage' ? `${value}%` : `₦${value}`} off)`,
+      metadata: { couponId: coupon.id, code: coupon.code, type, value, usageLimit },
+    });
+
     return c.json({
       success: true,
       coupon
@@ -194,6 +203,14 @@ app.put('/coupons/:couponId', async (c) => {
     await kv.set(`coupon_${couponId}`, updatedCoupon);
     await kv.set(`coupon_code_${coupon.code}`, updatedCoupon);
 
+    await logAuditEvent({
+      userId: auth as string,
+      action: 'coupon_updated',
+      category: 'coupons',
+      description: `Coupon ${coupon.code} updated`,
+      metadata: { couponId, code: coupon.code, updates },
+    });
+
     return c.json({
       success: true,
       coupon: updatedCoupon
@@ -221,6 +238,14 @@ app.post('/coupons/:couponId/deactivate', async (c) => {
 
     await kv.set(`coupon_${couponId}`, coupon);
     await kv.set(`coupon_code_${coupon.code}`, coupon);
+
+    await logAuditEvent({
+      userId: auth as string,
+      action: 'coupon_deactivated',
+      category: 'coupons',
+      description: `Coupon ${coupon.code} deactivated`,
+      metadata: { couponId, code: coupon.code },
+    });
 
     return c.json({
       success: true,
@@ -424,6 +449,14 @@ app.post('/coupons/apply', async (c) => {
 
     console.log(`Coupon ${coupon.code} applied by user ${userId}. Discount: £${discountAmount.toFixed(2)}`);
 
+    await logAuditEvent({
+      userId,
+      action: 'coupon_applied',
+      category: 'coupons',
+      description: `Coupon ${coupon.code} applied — discount ₦${discountAmount.toFixed(2)} on ${tierId}`,
+      metadata: { couponId: coupon.id, code: coupon.code, discountAmount, tierId, finalPrice },
+    });
+
     return c.json({
       success: true,
       discountAmount: Math.round(discountAmount * 100) / 100,
@@ -542,6 +575,15 @@ app.post('/referrals/complete', async (c) => {
       `Welcome credit from referral by ${referral.inviterEmail}`, referral.id);
 
     console.log(`Referral completed: ${referral.inviterEmail} -> ${inviteeEmail}. Credits awarded.`);
+
+    await logAuditEvent({
+      userId: inviteeId,
+      adminId: auth as string,
+      action: 'referral_completed',
+      category: 'coupons',
+      description: `Referral completed: ${referral.inviterEmail} → ${inviteeEmail}. ₦${REFERRAL_CREDIT_AMOUNT} credited to both.`,
+      metadata: { referralId: referral.id, inviterId: referral.inviterId, inviteeId, creditAmount: REFERRAL_CREDIT_AMOUNT },
+    });
 
     return c.json({
       success: true,
@@ -685,6 +727,14 @@ app.post('/credits/apply', async (c) => {
 
     console.log(`Credits applied for user ${userId}: £${amount.toFixed(2)}`);
 
+    await logAuditEvent({
+      userId,
+      action: 'credit_applied',
+      category: 'coupons',
+      description: `₦${Number(amount).toFixed(2)} credit applied — ${description || 'subscription payment'}`,
+      metadata: { amount, description },
+    });
+
     return c.json({
       success: true,
       credits: userCredits,
@@ -710,6 +760,15 @@ app.post('/credits/add', async (c) => {
     await addCredit(userId, amount, source, description);
 
     console.log(`Manual credit added by admin ${adminId} for user ${userId}: £${amount.toFixed(2)}`);
+
+    await logAuditEvent({
+      userId,
+      adminId,
+      action: 'credit_added',
+      category: 'coupons',
+      description: `₦${Number(amount).toFixed(2)} credit added manually (${source}): ${description}`,
+      metadata: { amount, source, description },
+    });
 
     const userCredits = await kv.get(`user_credits_${userId}`);
 

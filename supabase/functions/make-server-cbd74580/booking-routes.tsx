@@ -3,6 +3,7 @@ import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 import { collectBookingsForUser } from './messaging-access.tsx';
+import { logAuditEvent } from './activity-log.tsx';
 
 const app = new Hono();
 
@@ -574,6 +575,14 @@ app.post('/bookings/:bookingId/cancel', async (c) => {
 
     await kv.set(`booking:${bookingId}`, updatedBooking);
 
+    await logAuditEvent({
+      userId: user.id,
+      action: 'booking_cancelled',
+      category: 'bookings',
+      description: `Booking ${bookingId} cancelled by ${user.id === booking.tutorId ? 'tutor' : 'parent/student'} — refund: ${refundCalc.refundPercentage}%`,
+      metadata: { bookingId, cancelledBy: user.id, refundAmount: refundCalc.refundAmount, refundPercentage: refundCalc.refundPercentage },
+    });
+
     const dateLabel = formatSessionDate(booking.date);
     const timeOnly = String(booking.startTime).replace(/\s*WAT\s*$/i, '').trim();
     const timeLabel = `${timeOnly} WAT`;
@@ -766,6 +775,14 @@ app.post('/bookings/:bookingId/reschedule', async (c) => {
       }
       updated = await db.getBooking(bookingId);
     }
+
+    await logAuditEvent({
+      userId: user.id,
+      action: 'booking_rescheduled',
+      category: 'bookings',
+      description: `Booking ${bookingId} rescheduled by ${user.id === booking.tutorId ? 'tutor' : 'parent/student'}: ${oldDate} ${oldStartTime} → ${newDate} ${newStartTime}`,
+      metadata: { bookingId, rescheduledBy: user.id, oldDate, oldStartTime, newDate, newStartTime },
+    });
 
     const finalRecord = { ...booking, ...(updated || {}) };
     const dashboardBase =

@@ -2,6 +2,7 @@ import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
+import { logAuditEvent, ActivityCategory } from './activity-log.tsx';
 
 // Helper function to format timestamp
 function formatTimestamp(timestamp: string): string {
@@ -812,16 +813,14 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       await kv.set(`user:${targetUserId}`, user);
 
       // Create audit log
-      const auditId = `audit:${targetUserId}:${Date.now()}`;
-      await kv.set(auditId, {
-        id: auditId,
+      await logAuditEvent({
         userId: targetUserId,
         adminId,
         action: `status_changed_to_${status}`,
+        category: 'account',
         description: `User status changed to ${status}. Reason: ${reason}`,
-        timestamp: new Date().toISOString(),
         severity: status === 'banned' || status === 'suspended' ? 'warning' : 'info',
-        metadata: { status, reason }
+        metadata: { status, reason },
       });
 
       db.createAdminAuditLog({
@@ -868,16 +867,14 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       await kv.set(`user:${targetUserId}`, user);
 
       // Create audit log
-      const auditId = `audit:${targetUserId}:${Date.now()}`;
-      await kv.set(auditId, {
-        id: auditId,
+      await logAuditEvent({
         userId: targetUserId,
         adminId,
         action: '2fa_reset',
+        category: 'account',
         description: `2FA reset by admin. Reason: ${reason}`,
-        timestamp: new Date().toISOString(),
         severity: 'warning',
-        metadata: { reason }
+        metadata: { reason },
       });
 
       return c.json({ success: true, message: '2FA reset successfully' });
@@ -914,16 +911,14 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       await kv.set(`user:${targetUserId}`, user);
 
       // Create audit log
-      const auditId = `audit:${targetUserId}:${Date.now()}`;
-      await kv.set(auditId, {
-        id: auditId,
+      await logAuditEvent({
         userId: targetUserId,
         adminId,
         action: 'force_logout',
+        category: 'account',
         description: `User forced logout by admin. Reason: ${reason}`,
-        timestamp: new Date().toISOString(),
         severity: 'warning',
-        metadata: { reason }
+        metadata: { reason },
       });
 
       return c.json({ success: true, message: 'User logged out successfully' });
@@ -964,15 +959,13 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       });
 
       // Create audit log
-      const auditId = `audit:${targetUserId}:${Date.now()}`;
-      await kv.set(auditId, {
-        id: auditId,
+      await logAuditEvent({
         userId: targetUserId,
         adminId,
         action: 'impersonation_started',
+        category: 'account',
         description: `Admin started impersonation session`,
-        timestamp: new Date().toISOString(),
-        severity: 'warning'
+        severity: 'warning',
       });
 
       return c.json({ success: true, token });
@@ -1016,15 +1009,12 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       };
 
       // Create audit log
-      const auditId = `audit:${targetUserId}:${Date.now()}`;
-      await kv.set(auditId, {
-        id: auditId,
+      await logAuditEvent({
         userId: targetUserId,
         adminId,
         action: 'data_export',
+        category: 'account',
         description: `User data exported by admin`,
-        timestamp: new Date().toISOString(),
-        severity: 'info'
       });
 
       return c.json(exportData);
@@ -1295,6 +1285,14 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         createdAt: new Date().toISOString()
       });
 
+      await logAuditEvent({
+        userId,
+        action: 'moderation_keyword_added',
+        category: 'moderation',
+        description: `Moderation keyword added: "${keyword}" (${category}, ${severity})`,
+        metadata: { keywordId, keyword, category, severity, action },
+      });
+
       return c.json({ success: true, id: keywordId });
     } catch (error: any) {
       console.error('Error adding keyword:', error);
@@ -1324,6 +1322,14 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       keyword.enabled = enabled;
       await kv.set(keywordId, keyword);
 
+      await logAuditEvent({
+        userId,
+        action: 'moderation_keyword_updated',
+        category: 'moderation',
+        description: `Moderation keyword "${keyword.keyword}" ${enabled ? 'enabled' : 'disabled'}`,
+        metadata: { keywordId, keyword: keyword.keyword, enabled },
+      });
+
       return c.json({ success: true });
     } catch (error: any) {
       console.error('Error updating keyword:', error);
@@ -1342,7 +1348,16 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       const keywordId = c.req.param('keywordId');
+      const existingKeyword = await kv.get(keywordId) as any;
       await kv.del(keywordId);
+
+      await logAuditEvent({
+        userId,
+        action: 'moderation_keyword_deleted',
+        category: 'moderation',
+        description: `Moderation keyword deleted${existingKeyword ? `: "${existingKeyword.keyword}"` : ` (${keywordId})`}`,
+        metadata: { keywordId, keyword: existingKeyword?.keyword },
+      });
 
       return c.json({ success: true });
     } catch (error: any) {
@@ -1377,6 +1392,14 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         });
         ids.push(keywordId);
       }
+
+      await logAuditEvent({
+        userId,
+        action: 'moderation_keyword_bulk_added',
+        category: 'moderation',
+        description: `${ids.length} moderation keyword(s) added in bulk`,
+        metadata: { count: ids.length, keywordIds: ids },
+      });
 
       return c.json({ success: true, ids });
     } catch (error: any) {
@@ -1444,6 +1467,15 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       flag.slaCompliant = hoursToReview <= 24; // 24 hour SLA
 
       await kv.set(flagId, flag);
+
+      await logAuditEvent({
+        userId,
+        action: 'moderation_flag_reviewed',
+        category: 'moderation',
+        description: `Flagged content reviewed — action: ${action}${flag.slaCompliant ? '' : ' (SLA missed)'}`,
+        severity: flag.slaCompliant ? 'info' : 'warning',
+        metadata: { flagId, action, notes, hoursToReview: flag.hoursToReview },
+      });
 
       return c.json({ success: true });
     } catch (error: any) {
@@ -1667,6 +1699,15 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         updatedBy,
         timestamp: new Date().toISOString(),
         description: 'Policy configuration updated'
+      });
+
+      await logAuditEvent({
+        userId,
+        action: 'policy_config_updated',
+        category: 'content',
+        description: `Policy configuration updated by ${updatedBy || userId}`,
+        severity: 'warning',
+        metadata: { updatedBy },
       });
 
       return c.json({ success: true });
@@ -2008,16 +2049,13 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       await kv.set(notificationId, notification);
 
       // Create audit log
-      const auditId = `audit:${tutorId}:${Date.now()}`;
-      await kv.set(auditId, {
-        id: auditId,
+      await logAuditEvent({
         userId: tutorId,
         adminId,
         action: `verification_${action}`,
+        category: 'verification',
         description: `Tutor verification ${action === 'approve' ? 'approved' : 'rejected'} by admin`,
-        timestamp: new Date().toISOString(),
-        severity: 'info',
-        metadata: { action, rejectionReason }
+        metadata: { action, rejectionReason },
       });
 
       db.createAdminAuditLog({
@@ -2186,7 +2224,15 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
 
       console.log(`Admin resource uploaded: ${resourceId} by ${userId}`);
 
-      return c.json({ 
+      await logAuditEvent({
+        userId,
+        action: 'resource_uploaded',
+        category: 'content',
+        description: `Learning resource uploaded: "${resource.title}" (${gradeLevel}, ${subject})`,
+        metadata: { resourceId, title: resource.title, gradeLevel, subject, resourceType },
+      });
+
+      return c.json({
         success: true, 
         resource: {
           id: resource.id,
@@ -2217,10 +2263,19 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       const resourceId = c.req.param('resourceId');
-      
+      const existingResource = await kv.get(`admin_resource:${resourceId}`) as any;
+
       await kv.del(`admin_resource:${resourceId}`);
 
       console.log(`Admin resource deleted: ${resourceId} by ${userId}`);
+
+      await logAuditEvent({
+        userId,
+        action: 'resource_deleted',
+        category: 'content',
+        description: `Learning resource deleted${existingResource ? `: "${existingResource.title}"` : ` (${resourceId})`}`,
+        metadata: { resourceId, title: existingResource?.title },
+      });
 
       return c.json({ success: true });
     } catch (error: any) {
@@ -2329,21 +2384,31 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       if (!adminId) return c.json({ error: 'Unauthorized' }, 401);
 
       // Two audit trails exist: the Postgres admin_audit_log table (a handful
-      // of call sites) and a much larger set of KV `audit:<userId>:<ts>`
-      // entries written throughout the app (status changes, 2FA reset,
-      // force-logout, impersonation, account deletion, payouts, refunds...).
-      // Only the Postgres ones were ever surfaced here — the KV trail was
-      // write-only. Merge both into one feed.
+      // of call sites, no category field) and a much larger set of KV
+      // `audit:<userId>:<ts>` entries written throughout the app via
+      // logAuditEvent() (status changes, 2FA reset, force-logout,
+      // impersonation, account deletion, payouts, refunds, moderation,
+      // content, policy...). Only the Postgres ones were ever surfaced here —
+      // the KV trail was write-only. Merge both into one categorized feed.
       const [dbLogs, kvAuditEntries] = await Promise.all([
-        db.getAdminAuditLog(200),
+        db.getAdminAuditLog(500),
         kv.getByPrefix('audit:'),
       ]);
+
+      // Postgres entries predate the category field, so infer it from the
+      // action name for the handful of distinct actions written there.
+      const categoryForDbAction = (action: string): ActivityCategory => {
+        if (action.startsWith('tutor_verified') || action.startsWith('tutor_rejected')) return 'verification';
+        if (action.startsWith('payout_') || action.startsWith('payment_') || action.startsWith('refund_')) return 'payments';
+        return 'account';
+      };
 
       const kvLogs = (kvAuditEntries as any[]).map((entry) => ({
         id: entry.id,
         actorId: entry.adminId || entry.userId,
         actorEmail: null,
         action: entry.action,
+        category: (entry.category as ActivityCategory) || 'account',
         targetType: 'user',
         targetId: entry.userId,
         details: entry.metadata && Object.keys(entry.metadata).length > 0
@@ -2352,9 +2417,14 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         createdAt: entry.timestamp,
       }));
 
-      const logs = [...dbLogs, ...kvLogs]
+      const dbLogsWithCategory = dbLogs.map((log) => ({
+        ...log,
+        category: categoryForDbAction(log.action),
+      }));
+
+      const logs = [...dbLogsWithCategory, ...kvLogs]
         .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
-        .slice(0, 200);
+        .slice(0, 500);
 
       return c.json({ logs });
     } catch (err: any) {

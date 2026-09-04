@@ -4,6 +4,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 const app = new Hono();
 
 import { requireAdmin } from './route-auth.tsx';
+import { logAuditEvent } from './activity-log.tsx';
 
 const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
@@ -116,6 +117,14 @@ app.post('/upload', async (c) => {
       await supabase.storage.from(bucketName).remove([fileName]);
       return c.json({ error: `Failed to store curriculum metadata: ${kvError.message}` }, 500);
     }
+
+    await logAuditEvent({
+      userId: auth as string,
+      action: 'curriculum_uploaded',
+      category: 'content',
+      description: `Curriculum uploaded: "${curriculumData.title}" (${gradeLevel}, ${curriculumData.subject})`,
+      metadata: { curriculumId, title: curriculumData.title, gradeLevel, subject: curriculumData.subject },
+    });
 
     return c.json({
       success: true,
@@ -270,6 +279,14 @@ app.delete('/:curriculumId', async (c) => {
       console.error('KV deletion error:', kvError);
       return c.json({ error: `Failed to delete curriculum metadata: ${kvError.message}` }, 500);
     }
+
+    await logAuditEvent({
+      userId: auth as string,
+      action: 'curriculum_deleted',
+      category: 'content',
+      description: `Curriculum deleted: "${curriculum.title || curriculum.fileName}"`,
+      metadata: { curriculumId, title: curriculum.title },
+    });
 
     return c.json({
       success: true,

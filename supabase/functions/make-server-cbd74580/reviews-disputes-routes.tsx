@@ -2,6 +2,7 @@ import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { requireAdmin, requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
+import { logAuditEvent } from './activity-log.tsx';
 
 const app = new Hono();
 
@@ -304,6 +305,15 @@ app.patch('/reviews/:reviewId/resolve', async (c) => {
     review.resolved = true;
     review.resolvedAt = new Date().toISOString();
     await kv.set(`review:${reviewId}`, review);
+
+    await logAuditEvent({
+      userId: auth as string,
+      action: 'review_flag_resolved',
+      category: 'disputes',
+      description: `Flagged review resolved (${reviewId})`,
+      metadata: { reviewId },
+    });
+
     return c.json({ success: true, review });
   } catch (error) {
     return c.json({ error: 'Failed to resolve review', details: String(error) }, 500);
@@ -440,6 +450,15 @@ app.post('/disputes', async (c) => {
     await kv.set(`dispute:submittedAgainst:${submittedAgainst}:${disputeId}`, disputeId);
     await kv.set(`dispute:status:${dispute.status}:${disputeId}`, disputeId);
 
+    await logAuditEvent({
+      userId: submittedAgainst,
+      action: 'dispute_created',
+      category: 'disputes',
+      description: `Dispute filed against ${submittedAgainstRole || 'user'} — type: ${type}`,
+      severity: 'warning',
+      metadata: { disputeId, type, submittedBy, submittedAgainst, sessionId },
+    });
+
     return c.json({ success: true, dispute });
   } catch (error) {
     console.error('Error creating dispute:', error);
@@ -533,6 +552,17 @@ app.patch('/disputes/:disputeId', async (c) => {
     if (status && status !== oldStatus) {
       await kv.del(`dispute:status:${oldStatus}:${disputeId}`);
       await kv.set(`dispute:status:${status}:${disputeId}`, disputeId);
+    }
+
+    if (status && status !== oldStatus) {
+      await logAuditEvent({
+        userId: dispute.submittedAgainst || dispute.submittedBy,
+        adminId: auth as string,
+        action: status === 'resolved' || status === 'closed' ? 'dispute_resolved' : 'dispute_status_changed',
+        category: 'disputes',
+        description: `Dispute ${disputeId} ${oldStatus} → ${status}${outcome ? ` (outcome: ${outcome})` : ''}`,
+        metadata: { disputeId, oldStatus, newStatus: status, outcome, outcomeDetails },
+      });
     }
 
     return c.json({ success: true, dispute });

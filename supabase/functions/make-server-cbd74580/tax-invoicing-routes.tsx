@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import { requireAdmin, requireSelfOrAdmin, verifyUser, isAdmin } from './route-auth.tsx';
+import { logAuditEvent } from './activity-log.tsx';
 
 const app = new Hono();
 
@@ -254,6 +255,14 @@ app.post('/invoices/create', async (c) => {
 
     console.log(`Invoice ${invoice.invoiceNumber} created for user ${userId}. Total: £${total.toFixed(2)} (incl. ${vatRateInfo.rate}% VAT)`);
 
+    await logAuditEvent({
+      userId,
+      action: 'invoice_created',
+      category: 'tax',
+      description: `Invoice ${invoice.invoiceNumber} created — total £${total.toFixed(2)} (incl. ${vatRateInfo.rate}% VAT)`,
+      metadata: { invoiceId: invoice.id, invoiceNumber: invoice.invoiceNumber, total, tierId },
+    });
+
     return c.json({
       success: true,
       invoice
@@ -377,6 +386,15 @@ app.post('/invoices/:invoiceId/void', async (c) => {
     await kv.set(`invoice_${invoiceId}`, invoice);
 
     console.log(`Invoice ${invoice.invoiceNumber} voided: ${reason}`);
+
+    await logAuditEvent({
+      userId: invoice.userId,
+      adminId: auth as string,
+      action: 'invoice_voided',
+      category: 'tax',
+      description: `Invoice ${invoice.invoiceNumber} voided. Reason: ${reason}`,
+      metadata: { invoiceId, invoiceNumber: invoice.invoiceNumber, reason },
+    });
 
     return c.json({
       success: true,
@@ -523,6 +541,14 @@ app.post('/tax/reports/generate', async (c) => {
 
     console.log(`Tax report generated for ${startDate} to ${endDate}. Net revenue: £${netRevenue.toFixed(2)}`);
 
+    await logAuditEvent({
+      userId: adminId,
+      action: 'tax_report_generated',
+      category: 'tax',
+      description: `Tax report generated (${reportType}, ${startDate} to ${endDate}) — net revenue £${netRevenue.toFixed(2)}`,
+      metadata: { reportId: report.id, reportType, startDate, endDate, netRevenue },
+    });
+
     return c.json({
       success: true,
       report
@@ -612,6 +638,14 @@ app.post('/tax/export', async (c) => {
       csvHeaders.join(','),
       ...csvRows.map(row => row.map(cell => `"${cell}"`).join(','))
     ].join('\n');
+
+    await logAuditEvent({
+      userId: auth as string,
+      action: 'tax_export',
+      category: 'tax',
+      description: `Accounting data exported (${startDate} to ${endDate}) — ${invoices.length} invoice(s)`,
+      metadata: { startDate, endDate, recordCount: invoices.length },
+    });
 
     return c.json({
       success: true,

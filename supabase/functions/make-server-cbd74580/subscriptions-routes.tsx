@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import { requireSelfOrAdmin } from './route-auth.tsx';
+import { logAuditEvent } from './activity-log.tsx';
 
 const app = new Hono();
 
@@ -323,6 +324,14 @@ app.post('/subscription/upgrade', async (c) => {
     });
     await kv.set(historyKey, history);
 
+    await logAuditEvent({
+      userId: parentId,
+      action: 'subscription_upgraded',
+      category: 'subscriptions',
+      description: `Subscription upgraded: ${currentTier.name} → ${newTier.name} (pro-rata charge ₦${proRataCalculation.proRataCharge})`,
+      metadata: { fromTierId: currentTier.id, toTierId: newTier.id, proRataCharge: proRataCalculation.proRataCharge },
+    });
+
     return c.json({
       success: true,
       subscription: updatedSubscription,
@@ -402,6 +411,14 @@ app.post('/subscription/downgrade', async (c) => {
     });
     await kv.set(historyKey, history);
 
+    await logAuditEvent({
+      userId: parentId,
+      action: 'subscription_downgrade_scheduled',
+      category: 'subscriptions',
+      description: `Downgrade scheduled: ${currentTier.name} → ${newTier.name}, effective ${nextBillingDate.toLocaleDateString()}`,
+      metadata: { fromTierId: currentTier.id, toTierId: newTier.id, creditAmount: priceDifference, effectiveDate: nextBillingDate.toISOString() },
+    });
+
     return c.json({
       success: true,
       subscription: updatedSubscription,
@@ -461,6 +478,14 @@ app.post('/subscription/cancel', async (c) => {
       date: now.toISOString()
     });
     await kv.set(historyKey, history);
+
+    await logAuditEvent({
+      userId: parentId,
+      action: 'subscription_cancelled',
+      category: 'subscriptions',
+      description: `Subscription cancellation scheduled — effective ${nextBillingDate.toLocaleDateString()}. Reason: ${reason || 'not given'}`,
+      metadata: { tierId: currentSubscription.tierId, reason, feedback, effectiveDate: nextBillingDate.toISOString() },
+    });
 
     return c.json({
       success: true,
@@ -536,6 +561,14 @@ app.post('/subscription/reactivate', async (c) => {
       date: now.toISOString()
     });
     await kv.set(historyKey, history);
+
+    await logAuditEvent({
+      userId: parentId,
+      action: 'subscription_reactivated',
+      category: 'subscriptions',
+      description: `Subscription reactivated (${currentSubscription.tierName})`,
+      metadata: { tierId: currentSubscription.tierId },
+    });
 
     return c.json({
       success: true,
