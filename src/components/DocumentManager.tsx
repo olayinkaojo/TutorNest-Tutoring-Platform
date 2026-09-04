@@ -660,7 +660,8 @@ export function DocumentManager({ session, userId, userRole, childIds = [], chil
                       Download
                     </Button>
                     {doc.uploadedBy === userId &&
-                      String(doc.uploadedByRole || userRole).toLowerCase() === userRole && (
+                      String(doc.uploadedByRole || userRole).toLowerCase() === userRole &&
+                      userRole !== 'tutor' && (
                         <Button
                           type="button"
                           variant="ghost"

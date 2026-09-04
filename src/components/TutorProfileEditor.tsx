@@ -564,26 +564,6 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
     }
   };
 
-  const deleteCertificate = async (documentId: string, label: string) => {
-    if (!confirm(`Delete "${label}"? This action cannot be undone.`)) return;
-    try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/documents/${documentId}`,
-        { method: 'DELETE', headers: { 'Authorization': `Bearer ${session.access_token}` } }
-      );
-      if (response.ok) {
-        setCertificates(prev => prev.filter(d => d.id !== documentId));
-        toast.success('Document deleted');
-      } else {
-        const err = await response.json().catch(() => ({}));
-        toast.error(err.error || 'Failed to delete document');
-      }
-    } catch (error) {
-      console.error('Error deleting certificate:', error);
-      toast.error('Failed to delete document');
-    }
-  };
-
   useEffect(() => {
     if (currentProfile) {
       setFormData({
@@ -1334,9 +1314,6 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
                       </div>
                       <Button type="button" variant="ghost" size="sm" onClick={() => downloadCertificate(doc.id)} aria-label={`Download ${doc.title || doc.fileName}`}>
                         <Download className="w-4 h-4" />
-                      </Button>
-                      <Button type="button" variant="ghost" size="sm" className="text-red-600 hover:text-red-700 hover:bg-red-50" onClick={() => deleteCertificate(doc.id, doc.title || doc.fileName)} aria-label={`Delete ${doc.title || doc.fileName}`}>
-                        <X className="w-4 h-4" />
                       </Button>
                     </div>
                   ))}

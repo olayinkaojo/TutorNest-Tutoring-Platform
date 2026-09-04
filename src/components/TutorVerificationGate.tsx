@@ -9,7 +9,6 @@ import {
   Upload,
   FileText,
   Loader2,
-  X,
   ShieldCheck,
   LogOut,
 } from 'lucide-react';
@@ -183,15 +182,6 @@ export function TutorVerificationGate({ session, profile, onComplete, onSignOut 
     }
   };
 
-  const deleteDocument = async (id: string) => {
-    try {
-      const res = await fetch(`${BASE}/documents/${id}`, { method: 'DELETE', headers: authHeaders });
-      if (res.ok) setDocuments((prev) => prev.filter((d) => d.id !== id));
-    } catch (err) {
-      console.error('Gate delete error', err);
-    }
-  };
-
   const displayName = profile.full_name || profile.firstName || profile.name || 'there';
 
   if (checking) {
@@ -299,14 +289,6 @@ export function TutorVerificationGate({ session, profile, onComplete, onSignOut 
                     <p className="text-sm text-gray-800 truncate">{doc.title || doc.fileName}</p>
                     {doc.fileSize ? <p className="text-xs text-gray-400">{formatSize(doc.fileSize)}</p> : null}
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => deleteDocument(doc.id)}
-                    className="text-gray-400 hover:text-red-500"
-                    aria-label="Remove document"
-                  >
-                    <X className="w-4 h-4" />
-                  </button>
                 </div>
               ))}
             </div>

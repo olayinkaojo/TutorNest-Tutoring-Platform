@@ -511,9 +511,22 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         return c.json({ error: 'Document not found' }, 404);
       }
 
-      // Only the uploader can delete
-      if (document.uploadedBy !== userId) {
-        return c.json({ error: 'Unauthorized to delete this document' }, 403);
+      const callerProfile = await kv.get(`user:${userId}`) as any;
+      const callerIsAdmin = String(callerProfile?.role || '').toLowerCase() === 'admin';
+
+      if (!callerIsAdmin) {
+        // Only the uploader can delete their own document...
+        if (document.uploadedBy !== userId) {
+          return c.json({ error: 'Unauthorized to delete this document' }, 403);
+        }
+        // ...except tutors: documents they upload are kept for security and
+        // safeguarding reasons (e.g. resources shared with a student) and are
+        // not self-deletable. An admin can remove one if it's genuinely needed.
+        if (String(document.uploadedByRole || '').toLowerCase() === 'tutor') {
+          return c.json({
+            error: 'Tutors cannot delete uploaded documents. Contact an admin if this needs to be removed.',
+          }, 403);
+        }
       }
 
       // Delete from Supabase Storage

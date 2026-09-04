@@ -4,12 +4,15 @@ import * as kv from './kv_store.tsx';
 /**
  * Hard-deletes a user's own identity/account data.
  *
- * Scope is deliberate, not exhaustive: this removes the user's own profile,
- * role-specific profiles, verification record, connected-service tokens,
- * uploaded documents (KV metadata + the actual files in Storage), personal
- * notifications, and their Supabase Auth account.
+ * Scope is deliberate, not exhaustive: this removes the user's own login
+ * (Supabase Auth account), profile, role-specific profiles, connected-service
+ * tokens, payout/banking settings, and personal notifications.
  *
- * It does NOT touch bookings, payments/invoices, reviews, disputes, session
+ * It deliberately does NOT delete: documents, the verification record, or
+ * any audit/action log — kept for security and safeguarding purposes even
+ * after the account is gone (e.g. a tutor's uploaded ID/certificates, or the
+ * record of why a verification was rejected, may still matter later). It
+ * also does NOT touch bookings, payments/invoices, reviews, disputes, session
  * reports, or messages that reference this user. Those records legitimately
  * belong to (or involve) other real users too, and several are under
  * retention requirements the app's own privacy policy commits to (7yr
@@ -82,33 +85,23 @@ export const adminUserDeletionRoutes = (app: Hono, getUserId: Function, supabase
     });
 
     const deleted = {
-      documents: 0,
+      documentsRetained: 0,
       roleProfiles: 0,
       notifications: 0,
       authAccount: false,
     };
     const warnings: string[] = [];
 
-    // ── Uploaded documents: KV metadata + the actual Storage files ──────────
+    // ── Documents are intentionally NOT deleted — kept for security and ─────
+    // safeguarding purposes. Just count them so the admin can see what's
+    // still there.
     try {
       const allDocuments = await kv.getByPrefix('document:');
-      const ownDocuments = allDocuments.filter(
+      deleted.documentsRetained = allDocuments.filter(
         (d: any) => d.uploadedBy === targetUserId,
-      );
-      for (const doc of ownDocuments) {
-        if (doc.bucketName && doc.filePath) {
-          const { error: storageError } = await supabase.storage
-            .from(doc.bucketName)
-            .remove([doc.filePath]);
-          if (storageError) {
-            warnings.push(`Could not remove file for document ${doc.id}: ${storageError.message}`);
-          }
-        }
-        await kv.del(doc.id);
-        deleted.documents++;
-      }
+      ).length;
     } catch (err: any) {
-      warnings.push(`Document cleanup incomplete: ${err.message}`);
+      warnings.push(`Could not count retained documents: ${err.message}`);
     }
 
     // ── Role-specific profiles ───────────────────────────────────────────────
@@ -139,9 +132,11 @@ export const adminUserDeletionRoutes = (app: Hono, getUserId: Function, supabase
     }
 
     // ── Directly-keyed personal/account records ──────────────────────────────
+    // Note: verification:<id> is deliberately NOT included — it's the record
+    // of why a tutor was approved/rejected, kept for the same security reason
+    // documents are.
     const directKeys = [
       `user_roles:${targetUserId}`,
-      `verification:${targetUserId}`,
       `google_calendar_tokens:${targetUserId}`,
       `parent_children:${targetUserId}`,
       `payout_settings:${targetUserId}`,
