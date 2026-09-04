@@ -2327,7 +2327,35 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       const accessToken = c.req.header('Authorization')?.split(' ')[1];
       const adminId = await getUserId(accessToken ?? null);
       if (!adminId) return c.json({ error: 'Unauthorized' }, 401);
-      const logs = await db.getAdminAuditLog(200);
+
+      // Two audit trails exist: the Postgres admin_audit_log table (a handful
+      // of call sites) and a much larger set of KV `audit:<userId>:<ts>`
+      // entries written throughout the app (status changes, 2FA reset,
+      // force-logout, impersonation, account deletion, payouts, refunds...).
+      // Only the Postgres ones were ever surfaced here — the KV trail was
+      // write-only. Merge both into one feed.
+      const [dbLogs, kvAuditEntries] = await Promise.all([
+        db.getAdminAuditLog(200),
+        kv.getByPrefix('audit:'),
+      ]);
+
+      const kvLogs = (kvAuditEntries as any[]).map((entry) => ({
+        id: entry.id,
+        actorId: entry.adminId || entry.userId,
+        actorEmail: null,
+        action: entry.action,
+        targetType: 'user',
+        targetId: entry.userId,
+        details: entry.metadata && Object.keys(entry.metadata).length > 0
+          ? entry.metadata
+          : { description: entry.description },
+        createdAt: entry.timestamp,
+      }));
+
+      const logs = [...dbLogs, ...kvLogs]
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        .slice(0, 200);
+
       return c.json({ logs });
     } catch (err: any) {
       return c.json({ error: err.message || 'Internal server error' }, 500);

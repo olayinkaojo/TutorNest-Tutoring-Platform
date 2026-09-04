@@ -558,6 +558,19 @@ app.post('/tutors/payouts/request', async (c) => {
 
     await kv.set(`payout:${payoutId}`, payout);
 
+    // Audit log — a tutor moving money out of the platform is worth a record
+    // even before an admin acts on it.
+    const requestAuditId = `audit:${tutorId}:${Date.now()}`;
+    await kv.set(requestAuditId, {
+      id: requestAuditId,
+      userId: tutorId,
+      action: 'payout_requested',
+      description: `Payout requested: ${formatNaira(amount)} to account ending ${String(bankDetails.accountNumber).slice(-4)}`,
+      timestamp: new Date().toISOString(),
+      severity: 'info',
+      metadata: { payoutId, amount, bankCode: bankDetails.bankCode },
+    });
+
     // Update balance (move from available to pending payout)
     balance.availableBalance -= amount;
     balance.lastUpdated = new Date().toISOString();
@@ -652,8 +665,30 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
     payout.processedAt = new Date().toISOString();
     payout.reference = transferData.data.reference;
     payout.transferId = transferData.data.id;
-    payout.processedBy = user.userId || user.id;
+    const adminId = user.userId || user.id;
+    payout.processedBy = adminId;
     await kv.set(`payout:${payoutId}`, payout);
+
+    // Audit log — real money leaving the platform via an admin action is the
+    // single highest-value thing to have a record of.
+    const processAuditId = `audit:${payout.tutorId}:${Date.now()}`;
+    await kv.set(processAuditId, {
+      id: processAuditId,
+      userId: payout.tutorId,
+      adminId,
+      action: 'payout_processed',
+      description: `Payout of ${formatNaira(payout.amount)} processed to tutor ${payout.tutorId} via Flutterwave (ref: ${transferData.data.reference})`,
+      timestamp: new Date().toISOString(),
+      severity: 'info',
+      metadata: { payoutId, amount: payout.amount, reference: transferData.data.reference, transferId: transferData.data.id },
+    });
+    db.createAdminAuditLog({
+      actorId: adminId,
+      action: 'payout_processed',
+      targetType: 'payout',
+      targetId: payoutId,
+      details: { tutorId: payout.tutorId, amount: payout.amount, reference: transferData.data.reference },
+    }).catch(() => {});
 
     // Update tutor balance
     const balanceKey = `tutor_balance:${payout.tutorId}`;
@@ -1490,6 +1525,21 @@ app.post('/payments/:paymentId/refund', async (c) => {
     };
 
     await kv.set(`refund:${refundId}`, refund);
+
+    // Audit log. Note: this only records the *request* — there is currently
+    // no admin action anywhere that approves/processes a refund via
+    // Flutterwave, so a request stays status: 'pending' indefinitely. That's
+    // a real functional gap, not just a logging one.
+    const refundAuditId = `audit:${userId}:${Date.now()}`;
+    await kv.set(refundAuditId, {
+      id: refundAuditId,
+      userId,
+      action: 'refund_requested',
+      description: `Refund requested: ${formatNaira(refundAmount)} (${refundPercentage}%) for payment ${paymentId}. Reason: ${reason || 'Customer requested refund'}`,
+      timestamp: new Date().toISOString(),
+      severity: 'info',
+      metadata: { paymentId, refundId, amount: refundAmount, refundPercentage, reason },
+    });
 
     // Update payment with refund status
     const updatedPayment = {

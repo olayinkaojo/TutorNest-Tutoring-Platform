@@ -415,6 +415,19 @@ app.post('/tutors/payouts/request', async (c) => {
 
     await kv.set(`payout:${payoutId}`, payout);
 
+    // Audit log — a tutor moving money out of the platform is worth a record
+    // even before an admin acts on it.
+    const requestAuditId = `audit:${tutorId}:${Date.now()}`;
+    await kv.set(requestAuditId, {
+      id: requestAuditId,
+      userId: tutorId,
+      action: 'payout_requested',
+      description: `Payout requested: ₦${Number(amount).toLocaleString()} to account ending ${String(bankDetails.accountNumber).slice(-4)}`,
+      timestamp: new Date().toISOString(),
+      severity: 'info',
+      metadata: { payoutId, amount, bankCode: bankDetails.bankCode },
+    });
+
     // Update balance (move from available to pending payout)
     balance.availableBalance -= amount;
     balance.lastUpdated = new Date().toISOString();
@@ -509,8 +522,25 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
     payout.processedAt = new Date().toISOString();
     payout.reference = transferData.data.reference;
     payout.transferId = transferData.data.id;
-    payout.processedBy = user.userId || user.id;
+    const adminId = user.userId || user.id;
+    payout.processedBy = adminId;
     await kv.set(`payout:${payoutId}`, payout);
+
+    // Audit log — real money leaving the platform via an admin action is the
+    // single highest-value thing to have a record of.
+    const processAuditId = `audit:${payout.tutorId}:${Date.now()}`;
+    await kv.set(processAuditId, {
+      id: processAuditId,
+      userId: payout.tutorId,
+      adminId,
+      action: 'payout_processed',
+      description: `Payout of ₦${Number(payout.amount).toLocaleString()} processed to tutor ${payout.tutorId} via Flutterwave (ref: ${transferData.data.reference})`,
+      timestamp: new Date().toISOString(),
+      severity: 'info',
+      metadata: { payoutId, amount: payout.amount, reference: transferData.data.reference, transferId: transferData.data.id },
+    });
+    // Note: this mirror's db.tsx doesn't have createAdminAuditLog (the live
+    // db.tsx does) — see the deployed payment-routes.tsx for the full dual-log.
 
     // Update tutor balance
     const balanceKey = `tutor_balance:${payout.tutorId}`;
