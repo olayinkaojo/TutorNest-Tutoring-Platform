@@ -9,6 +9,11 @@ export const MESSAGING_BOOKING_STATUSES = new Set([
   'completed',
   'scheduled',
   'pending',
+  // A session marked not-attended is still evidence of a real, accepted
+  // booking between these two people — they may need to message about
+  // rescheduling or what happened. It just doesn't get earnings released
+  // (see processSessionAttendance in payment-routes.tsx).
+  'no_show',
 ]);
 
 export type MessagingChannel = 'parent-tutor' | 'tutor-parent' | 'tutor-student';

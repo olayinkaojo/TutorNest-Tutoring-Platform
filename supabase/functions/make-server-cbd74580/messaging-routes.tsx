@@ -323,8 +323,11 @@ export const messagingRoutes = (app: Hono, getUserId: Function) => {
         return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      // TODO: Verify admin role
-      
+      const adminProfile = ((await kv.get(`user:${userId}`)) as any) ?? (await db.getProfile(userId));
+      if (!adminProfile || adminProfile.role !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
       const allLogs = await kv.getByPrefix('message-log:');
       const allReportLogs = await kv.getByPrefix('message-report-log:');
 

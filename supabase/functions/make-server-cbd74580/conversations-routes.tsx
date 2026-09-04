@@ -1,5 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
+import { logAuditEvent } from './activity-log.tsx';
 import {
   buildConversationId,
   collectBookingsForUser,
@@ -8,6 +10,12 @@ import {
   isEligibleMessagingPair,
   type MessagingChannel,
 } from './messaging-access.tsx';
+
+async function requireAdminProfile(userId: string): Promise<any | null> {
+  const profile = ((await kv.get(`user:${userId}`)) as any) ?? (await db.getProfile(userId));
+  if (!profile || profile.role !== 'admin') return null;
+  return profile;
+}
 
 const MAX_MESSAGE_LENGTH = 8000;
 
@@ -381,6 +389,131 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
     } catch (error: unknown) {
       const err = error as { message?: string };
       console.error('Error reporting message:', error);
+      return c.json({ error: err.message || 'Internal server error' }, 500);
+    }
+  });
+
+  // ── Safeguarding: admin access to retained chat histories ─────────────────
+  // Messages are never deleted by any user-facing action in this file (report
+  // just flags one), so this is a full, permanent record. List view first —
+  // no message content here, just enough to find the right conversation.
+  app.get('/make-server-cbd74580/admin/conversations', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+      const admin = await requireAdminProfile(userId);
+      if (!admin) return c.json({ error: 'Admin access required' }, 403);
+
+      // Investigating a specific person (tutor/parent/student) is the primary
+      // safeguarding use case — pull every conversation they've been part of.
+      const filterUserId = c.req.query('userId') || '';
+
+      const [allConversations, allMessages] = await Promise.all([
+        kv.getByPrefix('conversation:'),
+        kv.getByPrefix('conv-message:'),
+      ]);
+
+      const filtered = filterUserId
+        ? allConversations.filter((conv: any) =>
+            (conv.participants as string[] | undefined)?.includes(filterUserId)
+          )
+        : allConversations;
+
+      const nameCache = new Map<string, string>();
+      const resolveName = async (id: string): Promise<string> => {
+        if (nameCache.has(id)) return nameCache.get(id)!;
+        const p = ((await kv.get(`user:${id}`)) as any) ?? (await db.getProfile(id).catch(() => null));
+        const name =
+          p?.fullName || p?.full_name || p?.name ||
+          (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
+          'Unknown';
+        nameCache.set(id, name);
+        return name;
+      };
+
+      const rows = await Promise.all(
+        (filtered as any[]).map(async (conv: any) => {
+          const convMessages = allMessages.filter((m: any) => m.conversationId === conv.id);
+          const flaggedCount = convMessages.filter((m: any) => m.reportedByUserId).length;
+          const lastMessage = [...convMessages].sort(
+            (a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()
+          )[0];
+          const participantIds: string[] = conv.participants || [];
+          const participants = await Promise.all(
+            participantIds.map(async (pid: string) => ({
+              id: pid,
+              name: conv.participantNames?.[pid] || (await resolveName(pid)),
+              role: conv.participantRoles?.[pid] || 'user',
+            }))
+          );
+
+          return {
+            id: conv.id,
+            channel: conv.channel || null,
+            participants,
+            messageCount: convMessages.length,
+            flaggedCount,
+            lastMessageAt: lastMessage?.createdAt || conv.updatedAt || conv.createdAt,
+            lastMessagePreview: lastMessage?.content ? String(lastMessage.content).slice(0, 140) : null,
+            createdAt: conv.createdAt,
+          };
+        })
+      );
+
+      rows.sort((a, b) => new Date(b.lastMessageAt || 0).getTime() - new Date(a.lastMessageAt || 0).getTime());
+
+      return c.json({ conversations: rows });
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      console.error('Error fetching admin conversations:', error);
+      return c.json({ error: err.message || 'Internal server error' }, 500);
+    }
+  });
+
+  // Full, unredacted transcript of one conversation — the sensitive read.
+  // Every access is audit-logged against BOTH participants (who, when, how
+  // many messages) rather than just fired silently: for safeguarding tooling,
+  // proof of *when the platform looked* is as important as the ability to
+  // look at all, and it means an admin can't quietly browse chats without a
+  // trace landing on the affected users' own audit history.
+  app.get('/make-server-cbd74580/admin/conversations/:conversationId/messages', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+      const admin = await requireAdminProfile(userId);
+      if (!admin) return c.json({ error: 'Admin access required' }, 403);
+
+      const conversationId = decodeURIComponent(c.req.param('conversationId'));
+      const conversation = (await kv.get(conversationId)) as Record<string, unknown> | null;
+      if (!conversation) return c.json({ error: 'Conversation not found' }, 404);
+
+      const allMessages = await kv.getByPrefix('conv-message:');
+      const messages = allMessages
+        .filter((m: any) => m.conversationId === conversationId)
+        .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+
+      const participantIds = (conversation.participants as string[] | undefined) || [];
+      const adminId = userId;
+      await Promise.all(
+        participantIds.map((pid) =>
+          logAuditEvent({
+            userId: pid,
+            adminId,
+            action: 'admin_viewed_chat_history',
+            category: 'moderation',
+            description: `Admin accessed the chat history of a conversation this user is part of (${messages.length} messages) — safeguarding/investigation access.`,
+            severity: 'warning',
+            metadata: { conversationId, messageCount: messages.length, participants: participantIds },
+          })
+        )
+      );
+
+      return c.json({ conversation, messages });
+    } catch (error: unknown) {
+      const err = error as { message?: string };
+      console.error('Error fetching admin conversation transcript:', error);
       return c.json({ error: err.message || 'Internal server error' }, 500);
     }
   });
