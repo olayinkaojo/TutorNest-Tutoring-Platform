@@ -191,23 +191,30 @@ app.post('/switch-role', async (c) => {
 
     // Get the profile for the target role
     const profileKey = `profile_${targetRole}_${userId}`;
-    const targetProfile = await kv.get(profileKey);
-    
+    const targetProfile = await kv.get(profileKey) as Record<string, unknown> | null;
+
     if (!targetProfile) {
       return c.json({ success: false, error: 'Profile not found for this role' }, 404);
     }
 
-    // IMPORTANT: Update the main user profile to reflect the active role
-    // This ensures that when the profile is fetched again (e.g., on tab focus),
-    // it returns the correct active role instead of reverting to the old role
-    await kv.set(`user:${userId}`, targetProfile);
+    // IMPORTANT: Merge the target role's fields into the existing user record —
+    // do NOT overwrite it wholesale. profile_<role>_<userId> is created from
+    // whatever the "add a role" flow sent (often just a couple of fields, e.g.
+    // { name: '', createdVia: 'add_role_feature' }), so replacing the canonical
+    // user:<userId> record with it used to wipe out email, firstName, lastName,
+    // photoUrl, and everything else on the account whenever a dual-role user
+    // switched roles. Merging keeps that identity data and only layers the
+    // target role's own fields (role, status, role-specific data) on top.
+    const existingUser = await kv.get(`user:${userId}`) as Record<string, unknown> | null;
+    const mergedProfile = { ...(existingUser ?? {}), ...targetProfile };
+    await kv.set(`user:${userId}`, mergedProfile);
 
     console.log(`User ${userId} switching to role: ${targetRole}`);
-    console.log('Updated main user profile with target role');
+    console.log('Merged target role profile into main user profile');
 
     return c.json({
       success: true,
-      profile: targetProfile,
+      profile: mergedProfile,
       message: `Switched to ${targetRole} role successfully`,
     });
   } catch (error) {
