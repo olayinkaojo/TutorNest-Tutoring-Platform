@@ -44,6 +44,7 @@ import { SystemAlertsPanel } from './SystemAlertsPanel';
 import { ChildProfileManagement } from './admin/ChildProfileManagement';
 import { AdminMetricsWidget } from './AdminMetricsWidget';
 import { AuditLogViewer } from './admin/AuditLogViewer';
+import { DocumentAuditTrail } from './admin/DocumentAuditTrail';
 import adminAPI from '../utils/admin-api-client';
 
 interface UserProfile {
@@ -399,6 +400,7 @@ export function AdminDashboard({
             <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
             <TabsTrigger value="auditlog">Audit Log</TabsTrigger>
+            <TabsTrigger value="documenttrail">Document Trail</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -532,6 +534,12 @@ export function AdminDashboard({
           <TabsContent value="auditlog">
             {session && (
               <AuditLogViewer accessToken={session.access_token} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="documenttrail">
+            {session && (
+              <DocumentAuditTrail accessToken={session.access_token} />
             )}
           </TabsContent>
 

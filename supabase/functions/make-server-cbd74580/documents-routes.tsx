@@ -358,6 +358,8 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
         allDocuments.map((doc: Record<string, unknown>) => userCanAccessDocument(doc, userId, userRole, childIds)),
       );
       let userDocuments = allDocuments.filter((_: unknown, i: number) => visibility[i]);
+      // Soft-deleted documents stay in the audit trail but disappear from normal lists
+      userDocuments = userDocuments.filter((doc: any) => doc.status !== 'deleted');
 
       // Apply filters
       if (documentType) {
@@ -457,6 +459,9 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       if (!userRole) {
         return c.json({ error: 'Admin access required' }, 403);
       }
+      if (document.status === 'deleted' && userRole !== 'admin') {
+        return c.json({ error: 'Document not found' }, 404);
+      }
       const childIds = await resolveChildIds(userId, userRole, c.req.query('childIds'));
       const hasAccess = await userCanAccessDocument(document, userId, userRole, childIds);
 
@@ -507,40 +512,30 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       const documentId = c.req.param('documentId');
       const document = await kv.get(documentId) as any;
 
-      if (!document) {
+      if (!document || document.status === 'deleted') {
         return c.json({ error: 'Document not found' }, 404);
       }
 
       const callerProfile = await kv.get(`user:${userId}`) as any;
       const callerIsAdmin = String(callerProfile?.role || '').toLowerCase() === 'admin';
 
-      if (!callerIsAdmin) {
-        // Only the uploader can delete their own document...
-        if (document.uploadedBy !== userId) {
-          return c.json({ error: 'Unauthorized to delete this document' }, 403);
-        }
-        // ...except tutors: documents they upload are kept for security and
-        // safeguarding reasons (e.g. resources shared with a student) and are
-        // not self-deletable. An admin can remove one if it's genuinely needed.
-        if (String(document.uploadedByRole || '').toLowerCase() === 'tutor') {
-          return c.json({
-            error: 'Tutors cannot delete uploaded documents. Contact an admin if this needs to be removed.',
-          }, 403);
-        }
+      // Only the uploader (or an admin) can delete a document.
+      if (!callerIsAdmin && document.uploadedBy !== userId) {
+        return c.json({ error: 'Unauthorized to delete this document' }, 403);
       }
 
-      // Delete from Supabase Storage
-      const { error: deleteError } = await supabase.storage
-        .from(document.bucketName)
-        .remove([document.filePath]);
-
-      if (deleteError) {
-        console.error('Error deleting from storage:', deleteError);
-        // Continue anyway to delete metadata
-      }
-
-      // Delete metadata
-      await kv.del(documentId);
+      // Soft delete: the file and metadata are kept for the document audit
+      // trail — a "deleted" document should still show up there with who
+      // uploaded/shared/deleted it and when, for security and safeguarding
+      // reasons. This only hides it from normal document lists and blocks
+      // further downloads by non-admins; an admin can still see and download
+      // it via the audit trail.
+      await kv.set(documentId, {
+        ...document,
+        status: 'deleted',
+        deletedAt: new Date().toISOString(),
+        deletedBy: userId,
+      });
 
       // Create audit log
       const logEntry = {
@@ -555,6 +550,113 @@ export const documentsRoutes = (app: Hono, getUserId: Function, supabase: any) =
       return c.json({ success: true });
     } catch (error: any) {
       console.error('Error deleting document:', error);
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
+  // Document exchange audit trail (admin only) — every upload, download, and
+  // deletion across the whole document store, with sender/recipient and
+  // document details resolved so it reads as a real activity log rather than
+  // raw KV rows. Soft-deleted documents are included on purpose: the point of
+  // this trail is that "deleting" a document doesn't erase the record of it.
+  app.get('/make-server-cbd74580/admin/documents/audit-trail', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+      const callerProfile = await kv.get(`user:${userId}`) as any;
+      if (String(callerProfile?.role || '').toLowerCase() !== 'admin') {
+        return c.json({ error: 'Admin access required' }, 403);
+      }
+
+      // Upload events are built straight from the document records below (richer
+      // than document-log:, which only has {documentId, userId, timestamp}).
+      const [allDocuments, downloadLogs, deleteLogs] = await Promise.all([
+        kv.getByPrefix('document:'),
+        kv.getByPrefix('document-download-log:'),
+        kv.getByPrefix('document-delete-log:'),
+      ]);
+
+      const docById = new Map<string, any>(allDocuments.map((d: any) => [d.id, d]));
+      const actorNameCache = new Map<string, string>();
+      const resolveActorName = async (actorId: string): Promise<string> => {
+        if (!actorId) return 'Unknown';
+        if (!actorNameCache.has(actorId)) {
+          actorNameCache.set(actorId, (await getProfileName(actorId)) || 'Unknown');
+        }
+        return actorNameCache.get(actorId)!;
+      };
+
+      type AuditEvent = {
+        id: string;
+        documentId: string;
+        documentTitle: string;
+        fileName: string;
+        documentType: string;
+        action: 'uploaded' | 'downloaded' | 'deleted';
+        actorName: string;
+        actorRole: string;
+        sender: string;
+        senderRole: string;
+        recipient: string;
+        recipientType: string;
+        timestamp: string;
+      };
+
+      const eventFromLog = async (
+        log: any,
+        action: 'uploaded' | 'downloaded' | 'deleted',
+      ): Promise<AuditEvent | null> => {
+        const doc = docById.get(log.documentId);
+        if (!doc) return null; // referenced document no longer exists at all
+        return {
+          id: log.id,
+          documentId: doc.id,
+          documentTitle: doc.title || doc.fileName || 'Untitled document',
+          fileName: doc.fileName || '',
+          documentType: doc.documentType || '',
+          action,
+          actorName: await resolveActorName(log.userId),
+          actorRole: log.userId === doc.uploadedBy ? doc.uploadedByRole : '',
+          sender: doc.uploadedByName || 'Unknown',
+          senderRole: doc.uploadedByRole || '',
+          recipient: doc.sharedWithId ? (doc.sharedWithName || 'Unknown') : '—',
+          recipientType: doc.sharedWithType || '',
+          timestamp: log.timestamp,
+        };
+      };
+
+      const uploadEvents: AuditEvent[] = allDocuments.map((doc: any) => ({
+        id: `${doc.id}-uploaded`,
+        documentId: doc.id,
+        documentTitle: doc.title || doc.fileName || 'Untitled document',
+        fileName: doc.fileName || '',
+        documentType: doc.documentType || '',
+        action: 'uploaded',
+        actorName: doc.uploadedByName || 'Unknown',
+        actorRole: doc.uploadedByRole || '',
+        sender: doc.uploadedByName || 'Unknown',
+        senderRole: doc.uploadedByRole || '',
+        recipient: doc.sharedWithId ? (doc.sharedWithName || 'Unknown') : '—',
+        recipientType: doc.sharedWithType || '',
+        timestamp: doc.createdAt,
+      }));
+
+      const [downloadEvents, deleteEvents] = await Promise.all([
+        Promise.all(downloadLogs.map((log: any) => eventFromLog(log, 'downloaded'))),
+        Promise.all(deleteLogs.map((log: any) => eventFromLog(log, 'deleted'))),
+      ]);
+
+      const events = [
+        ...uploadEvents,
+        ...downloadEvents.filter((e): e is AuditEvent => e !== null),
+        ...deleteEvents.filter((e): e is AuditEvent => e !== null),
+      ].sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+
+      return c.json({ events });
+    } catch (error: any) {
+      console.error('Error building document audit trail:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);
     }
   });
