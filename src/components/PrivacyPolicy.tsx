@@ -157,7 +157,7 @@ export function PrivacyPolicy() {
                 <li><strong>Account Information:</strong> Name, email address, password, phone number, profile photo</li>
                 <li><strong>Profile Information:</strong> Educational background, qualifications, teaching experience (tutors)</li>
                 <li><strong>Child Information:</strong> Names, ages, educational level, learning preferences, special educational needs (parents)</li>
-                <li><strong>Payment Information:</strong> Billing address, payment method details (processed securely via Stripe)</li>
+                <li><strong>Payment Information:</strong> Billing address, payment method details (processed securely via Flutterwave)</li>
                 <li><strong>Communications:</strong> Messages, session notes, support requests, feedback</li>
               </ul>
             </div>
@@ -177,7 +177,6 @@ export function PrivacyPolicy() {
               <ul className="text-gray-700 space-y-2 ml-4">
                 <li><strong>Identity Verification:</strong> DBS check results, qualification verification</li>
                 <li><strong>Payment Processors:</strong> Transaction status, payment disputes</li>
-                <li><strong>Analytics Providers:</strong> Aggregated usage statistics</li>
               </ul>
             </div>
           </div>
@@ -235,8 +234,9 @@ export function PrivacyPolicy() {
               tutor profiles are visible to parents during search
             </li>
             <li>
-              <strong>Service Providers:</strong> Payment processors (Stripe), video conferencing (Zoom),
-              email services (SendGrid), analytics (Google Analytics)
+              <strong>Service Providers:</strong> Payment processors (Flutterwave), video conferencing (Google Meet,
+              created via Google Calendar for tutors who connect it), email services (Resend), backend
+              infrastructure and file storage (Supabase)
             </li>
             <li>
               <strong>Legal Requirements:</strong> Law enforcement, regulators, courts when legally required
@@ -309,13 +309,14 @@ export function PrivacyPolicy() {
           <ul className="text-gray-700 space-y-2 ml-4">
             <li>• Adequacy decisions by the UK government or EU Commission</li>
             <li>• Standard Contractual Clauses (SCCs) approved by the ICO</li>
-            <li>• Privacy Shield certification (for US-based processors)</li>
+            <li>• EU-US Data Privacy Framework (DPF) certification (for eligible US-based processors)</li>
             <li>• Binding Corporate Rules for multinational companies</li>
           </ul>
           
           <p className="text-gray-700 mt-4">
-            <strong>Current international processors:</strong> Stripe (USA - Privacy Shield), Google Analytics
-            (USA - SCCs), AWS (Frankfurt, Germany - EEA)
+            <strong>Current international processors:</strong> Flutterwave (payments), Resend (email),
+            and Supabase (backend infrastructure and file storage) — see each provider's data processing
+            terms for the specific transfer safeguard they rely on.
           </p>
         </Card>
 
