@@ -53,6 +53,23 @@ tutorSearchRoutes.get('/search/tutors', async (c) => {
       user.role === 'tutor'
     );
 
+    // tutor.rating on the raw KV profile is never written by anything — real
+    // reviews update a separate cache (tutor:rating:<id>, see
+    // updateTutorRating in reviews-disputes-routes.tsx) that this endpoint
+    // never read. Every tutor showed whatever rating.rating happened to be
+    // seeded at signup (usually nothing, falling back to a flat "5.0"),
+    // completely disconnected from actual submitted reviews — overwrite it
+    // with the real number before anything below filters or sorts by it.
+    tutors = await Promise.all(tutors.map(async (tutor: any) => {
+      const tutorId = tutor.id ?? tutor.userId;
+      const stats = tutorId ? await kv.get(`tutor:rating:${tutorId}`) as any : null;
+      return {
+        ...tutor,
+        rating: stats ? stats.averageRating : null,
+        reviewCount: stats ? stats.totalReviews : 0,
+      };
+    }));
+
     // Apply filters
     if (keyword) {
       const keywordLower = keyword.toLowerCase();
@@ -131,10 +148,18 @@ tutorSearchRoutes.post('/search/recommendations', async (c) => {
 
     // Get all verified tutors
     const allUsers = await kv.getByPrefix('user:');
-    const tutors = allUsers.filter((user: any) =>
+    const verifiedTutors = allUsers.filter((user: any) =>
       user.role === 'tutor' &&
       user.verificationStatus === 'verified'
     );
+
+    // Same fix as /search/tutors — tutor.rating on the raw profile is never
+    // kept in sync with real reviews.
+    const tutors = await Promise.all(verifiedTutors.map(async (tutor: any) => {
+      const tutorId = tutor.id ?? tutor.userId;
+      const stats = tutorId ? await kv.get(`tutor:rating:${tutorId}`) as any : null;
+      return { ...tutor, rating: stats ? stats.averageRating : null, reviewCount: stats ? stats.totalReviews : 0 };
+    }));
 
     // Calculate match scores
     const scoredTutors = tutors.map((tutor: any) => {

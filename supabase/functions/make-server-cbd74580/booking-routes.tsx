@@ -4,6 +4,7 @@ import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 import { collectBookingsForUser } from './messaging-access.tsx';
 import { logAuditEvent } from './activity-log.tsx';
+import { releaseMaturedEarnings } from './payment-routes.tsx';
 
 const app = new Hono();
 
@@ -76,18 +77,41 @@ app.get('/bookings', async (c) => {
       totalSessions: (b.totalSessions ?? b.total_sessions) as number | undefined,
     });
 
+    // Release matured earnings (and flip 'confirmed' → 'completed') for
+    // whichever tutor(s) this call touches, before reading bookings back —
+    // otherwise a session that genuinely happened can sit at 'confirmed'
+    // forever from a parent's point of view, since nothing else in the app
+    // reliably visits a tutor's own balance screen to trigger the sweep
+    // (see releaseMaturedEarnings in payment-routes.tsx). This is exactly
+    // what silently broke "sessions awaiting review" — a parent can only
+    // rate a 'completed' session, and nothing was ever marking it that way
+    // from their side of the app.
+    const sweepTutor = (tutorId: string) =>
+      releaseMaturedEarnings(tutorId).catch((e: any) =>
+        console.warn(`GET /bookings: releaseMaturedEarnings(${tutorId}) failed (non-fatal):`, e.message)
+      );
+
     // Fetch bookings based on role context (role-specific filtering)
     let rawBookings: ReturnType<typeof normalizeBookingPayload>[];
     if (c.req.query('tutorId')) {
-      rawBookings = (await db.getBookingsByTutorId(c.req.query('tutorId')!)).map((row) =>
+      const tutorId = c.req.query('tutorId')!;
+      await sweepTutor(tutorId);
+      rawBookings = (await db.getBookingsByTutorId(tutorId)).map((row) =>
         normalizeBookingPayload(row as unknown as Record<string, unknown>)
       );
     } else if (c.req.query('studentId')) {
-      rawBookings = (await db.getBookingsByStudentId(c.req.query('studentId')!)).map((row) =>
+      const studentId = c.req.query('studentId')!;
+      const preSweep = await db.getBookingsByStudentId(studentId);
+      const tutorIds = [...new Set(preSweep.map((b) => b.tutorId).filter(Boolean))];
+      await Promise.all(tutorIds.map(sweepTutor));
+      rawBookings = (await db.getBookingsByStudentId(studentId)).map((row) =>
         normalizeBookingPayload(row as unknown as Record<string, unknown>)
       );
     } else {
       // Default + `?persona=`: include auth user AND linked child profile (bookings often use child id as student_id)
+      const preSweep = await collectBookingsForUser(user.id);
+      const tutorIds = [...new Set(preSweep.map((b: any) => b.tutorId ?? b.tutor_id).filter(Boolean))];
+      await Promise.all(tutorIds.map(sweepTutor));
       const merged = await collectBookingsForUser(user.id);
       rawBookings = merged.map((row) => normalizeBookingPayload(row));
     }
