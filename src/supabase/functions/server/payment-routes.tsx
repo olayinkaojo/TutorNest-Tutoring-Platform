@@ -434,7 +434,7 @@ app.post('/tutors/payouts/request', async (c) => {
   }
 });
 
-// Process payout (Admin only - initiates transfer via Paystack)
+// Process payout (Admin only - initiates transfer via Flutterwave)
 app.post('/admin/payouts/:payoutId/process', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
@@ -683,7 +683,7 @@ app.post('/payments/:paymentId/release', async (c) => {
 
 // ─── Plan-based payment: initialize ──────────────────────────────────────────
 // POST /payments/initiate-plan
-// Creates a payment record and returns a Paystack reference + access_code
+// Creates a payment record and returns a Flutterwave reference
 // for the inline popup. Does NOT require a pre-existing booking.
 app.post('/payments/initiate-plan', async (c) => {
   try {

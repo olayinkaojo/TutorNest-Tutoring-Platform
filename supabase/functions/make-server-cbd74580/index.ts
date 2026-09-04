@@ -49,7 +49,6 @@ import { tutorProfileRoutes } from './tutor-profile-routes.tsx';
 import { videoRoutes } from './video-routes.tsx';
 import { screenShareRoutes } from './screen-share-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
-import paymentPlansRoutes from './payment-plans-routes.tsx';
 import signupRoutes from './signup-routes.tsx';
 import { tutorSearchRoutes } from './tutor-search-routes.tsx';
 import { invitationRoutes } from './invitation-routes.tsx';
@@ -537,9 +536,6 @@ app.route('/make-server-cbd74580/tutor-session-reports', tutorSessionReportsRout
 
 // Register payment routes
 app.route('/make-server-cbd74580', paymentRoutes);
-
-// Register NEW payment plans routes (Trial, Weekly, Twice-Weekly)
-app.route('/make-server-cbd74580', paymentPlansRoutes);
 
 // Register live session routes
 app.route('/make-server-cbd74580', liveSessionRoutes);
