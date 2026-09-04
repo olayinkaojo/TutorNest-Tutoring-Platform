@@ -28,7 +28,7 @@ const POLICY_VERSIONS: PolicyVersion[] = [
     changes: [
       'Updated cookie policy with granular consent options',
       'Enhanced data subject rights information',
-      'Added information about AI-powered features',
+      'Added information about smart matching and recommendation features',
       'Clarified international data transfers'
     ],
     content: 'full-policy-v2'
@@ -136,7 +136,6 @@ export function PrivacyPolicy() {
           </div>
           <div className="text-gray-700 space-y-2">
             <p><strong>Company Name:</strong> Knowledge Fons Academy Ltd</p>
-            <p><strong>ICO Registration:</strong> ZA123456</p>
             <p><strong>Data Protection Officer:</strong> dpo@knowledgefonsacademy.com</p>
             <p><strong>Contact:</strong> privacy@knowledgefonsacademy.com</p>
           </div>
@@ -369,11 +368,7 @@ export function PrivacyPolicy() {
           
           <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
             <p className="text-sm text-blue-900">
-              To exercise your rights, visit our{' '}
-              <a href="/data-subject-rights" className="underline hover:text-blue-700">
-                Data Subject Rights page
-              </a>
-              {' '}or email{' '}
+              To exercise your rights, email{' '}
               <a href="mailto:dpo@knowledgefonsacademy.com" className="underline hover:text-blue-700">
                 dpo@knowledgefonsacademy.com
               </a>
@@ -394,12 +389,8 @@ export function PrivacyPolicy() {
           
           <ul className="text-gray-700 space-y-2 ml-4">
             <li>• SSL/TLS encryption for data in transit</li>
-            <li>• AES-256 encryption for data at rest</li>
-            <li>• Multi-factor authentication for account access</li>
+            <li>• Encryption at rest, provided by our infrastructure providers</li>
             <li>• Role-based access control with least privilege principle</li>
-            <li>• Regular security audits and penetration testing</li>
-            <li>• Employee training on data protection</li>
-            <li>• Incident response and breach notification procedures</li>
           </ul>
         </Card>
 
