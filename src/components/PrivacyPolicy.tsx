@@ -123,8 +123,10 @@ export function PrivacyPolicy() {
             safeguard your information when you use our online tutoring platform.
           </p>
           <p className="text-gray-700 leading-relaxed">
-            This policy complies with the UK General Data Protection Regulation (UK GDPR), the Data Protection
-            Act 2018, and other applicable data protection laws.
+            Knowledge Fons Academy Ltd is registered in Nigeria, and this policy is governed by the Nigeria
+            Data Protection Act 2023 (NDPA). We serve users across Nigeria, other African countries, and the
+            diaspora — for users based in the UK, EU, or elsewhere, we also aim to honour the data protection
+            principles of your local law where it applies to our processing of your information.
           </p>
         </Card>
 
@@ -173,7 +175,7 @@ export function PrivacyPolicy() {
             <div>
               <h3 className="text-lg font-medium mb-2">3. Information from Third Parties</h3>
               <ul className="text-gray-700 space-y-2 ml-4">
-                <li><strong>Identity Verification:</strong> DBS check results, qualification verification</li>
+                <li><strong>Identity Verification:</strong> Photo ID and qualification documents submitted for tutor verification</li>
                 <li><strong>Payment Processors:</strong> Transaction status, payment disputes</li>
               </ul>
             </div>
@@ -300,15 +302,16 @@ export function PrivacyPolicy() {
           </div>
           
           <p className="text-gray-700 mb-4">
-            Your data may be transferred to and processed in countries outside the UK and EEA. We ensure
-            appropriate safeguards are in place:
+            We serve users in Nigeria, other African countries, and the diaspora, so your data may be
+            transferred to and processed in countries outside Nigeria — by us or by the service providers
+            below. Where we do this, we rely on safeguards recognized under the NDPA and, where relevant,
+            your local law, such as:
           </p>
-          
+
           <ul className="text-gray-700 space-y-2 ml-4">
-            <li>• Adequacy decisions by the UK government or EU Commission</li>
-            <li>• Standard Contractual Clauses (SCCs) approved by the ICO</li>
-            <li>• EU-US Data Privacy Framework (DPF) certification (for eligible US-based processors)</li>
-            <li>• Binding Corporate Rules for multinational companies</li>
+            <li>• Adequacy determinations recognized by the Nigeria Data Protection Commission (NDPC)</li>
+            <li>• Contractual data protection safeguards with our service providers</li>
+            <li>• Your consent, where that is the applicable basis for the transfer</li>
           </ul>
           
           <p className="text-gray-700 mt-4">
@@ -333,7 +336,7 @@ export function PrivacyPolicy() {
             <li><strong>Active accounts:</strong> Duration of account + 12 months</li>
             <li><strong>Session recordings:</strong> 7-90 days (depending on subscription tier)</li>
             <li><strong>Payment records:</strong> 7 years (tax and accounting requirements)</li>
-            <li><strong>Dispute records:</strong> 6 years (UK contract law limitation period)</li>
+            <li><strong>Dispute records:</strong> 6 years (standard contract dispute limitation period)</li>
             <li><strong>Safeguarding records:</strong> Indefinite (child protection requirements)</li>
             <li><strong>Marketing consent:</strong> Until withdrawn or 2 years of inactivity</li>
           </ul>
@@ -349,9 +352,10 @@ export function PrivacyPolicy() {
             <Shield className="w-6 h-6 text-[#625d9c]" />
             <h2 className="text-2xl">Your Data Protection Rights</h2>
           </div>
-          
+
           <p className="text-gray-700 mb-4">
-            Under UK GDPR, you have the following rights:
+            Under the Nigeria Data Protection Act 2023 — and, where applicable, your local data protection
+            law — you have the following rights:
           </p>
           
           <ul className="text-gray-700 space-y-2 ml-4">
@@ -363,7 +367,7 @@ export function PrivacyPolicy() {
             <li><strong>Right to Object:</strong> Object to processing based on legitimate interests</li>
             <li><strong>Rights Related to Automated Decision-Making:</strong> Request human review</li>
             <li><strong>Right to Withdraw Consent:</strong> Withdraw consent for processing</li>
-            <li><strong>Right to Lodge a Complaint:</strong> Complain to the ICO</li>
+            <li><strong>Right to Lodge a Complaint:</strong> Complain to the Nigeria Data Protection Commission (NDPC), or the data protection authority in your own country</li>
           </ul>
           
           <div className="mt-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
@@ -405,10 +409,9 @@ export function PrivacyPolicy() {
           <ul className="text-gray-700 space-y-2 ml-4">
             <li>• Parental consent required for children under 13</li>
             <li>• Parent/guardian controls over messaging and file sharing</li>
-            <li>• All tutors undergo enhanced DBS checks</li>
+            <li>• All tutors submit photo ID and qualification documents, reviewed before they can teach</li>
             <li>• Safeguarding policies and procedures in place</li>
             <li>• Designated Safeguarding Lead available</li>
-            <li>• Compliance with Keeping Children Safe in Education guidance</li>
           </ul>
           
           <p className="text-gray-700 mt-4">
@@ -434,10 +437,13 @@ export function PrivacyPolicy() {
           
           <div className="mt-4 p-4 bg-gray-100 rounded-lg">
             <p className="text-sm text-gray-700">
-              <strong>Information Commissioner's Office (ICO):</strong><br />
-              If you're unhappy with how we handle your data, you can complain to the ICO:<br />
-              Website: <a href="https://ico.org.uk" className="text-[#625d9c] underline">ico.org.uk</a><br />
-              Phone: 0303 123 1113
+              <strong>Nigeria Data Protection Commission (NDPC):</strong><br />
+              If you're unhappy with how we handle your data, you can complain to the NDPC:<br />
+              Website: <a href="https://ndpc.gov.ng" className="text-[#625d9c] underline">ndpc.gov.ng</a><br />
+              Helpdesk: <a href="https://helpdesk.ndpc.gov.ng" className="text-[#625d9c] underline">helpdesk.ndpc.gov.ng</a>
+              <br /><br />
+              If you're based outside Nigeria, you may also be able to complain to the data protection
+              authority in your own country.
             </p>
           </div>
         </Card>

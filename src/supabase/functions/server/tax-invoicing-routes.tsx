@@ -389,10 +389,7 @@ app.get('/invoices/:invoiceId/download', async (c) => {
       ...invoice,
       companyInfo: {
         name: 'Knowledge Fons Academy Ltd',
-        address: '123 Education Street, London, UK',
-        vatNumber: 'GB123456789',
         email: 'billing@knowledgefonsacademy.com',
-        phone: '+44 20 1234 5678'
       },
       formattedDates: {
         issueDate: new Date(invoice.issueDate).toLocaleDateString('en-GB'),

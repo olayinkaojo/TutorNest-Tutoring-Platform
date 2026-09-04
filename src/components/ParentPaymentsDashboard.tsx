@@ -725,7 +725,7 @@ function generateInvoiceHTML(invoice: any, payment: Payment): string {
       <div class="meta-block">
         <h3>From</h3>
         <p><strong>${invoice.from?.name || 'Knowledge Fons Academy'}</strong></p>
-        <p class="muted">${invoice.from?.address || 'Lagos, Nigeria'}</p>
+        <p class="muted">${invoice.from?.address || 'Nigeria'}</p>
         <p class="muted">${invoice.from?.email || 'billing@knowledgefonsacademy.com'}</p>
       </div>
       <div class="meta-block" style="text-align:right">
