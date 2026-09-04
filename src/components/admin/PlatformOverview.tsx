@@ -45,6 +45,8 @@ import {
 interface PlatformOverviewProps {
   session: any;
   onTabChange?: (tab: string) => void;
+  /** Jumps to the Users tab pre-filtered by role and/or verification status. */
+  onNavigateUsers?: (role?: string, status?: string) => void;
 }
 
 interface OverviewMeta {
@@ -195,7 +197,7 @@ function OverviewSkeleton() {
   );
 }
 
-export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps) {
+export function PlatformOverview({ session, onTabChange, onNavigateUsers }: PlatformOverviewProps) {
   const [stats, setStats] = useState<PlatformStats | null>(null);
   const [meta, setMeta] = useState<OverviewMeta | null>(null);
   const [overviewLoading, setOverviewLoading] = useState(true);
@@ -594,7 +596,14 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
           </CardHeader>
           <CardContent>
             <div className="mb-4">
-              <div className="text-3xl font-bold tabular-nums tracking-tight">{stats.users.total.toLocaleString()}</div>
+              <button
+                type="button"
+                onClick={() => onNavigateUsers?.(undefined, undefined)}
+                disabled={!onNavigateUsers}
+                className="text-left rounded-md -mx-1 px-1 disabled:cursor-default enabled:hover:bg-violet-50/60 enabled:cursor-pointer transition-colors"
+              >
+                <div className="text-3xl font-bold tabular-nums tracking-tight">{stats.users.total.toLocaleString()}</div>
+              </button>
               <div className="mt-1 flex items-center gap-1 text-sm text-emerald-700">
                 <TrendingUp className="w-4 h-4 shrink-0" aria-hidden />
                 <span>+{stats.users.newThisMonth.toLocaleString()} new this month</span>
@@ -603,35 +612,27 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
                 Active today: <span className="font-medium text-foreground">{stats.users.activeToday.toLocaleString()}</span>
               </p>
             </div>
-            <dl className="space-y-2">
-              <div className="flex items-center justify-between text-sm">
-                <dt className="text-muted-foreground flex items-center gap-2">
-                  <Baby className="w-4 h-4 shrink-0" aria-hidden />
-                  Parents
-                </dt>
-                <dd className="font-semibold tabular-nums">{stats.users.parents.toLocaleString()}</dd>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <dt className="text-muted-foreground flex items-center gap-2">
-                  <BookOpen className="w-4 h-4 shrink-0" aria-hidden />
-                  Students
-                </dt>
-                <dd className="font-semibold tabular-nums">{stats.users.students.toLocaleString()}</dd>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <dt className="text-muted-foreground flex items-center gap-2">
-                  <GraduationCap className="w-4 h-4 shrink-0" aria-hidden />
-                  Tutors
-                </dt>
-                <dd className="font-semibold tabular-nums">{stats.users.tutors.toLocaleString()}</dd>
-              </div>
-              <div className="flex items-center justify-between text-sm">
-                <dt className="text-muted-foreground flex items-center gap-2">
-                  <Shield className="w-4 h-4 shrink-0" aria-hidden />
-                  Admins
-                </dt>
-                <dd className="font-semibold tabular-nums">{stats.users.admins.toLocaleString()}</dd>
-              </div>
+            <dl className="space-y-1">
+              {([
+                { label: 'Parents', role: 'parent', value: stats.users.parents, icon: Baby },
+                { label: 'Students', role: 'student', value: stats.users.students, icon: BookOpen },
+                { label: 'Tutors', role: 'tutor', value: stats.users.tutors, icon: GraduationCap },
+                { label: 'Admins', role: 'admin', value: stats.users.admins, icon: Shield },
+              ] as const).map(({ label, role, value, icon: Icon }) => (
+                <button
+                  type="button"
+                  key={role}
+                  onClick={() => onNavigateUsers?.(role, undefined)}
+                  disabled={!onNavigateUsers}
+                  className="flex w-full items-center justify-between rounded-md px-1 py-1 text-sm text-left disabled:cursor-default enabled:hover:bg-violet-50/60 enabled:cursor-pointer transition-colors"
+                >
+                  <dt className="text-muted-foreground flex items-center gap-2">
+                    <Icon className="w-4 h-4 shrink-0" aria-hidden />
+                    {label}
+                  </dt>
+                  <dd className="font-semibold tabular-nums">{value.toLocaleString()}</dd>
+                </button>
+              ))}
             </dl>
           </CardContent>
         </Card>
@@ -735,27 +736,42 @@ export function PlatformOverview({ session, onTabChange }: PlatformOverviewProps
             <CardDescription>Queue vs verified tutors</CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <div>
+            <button
+              type="button"
+              onClick={() => onNavigateUsers?.('tutor', 'pending')}
+              disabled={!onNavigateUsers}
+              className="block w-full text-left rounded-md px-1 -mx-1 disabled:cursor-default enabled:hover:bg-violet-50/60 enabled:cursor-pointer transition-colors"
+            >
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Pending review</span>
                 <Badge className="bg-amber-100 text-amber-900 border-amber-200">{stats.verification.pending}</Badge>
               </div>
               <Progress value={pctBar(stats.verification.pending, tutorDenom)} className="h-2" />
-            </div>
-            <div>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateUsers?.('tutor', 'verified')}
+              disabled={!onNavigateUsers}
+              className="block w-full text-left rounded-md px-1 -mx-1 disabled:cursor-default enabled:hover:bg-violet-50/60 enabled:cursor-pointer transition-colors"
+            >
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Verified</span>
                 <Badge className="bg-emerald-100 text-emerald-900 border-emerald-200">{stats.verification.verified}</Badge>
               </div>
               <Progress value={pctBar(stats.verification.verified, tutorDenom)} className="h-2 bg-muted [&>div]:bg-emerald-600" />
-            </div>
-            <div>
+            </button>
+            <button
+              type="button"
+              onClick={() => onNavigateUsers?.('tutor', 'rejected')}
+              disabled={!onNavigateUsers}
+              className="block w-full text-left rounded-md px-1 -mx-1 disabled:cursor-default enabled:hover:bg-violet-50/60 enabled:cursor-pointer transition-colors"
+            >
               <div className="mb-2 flex items-center justify-between text-sm">
                 <span className="text-muted-foreground">Rejected</span>
                 <Badge className="bg-red-100 text-red-900 border-red-200">{stats.verification.rejected}</Badge>
               </div>
               <Progress value={pctBar(stats.verification.rejected, tutorDenom)} className="h-2 bg-muted [&>div]:bg-red-500" />
-            </div>
+            </button>
           </CardContent>
         </Card>
 

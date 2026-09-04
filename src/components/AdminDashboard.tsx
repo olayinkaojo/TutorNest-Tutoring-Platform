@@ -42,7 +42,6 @@ import { AdminDashboardHealthCheck } from './AdminDashboardHealthCheck';
 import { PlatformOverview } from './admin/PlatformOverview';
 import { SystemAlertsPanel } from './SystemAlertsPanel';
 import { ChildProfileManagement } from './admin/ChildProfileManagement';
-import { AdminMetricsWidget } from './AdminMetricsWidget';
 import { AuditLogViewer } from './admin/AuditLogViewer';
 import { DocumentAuditTrail } from './admin/DocumentAuditTrail';
 import adminAPI from '../utils/admin-api-client';
@@ -86,6 +85,15 @@ export function AdminDashboard({
     unreadNotifications: 0
   });
   const [loadingStats, setLoadingStats] = useState(true);
+  // A dashboard total that represents a user count should drop the admin
+  // straight into the matching filtered Users list, not just the tab. The
+  // nonce forces the filter to re-apply even when the same card is clicked
+  // twice in a row with the Users tab already showing a different filter.
+  const [usersFilterRequest, setUsersFilterRequest] = useState<{ role?: string; status?: string; nonce: number } | null>(null);
+  const goToUsers = (role?: string, status?: string) => {
+    setUsersFilterRequest({ role, status, nonce: Date.now() });
+    setActiveTab('users');
+  };
 
   const validTabs = new Set([
     'overview',
@@ -319,7 +327,7 @@ export function AdminDashboard({
             {/* Stats Grid */}
             <div className="grid md:grid-cols-4 gap-4">
               <button
-                onClick={() => setActiveTab('users')}
+                onClick={() => goToUsers('tutor', 'verified')}
                 className="bg-purple-50 p-4 rounded-lg border border-purple-100 hover:border-purple-300 hover:shadow-md transition-all text-left w-full"
               >
                 <div className="flex items-center justify-between">
@@ -405,16 +413,13 @@ export function AdminDashboard({
 
           <TabsContent value="overview">
             <div className="space-y-6">
-              {/* Platform Metrics Widget */}
-              {session && (
-                <AdminMetricsWidget accessToken={session.access_token} />
-              )}
-
               {/* Health Check Tool */}
               {session && <AdminDashboardHealthCheck session={session} />}
 
               {/* Platform Overview with Key Metrics */}
-              {session && <PlatformOverview session={session} onTabChange={setActiveTab} />}
+              {session && (
+                <PlatformOverview session={session} onTabChange={setActiveTab} onNavigateUsers={goToUsers} />
+              )}
 
               {/* KV → Postgres migration (one-time, safe to re-run) */}
               {session && (
@@ -459,7 +464,7 @@ export function AdminDashboard({
 
           <TabsContent value="users">
             {session && (
-              <AdminUserManagement session={session} />
+              <AdminUserManagement session={session} filterRequest={usersFilterRequest} />
             )}
           </TabsContent>
 

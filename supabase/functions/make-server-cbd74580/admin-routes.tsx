@@ -92,7 +92,12 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         kv.getByPrefix('user:'),
         kv.getByPrefix('booking:'),
         kv.getByPrefix('payment:'),
-        kv.getByPrefix('alert:'),
+        // Real alerts (DBS/compliance, payment failures, flagged messages —
+        // see system-alerts-routes.tsx, messaging-routes.tsx) are stored
+        // under `system-alert:`, not `alert:`. That typo meant this always
+        // matched zero rows, so "Active Alerts" on the dashboard has been
+        // showing 0 no matter how many real alerts existed.
+        kv.getByPrefix('system-alert:'),
         kv.getByPrefix('notification:'),
         db.getAllBookingsForAdmin(year, month),
         db.getAllPaymentsForAdmin(year, month),
@@ -811,6 +816,13 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       user.statusUpdatedBy = adminId;
 
       await kv.set(`user:${targetUserId}`, user);
+
+      // Same staleness risk as verification status (see the review endpoint
+      // above) — keep the DB profiles copy in sync so any DB-precedence
+      // merge elsewhere doesn't show a suspended/banned user as active.
+      await db.upsertProfile(targetUserId, user).catch((e: any) =>
+        console.warn('Failed to mirror status change to profiles table (non-fatal):', e.message)
+      );
 
       // Create audit log
       await logAuditEvent({
@@ -2003,6 +2015,18 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       await kv.set(`user:${tutorId}`, tutor);
+
+      // Mirror into the Postgres profiles table too. platform-overview's
+      // verifiedTutors/tutorVerificationRate figures read from a merged user
+      // list that prefers the DB profile when one exists — every signup
+      // dual-writes one (see signup-routes.tsx) — but this endpoint used to
+      // only ever update KV, so that DB copy's verificationStatus stayed
+      // frozen at whatever it was at signup (never 'verified'/'rejected')
+      // forever. Verified tutors were silently undercounted on the overview
+      // dashboard even though the approval itself worked correctly.
+      await db.upsertProfile(tutorId, tutor).catch((e: any) =>
+        console.warn('Failed to mirror verification status to profiles table (non-fatal):', e.message)
+      );
 
       // Keep the role-specific profile in sync so that switching roles doesn't
       // revert the verification status back to 'pending'.

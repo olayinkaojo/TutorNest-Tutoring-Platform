@@ -51,6 +51,11 @@ import { Textarea } from './ui/textarea';
 
 interface AdminUserManagementProps {
   session: any;
+  /** Set by a clickable dashboard total (e.g. AdminDashboard's "Active Tutors"
+   * card, or PlatformOverview's Users/Verification breakdowns) to jump straight
+   * into a filtered view. `nonce` changes on every request so the same target
+   * filter re-applies even if the admin had since changed it locally. */
+  filterRequest?: { role?: string; status?: string; nonce: number } | null;
 }
 
 function getUserDisplayName(user: any): string {
@@ -172,7 +177,7 @@ function SectionCard({ title, icon: Icon, children }: { title: string; icon: any
   );
 }
 
-export function AdminUserManagement({ session }: AdminUserManagementProps) {
+export function AdminUserManagement({ session, filterRequest }: AdminUserManagementProps) {
   const [users, setUsers] = useState<any[]>([]);
   const [filteredUsers, setFilteredUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -249,6 +254,13 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
   }, []);
 
   useEffect(() => {
+    if (!filterRequest) return;
+    setRoleFilter(filterRequest.role || 'all');
+    setStatusFilter(filterRequest.status || 'all');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- re-apply on every request, not just value changes
+  }, [filterRequest?.nonce]);
+
+  useEffect(() => {
     filterUsers();
   }, [searchQuery, roleFilter, statusFilter, users]);
 
@@ -299,6 +311,7 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
       filtered = filtered.filter(user => {
         if (statusFilter === 'verified') return user.verificationStatus === 'verified';
         if (statusFilter === 'pending') return user.verificationStatus === 'pending';
+        if (statusFilter === 'rejected') return user.verificationStatus === 'rejected';
         if (statusFilter === 'suspended') return user.suspended === true;
         return true;
       });
@@ -696,6 +709,7 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
                 <SelectItem value="all">All Status</SelectItem>
                 <SelectItem value="verified">Verified</SelectItem>
                 <SelectItem value="pending">Pending</SelectItem>
+                <SelectItem value="rejected">Rejected</SelectItem>
                 <SelectItem value="suspended">Suspended</SelectItem>
               </SelectContent>
             </Select>
