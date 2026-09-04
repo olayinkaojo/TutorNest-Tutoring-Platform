@@ -74,6 +74,48 @@ async function getUserFromToken(accessToken: string | undefined): Promise<any | 
   return null;
 }
 
+// Plan-based bookings credit a tutor's ENTIRE plan earnings to pending_balance
+// up front (see confirmPlanPayment), but nothing ever moved that money to
+// available_balance — there's no cron here, and the one endpoint that did the
+// pending→available move (/sessions/:id/end) is wired to a component nothing
+// in the live app renders. Sessions were paid for and taught, but a tutor's
+// earnings from them could never become withdrawable.
+//
+// This runs lazily (called wherever a tutor's balance/payout eligibility is
+// checked) instead of on a schedule: once a booking's session time has
+// passed, its per-session share of the plan is released and the booking is
+// marked 'completed'. Idempotent — a booking only gets processed once,
+// because the status flip out of 'confirmed' is what excludes it next time.
+async function releaseMaturedEarnings(tutorId: string): Promise<void> {
+  let bookings: any[];
+  try {
+    bookings = await db.getBookingsByTutorId(tutorId);
+  } catch (e: any) {
+    console.warn('releaseMaturedEarnings: failed to fetch bookings (non-fatal):', e.message);
+    return;
+  }
+
+  const now = Date.now();
+  for (const booking of bookings) {
+    if (booking.status !== 'confirmed' || booking.paymentStatus !== 'paid') continue;
+    if (!booking.planType || !booking.totalSessions) continue;
+
+    const plan = PAYMENT_PLANS[booking.planType];
+    if (!plan) continue;
+
+    const endDateTime = new Date(`${booking.date}T${booking.endTime}:00+01:00`).getTime();
+    if (Number.isNaN(endDateTime) || endDateTime > now) continue;
+
+    const perSessionTutorAmount = (plan.price * 0.8) / booking.totalSessions;
+    try {
+      await db.releaseTutorBalance(tutorId, perSessionTutorAmount);
+      await db.updateBookingStatus(booking.id, 'completed');
+    } catch (e: any) {
+      console.warn(`releaseMaturedEarnings: failed for booking ${booking.id} (non-fatal):`, e.message);
+    }
+  }
+}
+
 // Validate payment initialization body
 function validatePaymentInit(body: Record<string, unknown>): string | null {
   const { bookingId, tutorId, amount, email } = body;
@@ -461,7 +503,9 @@ app.get('/payments/history', async (c) => {
   }
 });
 
-// Get tutor balance and earnings
+// Get tutor balance and earnings — single source of truth is the Postgres
+// tutor_balance table (see releaseMaturedEarnings above for why this can't
+// just read a KV mirror anymore).
 app.get('/tutors/balance', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
@@ -475,35 +519,23 @@ app.get('/tutors/balance', async (c) => {
     }
 
     const tutorId = user.userId || user.id;
-    const balanceKey = `tutor_balance:${tutorId}`;
-    let balance = await kv.get(balanceKey) as any;
 
-    if (!balance) {
-      balance = {
-        tutorId,
-        pendingBalance: 0,
-        availableBalance: 0,
-        totalEarnings: 0,
-        totalPayouts: 0,
-        lastUpdated: new Date().toISOString(),
-      };
-    }
+    await releaseMaturedEarnings(tutorId);
 
-    // Get earnings history
-    const allEarnings = await kv.getByPrefix('earning:');
-    const tutorEarnings = allEarnings
-      .filter((e: any) => e.tutorId === tutorId)
-      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const dbBalance = await db.getTutorBalance(tutorId);
+    const balance = {
+      tutorId,
+      pendingBalance: dbBalance.pending_balance,
+      availableBalance: dbBalance.available_balance,
+      totalEarnings: dbBalance.total_earnings,
+      totalPayouts: dbBalance.total_payouts,
+    };
 
-    // Get payout history
-    const allPayouts = await kv.getByPrefix('payout:');
-    const tutorPayouts = allPayouts
-      .filter((p: any) => p.tutorId === tutorId)
-      .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+    const tutorPayouts = await db.listPayoutsByTutor(tutorId);
 
     return c.json({
       balance,
-      earnings: tutorEarnings,
+      earnings: [], // per-booking ledger not tracked separately — totals live on `balance`
       payouts: tutorPayouts,
     });
   } catch (error: any) {
@@ -537,27 +569,19 @@ app.post('/tutors/payouts/request', async (c) => {
     }
 
     const tutorId = user.userId || user.id;
-    const balanceKey = `tutor_balance:${tutorId}`;
-    const balance = await kv.get(balanceKey) as any;
 
-    if (!balance || balance.availableBalance < amount) {
-      return c.json({ error: 'Insufficient available balance' }, 400);
+    await releaseMaturedEarnings(tutorId);
+
+    // Reserves the amount out of available_balance atomically-enough for this
+    // scale, and throws if there isn't enough — no separate balance check
+    // needed before this.
+    try {
+      await db.reserveTutorBalanceForPayout(tutorId, amount);
+    } catch (e: any) {
+      return c.json({ error: e.message || 'Insufficient available balance' }, 400);
     }
 
-    // Create payout request
-    const payoutId = `payout_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    const payout = {
-      id: payoutId,
-      tutorId,
-      amount,
-      bankDetails,
-      status: 'pending',
-      requestedAt: new Date().toISOString(),
-      processedAt: null,
-      reference: null,
-    };
-
-    await kv.set(`payout:${payoutId}`, payout);
+    const payout = await db.createPayout({ tutorId, amount, bankDetails });
 
     // Audit log — a tutor moving money out of the platform is worth a record
     // even before an admin acts on it.
@@ -566,18 +590,13 @@ app.post('/tutors/payouts/request', async (c) => {
       action: 'payout_requested',
       category: 'payments',
       description: `Payout requested: ${formatNaira(amount)} to account ending ${String(bankDetails.accountNumber).slice(-4)}`,
-      metadata: { payoutId, amount, bankCode: bankDetails.bankCode },
+      metadata: { payoutId: payout.id, amount, bankCode: bankDetails.bankCode },
     });
-
-    // Update balance (move from available to pending payout)
-    balance.availableBalance -= amount;
-    balance.lastUpdated = new Date().toISOString();
-    await kv.set(balanceKey, balance);
 
     return c.json({
       success: true,
       payout: {
-        id: payoutId,
+        id: payout.id,
         amount,
         status: 'pending',
       },
@@ -602,7 +621,7 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
     }
 
     const payoutId = c.req.param('payoutId');
-    const payout = await kv.get(`payout:${payoutId}`) as any;
+    const payout = await db.getPayout(payoutId);
 
     if (!payout) {
       return c.json({ error: 'Payout not found' }, 404);
@@ -612,6 +631,8 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
       return c.json({ error: 'Payout already processed' }, 400);
     }
 
+    const bankDetails = payout.bankDetails as any;
+
     // Create transfer recipient on Flutterwave
     const recipientResponse = await fetch('https://api.flutterwave.com/v3/beneficiaries', {
       method: 'POST',
@@ -620,9 +641,9 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        account_number: payout.bankDetails.accountNumber,
-        account_bank: payout.bankDetails.bankCode,
-        beneficiary_name: payout.bankDetails.accountName || 'Tutor',
+        account_number: bankDetails.accountNumber,
+        account_bank: bankDetails.bankCode,
+        beneficiary_name: bankDetails.accountName || 'Tutor',
       }),
     });
 
@@ -641,13 +662,13 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        account_bank: payout.bankDetails.bankCode,
-        account_number: payout.bankDetails.accountNumber,
+        account_bank: bankDetails.bankCode,
+        account_number: bankDetails.accountNumber,
         amount: payout.amount,
         narration: `Knowledge Fons Academy payout - ${payoutId}`,
         currency: 'NGN',
         reference: `PAYOUT_${payoutId}_${Date.now()}`,
-        beneficiary_name: payout.bankDetails.accountName || 'Tutor',
+        beneficiary_name: bankDetails.accountName || 'Tutor',
       }),
     });
 
@@ -655,17 +676,20 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
 
     if (transferData.status !== 'success') {
       console.error('Failed to initiate transfer:', transferData);
+      // Give the reserved funds back — the attempt failed before any money moved.
+      await db.refundTutorReservedBalance(payout.tutorId, payout.amount).catch(() => {});
+      await db.updatePayout(payoutId, { status: 'failed' });
       return c.json({ error: 'Failed to initiate transfer', details: transferData.message }, 500);
     }
 
-    // Update payout status
-    payout.status = 'processing';
-    payout.processedAt = new Date().toISOString();
-    payout.reference = transferData.data.reference;
-    payout.transferId = transferData.data.id;
     const adminId = user.userId || user.id;
-    payout.processedBy = adminId;
-    await kv.set(`payout:${payoutId}`, payout);
+    await db.updatePayout(payoutId, {
+      status: 'processing',
+      reference: transferData.data.reference,
+      transferId: String(transferData.data.id),
+      processedBy: adminId,
+      processedAt: new Date().toISOString(),
+    });
 
     // Audit log — real money leaving the platform via an admin action is the
     // single highest-value thing to have a record of.
@@ -685,25 +709,8 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
       details: { tutorId: payout.tutorId, amount: payout.amount, reference: transferData.data.reference },
     }).catch(() => {});
 
-    // Update tutor balance
-    const balanceKey = `tutor_balance:${payout.tutorId}`;
-    const balance = await kv.get(balanceKey) as any;
-    if (balance) {
-      balance.totalPayouts = (balance.totalPayouts || 0) + payout.amount;
-      balance.lastUpdated = new Date().toISOString();
-      await kv.set(balanceKey, balance);
-    }
-
-    // Update earnings status
-    const allEarnings = await kv.getByPrefix('earning:');
-    const tutorEarnings = allEarnings.filter((e: any) => e.tutorId === payout.tutorId && e.status === 'pending');
-    
-    for (const earning of tutorEarnings) {
-      earning.status = 'paid';
-      earning.payoutId = payoutId;
-      earning.paidAt = new Date().toISOString();
-      await kv.set(`earning:${earning.id}`, earning);
-    }
+    // Finalize: the reserved amount is now actually out the door.
+    await db.finalizeTutorPayout(payout.tutorId, payout.amount);
 
     return c.json({
       success: true,
@@ -716,6 +723,71 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
   } catch (error: any) {
     console.error('Error processing payout:', error);
     return c.json({ error: error.message || 'Failed to process payout' }, 500);
+  }
+});
+
+// Reject payout (Admin only) — e.g. invalid bank details. Returns the
+// reserved amount to the tutor's available balance rather than leaving it stuck.
+app.post('/admin/payouts/:payoutId/reject', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const user = await getUserFromToken(accessToken);
+    if (!user || user.role !== 'admin') {
+      return c.json({ error: 'Unauthorized - Admins only' }, 403);
+    }
+
+    const payoutId = c.req.param('payoutId');
+    const body = await c.req.json().catch(() => ({}));
+    const reason = typeof body?.reason === 'string' && body.reason.trim() ? body.reason.trim() : 'No reason provided';
+
+    const payout = await db.getPayout(payoutId);
+    if (!payout) {
+      return c.json({ error: 'Payout not found' }, 404);
+    }
+    if (payout.status !== 'pending') {
+      return c.json({ error: 'Payout already processed' }, 400);
+    }
+
+    const adminId = user.userId || user.id;
+    await db.updatePayout(payoutId, {
+      status: 'rejected',
+      processedBy: adminId,
+      processedAt: new Date().toISOString(),
+    });
+
+    await db.refundTutorReservedBalance(payout.tutorId, payout.amount);
+
+    await logAuditEvent({
+      userId: payout.tutorId,
+      adminId,
+      action: 'payout_rejected',
+      category: 'payments',
+      description: `Payout request of ${formatNaira(payout.amount)} rejected: ${reason}`,
+      metadata: { payoutId, amount: payout.amount, reason },
+    });
+    db.createAdminAuditLog({
+      actorId: adminId,
+      action: 'payout_rejected',
+      targetType: 'payout',
+      targetId: payoutId,
+      details: { tutorId: payout.tutorId, amount: payout.amount, reason },
+    }).catch(() => {});
+
+    await db.createNotification({
+      userId: payout.tutorId,
+      type: 'payout_rejected',
+      title: 'Payout Rejected',
+      message: `Your payout request of ${formatNaira(payout.amount)} was rejected: ${reason}`,
+    }).catch(() => {});
+
+    return c.json({ success: true, payout: { id: payoutId, status: 'rejected' } });
+  } catch (error: any) {
+    console.error('Error rejecting payout:', error);
+    return c.json({ error: error.message || 'Failed to reject payout' }, 500);
   }
 });
 
@@ -732,14 +804,10 @@ app.get('/admin/payouts', async (c) => {
       return c.json({ error: 'Unauthorized - Admins only' }, 403);
     }
 
-    const allPayouts = await kv.getByPrefix('payout:');
-    
-    // Sort by date (newest first)
-    const sortedPayouts = allPayouts.sort((a: any, b: any) => 
-      new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()
-    );
+    const status = c.req.query('status') || undefined;
+    const payouts = await db.listAllPayouts(status);
 
-    return c.json({ payouts: sortedPayouts });
+    return c.json({ payouts });
   } catch (error: any) {
     console.error('Error fetching payouts:', error);
     return c.json({ error: error.message || 'Failed to fetch payouts' }, 500);
@@ -1526,6 +1594,8 @@ app.post('/payments/:paymentId/refund', async (c) => {
       id: refundId,
       paymentId,
       userId,
+      tutorId: payment.tutorId,
+      isDbPayment,
       amount: refundAmount,
       refundPercentage,
       reason: reason || 'Customer requested refund',
@@ -1761,13 +1831,61 @@ app.post('/admin/refunds/:refundId/process', async (c) => {
       await kv.set(`payment:${refund.paymentId}`, kvPayment);
     }
 
+    // DB-based (plan) payments never had their status flipped on refund —
+    // they kept counting as revenue in dashboard-stats forever. The `payments`
+    // table already has a status column; no migration needed.
+    if (refund.isDbPayment) {
+      await db.updatePayment(refund.paymentId, { status: 'refunded' }).catch((e: any) =>
+        console.warn('Failed to flip DB payment status to refunded (non-fatal):', e.message)
+      );
+    }
+
+    // Claw back the tutor's share of the refunded amount from their balance —
+    // pending first, then available. Whatever can't be recovered that way
+    // (already reserved for/paid out in a completed payout) is flagged for
+    // manual admin review rather than silently written off or left untouched.
+    let clawback: { deductedFromPending: number; deductedFromAvailable: number; shortfall: number } | null = null;
+    if (refund.tutorId) {
+      const tutorShare = refund.amount * 0.8;
+      try {
+        clawback = await db.deductTutorBalanceForRefund(refund.tutorId, tutorShare);
+      } catch (e: any) {
+        console.warn('Tutor balance clawback failed (non-fatal, flagging for review):', e.message);
+        clawback = { deductedFromPending: 0, deductedFromAvailable: 0, shortfall: tutorShare };
+      }
+
+      if (clawback.shortfall > 0) {
+        const reviewId = `${refund.tutorId}:${Date.now()}`;
+        await kv.set(`balance_review:${reviewId}`, {
+          id: reviewId,
+          tutorId: refund.tutorId,
+          refundId,
+          paymentId: refund.paymentId,
+          shortfallAmount: clawback.shortfall,
+          reason: `Refund of ${formatNaira(refund.amount)} processed, but only ${formatNaira(clawback.deductedFromPending + clawback.deductedFromAvailable)} of the tutor's ${formatNaira(tutorShare)} share could be recovered from pending/available balance. The remaining ${formatNaira(clawback.shortfall)} may already have been paid out to the tutor's bank account.`,
+          status: 'open',
+          createdAt: new Date().toISOString(),
+        });
+
+        await logAuditEvent({
+          userId: refund.tutorId,
+          adminId,
+          action: 'tutor_balance_clawback_shortfall',
+          category: 'payments',
+          description: `Refund clawback shortfall of ${formatNaira(clawback.shortfall)} for tutor ${refund.tutorId} (payment ${refund.paymentId}) — flagged for manual review, funds may already be paid out.`,
+          severity: 'critical',
+          metadata: { refundId, paymentId: refund.paymentId, tutorId: refund.tutorId, shortfall: clawback.shortfall, reviewId },
+        });
+      }
+    }
+
     await logAuditEvent({
       userId: refund.userId,
       adminId,
       action: 'refund_processed',
       category: 'payments',
       description: `Refund of ${formatNaira(refund.amount)} processed via Flutterwave for payment ${refund.paymentId}`,
-      metadata: { refundId, paymentId: refund.paymentId, amount: refund.amount, flutterwaveTransactionId },
+      metadata: { refundId, paymentId: refund.paymentId, amount: refund.amount, flutterwaveTransactionId, tutorClawback: clawback },
     });
 
     if (userEmail) {
@@ -1787,6 +1905,78 @@ app.post('/admin/refunds/:refundId/process', async (c) => {
   }
 });
 
+// List tutor balance clawback shortfalls flagged for manual review — created
+// when a refund is approved but a tutor's balance couldn't fully absorb the
+// clawback (the remainder may already be sitting in their bank account).
+app.get('/admin/balance-reviews', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) return c.json({ error: 'Unauthorized' }, 401);
+    const admin = await getUserFromToken(accessToken);
+    if (!admin || admin.role !== 'admin') {
+      return c.json({ error: 'Unauthorized - Admins only' }, 403);
+    }
+
+    const statusFilter = c.req.query('status'); // 'open' | 'resolved' | undefined (all)
+    const all = await kv.getByPrefix('balance_review:');
+    const filtered = statusFilter ? all.filter((r: any) => r.status === statusFilter) : all;
+    filtered.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
+    // Enrich with tutor display name/email
+    const enriched = await Promise.all(filtered.map(async (r: any) => {
+      const tutor = (await kv.get(`user:${r.tutorId}`) as any) || await db.getProfile(r.tutorId).catch(() => null);
+      return { ...r, tutorName: tutor?.fullName || tutor?.name || 'Unknown', tutorEmail: tutor?.email };
+    }));
+
+    return c.json({ reviews: enriched });
+  } catch (error: any) {
+    console.error('Error fetching balance reviews:', error);
+    return c.json({ error: error.message || 'Failed to fetch balance reviews' }, 500);
+  }
+});
+
+// Mark a balance-review flag resolved — e.g. after manually deducting the
+// shortfall from the tutor's next payout, or after confirming it should be
+// written off.
+app.post('/admin/balance-reviews/:reviewId/resolve', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) return c.json({ error: 'Unauthorized' }, 401);
+    const admin = await getUserFromToken(accessToken);
+    if (!admin || admin.role !== 'admin') {
+      return c.json({ error: 'Unauthorized - Admins only' }, 403);
+    }
+    const adminId = admin.userId || admin.id;
+
+    const reviewId = c.req.param('reviewId');
+    const { note } = await c.req.json().catch(() => ({ note: undefined })) as { note?: string };
+
+    const review = await kv.get(`balance_review:${reviewId}`) as any;
+    if (!review) return c.json({ error: 'Review not found' }, 404);
+    if (review.status === 'resolved') return c.json({ error: 'Already resolved' }, 400);
+
+    review.status = 'resolved';
+    review.resolvedAt = new Date().toISOString();
+    review.resolvedBy = adminId;
+    review.resolutionNote = note || '';
+    await kv.set(`balance_review:${reviewId}`, review);
+
+    await logAuditEvent({
+      userId: review.tutorId,
+      adminId,
+      action: 'balance_review_resolved',
+      category: 'payments',
+      description: `Balance clawback shortfall of ${formatNaira(review.shortfallAmount)} for tutor ${review.tutorId} marked resolved.${note ? ` Note: ${note}` : ''}`,
+      metadata: { reviewId, tutorId: review.tutorId, shortfallAmount: review.shortfallAmount, note },
+    });
+
+    return c.json({ success: true, review });
+  } catch (error: any) {
+    console.error('Error resolving balance review:', error);
+    return c.json({ error: error.message || 'Failed to resolve balance review' }, 500);
+  }
+});
+
 // Helper to format amount in Naira. Amounts throughout this codebase are
 // stored in major units (Naira), not kobo — see src/utils/currency.ts:
 // "Flutterwave uses direct Naira amounts". This used to divide by 100,
@@ -1796,4 +1986,5 @@ function formatNaira(amount: number): string {
   return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
+export { releaseMaturedEarnings };
 export default app;

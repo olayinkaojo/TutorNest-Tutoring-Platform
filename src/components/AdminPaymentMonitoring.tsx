@@ -62,6 +62,19 @@ interface RefundRequest {
   requestedAt: string;
 }
 
+interface BalanceReview {
+  id: string;
+  tutorId: string;
+  tutorName: string;
+  tutorEmail: string | null;
+  refundId: string;
+  paymentId: string;
+  shortfallAmount: number;
+  reason: string;
+  status: 'open' | 'resolved';
+  createdAt: string;
+}
+
 export function AdminPaymentMonitoring() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [stats, setStats] = useState<PaymentStats>({
@@ -78,17 +91,79 @@ export function AdminPaymentMonitoring() {
   const [pendingRefunds, setPendingRefunds] = useState<RefundRequest[]>([]);
   const [loadingRefunds, setLoadingRefunds] = useState(true);
   const [processingRefundId, setProcessingRefundId] = useState<string | null>(null);
+  const [balanceReviews, setBalanceReviews] = useState<BalanceReview[]>([]);
+  const [loadingReviews, setLoadingReviews] = useState(true);
+  const [resolvingReviewId, setResolvingReviewId] = useState<string | null>(null);
   const supabase = getSupabaseClient();
 
   useEffect(() => {
     fetchPayments();
     fetchPendingRefunds();
+    fetchBalanceReviews();
     const interval = setInterval(() => {
       fetchPayments();
       fetchPendingRefunds();
+      fetchBalanceReviews();
     }, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchBalanceReviews = async () => {
+    try {
+      setLoadingReviews(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/balance-reviews?status=open`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } },
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setBalanceReviews(data.reviews || []);
+      }
+    } catch (error) {
+      console.error('Error fetching balance reviews:', error);
+    } finally {
+      setLoadingReviews(false);
+    }
+  };
+
+  const resolveBalanceReview = async (review: BalanceReview) => {
+    const note = window.prompt(
+      `How was the ${formatNaira(review.shortfallAmount)} shortfall for ${review.tutorName} resolved? (e.g. "deducted from next payout", "written off")`,
+    );
+    if (note === null) return; // cancelled
+
+    setResolvingReviewId(review.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/balance-reviews/${review.id}/resolve`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ note }),
+        },
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setBalanceReviews((prev) => prev.filter((r) => r.id !== review.id));
+      } else {
+        alert(data.error || 'Failed to resolve review');
+      }
+    } catch (error) {
+      console.error('Error resolving balance review:', error);
+      alert('Failed to resolve review');
+    } finally {
+      setResolvingReviewId(null);
+    }
+  };
 
   const fetchPendingRefunds = async () => {
     try {
@@ -352,6 +427,63 @@ export function AdminPaymentMonitoring() {
                     >
                       <CheckCircle2 className="w-4 h-4 mr-1.5" />
                       {processingRefundId === refund.id ? 'Processing...' : 'Approve & Refund'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
+
+      {/* Tutor Balance Clawback Shortfalls */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <AlertCircle className="w-5 h-5" style={{ color: '#dc2626' }} />
+            Balance Review — Refund Clawback Shortfalls
+            {balanceReviews.length > 0 && (
+              <Badge style={{ backgroundColor: '#dc2626', color: 'white' }}>{balanceReviews.length}</Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            A refund was processed, but the tutor's pending/available balance couldn't fully cover the
+            clawback — the remainder may already be sitting in their bank account and needs manual follow-up.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingReviews ? (
+            <div className="text-center py-6 text-gray-500">Loading...</div>
+          ) : balanceReviews.length === 0 ? (
+            <div className="text-center py-6 text-gray-500 text-sm">Nothing flagged for review.</div>
+          ) : (
+            <div className="space-y-3">
+              {balanceReviews.map((review) => (
+                <div
+                  key={review.id}
+                  className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 border rounded-lg"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium">{review.tutorName}</p>
+                      <Badge variant="outline" className="text-red-600 border-red-200">
+                        {formatNaira(review.shortfallAmount)} shortfall
+                      </Badge>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">{review.reason}</p>
+                    <p className="text-xs text-gray-400 mt-1 font-mono">
+                      refund {review.refundId} · payment {review.paymentId}
+                    </p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      disabled={resolvingReviewId === review.id}
+                      onClick={() => resolveBalanceReview(review)}
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                      {resolvingReviewId === review.id ? 'Saving...' : 'Mark Resolved'}
                     </Button>
                   </div>
                 </div>

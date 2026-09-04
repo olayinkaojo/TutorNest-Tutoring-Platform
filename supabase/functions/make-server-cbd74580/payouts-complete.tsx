@@ -1,6 +1,8 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
 import { verifyAccessToken } from './route-auth.tsx';
+import { releaseMaturedEarnings } from './payment-routes.tsx';
 
 const payoutsComplete = new Hono();
 
@@ -27,40 +29,18 @@ payoutsComplete.get('/dashboard', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    // Get all completed, paid bookings for this tutor
-    const allBookings = await kv.getByPrefix('booking:');
-    const tutorBookings = allBookings.filter((b: any) =>
-      b.tutorId === userId && b.status === 'completed' && b.paidAt
-    );
+    // Release any earnings from sessions that have now happened — see
+    // releaseMaturedEarnings in payment-routes.tsx for why this can't just
+    // be a one-time background job.
+    await releaseMaturedEarnings(userId);
 
-    // Calculate earnings from bookings
-    const earnings = tutorBookings.map((booking: any) => {
-      const subjectRate = getSubjectRate(booking.subject || '');
-      const grossAmount = subjectRate;
-      const platformFee = (grossAmount * 0.20).toFixed(2);
-      const netAmount = (grossAmount * 0.80).toFixed(2);
-
-      return {
-        id: `earn_${booking.id}`,
-        bookingId: booking.id,
-        date: booking.date || booking.scheduledDate,
-        studentName: booking.studentName || 'Unknown',
-        subject: booking.subject || 'Not specified',
-        lessonDuration: booking.duration || '1 hour',
-        grossAmount: grossAmount.toFixed(2),
-        platformFee,
-        netAmount,
-        status: booking.payoutStatus || 'pending',
-        payoutDate: booking.payoutDate,
-      };
-    });
-
-    // Calculate totals
-    const totalEarnings = earnings.reduce((sum, e) => sum + parseFloat(e.netAmount), 0);
-    const paidEarnings = earnings
-      .filter((e) => e.status === 'paid')
-      .reduce((sum, e) => sum + parseFloat(e.netAmount), 0);
-    const pendingPayout = totalEarnings - paidEarnings;
+    // Single source of truth: the Postgres tutor_balance table. This used to
+    // be computed by re-scanning KV `booking:` records, which only ever
+    // captured the old single-session flow — plan-based bookings (the flow
+    // the live app actually uses) live in Postgres and were invisible here,
+    // so a tutor's real earnings never showed up on their own dashboard.
+    const balance = await db.getTutorBalance(userId);
+    const payouts = await db.listPayoutsByTutor(userId);
 
     // Get settings
     const settings = (await kv.get(`payout_settings:${userId}`)) as any || {
@@ -68,9 +48,6 @@ payoutsComplete.get('/dashboard', async (c) => {
       minimumAmount: 50,
       bankAccountLast4: null,
     };
-
-    // Get payout history (Task 2)
-    const payoutHistory = (await kv.get(`payout_history:${userId}`)) as any[] || [];
 
     // Calculate next payout date based on schedule
     const today = new Date();
@@ -89,9 +66,17 @@ payoutsComplete.get('/dashboard', async (c) => {
     }
 
     const stats = {
-      totalEarnings: totalEarnings.toFixed(2),
-      paidThisMonth: paidEarnings.toFixed(2),
-      pendingPayout: pendingPayout.toFixed(2),
+      totalEarnings: balance.total_earnings.toFixed(2),
+      paidThisMonth: balance.total_payouts.toFixed(2),
+      // `pendingPayout` is what TutorPayoutDashboard.tsx treats as the
+      // requestable amount (its "Available: ₦…" line and the
+      // canRequestPayout gate both read this field) — it must be
+      // available_balance, not pending_balance, or the UI would tell a tutor
+      // they can request money that /request would then correctly reject.
+      pendingPayout: balance.available_balance.toFixed(2),
+      // Earned but not yet released (session hasn't happened yet) — not
+      // withdrawable until releaseMaturedEarnings moves it above.
+      awaitingSessionCompletion: balance.pending_balance.toFixed(2),
       nextPayoutDate: nextPayoutDate.toISOString(),
       minimumPayout: settings.minimumAmount,
       bankAccountLast4: settings.bankAccountLast4,
@@ -99,7 +84,7 @@ payoutsComplete.get('/dashboard', async (c) => {
       currencySymbol: '₦',
     };
 
-    return c.json({ earnings, payouts: payoutHistory, stats, settings });
+    return c.json({ earnings: [], payouts, stats, settings });
   } catch (error: any) {
     console.error('Error fetching payout dashboard:', error);
     return c.json({ error: error.message || 'Internal server error' }, 500);
@@ -202,71 +187,46 @@ payoutsComplete.post('/request', async (c) => {
     if (!amount || parseFloat(amount) <= 0) {
       return c.json({ error: 'Invalid amount' }, 400);
     }
+    const requestedAmount = parseFloat(amount);
 
     // Get settings for minimum
     const settings = (await kv.get(`payout_settings:${userId}`)) as any || { minimumAmount: 50 };
 
-    if (parseFloat(amount) < settings.minimumAmount) {
+    if (requestedAmount < settings.minimumAmount) {
       return c.json({ error: `Minimum payout amount is ₦${settings.minimumAmount}` }, 400);
     }
 
     // Check if bank account exists
-    const bankAccount = await kv.get(`bank_account:${userId}`);
+    const bankAccount = (await kv.get(`bank_account:${userId}`)) as any;
     if (!bankAccount) {
       return c.json({ error: 'Please add a bank account before requesting payout' }, 400);
     }
 
-    // Requested amount must not exceed what the tutor has actually earned and
-    // cleared, and is reserved out of availableBalance immediately — not just
-    // checked — so a second request submitted before this one is approved
-    // can't also pass against the same funds. This route previously had no
-    // check at all: a tutor could request any amount and it would go
-    // straight to "pending admin approval" with nothing tying it back to
-    // their real tutor_balance record, and approving it didn't touch balance
-    // either. Refunded back to availableBalance on rejection (see below).
-    const balanceKey = `tutor_balance:${userId}`;
-    const balance = (await kv.get(balanceKey)) as any;
-    const availableBalance = balance?.availableBalance ?? 0;
-    const requestedAmount = parseFloat(amount);
-    if (requestedAmount > availableBalance) {
-      return c.json({ error: `Insufficient available balance. You have ₦${availableBalance.toLocaleString()} available.` }, 400);
+    await releaseMaturedEarnings(userId);
+
+    // Reserves the amount out of available_balance in the single Postgres
+    // source of truth (see payment-routes.tsx) and creates a real payouts
+    // row admins can actually see and process — this used to write a
+    // parallel `payout_req_…` KV record that no admin screen ever read, so a
+    // tutor's request went nowhere no matter what an admin did.
+    try {
+      await db.reserveTutorBalanceForPayout(userId, requestedAmount);
+    } catch (e: any) {
+      return c.json({ error: e.message || 'Insufficient available balance' }, 400);
     }
-    balance.availableBalance = availableBalance - requestedAmount;
-    balance.lastUpdated = new Date().toISOString();
-    await kv.set(balanceKey, balance);
 
-    // Get tutor profile for name
-    const tutorProfile = (await kv.get(`user:${userId}`)) as any || {};
-
-    // Create payout request
-    const requestId = `payout_req_${Date.now()}_${userId}`;
-    const payoutRequest = {
-      id: requestId,
+    const payout = await db.createPayout({
       tutorId: userId,
-      tutorName: tutorProfile.full_name || tutorProfile.email || 'Unknown',
-      amount: parseFloat(amount).toFixed(2),
-      status: 'pending_approval', // pending_approval → approved → processing → paid/failed
-      requestedAt: new Date().toISOString(),
-      approvedAt: null,
-      approvedBy: null,
-      processedAt: null,
-      failureReason: null,
-      reference: null,
-    };
-
-    await kv.set(requestId, payoutRequest);
-
-    // Add to tutor's payout requests list
-    const tutorRequests = ((await kv.get(`tutor_payout_requests:${userId}`)) as any) || [];
-    tutorRequests.push(requestId);
-    await kv.set(`tutor_payout_requests:${userId}`, tutorRequests);
-
-    // Add to admin's pending approvals
-    const adminPending = ((await kv.get(`admin_payout_pending`)) as any) || [];
-    adminPending.push(requestId);
-    await kv.set(`admin_payout_pending`, adminPending);
+      amount: requestedAmount,
+      bankDetails: {
+        accountNumber: bankAccount.accountNumber,
+        bankCode: bankAccount.bankCode,
+        accountName: bankAccount.accountHolder,
+      },
+    });
 
     // Send notification to admins
+    const tutorProfile = (await kv.get(`user:${userId}`)) as any || {};
     const adminUsers = (await kv.getByPrefix('user:')) as any[];
     const admins = adminUsers.filter((u: any) => u.role === 'admin');
     for (const admin of admins) {
@@ -277,7 +237,7 @@ payoutsComplete.post('/request', async (c) => {
         type: 'payout_request',
         title: 'New Payout Request',
         message: `${tutorProfile.full_name || 'A tutor'} has requested a payout of ₦${amount}`,
-        actionUrl: `/admin/dashboard?tab=payouts&request=${requestId}`,
+        actionUrl: `/admin/dashboard?tab=payouts`,
         read: false,
         createdAt: new Date().toISOString(),
       };
@@ -286,9 +246,9 @@ payoutsComplete.post('/request', async (c) => {
 
     return c.json({
       success: true,
-      requestId,
+      requestId: payout.id,
       message: 'Payout request submitted for admin approval',
-      request: payoutRequest,
+      request: payout,
     });
   } catch (error: any) {
     console.error('Error creating payout request:', error);
@@ -306,17 +266,8 @@ payoutsComplete.get('/requests', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    const requestIds = ((await kv.get(`tutor_payout_requests:${userId}`)) as any) || [];
-    const requests = [];
-
-    for (const requestId of requestIds) {
-      const request = await kv.get(requestId);
-      if (request) requests.push(request);
-    }
-
-    return c.json({ requests: requests.sort((a: any, b: any) =>
-      new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()
-    )});
+    const requests = await db.listPayoutsByTutor(userId);
+    return c.json({ requests });
   } catch (error: any) {
     console.error('Error fetching payout requests:', error);
     return c.json({ error: error.message }, 500);
@@ -354,237 +305,15 @@ payoutsComplete.get('/notifications', async (c) => {
 });
 
 // ============================================
-// TASK 7: Admin Payout Management Dashboard
+// TASK 7: Admin Payout Management
 // ============================================
-
-payoutsComplete.get('/admin/pending', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = await getUserId(accessToken);
-
-    if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    // Verify admin
-    const userProfile = (await kv.get(`user:${userId}`)) as any;
-    if (userProfile?.role !== 'admin') {
-      return c.json({ error: 'Admin access required' }, 403);
-    }
-
-    const pendingIds = ((await kv.get(`admin_payout_pending`)) as any) || [];
-    const requests = [];
-
-    for (const requestId of pendingIds) {
-      const request = await kv.get(requestId);
-      if (request && request.status === 'pending_approval') {
-        requests.push(request);
-      }
-    }
-
-    return c.json({
-      pending: requests.sort((a: any, b: any) =>
-        new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime()
-      ),
-    });
-  } catch (error: any) {
-    console.error('Error fetching pending payouts:', error);
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-payoutsComplete.post('/admin/approve/:requestId', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = await getUserId(accessToken);
-
-    if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    const userProfile = (await kv.get(`user:${userId}`)) as any;
-    if (userProfile?.role !== 'admin') {
-      return c.json({ error: 'Admin access required' }, 403);
-    }
-
-    const requestId = c.req.param('requestId');
-    const { notes } = await c.req.json();
-
-    const payoutRequest = (await kv.get(requestId)) as any;
-    if (!payoutRequest) {
-      return c.json({ error: 'Payout request not found' }, 404);
-    }
-
-    // Update request status
-    payoutRequest.status = 'approved';
-    payoutRequest.approvedAt = new Date().toISOString();
-    payoutRequest.approvedBy = userId;
-    payoutRequest.notes = notes;
-
-    await kv.set(requestId, payoutRequest);
-
-    // The requested amount was already reserved out of availableBalance when
-    // the request was submitted (see /request above) — finalize it here by
-    // moving it into totalPayouts, so the tutor's earnings-vs-paid-out totals
-    // stay accurate once you actually wire the funds via your bank.
-    const approvedTutorId = payoutRequest.tutorId;
-    const approvedBalanceKey = `tutor_balance:${approvedTutorId}`;
-    const approvedBalance = (await kv.get(approvedBalanceKey)) as any;
-    if (approvedBalance) {
-      approvedBalance.totalPayouts = (approvedBalance.totalPayouts || 0) + parseFloat(payoutRequest.amount);
-      approvedBalance.lastUpdated = new Date().toISOString();
-      await kv.set(approvedBalanceKey, approvedBalance);
-    }
-
-    // Remove from pending
-    const pendingIds = ((await kv.get(`admin_payout_pending`)) as any) || [];
-    const updatedPending = pendingIds.filter((id: string) => id !== requestId);
-    await kv.set(`admin_payout_pending`, updatedPending);
-
-    // Add to approved list
-    const approvedIds = ((await kv.get(`admin_payout_approved`)) as any) || [];
-    approvedIds.push(requestId);
-    await kv.set(`admin_payout_approved`, approvedIds);
-
-    // Store in payout history
-    const tutorId = payoutRequest.tutorId;
-    const payoutHistory = ((await kv.get(`payout_history:${tutorId}`)) as any) || [];
-    payoutHistory.push({
-      id: requestId,
-      amount: payoutRequest.amount,
-      status: 'approved',
-      requestedAt: payoutRequest.requestedAt,
-      approvedAt: payoutRequest.approvedAt,
-    });
-    await kv.set(`payout_history:${tutorId}`, payoutHistory);
-
-    // Notify tutor
-    const notificationId = `notification_${Date.now()}_${tutorId}`;
-    const notification = {
-      id: notificationId,
-      userId: tutorId,
-      type: 'payout_approved',
-      title: 'Payout Approved',
-      message: `Your payout request of ₦${payoutRequest.amount} has been approved`,
-      actionUrl: `/tutor/dashboard?tab=payouts`,
-      read: false,
-      createdAt: new Date().toISOString(),
-    };
-    await kv.set(notificationId, notification);
-
-    return c.json({
-      success: true,
-      message: 'Payout request approved',
-      request: payoutRequest,
-    });
-  } catch (error: any) {
-    console.error('Error approving payout:', error);
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-payoutsComplete.post('/admin/reject/:requestId', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = await getUserId(accessToken);
-
-    if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    const userProfile = (await kv.get(`user:${userId}`)) as any;
-    if (userProfile?.role !== 'admin') {
-      return c.json({ error: 'Admin access required' }, 403);
-    }
-
-    const requestId = c.req.param('requestId');
-    const { reason } = await c.req.json();
-
-    const payoutRequest = (await kv.get(requestId)) as any;
-    if (!payoutRequest) {
-      return c.json({ error: 'Payout request not found' }, 404);
-    }
-
-    // Update request status
-    payoutRequest.status = 'rejected';
-    payoutRequest.failureReason = reason;
-    payoutRequest.rejectedAt = new Date().toISOString();
-    payoutRequest.rejectedBy = userId;
-
-    await kv.set(requestId, payoutRequest);
-
-    // Refund the amount reserved out of availableBalance when this request
-    // was submitted (see /request above) — a rejection shouldn't leave the
-    // tutor's funds stuck in limbo.
-    const rejectedTutorId = payoutRequest.tutorId;
-    const rejectedBalanceKey = `tutor_balance:${rejectedTutorId}`;
-    const rejectedBalance = (await kv.get(rejectedBalanceKey)) as any;
-    if (rejectedBalance) {
-      rejectedBalance.availableBalance = (rejectedBalance.availableBalance || 0) + parseFloat(payoutRequest.amount);
-      rejectedBalance.lastUpdated = new Date().toISOString();
-      await kv.set(rejectedBalanceKey, rejectedBalance);
-    }
-
-    // Remove from pending
-    const pendingIds = ((await kv.get(`admin_payout_pending`)) as any) || [];
-    const updatedPending = pendingIds.filter((id: string) => id !== requestId);
-    await kv.set(`admin_payout_pending`, updatedPending);
-
-    // Notify tutor
-    const tutorId = payoutRequest.tutorId;
-    const notificationId = `notification_${Date.now()}_${tutorId}`;
-    const notification = {
-      id: notificationId,
-      userId: tutorId,
-      type: 'payout_rejected',
-      title: 'Payout Rejected',
-      message: `Your payout request of ₦${payoutRequest.amount} was rejected: ${reason}`,
-      actionUrl: `/tutor/dashboard?tab=payouts`,
-      read: false,
-      createdAt: new Date().toISOString(),
-    };
-    await kv.set(notificationId, notification);
-
-    return c.json({
-      success: true,
-      message: 'Payout request rejected',
-    });
-  } catch (error: any) {
-    console.error('Error rejecting payout:', error);
-    return c.json({ error: error.message }, 500);
-  }
-});
-
-payoutsComplete.get('/admin/history', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const userId = await getUserId(accessToken);
-
-    if (!userId) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    const userProfile = (await kv.get(`user:${userId}`)) as any;
-    if (userProfile?.role !== 'admin') {
-      return c.json({ error: 'Admin access required' }, 403);
-    }
-
-    // Get all payout requests (processed)
-    const allRequests = (await kv.getByPrefix('payout_req_')) as any[];
-    const processed = allRequests.filter((r: any) =>
-      r.status === 'approved' || r.status === 'rejected' || r.status === 'paid'
-    );
-
-    return c.json({
-      history: processed.sort((a: any, b: any) =>
-        new Date(b.approvedAt || b.requestedAt).getTime() - new Date(a.approvedAt || a.requestedAt).getTime()
-      ),
-    });
-  } catch (error: any) {
-    console.error('Error fetching payout history:', error);
-    return c.json({ error: error.message }, 500);
-  }
-});
+// Real admin approval/processing (including the actual Flutterwave transfer)
+// now lives in payment-routes.tsx (GET /admin/payouts, POST
+// /admin/payouts/:id/process, POST /admin/payouts/:id/reject) — this file
+// used to have its own parallel /admin/pending, /admin/approve, /admin/reject
+// and /admin/history endpoints that only flipped a status flag and never
+// called Flutterwave, and had no admin UI wired to them anyway. Removed to
+// avoid a second, silently-non-functional "approval" path existing again.
 
 // ============================================
 // TASK 8: Tax & Compliance Reports

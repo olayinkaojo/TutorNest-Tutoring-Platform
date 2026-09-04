@@ -260,6 +260,15 @@ export async function getBooking(bookingId: string): Promise<BookingRow | null> 
   };
 }
 
+/** Flips a booking's status — used to mark a session 'completed' once it has ended. */
+export async function updateBookingStatus(bookingId: string, status: string): Promise<void> {
+  const { error } = await db()
+    .from('bookings')
+    .update({ status, updated_at: new Date().toISOString() })
+    .eq('id', bookingId);
+  if (error) throw new Error(error.message);
+}
+
 // ─── Payments ─────────────────────────────────────────────────────────────────
 
 export interface PaymentRow {
@@ -421,6 +430,225 @@ export async function incrementTutorBalance(tutorId: string, tutorAmount: number
       { onConflict: 'tutor_id' },
     );
   if (error) throw new Error(error.message);
+}
+
+/**
+ * Moves `amount` from pending_balance to available_balance — call this once a
+ * paid session has actually happened, so a tutor can eventually withdraw it.
+ * Clamped so pending never goes negative if called twice for the same amount.
+ */
+export async function releaseTutorBalance(tutorId: string, amount: number): Promise<void> {
+  if (amount <= 0) return;
+  const current = await getTutorBalance(tutorId);
+  const moved = Math.min(amount, current.pending_balance ?? 0);
+  if (moved <= 0) return;
+  const { error } = await db()
+    .from('tutor_balance')
+    .upsert(
+      {
+        tutor_id: tutorId,
+        pending_balance: (current.pending_balance ?? 0) - moved,
+        available_balance: (current.available_balance ?? 0) + moved,
+        total_earnings: current.total_earnings ?? 0,
+        total_payouts: current.total_payouts ?? 0,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tutor_id' },
+    );
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Reserves `amount` out of available_balance when a payout is requested, so a
+ * second request submitted before the first is approved can't double-spend
+ * the same funds. Throws if the tutor doesn't have enough available.
+ */
+export async function reserveTutorBalanceForPayout(tutorId: string, amount: number): Promise<void> {
+  const current = await getTutorBalance(tutorId);
+  if ((current.available_balance ?? 0) < amount) {
+    throw new Error('Insufficient available balance');
+  }
+  const { error } = await db()
+    .from('tutor_balance')
+    .upsert(
+      {
+        tutor_id: tutorId,
+        pending_balance: current.pending_balance ?? 0,
+        available_balance: (current.available_balance ?? 0) - amount,
+        total_earnings: current.total_earnings ?? 0,
+        total_payouts: current.total_payouts ?? 0,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tutor_id' },
+    );
+  if (error) throw new Error(error.message);
+}
+
+/** Returns a reserved amount to available_balance — payout was rejected or failed. */
+export async function refundTutorReservedBalance(tutorId: string, amount: number): Promise<void> {
+  if (amount <= 0) return;
+  const current = await getTutorBalance(tutorId);
+  const { error } = await db()
+    .from('tutor_balance')
+    .upsert(
+      {
+        tutor_id: tutorId,
+        pending_balance: current.pending_balance ?? 0,
+        available_balance: (current.available_balance ?? 0) + amount,
+        total_earnings: current.total_earnings ?? 0,
+        total_payouts: current.total_payouts ?? 0,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tutor_id' },
+    );
+  if (error) throw new Error(error.message);
+}
+
+/** Records a completed payout — the reserved amount is now actually out the door. */
+export async function finalizeTutorPayout(tutorId: string, amount: number): Promise<void> {
+  const current = await getTutorBalance(tutorId);
+  const { error } = await db()
+    .from('tutor_balance')
+    .upsert(
+      {
+        tutor_id: tutorId,
+        pending_balance: current.pending_balance ?? 0,
+        available_balance: current.available_balance ?? 0,
+        total_earnings: current.total_earnings ?? 0,
+        total_payouts: (current.total_payouts ?? 0) + amount,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tutor_id' },
+    );
+  if (error) throw new Error(error.message);
+}
+
+/**
+ * Claws back `amount` from a tutor's balance when a refund is processed —
+ * pending first (money never actually cleared for withdrawal), then
+ * available. Whatever's left after both are exhausted is a shortfall: money
+ * already sitting as available/reserved-or-paid-out that this function
+ * cannot safely touch automatically. Callers should flag that remainder for
+ * manual admin review rather than silently writing it off.
+ */
+export async function deductTutorBalanceForRefund(
+  tutorId: string,
+  amount: number,
+): Promise<{ deductedFromPending: number; deductedFromAvailable: number; shortfall: number }> {
+  const current = await getTutorBalance(tutorId);
+  const fromPending = Math.min(amount, current.pending_balance ?? 0);
+  const remaining = amount - fromPending;
+  const fromAvailable = Math.min(remaining, current.available_balance ?? 0);
+  const shortfall = remaining - fromAvailable;
+  const { error } = await db()
+    .from('tutor_balance')
+    .upsert(
+      {
+        tutor_id: tutorId,
+        pending_balance: (current.pending_balance ?? 0) - fromPending,
+        available_balance: (current.available_balance ?? 0) - fromAvailable,
+        total_earnings: current.total_earnings ?? 0,
+        total_payouts: current.total_payouts ?? 0,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tutor_id' },
+    );
+  if (error) throw new Error(error.message);
+  return { deductedFromPending: fromPending, deductedFromAvailable: fromAvailable, shortfall };
+}
+
+// ─── Payouts ──────────────────────────────────────────────────────────────────
+// Single source of truth for payout requests (replaces the old KV `payout:`
+// and `payout_req_:` records — two parallel, mutually-invisible systems that
+// meant a tutor's real request never reached the admin approval screen).
+
+export interface PayoutRow {
+  id: string;
+  tutorId: string;
+  amount: number;
+  bankDetails: Record<string, unknown>;
+  status: string; // pending | processing | completed | failed | rejected
+  reference?: string | null;
+  transferId?: string | null;
+  processedBy?: string | null;
+  requestedAt: string;
+  processedAt?: string | null;
+}
+
+function mapPayoutRow(row: any): PayoutRow {
+  return {
+    id: row.id,
+    tutorId: row.tutor_id,
+    amount: Number(row.amount),
+    bankDetails: row.bank_details ?? {},
+    status: row.status,
+    reference: row.reference,
+    transferId: row.transfer_id,
+    processedBy: row.processed_by,
+    requestedAt: row.requested_at,
+    processedAt: row.processed_at,
+  };
+}
+
+export async function createPayout(payout: {
+  tutorId: string;
+  amount: number;
+  bankDetails: Record<string, unknown>;
+}): Promise<PayoutRow> {
+  const { data, error } = await db()
+    .from('payouts')
+    .insert({
+      tutor_id: payout.tutorId,
+      amount: payout.amount,
+      bank_details: payout.bankDetails,
+      status: 'pending',
+    })
+    .select('*')
+    .single();
+  if (error) throw new Error(error.message);
+  return mapPayoutRow(data);
+}
+
+export async function getPayout(payoutId: string): Promise<PayoutRow | null> {
+  const { data, error } = await db()
+    .from('payouts')
+    .select('*')
+    .eq('id', payoutId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapPayoutRow(data) : null;
+}
+
+export async function updatePayout(
+  payoutId: string,
+  updates: { status?: string; reference?: string; transferId?: string; processedBy?: string; processedAt?: string },
+): Promise<void> {
+  const patch: Record<string, unknown> = {};
+  if (updates.status !== undefined) patch.status = updates.status;
+  if (updates.reference !== undefined) patch.reference = updates.reference;
+  if (updates.transferId !== undefined) patch.transfer_id = updates.transferId;
+  if (updates.processedBy !== undefined) patch.processed_by = updates.processedBy;
+  if (updates.processedAt !== undefined) patch.processed_at = updates.processedAt;
+  const { error } = await db().from('payouts').update(patch).eq('id', payoutId);
+  if (error) throw new Error(error.message);
+}
+
+export async function listPayoutsByTutor(tutorId: string): Promise<PayoutRow[]> {
+  const { data, error } = await db()
+    .from('payouts')
+    .select('*')
+    .eq('tutor_id', tutorId)
+    .order('requested_at', { ascending: false });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapPayoutRow);
+}
+
+export async function listAllPayouts(status?: string): Promise<PayoutRow[]> {
+  let query = db().from('payouts').select('*').order('requested_at', { ascending: false });
+  if (status) query = query.eq('status', status);
+  const { data, error } = await query;
+  if (error) throw new Error(error.message);
+  return (data ?? []).map(mapPayoutRow);
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

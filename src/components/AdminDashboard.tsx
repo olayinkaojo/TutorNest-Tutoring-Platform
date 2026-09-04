@@ -7,7 +7,7 @@ import { AdminDisputeHandler } from './AdminDisputeHandler';
 import { CouponManager } from './CouponManager';
 import { TaxReportsManager } from './TaxReportsManager';
 import { AdminPaymentMonitoring } from './AdminPaymentMonitoring';
-import { AdminPayoutBatchManager } from './AdminPayoutBatchManager';
+import { AdminPayoutsManager } from './AdminPayoutsManager';
 import { RoleSwitcher } from './RoleSwitcher';
 import { CurriculumUploader } from './admin/CurriculumUploader';
 import { ResourcesUploader } from './admin/ResourcesUploader';
@@ -503,7 +503,7 @@ export function AdminDashboard({
           </TabsContent>
 
           <TabsContent value="payouts">
-            <AdminPayoutBatchManager />
+            <AdminPayoutsManager />
           </TabsContent>
 
           <TabsContent value="childprofiles">

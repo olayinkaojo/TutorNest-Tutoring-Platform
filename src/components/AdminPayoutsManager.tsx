@@ -38,6 +38,7 @@ export function AdminPayoutsManager() {
   const [payouts, setPayouts] = useState<Payout[]>([]);
   const [loading, setLoading] = useState(true);
   const [processing, setProcessing] = useState<string | null>(null);
+  const [rejecting, setRejecting] = useState<string | null>(null);
 
   useEffect(() => {
     fetchPayouts();
@@ -115,12 +116,55 @@ export function AdminPayoutsManager() {
     }
   };
 
+  const rejectPayout = async (payoutId: string) => {
+    const reason = window.prompt('Reason for rejecting this payout request (shown to the tutor):');
+    if (reason === null) return; // cancelled
+    setRejecting(payoutId);
+
+    try {
+      const { getSupabaseClient } = await import('../utils/supabase/client');
+      const supabase = getSupabaseClient();
+      const { data: { session } } = await supabase.auth.getSession();
+
+      if (!session) {
+        throw new Error('Please sign in');
+      }
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/payouts/${payoutId}/reject`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ reason }),
+        }
+      );
+
+      const data = await response.json();
+
+      if (data.success) {
+        toast.success('Payout request rejected; funds returned to tutor balance');
+        fetchPayouts();
+      } else {
+        throw new Error(data.error || 'Failed to reject payout');
+      }
+    } catch (error: any) {
+      console.error('Error rejecting payout:', error);
+      toast.error(error.message || 'Failed to reject payout');
+    } finally {
+      setRejecting(null);
+    }
+  };
+
   const getStatusBadge = (status: string) => {
     const colors: Record<string, string> = {
       pending: 'bg-yellow-100 text-yellow-800',
       processing: 'bg-blue-100 text-blue-800',
       completed: 'bg-green-100 text-green-800',
       failed: 'bg-red-100 text-red-800',
+      rejected: 'bg-gray-100 text-gray-800',
     };
 
     const icons: Record<string, any> = {
@@ -128,6 +172,7 @@ export function AdminPayoutsManager() {
       processing: Loader2,
       completed: CheckCircle,
       failed: XCircle,
+      rejected: XCircle,
     };
 
     const Icon = icons[status] || AlertCircle;
@@ -255,34 +300,47 @@ export function AdminPayoutsManager() {
                       <TableCell>{getStatusBadge(payout.status)}</TableCell>
                       <TableCell>
                         {payout.status === 'pending' && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button 
-                                size="sm" 
-                                disabled={processing === payout.id}
-                              >
-                                {processing === payout.id && (
-                                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                                )}
-                                Process
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Process Payout</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  This will initiate a transfer of ₦{payout.amount.toLocaleString()} to account {payout.bankDetails.accountNumber}.
-                                  This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={() => processPayout(payout.id)}>
-                                  Confirm & Process
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                          <div className="flex items-center gap-2">
+                            <AlertDialog>
+                              <AlertDialogTrigger asChild>
+                                <Button
+                                  size="sm"
+                                  disabled={processing === payout.id || rejecting === payout.id}
+                                >
+                                  {processing === payout.id && (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                  )}
+                                  Process
+                                </Button>
+                              </AlertDialogTrigger>
+                              <AlertDialogContent>
+                                <AlertDialogHeader>
+                                  <AlertDialogTitle>Process Payout</AlertDialogTitle>
+                                  <AlertDialogDescription>
+                                    This will initiate a transfer of ₦{payout.amount.toLocaleString()} to account {payout.bankDetails.accountNumber}.
+                                    This action cannot be undone.
+                                  </AlertDialogDescription>
+                                </AlertDialogHeader>
+                                <AlertDialogFooter>
+                                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                  <AlertDialogAction onClick={() => processPayout(payout.id)}>
+                                    Confirm & Process
+                                  </AlertDialogAction>
+                                </AlertDialogFooter>
+                              </AlertDialogContent>
+                            </AlertDialog>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              disabled={processing === payout.id || rejecting === payout.id}
+                              onClick={() => rejectPayout(payout.id)}
+                            >
+                              {rejecting === payout.id && (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              )}
+                              Reject
+                            </Button>
+                          </div>
                         )}
                         {payout.status === 'processing' && (
                           <span className="text-sm text-muted-foreground">In progress...</span>
@@ -296,6 +354,9 @@ export function AdminPayoutsManager() {
                               </div>
                             )}
                           </div>
+                        )}
+                        {payout.status === 'rejected' && (
+                          <span className="text-sm text-muted-foreground">Rejected</span>
                         )}
                       </TableCell>
                     </TableRow>
