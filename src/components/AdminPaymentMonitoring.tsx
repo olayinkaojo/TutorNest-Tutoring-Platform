@@ -19,6 +19,9 @@ import {
   Search,
   Filter,
   RefreshCw,
+  CheckCircle2,
+  XCircle,
+  Undo2,
 } from 'lucide-react';
 import { Input } from './ui/input';
 import { formatNaira } from '../utils/currency';
@@ -45,6 +48,20 @@ interface PaymentStats {
   thisMonthCount: number;
 }
 
+interface RefundRequest {
+  id: string;
+  paymentId: string;
+  userId: string;
+  userName: string;
+  userEmail: string | null;
+  amount: number;
+  refundPercentage: number;
+  reason: string;
+  status: 'pending' | 'processed' | 'rejected' | 'failed';
+  reference: string;
+  requestedAt: string;
+}
+
 export function AdminPaymentMonitoring() {
   const [payments, setPayments] = useState<Payment[]>([]);
   const [stats, setStats] = useState<PaymentStats>({
@@ -58,13 +75,82 @@ export function AdminPaymentMonitoring() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [pendingRefunds, setPendingRefunds] = useState<RefundRequest[]>([]);
+  const [loadingRefunds, setLoadingRefunds] = useState(true);
+  const [processingRefundId, setProcessingRefundId] = useState<string | null>(null);
   const supabase = getSupabaseClient();
 
   useEffect(() => {
     fetchPayments();
-    const interval = setInterval(fetchPayments, 60000);
+    fetchPendingRefunds();
+    const interval = setInterval(() => {
+      fetchPayments();
+      fetchPendingRefunds();
+    }, 60000);
     return () => clearInterval(interval);
   }, []);
+
+  const fetchPendingRefunds = async () => {
+    try {
+      setLoadingRefunds(true);
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/refunds?status=pending`,
+        { headers: { Authorization: `Bearer ${session.access_token}` } },
+      );
+      if (response.ok) {
+        const data = await response.json();
+        setPendingRefunds(data.refunds || []);
+      }
+    } catch (error) {
+      console.error('Error fetching pending refunds:', error);
+    } finally {
+      setLoadingRefunds(false);
+    }
+  };
+
+  const handleRefundAction = async (refund: RefundRequest, action: 'approve' | 'reject') => {
+    const confirmMsg = action === 'approve'
+      ? `Approve and process a refund of ${formatNaira(refund.amount)} to ${refund.userName} via Flutterwave?`
+      : `Reject this refund request from ${refund.userName}?`;
+    if (!confirm(confirmMsg)) return;
+
+    const note = action === 'reject'
+      ? (window.prompt('Reason for rejecting (shown to the customer, optional):') || '')
+      : '';
+
+    setProcessingRefundId(refund.id);
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session?.access_token) return;
+
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/refunds/${refund.id}/process`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify({ action, note }),
+        },
+      );
+      const data = await response.json();
+      if (response.ok) {
+        setPendingRefunds((prev) => prev.filter((r) => r.id !== refund.id));
+        fetchPayments();
+      } else {
+        alert(data.error || `Failed to ${action} refund`);
+      }
+    } catch (error) {
+      console.error(`Error ${action}ing refund:`, error);
+      alert(`Failed to ${action} refund`);
+    } finally {
+      setProcessingRefundId(null);
+    }
+  };
 
   const fetchPayments = async () => {
     try {
@@ -211,6 +297,69 @@ export function AdminPaymentMonitoring() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Pending Refunds */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Undo2 className="w-5 h-5" style={{ color: '#625d9c' }} />
+            Pending Refund Requests
+            {pendingRefunds.length > 0 && (
+              <Badge style={{ backgroundColor: '#f59e0b', color: 'white' }}>{pendingRefunds.length}</Badge>
+            )}
+          </CardTitle>
+          <CardDescription>
+            Approving sends the refund to the customer's original payment method via Flutterwave immediately.
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          {loadingRefunds ? (
+            <div className="text-center py-6 text-gray-500">Loading refund requests...</div>
+          ) : pendingRefunds.length === 0 ? (
+            <div className="text-center py-6 text-gray-500 text-sm">No pending refund requests.</div>
+          ) : (
+            <div className="space-y-3">
+              {pendingRefunds.map((refund) => (
+                <div
+                  key={refund.id}
+                  className="flex flex-col md:flex-row md:items-center justify-between gap-3 p-4 border rounded-lg"
+                >
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <p className="font-medium">{refund.userName}</p>
+                      <Badge variant="outline">{formatNaira(refund.amount)} · {refund.refundPercentage}%</Badge>
+                    </div>
+                    <p className="text-sm text-gray-600 mt-1">{refund.reason}</p>
+                    <p className="text-xs text-gray-400 mt-1 font-mono">{refund.reference}</p>
+                  </div>
+                  <div className="flex gap-2 flex-shrink-0">
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      className="text-red-600 border-red-200 hover:bg-red-50"
+                      disabled={processingRefundId === refund.id}
+                      onClick={() => handleRefundAction(refund, 'reject')}
+                    >
+                      <XCircle className="w-4 h-4 mr-1.5" />
+                      Reject
+                    </Button>
+                    <Button
+                      size="sm"
+                      className="text-white"
+                      style={{ backgroundColor: '#5d9827' }}
+                      disabled={processingRefundId === refund.id}
+                      onClick={() => handleRefundAction(refund, 'approve')}
+                    >
+                      <CheckCircle2 className="w-4 h-4 mr-1.5" />
+                      {processingRefundId === refund.id ? 'Processing...' : 'Approve & Refund'}
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </CardContent>
+      </Card>
 
       {/* Search & Filter */}
       <Card>

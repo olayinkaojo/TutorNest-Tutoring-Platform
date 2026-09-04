@@ -689,6 +689,90 @@ export const emailTemplates = {
     `,
   }),
 
+  refundProcessed: (userName: string, amountDisplay: string, reference: string, dashboardLink: string) => ({
+    subject: `Your refund has been processed — ${amountDisplay}`,
+    html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#16a34a;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">✓ &nbsp;Refund Processed</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${userName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              Your refund has been approved and sent to your original payment method. It typically takes 3–15 working days to reflect, depending on your bank.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:24px;">
+                <p style="margin:0 0 16px;font-size:13px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.8px;">Refund Details</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;width:130px;">💰 Amount Refunded</td>
+                    <td style="padding:8px 0;font-size:15px;color:#15803d;font-weight:700;">${amountDisplay}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">🔖 Reference</td>
+                    <td style="padding:8px 0;font-size:12px;color:#6b7280;word-break:break-all;">${reference}</td>
+                  </tr>
+                </table>
+              </td></tr>
+            </table>
+            <p style="font-size:14px;color:#374151;">
+              <a href="${dashboardLink}" style="color:#625d9c;font-weight:600;">View your dashboard →</a>
+            </p>
+            <p style="font-size:14px;color:#374151;">For questions, reply to this email or contact support@knowledgefonsacademy.com.<br><strong>The Knowledge Fons Academy Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.knowledgefonsacademy.com" style="color:#625d9c;text-decoration:none;">knowledgefonsacademy.com</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
+    `,
+  }),
+
+  refundRejected: (userName: string, amountDisplay: string, reference: string, adminNote: string, dashboardLink: string) => ({
+    subject: `Update on your refund request — ${amountDisplay}`,
+    html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+          </td></tr>
+          <tr><td style="background:#6b7280;padding:14px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">Refund Request — Not Approved</p>
+          </td></tr>
+          <tr><td style="padding:36px 40px;">
+            <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${userName},</p>
+            <p style="margin:0 0 24px;font-size:15px;color:#374151;line-height:1.6;">
+              We've reviewed your refund request for ${amountDisplay} (reference ${reference}) and are unable to approve it at this time.
+            </p>
+            ${adminNote ? `<table width="100%" cellpadding="0" cellspacing="0" style="background:#f9fafb;border:1px solid #e5e7eb;border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 6px;font-size:13px;font-weight:700;color:#374151;text-transform:uppercase;letter-spacing:0.8px;">Note from our team</p>
+                <p style="margin:0;font-size:14px;color:#374151;line-height:1.6;">${adminNote}</p>
+              </td></tr>
+            </table>` : ''}
+            <p style="font-size:14px;color:#374151;">
+              If you believe this is a mistake, reply to this email or contact support@knowledgefonsacademy.com and we'll take another look.<br>
+              <a href="${dashboardLink}" style="color:#625d9c;font-weight:600;">View your dashboard →</a>
+            </p>
+            <p style="font-size:14px;color:#374151;"><strong>The Knowledge Fons Academy Team</strong></p>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.knowledgefonsacademy.com" style="color:#625d9c;text-decoration:none;">knowledgefonsacademy.com</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
+    `,
+  }),
+
   // Email verification/confirmation for signup
   emailVerification: (name: string, confirmationLink: string) => ({
     subject: `Confirm your email — Knowledge Fons Academy`,

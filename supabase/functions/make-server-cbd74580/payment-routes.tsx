@@ -1462,8 +1462,17 @@ app.post('/payments/:paymentId/refund', async (c) => {
     const paymentId = c.req.param('paymentId');
     const { reason } = await c.req.json() as { reason?: string };
 
-    // Get the payment
-    const payment = await kv.get(`payment:${paymentId}`) as any;
+    // Get the payment — single-session bookings live in KV, plan bookings (the
+    // flow BookSessionWithPayment.tsx actually uses today) live in the DB via
+    // db.createPayment(). This only ever checked KV, so every plan-based
+    // payment 404'd here even though it genuinely existed — refund requests
+    // have been broken for the live booking flow.
+    let payment: any = await kv.get(`payment:${paymentId}`);
+    let isDbPayment = false;
+    if (!payment) {
+      payment = await db.getPaymentById(paymentId);
+      if (payment) isDbPayment = true;
+    }
     if (!payment) {
       return c.json({ error: 'Payment not found' }, 404);
     }
@@ -1478,10 +1487,17 @@ app.post('/payments/:paymentId/refund', async (c) => {
       return c.json({ error: `Cannot refund ${payment.status} payments` }, 400);
     }
 
-    // Calculate refund amount based on time until session
-    const bookingId = payment.bookingId;
-    const booking = await kv.get(`booking:${bookingId}`) as any;
-    
+    // Calculate refund amount based on time until session. DB payments store
+    // bookingIds (plural — one per session in the plan); use the first
+    // upcoming one as the reference point, same logic as before.
+    let booking: any = null;
+    if (isDbPayment) {
+      const firstBookingId = (payment.bookingIds ?? [])[0];
+      if (firstBookingId) booking = await db.getBooking(firstBookingId);
+    } else {
+      booking = payment.bookingId ? await kv.get(`booking:${payment.bookingId}`) : null;
+    }
+
     let refundPercentage = 0;
     if (booking) {
       const sessionDateTime = new Date(`${booking.date}T${booking.startTime}+01:00`);
@@ -1533,16 +1549,22 @@ app.post('/payments/:paymentId/refund', async (c) => {
       metadata: { paymentId, refundId, amount: refundAmount, refundPercentage, reason },
     });
 
-    // Update payment with refund status
-    const updatedPayment = {
-      ...payment,
-      refundId,
-      refundStatus: 'requested',
-      refundAmount,
-      refundPercentage,
-      refundRequestedAt: new Date().toISOString(),
-    };
-    await kv.set(`payment:${paymentId}`, updatedPayment);
+    // Mirror refund status onto the payment record — KV only. The `payments`
+    // DB table has no refund columns (no migration for it), so for DB-based
+    // payments the refund:<id> record above is the source of truth for
+    // status instead; writing here would just create a spurious new KV row
+    // sharing the DB payment's id rather than updating anything real.
+    if (!isDbPayment) {
+      const updatedPayment = {
+        ...payment,
+        refundId,
+        refundStatus: 'requested',
+        refundAmount,
+        refundPercentage,
+        refundRequestedAt: new Date().toISOString(),
+      };
+      await kv.set(`payment:${paymentId}`, updatedPayment);
+    }
 
     // Send refund confirmation email (non-fatal)
     try {
@@ -1580,9 +1602,198 @@ app.post('/payments/:paymentId/refund', async (c) => {
   }
 });
 
-// Helper to format amount in Naira (assuming it's in minor units)
+// List refund requests (admin only) — optionally filter by ?status=pending
+app.get('/admin/refunds', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) return c.json({ error: 'Unauthorized' }, 401);
+    const user = await getUserFromToken(accessToken);
+    if (!user || user.role !== 'admin') {
+      return c.json({ error: 'Unauthorized - Admins only' }, 403);
+    }
+
+    const statusFilter = c.req.query('status');
+    const allRefunds = await kv.getByPrefix('refund:');
+    const filtered = statusFilter ? allRefunds.filter((r: any) => r.status === statusFilter) : allRefunds;
+
+    const enriched = await Promise.all(filtered.map(async (r: any) => {
+      const requester = (await kv.get(`user:${r.userId}`) as any) || await db.getProfile(r.userId).catch(() => null);
+      const userName = requester?.fullName || requester?.name ||
+        (requester?.firstName ? `${requester.firstName} ${requester.lastName || ''}`.trim() : null) ||
+        requester?.email || 'Unknown';
+      return { ...r, userName, userEmail: requester?.email || null };
+    }));
+
+    enriched.sort((a, b) => new Date(b.requestedAt).getTime() - new Date(a.requestedAt).getTime());
+
+    return c.json({ refunds: enriched });
+  } catch (error: any) {
+    console.error('Error listing refunds:', error);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
+// Approve or reject a refund request (admin only). Approval re-verifies the
+// original transaction with Flutterwave to get its current numeric id (not
+// reliably stored at request time, especially for DB-based/plan payments)
+// and issues the refund through their API — this is the step that was
+// entirely missing: requests could be created but never actually completed.
+app.post('/admin/refunds/:refundId/process', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    if (!accessToken) return c.json({ error: 'Unauthorized' }, 401);
+    const admin = await getUserFromToken(accessToken);
+    if (!admin || admin.role !== 'admin') {
+      return c.json({ error: 'Unauthorized - Admins only' }, 403);
+    }
+    const adminId = admin.userId || admin.id;
+
+    const refundId = c.req.param('refundId');
+    const { action, note } = await c.req.json() as { action?: string; note?: string };
+    if (action !== 'approve' && action !== 'reject') {
+      return c.json({ error: 'action must be "approve" or "reject"' }, 400);
+    }
+
+    const refund = await kv.get(`refund:${refundId}`) as any;
+    if (!refund) return c.json({ error: 'Refund request not found' }, 404);
+    if (refund.status !== 'pending') {
+      return c.json({ error: `Refund is already ${refund.status}` }, 400);
+    }
+
+    const requester = (await kv.get(`user:${refund.userId}`) as any) || await db.getProfile(refund.userId).catch(() => null);
+    const userName = requester?.fullName || requester?.name || 'Customer';
+    const userEmail = requester?.email;
+    const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
+
+    if (action === 'reject') {
+      refund.status = 'rejected';
+      refund.rejectedAt = new Date().toISOString();
+      refund.rejectedBy = adminId;
+      refund.adminNote = note || '';
+      await kv.set(`refund:${refundId}`, refund);
+
+      await logAuditEvent({
+        userId: refund.userId,
+        adminId,
+        action: 'refund_rejected',
+        category: 'payments',
+        description: `Refund request rejected for payment ${refund.paymentId} (${formatNaira(refund.amount)}).${note ? ` Note: ${note}` : ''}`,
+        metadata: { refundId, paymentId: refund.paymentId, amount: refund.amount, note },
+      });
+
+      if (userEmail) {
+        const tpl = emailTemplates.refundRejected(
+          userName,
+          formatNaira(refund.amount),
+          refund.reference || refundId,
+          note || '',
+          `${dashboardBase}/dashboard`,
+        );
+        await sendEmail({ to: userEmail, ...tpl }).catch((e) => console.warn('refund rejection email:', e));
+      }
+
+      return c.json({ success: true, refund });
+    }
+
+    // action === 'approve'
+    if (!FLUTTERWAVE_SECRET_KEY) return c.json({ error: 'Payment not configured yet' }, 503);
+    if (!refund.reference) {
+      return c.json({ error: 'Refund has no payment reference on file — cannot verify with Flutterwave' }, 400);
+    }
+
+    const verifyRes = await fetch(
+      `https://api.flutterwave.com/v3/transactions/verify_by_reference?tx_ref=${refund.reference}`,
+      { headers: { 'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}` } },
+    );
+    const verifyData = await verifyRes.json() as { status: string; message?: string; data?: { id: number } };
+    if (verifyData.status !== 'success' || !verifyData.data?.id) {
+      return c.json({ error: 'Could not verify the original transaction with Flutterwave', details: verifyData.message }, 502);
+    }
+    const flutterwaveTransactionId = verifyData.data.id;
+
+    const refundRes = await fetch(
+      `https://api.flutterwave.com/v3/transactions/${flutterwaveTransactionId}/refund`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          amount: refund.amount,
+          comments: note || refund.reason || 'Refund approved by admin',
+        }),
+      },
+    );
+    const refundData = await refundRes.json() as { status: string; message?: string; data?: unknown };
+
+    if (refundData.status !== 'success') {
+      refund.status = 'failed';
+      refund.failedAt = new Date().toISOString();
+      refund.failureReason = refundData.message || 'Flutterwave refund failed';
+      await kv.set(`refund:${refundId}`, refund);
+
+      await logAuditEvent({
+        userId: refund.userId,
+        adminId,
+        action: 'refund_failed',
+        category: 'payments',
+        description: `Refund attempt failed for payment ${refund.paymentId}: ${refund.failureReason}`,
+        severity: 'critical',
+        metadata: { refundId, paymentId: refund.paymentId, amount: refund.amount, flutterwaveTransactionId, error: refundData.message },
+      });
+
+      return c.json({ success: false, error: 'Flutterwave refund failed', details: refundData.message }, 502);
+    }
+
+    refund.status = 'processed';
+    refund.processedAt = new Date().toISOString();
+    refund.processedBy = adminId;
+    refund.flutterwaveRefundResponse = refundData.data;
+    await kv.set(`refund:${refundId}`, refund);
+
+    // Mirror onto the KV payment record when that's where it lives (see the
+    // request handler above for why DB-based payments skip this).
+    const kvPayment = await kv.get(`payment:${refund.paymentId}`) as any;
+    if (kvPayment) {
+      kvPayment.refundStatus = 'processed';
+      kvPayment.status = 'refunded';
+      await kv.set(`payment:${refund.paymentId}`, kvPayment);
+    }
+
+    await logAuditEvent({
+      userId: refund.userId,
+      adminId,
+      action: 'refund_processed',
+      category: 'payments',
+      description: `Refund of ${formatNaira(refund.amount)} processed via Flutterwave for payment ${refund.paymentId}`,
+      metadata: { refundId, paymentId: refund.paymentId, amount: refund.amount, flutterwaveTransactionId },
+    });
+
+    if (userEmail) {
+      const tpl = emailTemplates.refundProcessed(
+        userName,
+        formatNaira(refund.amount),
+        refund.reference || refundId,
+        `${dashboardBase}/dashboard`,
+      );
+      await sendEmail({ to: userEmail, ...tpl }).catch((e) => console.warn('refund processed email:', e));
+    }
+
+    return c.json({ success: true, refund });
+  } catch (error: any) {
+    console.error('Error processing refund action:', error);
+    return c.json({ error: error.message || 'Failed to process refund' }, 500);
+  }
+});
+
+// Helper to format amount in Naira. Amounts throughout this codebase are
+// stored in major units (Naira), not kobo — see src/utils/currency.ts:
+// "Flutterwave uses direct Naira amounts". This used to divide by 100,
+// silently under-displaying every amount it formatted by 100x (the
+// refund-requested email, and this file's payout audit-log entries).
 function formatNaira(amount: number): string {
-  return `₦${(amount / 100).toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+  return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 export default app;
