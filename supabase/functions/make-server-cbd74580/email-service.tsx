@@ -827,6 +827,7 @@ export const emailTemplates = {
     dashboardLink: string,
     transactionRef: string,
     amount: string,
+    calendarLink: string | null = null,
   ) => ({
     subject: `Booking Confirmed — ${planName} with ${tutorName}`,
     html: `
@@ -913,6 +914,21 @@ export const emailTemplates = {
                   </td></tr>
                 </table>
 
+                ${calendarLink ? `
+                <!-- Calendar link -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:24px;">
+                  <tr><td style="padding:20px 24px;">
+                    <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#15803d;text-transform:uppercase;letter-spacing:0.8px;">Add to Your Calendar</p>
+                    <p style="margin:0 0 16px;font-size:14px;color:#374151;line-height:1.5;">
+                      One click adds every session in this plan to your calendar app (Google, Outlook, or Apple) with a reminder.
+                    </p>
+                    <a href="${calendarLink}" style="display:inline-block;background:#15803d;color:#ffffff;font-size:14px;font-weight:600;padding:12px 24px;border-radius:6px;text-decoration:none;">
+                      &#128197; &nbsp;Add to Calendar
+                    </a>
+                  </td></tr>
+                </table>
+                ` : ''}
+
                 <!-- Tips -->
                 <table width="100%" cellpadding="0" cellspacing="0" style="background:#fefce8;border:1px solid #fef08a;border-radius:8px;margin-bottom:24px;">
                   <tr><td style="padding:20px 24px;">
@@ -967,6 +983,7 @@ export const emailTemplates = {
     meetLink: string,
     dashboardLink: string,
     tutorEarnings: string,
+    calendarLink: string | null = null,
   ) => ({
     subject: `New Booking — ${planName} for ${studentName}`,
     html: `
@@ -1063,6 +1080,21 @@ export const emailTemplates = {
                     <p style="margin:12px 0 0;font-size:12px;color:#6b7280;word-break:break-all;">${meetLink}</p>
                   </td></tr>
                 </table>
+
+                ${calendarLink ? `
+                <!-- Calendar link -->
+                <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:24px;">
+                  <tr><td style="padding:20px 24px;">
+                    <p style="margin:0 0 8px;font-size:13px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.8px;">Add to Your Calendar</p>
+                    <p style="margin:0 0 16px;font-size:14px;color:#374151;line-height:1.5;">
+                      One click adds every session in this booking to your calendar app with a reminder.
+                    </p>
+                    <a href="${calendarLink}" style="display:inline-block;background:#7c3aed;color:#ffffff;font-size:14px;font-weight:600;padding:12px 24px;border-radius:6px;text-decoration:none;">
+                      &#128197; &nbsp;Add to Calendar
+                    </a>
+                  </td></tr>
+                </table>
+                ` : ''}
 
                 <!-- Expectations -->
                 <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;margin-bottom:24px;">

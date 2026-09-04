@@ -43,7 +43,6 @@ import KFALogo from './KFALogo';
 import { MobileNavigation } from './MobileNavigation';
 import { NotificationCenter } from './NotificationCenter';
 import { TutorProfileEditor } from './TutorProfileEditor';
-import { GoogleCalendarSetup } from './GoogleCalendarSetup';
 
 import { TutorAvailabilityManager } from './TutorAvailabilityManager';
 import { BookingManager } from './BookingManager';
@@ -1149,7 +1148,6 @@ export function TutorDashboard({
                   currentProfile={profile}
                   onProfileUpdated={fetchDashboardData}
                 />
-                <GoogleCalendarSetup session={session} />
               </div>
             )}
           </TabsContent>

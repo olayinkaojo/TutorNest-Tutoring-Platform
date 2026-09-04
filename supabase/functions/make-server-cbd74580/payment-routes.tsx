@@ -4,6 +4,7 @@ import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 import { logAuditEvent } from './activity-log.tsx';
+import { buildIcsContent, createCalendarDownloadLink } from './calendar-ics.tsx';
 
 const app = new Hono();
 
@@ -1065,92 +1066,6 @@ app.post('/payments/initiate-plan', async (c) => {
   }
 });
 
-// ─── Google Calendar helpers ──────────────────────────────────────────────────
-
-/** Returns a valid Google access token, refreshing if it is about to expire. */
-async function getGoogleToken(tutorId: string): Promise<string | null> {
-  const tokens = await kv.get(`google_calendar_tokens:${tutorId}`) as any;
-  if (!tokens?.accessToken) return null;
-
-  // Refresh if expiring within 5 minutes
-  if (tokens.expiresAt && Date.now() >= tokens.expiresAt - 300_000) {
-    const clientId = Deno.env.get('GOOGLE_CLIENT_ID');
-    const clientSecret = Deno.env.get('GOOGLE_CLIENT_SECRET');
-    if (!clientId || !clientSecret || !tokens.refreshToken) return null;
-
-    const res = await fetch('https://oauth2.googleapis.com/token', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-      body: new URLSearchParams({
-        refresh_token: tokens.refreshToken,
-        client_id: clientId,
-        client_secret: clientSecret,
-        grant_type: 'refresh_token',
-      }),
-    });
-    if (!res.ok) return null;
-    const fresh = await res.json() as any;
-    await kv.set(`google_calendar_tokens:${tutorId}`, {
-      ...tokens,
-      accessToken: fresh.access_token,
-      expiresAt: Date.now() + (fresh.expires_in * 1000),
-      refreshToken: fresh.refresh_token || tokens.refreshToken,
-    });
-    return fresh.access_token;
-  }
-
-  return tokens.accessToken;
-}
-
-/**
- * Creates a single Google Calendar event with a Meet link.
- * Returns the hangout (Meet) link, or null on failure.
- */
-async function createMeetEvent(
-  googleToken: string,
-  opts: { date: string; startTime: string; endTime: string; subject: string | null; sessionLabel: string },
-): Promise<string | null> {
-  const tz = 'Africa/Lagos';
-  const event = {
-    summary: `Knowledge Fons Academy: ${opts.subject ?? 'Tutoring Session'}`,
-    description: opts.sessionLabel,
-    start: { dateTime: `${opts.date}T${opts.startTime}:00`, timeZone: tz },
-    end:   { dateTime: `${opts.date}T${opts.endTime}:00`,   timeZone: tz },
-    reminders: {
-      useDefault: false,
-      overrides: [
-        { method: 'email', minutes: 24 * 60 },
-        { method: 'popup', minutes: 30 },
-      ],
-    },
-    conferenceData: {
-      createRequest: {
-        requestId: crypto.randomUUID(),
-        conferenceSolutionKey: { type: 'hangoutsMeet' },
-      },
-    },
-  };
-
-  const res = await fetch(
-    'https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1',
-    {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${googleToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(event),
-    },
-  );
-
-  if (!res.ok) {
-    console.warn('Google Calendar event creation failed:', await res.text());
-    return null;
-  }
-  const data = await res.json() as any;
-  return data.hangoutLink ?? data.conferenceData?.entryPoints?.[0]?.uri ?? null;
-}
-
 // ─── Shared: confirm a plan payment and create all bookings ──────────────────
 // Called by both the client-side confirm-plan route AND the Flutterwave webhook.
 // Returns the number of sessions created, or throws on failure.
@@ -1234,36 +1149,39 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
     message: `You have a new ${plan.name} booking — ${plan.sessions} sessions starting ${payment.startDate}. Expected earnings: ₦${tutorAmount.toLocaleString()}.`,
   });
 
-  // ── Create Google Meet link, falling back to Jitsi ────────────────────────
-  // We create ONE link shared across ALL sessions in the plan so both parties
-  // use the same virtual room every week.
-  let meetLink: string | null = null;
-  try {
-    const googleToken = await getGoogleToken(payment.tutorId);
-    if (googleToken) {
-      const firstDate = bookingDates[0].toISOString().split('T')[0];
-      meetLink = await createMeetEvent(googleToken, {
-        date: firstDate,
-        startTime: payment.startTime,
-        endTime,
-        subject: payment.subject,
-        sessionLabel: `${plan.name} (${plan.sessions} sessions) — Knowledge Fons Academy`,
-      });
-    }
-  } catch (calendarErr: any) {
-    console.warn('Google Calendar Meet link creation skipped:', calendarErr.message);
-  }
-
-  // Jitsi fallback — always available, no account needed
-  if (!meetLink) {
-    const roomSlug = payment.reference.replace('TNP_', '').slice(0, 16).toLowerCase();
-    meetLink = `https://meet.jit.si/Knowledge Fons Academy-${roomSlug}`;
-    console.log('Using Jitsi fallback meet link:', meetLink);
-  }
+  // ── Session room ───────────────────────────────────────────────────────────
+  // Used to create this via a per-tutor Google Calendar OAuth grant (full
+  // read/write access to their whole calendar, just to create one event with
+  // a Meet link — the "sensitive scope" that put the app through Google's
+  // verification review). Retired: Jitsi needs no account and no per-tutor
+  // setup at all. This is the interim video mechanism until Daily.co
+  // (cloud-recorded, embedded) replaces it.
+  const roomSlug = payment.reference.replace('TNP_', '').slice(0, 16).toLowerCase();
+  const meetLink = `https://meet.jit.si/Knowledge Fons Academy-${roomSlug}`;
 
   // Stamp meet link on all booking rows
   await db.updateBookingsMeetLink(bookingIds, meetLink);
   console.log(`Meet link set for payment ${payment.id}:`, meetLink);
+
+  // ── Calendar invite (.ics) — no OAuth, works with any calendar app ────────
+  let calendarLink: string | null = null;
+  try {
+    const firstDate = bookingDates[0].toISOString().split('T')[0];
+    const icsContent = buildIcsContent({
+      uid: `plan-${payment.id}`,
+      summary: `Knowledge Fons Academy: ${payment.subject ?? 'Tutoring Session'}`,
+      description: `${plan.name} (${plan.sessions} sessions) — Knowledge Fons Academy. Join link: ${meetLink}`,
+      location: meetLink,
+      startDate: firstDate,
+      startTime: payment.startTime,
+      endTime,
+      sessionsPerWeek: plan.sessionsPerWeek as 1 | 2,
+      totalSessions: plan.sessions,
+    });
+    calendarLink = await createCalendarDownloadLink(icsContent);
+  } catch (icsErr: any) {
+    console.warn('Calendar invite (.ics) creation skipped (non-fatal):', icsErr.message);
+  }
 
   // ── Send professional emails (non-fatal) ───────────────────────────────────
   try {
@@ -1329,6 +1247,7 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
         dashboardLink,
         payment.reference,
         formattedAmount,
+        calendarLink,
       );
       await sendEmail({ to: parentEmail, ...parentTemplate });
     }
@@ -1347,6 +1266,7 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
         meetLink,
         dashboardLink,
         tutorEarnings,
+        calendarLink,
       );
       await sendEmail({ to: tutorEmail, ...tutorTemplate });
     }

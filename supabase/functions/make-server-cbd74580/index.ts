@@ -18,6 +18,7 @@ import { adminUserDeletionRoutes } from './admin-user-deletion-routes.tsx';
 import reviewsDisputesRoutes from './reviews-disputes-routes.tsx';
 import subscriptionsRoutes from './subscriptions-routes.tsx';
 import googleCalendarRoutes from './google-calendar-routes.tsx';
+import calendarIcsRoutes from './calendar-ics.tsx';
 import couponsCreditsRoutes from './coupons-credits-routes.tsx';
 import taxInvoicingRoutes from './tax-invoicing-routes.tsx';
 import bookingRoutes from './booking-routes.tsx';
@@ -470,8 +471,13 @@ app.get('/make-server-cbd74580/subscription-tiers', async (c) => {
   });
 });
 
-// Register Google Calendar routes
+// Register Google Calendar routes — kept only for existing tutors' status/
+// disconnect checks (see BookingCalendar.tsx). Nothing writes new
+// connections anymore; new bookings use calendar-ics.tsx instead.
 googleCalendarRoutes(app, getSupabaseClient);
+
+// OAuth-free calendar invites (.ics) — see calendar-ics.tsx for why.
+app.route('/', calendarIcsRoutes);
 
 // Register coupons and credits routes
 app.route('/make-server-cbd74580', couponsCreditsRoutes);
