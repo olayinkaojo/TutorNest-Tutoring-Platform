@@ -12,6 +12,7 @@ import { Label } from './ui/label';
 import { Input } from './ui/input';
 import { PostSessionReport } from './PostSessionReport';
 import { ViewSessionReport } from './ViewSessionReport';
+import { SessionCallModal } from './SessionCallModal';
 import { parentAPI } from '../utils/api-client';
 import { useRealtimeBookings, WebSocketEvents } from '../hooks/useWebSocket';
 import {
@@ -76,6 +77,7 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
   const [rescheduleTime, setRescheduleTime] = useState('');
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [rescheduling, setRescheduling] = useState(false);
+  const [callBookingId, setCallBookingId] = useState<string | null>(null);
 
   // Real-time updates via WebSocket
   const handleRealtimeUpdate = (type: string, data: unknown) => {
@@ -437,15 +439,14 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
           {booking.status === 'confirmed' && (
             <div className="space-y-2">
               {booking.googleMeetLink ? (
-                <a href={booking.googleMeetLink} target="_blank" rel="noopener noreferrer" className="block">
-                  <Button
-                    className="w-full text-white font-semibold h-11"
-                    style={{ backgroundColor: accentColor }}
-                  >
-                    <Video className="w-4 h-4 mr-2" />
-                    {startingSoon ? 'Join Now — Session Starting!' : 'Enter Classroom'}
-                  </Button>
-                </a>
+                <Button
+                  className="w-full text-white font-semibold h-11"
+                  style={{ backgroundColor: accentColor }}
+                  onClick={() => setCallBookingId(booking.id)}
+                >
+                  <Video className="w-4 h-4 mr-2" />
+                  {startingSoon ? 'Join Now — Session Starting!' : 'Enter Classroom'}
+                </Button>
               ) : (
                 <Button className="w-full h-11" variant="outline" disabled>
                   <Video className="w-4 h-4 mr-2" />
@@ -809,6 +810,14 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
           <Wifi className="w-3 h-3 text-green-600" />
           <span>Real-time updates active</span>
         </div>
+      )}
+
+      {callBookingId && (
+        <SessionCallModal
+          bookingId={callBookingId}
+          accessToken={session.access_token}
+          onClose={() => setCallBookingId(null)}
+        />
       )}
       </div>
     </div>

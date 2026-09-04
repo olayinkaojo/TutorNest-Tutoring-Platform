@@ -19,6 +19,7 @@ import reviewsDisputesRoutes from './reviews-disputes-routes.tsx';
 import subscriptionsRoutes from './subscriptions-routes.tsx';
 import googleCalendarRoutes from './google-calendar-routes.tsx';
 import calendarIcsRoutes from './calendar-ics.tsx';
+import dailyVideoRoutes from './daily-video-routes.tsx';
 import couponsCreditsRoutes from './coupons-credits-routes.tsx';
 import taxInvoicingRoutes from './tax-invoicing-routes.tsx';
 import bookingRoutes from './booking-routes.tsx';
@@ -478,6 +479,9 @@ googleCalendarRoutes(app, getSupabaseClient);
 
 // OAuth-free calendar invites (.ics) — see calendar-ics.tsx for why.
 app.route('/', calendarIcsRoutes);
+
+// Daily.co embedded video + cloud recording — replaces Google Meet/Jitsi.
+dailyVideoRoutes(app, getUserId);
 
 // Register coupons and credits routes
 app.route('/make-server-cbd74580', couponsCreditsRoutes);

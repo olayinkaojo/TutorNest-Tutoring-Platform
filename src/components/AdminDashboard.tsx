@@ -45,6 +45,7 @@ import { ChildProfileManagement } from './admin/ChildProfileManagement';
 import { AuditLogViewer } from './admin/AuditLogViewer';
 import { DocumentAuditTrail } from './admin/DocumentAuditTrail';
 import { ChatSafeguardingViewer } from './admin/ChatSafeguardingViewer';
+import { RecordingsViewer } from './admin/RecordingsViewer';
 import adminAPI from '../utils/admin-api-client';
 
 interface UserProfile {
@@ -411,6 +412,7 @@ export function AdminDashboard({
             <TabsTrigger value="auditlog">Audit Log</TabsTrigger>
             <TabsTrigger value="documenttrail">Document Trail</TabsTrigger>
             <TabsTrigger value="safeguarding">Safeguarding</TabsTrigger>
+            <TabsTrigger value="recordings">Recordings</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -553,6 +555,12 @@ export function AdminDashboard({
           <TabsContent value="safeguarding">
             {session && (
               <ChatSafeguardingViewer accessToken={session.access_token} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="recordings">
+            {session && (
+              <RecordingsViewer accessToken={session.access_token} />
             )}
           </TabsContent>
 

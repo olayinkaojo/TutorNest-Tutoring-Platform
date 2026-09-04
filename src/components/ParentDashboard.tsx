@@ -13,6 +13,7 @@ import { NotificationCenter } from './NotificationCenter';
 import { ProgressDashboard } from './ProgressDashboard';
 import { MobileNavigation } from './MobileNavigation';
 import { UpcomingLessonsCard } from './UpcomingLessonsCard';
+import { SessionCallModal } from './SessionCallModal';
 import { CurriculumPDFViewer } from './CurriculumPDFViewer';
 import { ParentContentLibrary } from './ParentContentLibrary';
 import { AddChildDialog } from './AddChildDialog';
@@ -100,6 +101,7 @@ export function ParentDashboard({
   const [showRoleCongrats, setShowRoleCongrats] = useState(false);
   const [preSelectedTutorId, setPreSelectedTutorId] = useState<string | undefined>(undefined);
   const [soonSession, setSoonSession] = useState<any>(null);
+  const [callBookingId, setCallBookingId] = useState<string | null>(null);
 
   const validTabs = new Set([
     'overview',
@@ -627,14 +629,12 @@ export function ParentDashboard({
             </div>
           </div>
           {(soonSession.googleMeetLink || soonSession.meetLink) && (
-            <a
-              href={soonSession.googleMeetLink || soonSession.meetLink}
-              target="_blank"
-              rel="noopener noreferrer"
+            <button
+              onClick={() => setCallBookingId(soonSession.id)}
               className="bg-white text-purple-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-purple-50 transition-colors flex-shrink-0"
             >
               Join Now
-            </a>
+            </button>
           )}
         </div>
       )}
@@ -1231,6 +1231,14 @@ export function ParentDashboard({
         accessToken={session?.access_token || ''}
         onChildUpdated={handleChildAdded}
       />
+
+      {callBookingId && (
+        <SessionCallModal
+          bookingId={callBookingId}
+          accessToken={session.access_token}
+          onClose={() => setCallBookingId(null)}
+        />
+      )}
     </div>
   );
 }

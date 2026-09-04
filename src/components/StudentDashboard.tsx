@@ -57,6 +57,7 @@ import { Progress } from './ui/progress';
 import { StudentGettingStartedCard } from './student/StudentGettingStartedCard';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { AvatarUpload } from './AvatarUpload';
+import { SessionCallModal } from './SessionCallModal';
 import {
   BookOpen,
   Clock,
@@ -152,6 +153,7 @@ export function StudentDashboard({
   const [activeTab, setActiveTab] = useState('performance');
   const [newReportsCount, setNewReportsCount] = useState(0);
   const [soonSession, setSoonSession] = useState<any>(null);
+  const [callBookingId, setCallBookingId] = useState<string | null>(null);
   const [progressImprovement, setProgressImprovement] = useState<{ subject: string; improvement: number } | null>(null);
   const [lastReportCheck, setLastReportCheck] = useState<Date | null>(null);
   const academicStudentId = profile.linkedChildId || profile.id || profile.userId;
@@ -704,14 +706,12 @@ export function StudentDashboard({
               </div>
             </div>
             {(soonSession.googleMeetLink || soonSession.meetLink) && (
-              <a
-                href={soonSession.googleMeetLink || soonSession.meetLink}
-                target="_blank"
-                rel="noopener noreferrer"
+              <button
+                onClick={() => setCallBookingId(soonSession.id)}
                 className="bg-white text-purple-700 text-xs font-bold px-3 py-1.5 rounded-full hover:bg-purple-50 transition-colors flex-shrink-0"
               >
                 Join Now
-              </a>
+              </button>
             )}
           </div>
         )}
@@ -959,16 +959,14 @@ export function StudentDashboard({
                                       </Badge>
                                     </div>
                                     {session.googleMeetLink && (
-                                      <a
-                                        href={session.googleMeetLink}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
+                                      <button
+                                        onClick={() => setCallBookingId(session.id)}
                                         className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-white transition-colors"
                                         style={{ backgroundColor: startingSoon ? '#5d9827' : '#625d9c' }}
                                       >
                                         <Video className="w-3.5 h-3.5" />
                                         {startingSoon ? 'Join Now' : 'Join Classroom'}
-                                      </a>
+                                      </button>
                                     )}
                                   </div>
                                 </div>
@@ -1276,6 +1274,14 @@ export function StudentDashboard({
           </TabsContent>
         </Tabs>
       </main>
+
+      {callBookingId && (
+        <SessionCallModal
+          bookingId={callBookingId}
+          accessToken={session.access_token}
+          onClose={() => setCallBookingId(null)}
+        />
+      )}
     </div>
   );
 }

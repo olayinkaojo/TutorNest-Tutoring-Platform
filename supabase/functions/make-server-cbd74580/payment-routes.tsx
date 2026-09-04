@@ -5,6 +5,7 @@ import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 import { logAuditEvent } from './activity-log.tsx';
 import { buildIcsContent, createCalendarDownloadLink } from './calendar-ics.tsx';
+import { createDailyRoom } from './daily-video-routes.tsx';
 
 const app = new Hono();
 
@@ -1150,18 +1151,37 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
   });
 
   // ── Session room ───────────────────────────────────────────────────────────
-  // Used to create this via a per-tutor Google Calendar OAuth grant (full
-  // read/write access to their whole calendar, just to create one event with
-  // a Meet link — the "sensitive scope" that put the app through Google's
-  // verification review). Retired: Jitsi needs no account and no per-tutor
-  // setup at all. This is the interim video mechanism until Daily.co
-  // (cloud-recorded, embedded) replaces it.
-  const roomSlug = payment.reference.replace('TNP_', '').slice(0, 16).toLowerCase();
-  const meetLink = `https://meet.jit.si/Knowledge Fons Academy-${roomSlug}`;
+  // One Daily.co room for the whole plan (all weekly sessions reuse it, same
+  // as the old shared-link behaviour) — private, cloud recording enabled.
+  // Recording itself is triggered per-join via a meeting token (see
+  // daily-video-routes.tsx's join-token endpoint), not here. Falls back to
+  // Jitsi (no account needed, but not recorded) only if Daily's API is
+  // unreachable, so a booking is never left with no room at all.
+  const roomExpiresAt = new Date(payment.startDate + 'T23:59:59+01:00');
+  roomExpiresAt.setDate(roomExpiresAt.getDate() + (plan.weeks * 7) + 3);
+  let meetLink = await createDailyRoom(payment.id, roomExpiresAt).catch((e: any) => {
+    console.warn('Daily room creation failed (non-fatal, falling back to Jitsi):', e.message);
+    return null;
+  });
+  let recordedSessions = true;
+  if (!meetLink) {
+    recordedSessions = false;
+    const roomSlug = payment.reference.replace('TNP_', '').slice(0, 16).toLowerCase();
+    meetLink = `https://meet.jit.si/Knowledge Fons Academy-${roomSlug}`;
+    console.warn(`Daily unavailable — using unrecorded Jitsi fallback for payment ${payment.id}`);
+    await logAuditEvent({
+      userId: payment.tutorId,
+      action: 'session_room_fallback_unrecorded',
+      category: 'bookings',
+      description: `Daily.co room creation failed for payment ${payment.id} — sessions fell back to an unrecorded Jitsi room.`,
+      severity: 'warning',
+      metadata: { paymentId: payment.id },
+    });
+  }
 
   // Stamp meet link on all booking rows
   await db.updateBookingsMeetLink(bookingIds, meetLink);
-  console.log(`Meet link set for payment ${payment.id}:`, meetLink);
+  console.log(`Meet link set for payment ${payment.id} (recorded: ${recordedSessions}):`, meetLink);
 
   // ── Calendar invite (.ics) — no OAuth, works with any calendar app ────────
   let calendarLink: string | null = null;
