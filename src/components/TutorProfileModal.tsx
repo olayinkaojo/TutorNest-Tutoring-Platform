@@ -8,7 +8,7 @@ import {
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from './ui/card';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Alert, AlertDescription } from './ui/alert';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { ScrollArea } from './ui/scroll-area';
@@ -183,6 +183,12 @@ export function TutorProfileModal({
             <div className="bg-gradient-to-r from-purple-50 to-indigo-50 p-6 rounded-lg border border-purple-200">
               <div className="flex gap-4">
                 <Avatar className="w-20 h-20">
+                  {/* This never had an AvatarImage at all — it showed
+                      initials unconditionally, even for tutors with a real
+                      uploaded photo. */}
+                  {(tutor.photoUrl || tutor.photo_url) && (
+                    <AvatarImage src={tutor.photoUrl || tutor.photo_url} className="object-cover" />
+                  )}
                   <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }} className="text-lg">
                     {tutor.firstName?.[0]}{tutor.lastName?.[0]}
                   </AvatarFallback>

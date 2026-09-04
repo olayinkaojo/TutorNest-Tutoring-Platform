@@ -232,7 +232,13 @@ export function TutorSearch({
         <CardContent className="pt-5 pb-4">
           <div className="flex items-start gap-3 mb-4">
             <Avatar className="w-14 h-14 flex-shrink-0">
-              {tutor.profilePhoto && <AvatarImage src={tutor.profilePhoto} />}
+              {/* Uploads are written under photoUrl/photo_url (see
+                  profile-avatar-routes.tsx) — this read a field
+                  ("profilePhoto") that was never set, so every tutor with a
+                  real uploaded photo still showed initials here. */}
+              {(tutor.photoUrl || tutor.photo_url) && (
+                <AvatarImage src={tutor.photoUrl || tutor.photo_url} />
+              )}
               <AvatarFallback className="text-white text-sm font-bold" style={{ backgroundColor: '#625d9c' }}>
                 {initials || '?'}
               </AvatarFallback>
