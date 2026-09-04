@@ -226,7 +226,7 @@ export function TutorSearch({
         {isRecommended && (
           <div className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium" style={{ backgroundColor: '#625d9c15', color: '#625d9c' }}>
             <Sparkles className="w-3.5 h-3.5" />
-            AI Recommended Match
+            Recommended Match
           </div>
         )}
         <CardContent className="pt-5 pb-4">

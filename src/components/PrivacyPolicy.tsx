@@ -250,6 +250,50 @@ export function PrivacyPolicy() {
           </ul>
         </Card>
 
+        {/* Google User Data & API Services */}
+        <Card className="p-6">
+          <div className="flex items-center gap-3 mb-4">
+            <Shield className="w-6 h-6 text-[#625d9c]" />
+            <h2 className="text-2xl">Google User Data &amp; API Services</h2>
+          </div>
+
+          <p className="text-gray-700 mb-4">
+            Tutors may connect their Google Calendar so that confirmed tutoring sessions are automatically added
+            to their own calendar. Our use and transfer of information received from Google APIs adheres to the{' '}
+            <a
+              href="https://developers.google.com/terms/api-services-user-data-policy"
+              target="_blank"
+              rel="noreferrer"
+              className="underline hover:text-[#625d9c]"
+            >
+              Google API Services User Data Policy
+            </a>
+            , including the Limited Use requirements.
+          </p>
+
+          <ul className="text-gray-700 space-y-2 ml-4">
+            <li>
+              <strong>What we access:</strong> Only what's needed to create, read, update, and delete events on
+              the connecting tutor's own calendar for their tutoring sessions (session time, student name, and
+              meeting link). We do not read, store, or share any other calendar data.
+            </li>
+            <li>
+              <strong>No AI/ML use:</strong> We do not use Google user data — raw, aggregated, or derived — to
+              train, develop, or improve any artificial intelligence or machine learning model, foundational or
+              otherwise, and we do not transfer Google user data to any third-party AI/ML service.
+            </li>
+            <li>
+              <strong>No resale or unrelated use:</strong> Google user data is never sold, and is never used or
+              transferred for advertising, or for any purpose other than providing and maintaining the calendar
+              sync feature described here.
+            </li>
+            <li>
+              <strong>Revoking access:</strong> A tutor can disconnect Google Calendar at any time from their
+              profile settings, which deletes our stored access tokens.
+            </li>
+          </ul>
+        </Card>
+
         {/* International Transfers */}
         <Card className="p-6">
           <div className="flex items-center gap-3 mb-4">

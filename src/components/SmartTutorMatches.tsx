@@ -264,7 +264,7 @@ export function SmartTutorMatches({
               <h3 className="flex items-center gap-2">
                 Smart Matches for {studentName}
                 <Badge style={{ backgroundColor: '#5d9827', color: 'white' }}>
-                  AI-Powered
+                  Recommended
                 </Badge>
               </h3>
               <p className="text-sm text-gray-600">

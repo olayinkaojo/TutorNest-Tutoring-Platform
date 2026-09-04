@@ -234,7 +234,7 @@ export function AdvancedReporting({ userId, userType }: AdvancedReportingProps) 
           <TabsTrigger value="overview">Overview</TabsTrigger>
           <TabsTrigger value="performance">Performance</TabsTrigger>
           <TabsTrigger value="goals">Goals & Progress</TabsTrigger>
-          <TabsTrigger value="insights">AI Insights</TabsTrigger>
+          <TabsTrigger value="insights">Insights</TabsTrigger>
         </TabsList>
 
         {/* Overview Tab */}
@@ -437,12 +437,12 @@ export function AdvancedReporting({ userId, userType }: AdvancedReportingProps) 
           </Card>
         </TabsContent>
 
-        {/* AI Insights Tab */}
+        {/* Insights Tab */}
         <TabsContent value="insights" className="space-y-6">
           <Card>
             <CardHeader>
               <CardTitle>Predictive Insights</CardTitle>
-              <CardDescription>AI-powered recommendations and predictions</CardDescription>
+              <CardDescription>Personalized recommendations and predictions</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">

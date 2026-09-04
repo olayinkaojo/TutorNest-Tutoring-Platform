@@ -566,7 +566,7 @@ export function EnhancedTutorDashboard({ profile, onSignOut }: EnhancedTutorDash
               <Card>
                 <CardHeader>
                   <CardTitle>Teaching Tips</CardTitle>
-                  <CardDescription>AI-powered recommendations</CardDescription>
+                  <CardDescription>Personalized recommendations</CardDescription>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">

@@ -892,7 +892,7 @@ export function ParentDashboard({
                       <span className="text-2xl">✨</span>
                       <div className="flex-1">
                         <p className="font-semibold text-purple-800 text-sm">
-                          {showSmartMatch ? 'AI Smart Match Results' : 'Try AI-Powered Matching'}
+                          {showSmartMatch ? 'Smart Match Results' : 'Try Smart Matching'}
                         </p>
                         <p className="text-purple-600 text-xs mt-0.5">
                           {showSmartMatch
