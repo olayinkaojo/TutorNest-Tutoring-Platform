@@ -140,7 +140,20 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
 
       const totalSessions = filteredBookings.length;
 
-      const revenue = filteredPayments.reduce((sum: number, p: any) =>
+      // Revenue counts confirmed payments only — a pending payment hasn't
+      // actually been collected yet, so it was inflating this figure before.
+      const isConfirmed = (p: any) => p.status === 'confirmed' || p.status === 'paid' || p.status === 'successful';
+      const isPending   = (p: any) => p.status === 'pending' || p.status === 'processing';
+      const isFailed    = (p: any) => p.status === 'failed';
+      const isRefunded  = (p: any) => p.status === 'refunded';
+
+      const confirmedPayments = filteredPayments.filter(isConfirmed);
+      const revenue = confirmedPayments.reduce((sum: number, p: any) =>
+        sum + (parseFloat(p.amount) || 0), 0
+      );
+      const pendingPaymentsCount = filteredPayments.filter(isPending).length;
+      const failedPaymentsCount = filteredPayments.filter(isFailed).length;
+      const refundedAmount = filteredPayments.filter(isRefunded).reduce((sum: number, p: any) =>
         sum + (parseFloat(p.amount) || 0), 0
       );
 
@@ -153,14 +166,39 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       const dbUnread = await db.getUnreadNotificationCount(userId).catch(() => 0);
       const unreadNotifications = kvUnread + dbUnread;
 
+      // Real payment rows for the admin payments table — no more fabricating
+      // a single "Platform Revenue" row with a random fake reference.
+      const userNameById = new Map<string, string>(
+        kvUsers.map((u: any) => [
+          u.id ?? u.userId,
+          `${u.firstName || ''} ${u.lastName || ''}`.trim() || u.fullName || u.email || 'Unknown',
+        ])
+      );
+      const payments = filteredPayments
+        .map((p: any) => ({
+          id: p.id,
+          reference: p.reference ?? p.tx_ref ?? p.id,
+          user: userNameById.get(p.userId) || p.email || 'Unknown',
+          userRole: p.uploadedByRole || 'parent',
+          amount: parseFloat(p.amount) || 0,
+          status: p.status || 'pending',
+          createdAt: p.createdAt || p.confirmedAt || new Date().toISOString(),
+          planType: p.planType || p.subject || '—',
+        }))
+        .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+
       return c.json({
         stats: {
           activeTutors: activeTutorsCount,
           totalSessions,
           revenue: revenue.toFixed(2),
+          pendingPayments: pendingPaymentsCount,
+          failedPayments: failedPaymentsCount,
+          refundedAmount: refundedAmount.toFixed(2),
           activeAlerts,
           unreadNotifications,
         },
+        payments,
       });
     } catch (error: any) {
       console.error('Error fetching dashboard stats:', error);

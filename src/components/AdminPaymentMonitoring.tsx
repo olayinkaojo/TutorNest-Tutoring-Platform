@@ -86,34 +86,21 @@ export function AdminPaymentMonitoring() {
 
       if (response.ok) {
         const data = await response.json();
-        
-        // Mock payment objects from stats - in production, would fetch from dedicated endpoint
-        const mockPayments: Payment[] = [
-          {
-            id: '1',
-            reference: 'FLW-' + Math.random().toString(36).substring(7).toUpperCase(),
-            user: 'Platform Revenue',
-            userRole: 'system',
-            amount: parseFloat(data.stats?.revenue || '0'),
-            status: 'confirmed',
-            createdAt: new Date().toISOString(),
-            planType: 'Monthly',
-          },
-        ];
+        const realPayments: Payment[] = data.payments || [];
 
         const thisMonthStart = new Date(year, month - 1, 1);
         const thisMonthEnd = new Date(year, month, 0);
-        const thisMonthPayments = mockPayments.filter(p => {
+        const thisMonthPayments = realPayments.filter(p => {
           const d = new Date(p.createdAt);
-          return d >= thisMonthStart && d <= thisMonthEnd;
+          return d >= thisMonthStart && d <= thisMonthEnd && p.status === 'confirmed';
         });
 
-        setPayments(mockPayments);
+        setPayments(realPayments);
         setStats({
           totalRevenue: parseFloat(data.stats?.revenue || '0'),
-          pendingPayments: 0,
-          failedPayments: 0,
-          refundedAmount: 0,
+          pendingPayments: data.stats?.pendingPayments || 0,
+          failedPayments: data.stats?.failedPayments || 0,
+          refundedAmount: parseFloat(data.stats?.refundedAmount || '0'),
           thisMonthRevenue: thisMonthPayments.reduce((sum, p) => sum + p.amount, 0),
           thisMonthCount: thisMonthPayments.length,
         });
