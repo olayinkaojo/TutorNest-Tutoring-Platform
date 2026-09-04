@@ -136,10 +136,9 @@ export function PrivacyPolicy() {
           </div>
           <div className="text-gray-700 space-y-2">
             <p><strong>Company Name:</strong> Knowledge Fons Academy Ltd</p>
-            <p><strong>Registered Address:</strong> 123 Education Street, London, EC1A 1BB, United Kingdom</p>
             <p><strong>ICO Registration:</strong> ZA123456</p>
             <p><strong>Data Protection Officer:</strong> dpo@knowledgefonsacademy.com</p>
-            <p><strong>Contact:</strong> privacy@knowledgefonsacademy.com | +44 (0)20 1234 5678</p>
+            <p><strong>Contact:</strong> privacy@knowledgefonsacademy.com</p>
           </div>
         </Card>
 
@@ -426,7 +425,6 @@ export function PrivacyPolicy() {
             <a href="mailto:safeguarding@knowledgefonsacademy.com" className="text-[#625d9c] underline">
               safeguarding@knowledgefonsacademy.com
             </a>
-            {' '}or call 0800 123 4567 (24/7)
           </p>
         </Card>
 
@@ -441,8 +439,6 @@ export function PrivacyPolicy() {
           <div className="space-y-2 text-gray-700">
             <p><strong>Data Protection Officer:</strong> dpo@knowledgefonsacademy.com</p>
             <p><strong>Privacy Team:</strong> privacy@knowledgefonsacademy.com</p>
-            <p><strong>Phone:</strong> +44 (0)20 1234 5678</p>
-            <p><strong>Post:</strong> Knowledge Fons Academy Ltd, 123 Education Street, London, EC1A 1BB</p>
           </div>
           
           <div className="mt-4 p-4 bg-gray-100 rounded-lg">
