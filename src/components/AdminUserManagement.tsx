@@ -29,6 +29,7 @@ import {
   ShieldCheck,
   Calendar,
   FileText,
+  Trash2,
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
 import {
@@ -45,6 +46,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from './ui/dropdown-menu';
+import { Label } from './ui/label';
+import { Textarea } from './ui/textarea';
 
 interface AdminUserManagementProps {
   session: any;
@@ -179,6 +182,10 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
+  const [deleteTarget, setDeleteTarget] = useState<any>(null);
+  const [deleteReason, setDeleteReason] = useState('');
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   // Resolve a value across profileSummary + camelCase + snake_case variants.
   const ps = selectedUser?.profileSummary || {};
@@ -300,25 +307,27 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
     setFilteredUsers(filtered);
   };
 
-  const handleSuspendUser = async (userId: string) => {
+  const updateUserStatus = async (userId: string, status: 'suspended' | 'active', reason: string) => {
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/users/${userId}/suspend`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/users/${userId}/status`,
         {
-          method: 'POST',
+          method: 'PUT',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session.access_token}`,
           },
+          body: JSON.stringify({ status, reason }),
         }
       );
 
       if (response.ok) {
-        setSuccess('User suspended successfully');
+        setSuccess(status === 'suspended' ? 'User suspended successfully' : 'User reactivated successfully');
         setTimeout(() => setSuccess(''), 3000);
         loadUsers();
       } else {
-        throw new Error('Failed to suspend user');
+        const err = await response.json().catch(() => ({}));
+        throw new Error(err.error || `Failed to ${status === 'suspended' ? 'suspend' : 'reactivate'} user`);
       }
     } catch (err: any) {
       setError(err.message);
@@ -326,29 +335,58 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
     }
   };
 
-  const handleReactivateUser = async (userId: string) => {
+  const handleSuspendUser = (userId: string) => {
+    const reason = window.prompt('Reason for suspending this user (required):');
+    if (!reason || !reason.trim()) return;
+    void updateUserStatus(userId, 'suspended', reason.trim());
+  };
+
+  const handleReactivateUser = (userId: string) => {
+    void updateUserStatus(userId, 'active', 'Reactivated by admin');
+  };
+
+  const closeDeleteDialog = () => {
+    setDeleteTarget(null);
+    setDeleteReason('');
+    setDeleteConfirmText('');
+  };
+
+  const handleDeleteUser = async () => {
+    if (!deleteTarget) return;
+    setDeleting(true);
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/users/${userId}/reactivate`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/users/${deleteTarget.userId}`,
         {
-          method: 'POST',
+          method: 'DELETE',
           headers: {
             'Content-Type': 'application/json',
             Authorization: `Bearer ${session.access_token}`,
           },
+          body: JSON.stringify({ reason: deleteReason.trim() }),
         }
       );
 
+      const data = await response.json().catch(() => ({}));
       if (response.ok) {
-        setSuccess('User reactivated successfully');
-        setTimeout(() => setSuccess(''), 3000);
+        setSuccess(
+          data.warnings?.length
+            ? `Account deleted with ${data.warnings.length} warning(s) — check console for details.`
+            : 'Account permanently deleted.'
+        );
+        if (data.warnings?.length) console.warn('Account deletion warnings:', data.warnings);
+        setTimeout(() => setSuccess(''), 5000);
+        closeDeleteDialog();
+        setSelectedUser(null);
         loadUsers();
       } else {
-        throw new Error('Failed to reactivate user');
+        throw new Error(data.error || 'Failed to delete account');
       }
     } catch (err: any) {
       setError(err.message);
-      setTimeout(() => setError(''), 3000);
+      setTimeout(() => setError(''), 4000);
+    } finally {
+      setDeleting(false);
     }
   };
 
@@ -472,6 +510,18 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
                     <Ban className="w-4 h-4 mr-2 text-red-600" />
                     Suspend User
                   </DropdownMenuItem>
+                )}
+                {user.role !== 'admin' && (
+                  <>
+                    <DropdownMenuSeparator />
+                    <DropdownMenuItem
+                      onClick={() => setDeleteTarget(user)}
+                      className="text-red-700 focus:text-red-700 focus:bg-red-50"
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Account
+                    </DropdownMenuItem>
+                  </>
                 )}
               </DropdownMenuContent>
             </DropdownMenu>
@@ -829,12 +879,79 @@ export function AdminUserManagement({ session }: AdminUserManagementProps) {
                   </p>
                 </SectionCard>
 
-                <Button className="w-full" variant="outline" onClick={() => setSelectedUser(null)}>
-                  Close
-                </Button>
+                <div className="flex gap-2">
+                  <Button className="flex-1" variant="outline" onClick={() => setSelectedUser(null)}>
+                    Close
+                  </Button>
+                  {selectedUser.role !== 'admin' && (
+                    <Button
+                      variant="outline"
+                      className="text-red-700 border-red-200 hover:bg-red-50 hover:text-red-800"
+                      onClick={() => setDeleteTarget(selectedUser)}
+                    >
+                      <Trash2 className="w-4 h-4 mr-2" />
+                      Delete Account
+                    </Button>
+                  )}
+                </div>
               </div>
             </>
           )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Delete confirmation — requires typing the account's email, since this is permanent */}
+      <Dialog open={!!deleteTarget} onOpenChange={(open) => !open && !deleting && closeDeleteDialog()}>
+        <DialogContent className="max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-red-700">Delete account permanently</DialogTitle>
+            <DialogDescription>
+              This removes {deleteTarget ? getUserDisplayName(deleteTarget) : 'this user'}'s profile, uploaded
+              documents, verification record, and login — permanently. Bookings, payments, and reviews
+              involving them are kept (required for financial and dispute records) and will show as
+              "Unknown" going forward. This cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="delete-reason">Reason (required, kept in the audit log)</Label>
+              <Textarea
+                id="delete-reason"
+                value={deleteReason}
+                onChange={(e) => setDeleteReason(e.target.value)}
+                placeholder="e.g. Duplicate test account created during development"
+                rows={2}
+              />
+            </div>
+
+            <div>
+              <Label htmlFor="delete-confirm">
+                Type <strong>{deleteTarget?.email}</strong> to confirm
+              </Label>
+              <Input
+                id="delete-confirm"
+                value={deleteConfirmText}
+                onChange={(e) => setDeleteConfirmText(e.target.value)}
+                placeholder={deleteTarget?.email || ''}
+                autoComplete="off"
+              />
+            </div>
+          </div>
+
+          <div className="flex gap-2 mt-2">
+            <Button variant="outline" className="flex-1" onClick={closeDeleteDialog} disabled={deleting}>
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              className="flex-1"
+              disabled={deleting || !deleteReason.trim() || deleteConfirmText !== deleteTarget?.email}
+              onClick={() => void handleDeleteUser()}
+            >
+              {deleting ? 'Deleting…' : 'Delete Permanently'}
+            </Button>
+          </div>
         </DialogContent>
       </Dialog>
     </div>
