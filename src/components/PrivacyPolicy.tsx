@@ -123,10 +123,11 @@ export function PrivacyPolicy() {
             safeguard your information when you use our online tutoring platform.
           </p>
           <p className="text-gray-700 leading-relaxed">
-            Knowledge Fons Academy Ltd is registered in Nigeria, and this policy is governed by the Nigeria
-            Data Protection Act 2023 (NDPA). We serve users across Nigeria, other African countries, and the
-            diaspora — for users based in the UK, EU, or elsewhere, we also aim to honour the data protection
-            principles of your local law where it applies to our processing of your information.
+            Knowledge Fons Academy Ltd is registered in Nigeria, and our processing of your personal data is
+            governed primarily by the Nigeria Data Protection Act 2023 (NDPA). We also serve users in the
+            United Kingdom, the European Economic Area, the United States, and elsewhere — for those users,
+            we act as data controller for the purposes of UK GDPR, EU GDPR, or other local law where it
+            applies to our processing of your information.
           </p>
         </Card>
 
@@ -190,7 +191,9 @@ export function PrivacyPolicy() {
             <div>
               <h3 className="text-lg font-medium mb-2">Legal Basis for Processing</h3>
               <p className="text-gray-700 mb-3">
-                We process your personal data under the following legal bases:
+                Under the Nigeria Data Protection Act 2023, and — for users in the UK or European Economic
+                Area — as defined by UK GDPR / EU GDPR, we process your personal data under the following
+                legal bases:
               </p>
               <ul className="text-gray-700 space-y-2 ml-4">
                 <li><strong>Contract Performance:</strong> To provide tutoring services and process payments</li>
