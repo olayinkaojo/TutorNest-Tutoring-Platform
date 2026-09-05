@@ -690,7 +690,7 @@ export function EnhancedAddChildDialog({
             <Alert className="bg-blue-50 border-blue-200">
               <Sparkles className="h-4 w-4 text-blue-600" />
               <AlertDescription className="text-blue-800 text-sm">
-                <strong>Smart Matching Enabled!</strong> Based on this profile, our AI will match your child with the most compatible tutors, considering teaching style, experience, availability, and budget.
+                <strong>Smart Matching Enabled!</strong> Based on this profile, our Smart Match engine will rank the most compatible tutors for your child, considering teaching style, experience, availability, and budget.
               </AlertDescription>
             </Alert>
 
