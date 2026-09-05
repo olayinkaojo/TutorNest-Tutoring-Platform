@@ -260,6 +260,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
 
   // Final submission consent
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [recordingAcknowledged, setRecordingAcknowledged] = useState(false);
 
   const [draftBanner, setDraftBanner] = useState<{ show: boolean; savedAt: number | null }>({
     show: false,
@@ -649,6 +650,10 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
       setError('Please confirm you accept the Terms of Service and Privacy Policy to continue.');
       return;
     }
+    if (!recordingAcknowledged) {
+      setError('Please confirm you understand that sessions are recorded, below.');
+      return;
+    }
 
     setLoading(true);
 
@@ -706,6 +711,8 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
           verificationStatus: 'pending',
           role: 'tutor',
           onboardingComplete: true,
+          recordingAcknowledged: true,
+          recordingAcknowledgedAt: new Date().toISOString(),
         };
 
         let signupResponse;
@@ -1787,10 +1794,24 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                         . I understand my profile must be approved before I can accept paid bookings.
                       </label>
                     </div>
+                    <div className="flex items-start gap-2">
+                      <input
+                        type="checkbox"
+                        id="tutor-recording-ack"
+                        checked={recordingAcknowledged}
+                        onChange={(e) => setRecordingAcknowledged(e.target.checked)}
+                        className="mt-1 h-4 w-4 rounded border-gray-300 accent-purple-600"
+                      />
+                      <label htmlFor="tutor-recording-ack" className="text-xs text-gray-600 leading-relaxed">
+                        I understand that every tutoring session I teach is recorded (video and audio) by default,
+                        for safeguarding and quality-assurance purposes, and that this is a condition of teaching
+                        on the platform.
+                      </label>
+                    </div>
                     <Button
                       type="button"
                       onClick={handleSubmit}
-                      disabled={!agreedToTerms || loading || photoUploading}
+                      disabled={!agreedToTerms || !recordingAcknowledged || loading || photoUploading}
                       className="text-white w-full sm:w-auto min-h-[48px]"
                       style={{ backgroundColor: '#5d9827' }}
                     >

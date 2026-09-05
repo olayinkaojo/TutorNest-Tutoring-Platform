@@ -111,6 +111,15 @@ signupRoutes.post('/signup', async (c) => {
 
     // Step 1: Create user via admin client — auto-confirm so they can sign in immediately
     const userRole = role || profileData?.role || null;
+
+    // Frontend already blocks submission on this (ParentSignup.tsx,
+    // TutorSignup.tsx), but that's client-side only — enforce it here too so
+    // it can't be skipped by calling this endpoint directly. Doesn't apply
+    // to admin signups, who aren't a participant in recorded sessions.
+    if ((userRole === 'parent' || userRole === 'tutor') && !profileData?.recordingAcknowledged) {
+      return c.json({ error: 'Please confirm you understand that sessions are recorded before creating an account.' }, 400);
+    }
+
     const { data, error } = await adminSupabase.auth.admin.createUser({
       email,
       password,

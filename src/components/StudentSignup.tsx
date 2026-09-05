@@ -78,6 +78,7 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
   const [success, setSuccess] = useState(false);
   const [awaitingParentLink, setAwaitingParentLink] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [recordingAcknowledged, setRecordingAcknowledged] = useState(false);
 
   const [draftBanner, setDraftBanner] = useState<{ show: boolean; savedAt: number | null }>({
     show: false,
@@ -259,6 +260,10 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
       setError('Please accept the Terms of Service and Privacy Policy.');
       return;
     }
+    if (!recordingAcknowledged) {
+      setError('Please confirm you understand that sessions are recorded.');
+      return;
+    }
 
     const subjectsArray = formData.subjects
       ? formData.subjects.split(',').map((s) => s.trim()).filter(Boolean)
@@ -288,6 +293,8 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
               dateOfBirth: formData.dateOfBirth,
               subjects: subjectsArray,
               learningGoals: formData.learningGoals,
+              recordingAcknowledged: true,
+              recordingAcknowledgedAt: new Date().toISOString(),
             }),
           }
         );
@@ -332,6 +339,8 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
               parentEmail: formData.parentEmail,
               subjects: subjectsArray,
               learningGoals: formData.learningGoals,
+              recordingAcknowledged: true,
+              recordingAcknowledgedAt: new Date().toISOString(),
             }),
           }
         );
@@ -750,6 +759,21 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
                           </label>
                         </div>
                       )}
+                      {step === 2 && showAccountSections && (
+                        <div className="flex items-start gap-2">
+                          <input
+                            type="checkbox"
+                            id="student-recording-ack"
+                            checked={recordingAcknowledged}
+                            onChange={(e) => setRecordingAcknowledged(e.target.checked)}
+                            className="mt-1 h-4 w-4 rounded border-gray-300 accent-purple-600"
+                          />
+                          <label htmlFor="student-recording-ack" className="text-xs text-gray-600 leading-relaxed">
+                            I understand that tutoring sessions are recorded (video and audio) by default, for
+                            safeguarding and quality-assurance purposes.
+                          </label>
+                        </div>
+                      )}
                       {step === 1 ? (
                         <Button
                           type="button"
@@ -763,7 +787,7 @@ export function StudentSignup({ onBackToSignIn, initialData, onSignupSuccess }: 
                       ) : (
                         <Button
                           type="submit"
-                          disabled={!agreedToTerms || loading || !signupType || !showAccountSections}
+                          disabled={!agreedToTerms || !recordingAcknowledged || loading || !signupType || !showAccountSections}
                           className="min-h-[48px] w-full text-white sm:w-auto"
                           style={{ backgroundColor: '#5d9827' }}
                         >

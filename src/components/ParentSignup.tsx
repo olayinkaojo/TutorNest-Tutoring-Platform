@@ -64,6 +64,7 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
   const [childrenAges, setChildrenAges] = useState('');
   const [agreeTerms, setAgreeTerms] = useState(false);
   const [agreedToTerms, setAgreedToTerms] = useState(false);
+  const [recordingAcknowledged, setRecordingAcknowledged] = useState(false);
 
   const [draftBanner, setDraftBanner] = useState<{ show: boolean; savedAt: number | null }>({
     show: false,
@@ -235,6 +236,10 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
       setError('Please confirm the final Terms & Privacy acceptance below to create your account.');
       return;
     }
+    if (!recordingAcknowledged) {
+      setError('Please confirm you understand that sessions are recorded, below.');
+      return;
+    }
 
     setLoading(true);
 
@@ -263,6 +268,8 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
                 children_ages: childrenAges,
                 role: 'parent',
                 onboardingComplete: true,
+                recordingAcknowledged: true,
+                recordingAcknowledgedAt: new Date().toISOString(),
               },
             }),
           }
@@ -636,6 +643,21 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
                         </label>
                       </div>
                     )}
+                    {step === TOTAL_STEPS && (
+                      <div className="flex items-start gap-2 w-full sm:max-w-md">
+                        <input
+                          type="checkbox"
+                          id="parent-recording-ack"
+                          checked={recordingAcknowledged}
+                          onChange={(e) => setRecordingAcknowledged(e.target.checked)}
+                          className="mt-1 h-4 w-4 rounded border-gray-300 accent-purple-600"
+                        />
+                        <label htmlFor="parent-recording-ack" className="text-xs text-gray-600 leading-relaxed">
+                          I understand that tutoring sessions are recorded (video and audio) by default, for
+                          safeguarding and quality-assurance purposes.
+                        </label>
+                      </div>
+                    )}
                     {step < TOTAL_STEPS ? (
                       <Button
                         type="button"
@@ -650,7 +672,7 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
                         type="submit"
                         className="w-full sm:w-auto min-h-[48px] text-white"
                         style={{ backgroundColor: '#5d9827' }}
-                        disabled={!agreedToTerms || loading}
+                        disabled={!agreedToTerms || !recordingAcknowledged || loading}
                       >
                         {loading ? 'Creating account…' : 'Create parent account'}
                       </Button>

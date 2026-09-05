@@ -250,11 +250,14 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
   app.post('/make-server-cbd74580/student-auth/independent-signup', async (c) => {
     try {
       const body = await c.req.json();
-      const { email, password, firstName, lastName, dateOfBirth, subjects, learningGoals } = body;
+      const { email, password, firstName, lastName, dateOfBirth, subjects, learningGoals, recordingAcknowledged, recordingAcknowledgedAt } = body;
 
       // Validate required fields
       if (!email || !password || !firstName || !lastName || !dateOfBirth) {
         return c.json({ error: 'Missing required fields' }, 400);
+      }
+      if (!recordingAcknowledged) {
+        return c.json({ error: 'Please confirm you understand that sessions are recorded.' }, 400);
       }
 
       // Calculate age
@@ -312,7 +315,9 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         isDependent: false,
         accountType: 'independent_student',
         createdAt: new Date().toISOString(),
-        onboardingCompleted: false
+        onboardingCompleted: false,
+        recordingAcknowledged: true,
+        recordingAcknowledgedAt: recordingAcknowledgedAt || new Date().toISOString(),
       };
 
       console.log('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━');
@@ -362,11 +367,14 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
   app.post('/make-server-cbd74580/student-auth/dependent-signup', async (c) => {
     try {
       const body = await c.req.json();
-      const { email, password, firstName, lastName, dateOfBirth, parentEmail, subjects, learningGoals } = body;
+      const { email, password, firstName, lastName, dateOfBirth, parentEmail, subjects, learningGoals, recordingAcknowledged, recordingAcknowledgedAt } = body;
 
       // Validate required fields
       if (!email || !password || !firstName || !lastName || !dateOfBirth || !parentEmail) {
         return c.json({ error: 'Missing required fields (including parent email)' }, 400);
+      }
+      if (!recordingAcknowledged) {
+        return c.json({ error: 'Please confirm you understand that sessions are recorded.' }, 400);
       }
 
       // Calculate age
@@ -435,7 +443,9 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         accountType: 'dependent_student',
         awaitingParentLink: true,
         parentLinkToken: `link_${Date.now()}_${Math.random().toString(36).slice(2)}`,
-        createdAt: new Date().toISOString()
+        createdAt: new Date().toISOString(),
+        recordingAcknowledged: true,
+        recordingAcknowledgedAt: recordingAcknowledgedAt || new Date().toISOString(),
       };
 
       await kv.set(`user:${authData.user.id}`, studentProfile);
