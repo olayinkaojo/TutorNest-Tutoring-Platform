@@ -15,7 +15,8 @@ import {
   CheckCircle,
   TrendingUp,
   Heart,
-  Brain,
+  GraduationCap,
+  Shield,
   Calendar,
   MessageSquare,
   AlertCircle,
@@ -154,12 +155,23 @@ export function SmartTutorMatches({
 
             <div className="flex items-center justify-between text-sm">
               <span className="flex items-center gap-1 text-gray-600">
-                <Brain className="w-4 h-4" />
-                Learning Style
+                <GraduationCap className="w-4 h-4" />
+                Level Match
               </span>
               <div className="flex items-center gap-2">
-                <Progress value={(match.matchBreakdown.learningStyle / 15) * 100} className="w-20 h-2" />
-                <span className="font-medium">{Math.round((match.matchBreakdown.learningStyle / 15) * 100)}%</span>
+                <Progress value={(match.matchBreakdown.level / 15) * 100} className="w-20 h-2" />
+                <span className="font-medium">{Math.round((match.matchBreakdown.level / 15) * 100)}%</span>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between text-sm">
+              <span className="flex items-center gap-1 text-gray-600">
+                <Shield className="w-4 h-4" />
+                Trust &amp; Safety
+              </span>
+              <div className="flex items-center gap-2">
+                <Progress value={(match.matchBreakdown.trust / 25) * 100} className="w-20 h-2" />
+                <span className="font-medium">{Math.round((match.matchBreakdown.trust / 25) * 100)}%</span>
               </div>
             </div>
 
@@ -169,8 +181,8 @@ export function SmartTutorMatches({
                 Schedule
               </span>
               <div className="flex items-center gap-2">
-                <Progress value={(match.matchBreakdown.schedule / 20) * 100} className="w-20 h-2" />
-                <span className="font-medium">{Math.round((match.matchBreakdown.schedule / 20) * 100)}%</span>
+                <Progress value={(match.matchBreakdown.schedule / 10) * 100} className="w-20 h-2" />
+                <span className="font-medium">{Math.round((match.matchBreakdown.schedule / 10) * 100)}%</span>
               </div>
             </div>
 

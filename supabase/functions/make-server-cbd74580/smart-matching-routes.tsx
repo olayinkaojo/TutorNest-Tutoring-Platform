@@ -7,7 +7,24 @@ const app = new Hono();
 import { requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
 
 // Smart Matching Algorithm
-function calculateMatchScore(student: any, tutor: any): {score: number, breakdown: any} {
+//
+// Every dimension here should reflect data that's actually collected
+// somewhere in the live product — a "neutral" fallback score is fine when an
+// individual profile happens to be incomplete, but a dimension that is
+// *always* neutral because nothing anywhere ever collects that field is just
+// decoration dressed up as analysis. Three dimensions used to exist here —
+// Learning Style, Teaching Style Preference, and Experience Level — that
+// read fields (student.learningStyle, student.preferredTeachingStyle,
+// student.tutorExperienceLevel) which no live signup or "Add Child" form
+// (see AddChildDialog.tsx / parent-children-routes.tsx) has ever populated,
+// so they scored the same flat neutral value for every single match,
+// regardless of the two people actually being compared. They've been
+// replaced below with Level Match (real: gradeLevel vs. tutor.yearGroups,
+// both genuinely collected) and Trust & Safety (real: DBS verification,
+// review-weighted rating, and actual session-attendance history — the one
+// dimension that's always backed by real data no matter what either side
+// filled in on a form).
+async function calculateMatchScore(student: any, tutor: any): Promise<{score: number, breakdown: any}> {
   let totalScore = 0;
   const breakdown: any = {};
 
@@ -16,35 +33,31 @@ function calculateMatchScore(student: any, tutor: any): {score: number, breakdow
   totalScore += subjectScore;
   breakdown.subject = subjectScore;
 
-  // 2. Learning Style Compatibility (15 points max)
-  const learningStyleScore = calculateLearningStyleMatch(student, tutor);
-  totalScore += learningStyleScore;
-  breakdown.learningStyle = learningStyleScore;
+  // 2. Level/Grade Match (15 points max)
+  const levelScore = calculateLevelMatch(student, tutor);
+  totalScore += levelScore;
+  breakdown.level = levelScore;
 
-  // 3. Schedule Compatibility (20 points max)
-  const scheduleScore = calculateScheduleMatch(student, tutor);
-  totalScore += scheduleScore;
-  breakdown.schedule = scheduleScore;
-
-  // 4. Budget Fit (10 points max)
-  const budgetScore = calculateBudgetMatch(student, tutor);
-  totalScore += budgetScore;
-  breakdown.budget = budgetScore;
-
-  // 5. SEN/Accessibility Match (15 points max)
+  // 3. SEN/Accessibility Match (15 points max)
   const senScore = calculateSENMatch(student, tutor);
   totalScore += senScore;
   breakdown.sen = senScore;
 
-  // 6. Teaching Style Preference (10 points max)
-  const teachingStyleScore = calculateTeachingStyleMatch(student, tutor);
-  totalScore += teachingStyleScore;
-  breakdown.teachingStyle = teachingStyleScore;
+  // 4. Trust & Safety (25 points max)
+  const trust = await calculateTrustScore(tutor);
+  totalScore += trust.score;
+  breakdown.trust = trust.score;
+  breakdown.trustBreakdown = trust.breakdown;
 
-  // 7. Experience Level Match (5 points max)
-  const experienceScore = calculateExperienceMatch(student, tutor);
-  totalScore += experienceScore;
-  breakdown.experience = experienceScore;
+  // 5. Budget Fit (10 points max)
+  const budgetScore = calculateBudgetMatch(student, tutor);
+  totalScore += budgetScore;
+  breakdown.budget = budgetScore;
+
+  // 6. Schedule Compatibility (10 points max)
+  const scheduleScore = calculateScheduleMatch(student, tutor);
+  totalScore += scheduleScore;
+  breakdown.schedule = scheduleScore;
 
   return { score: totalScore, breakdown };
 }
@@ -76,26 +89,30 @@ function calculateSubjectMatch(student: any, tutor: any): number {
   return Math.min(25, (matchPercentage * 20) + bonusPoints);
 }
 
-function calculateLearningStyleMatch(student: any, tutor: any): number {
-  const studentStyles = student.learningStyle || [];
-  const tutorStyles = tutor.learningStylesSupported || [];
-  
-  if (studentStyles.length === 0 || tutorStyles.length === 0) return 8; // neutral score
+// Maps a school year group to the same broad level buckets tutors select
+// from on their profile (see tutor.yearGroups, collected by
+// TutorProfileForm.tsx).
+const YEAR_GROUP_LEVELS: [string[], string][] = [
+  [['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6'], 'Primary (Year 1-6)'],
+  [['Year 7', 'Year 8', 'Year 9'], 'KS3 (Year 7-9)'],
+  [['Year 10', 'Year 11'], 'GCSE (Year 10-11)'],
+  [['Year 12', 'Year 13'], 'A-Level (Year 12-13)'],
+];
 
-  // Map student preferences to tutor capabilities
-  const styleMap: Record<string, string> = {
-    'Visual (pictures, diagrams)': 'Visual Learners',
-    'Auditory (listening, discussion)': 'Auditory Learners',
-    'Kinesthetic (hands-on, practical)': 'Kinesthetic Learners',
-    'Reading/Writing': 'Reading/Writing Learners'
-  };
+function mapYearGroupToLevel(yearGroup: string): string {
+  for (const [years, level] of YEAR_GROUP_LEVELS) {
+    if (years.includes(yearGroup)) return level;
+  }
+  return '';
+}
 
-  const matchedStyles = studentStyles.filter((s: string) => 
-    tutorStyles.includes(styleMap[s] || s)
-  );
+function calculateLevelMatch(student: any, tutor: any): number {
+  const studentLevel = mapYearGroupToLevel(student.gradeLevel || student.yearGroup || '');
+  const tutorLevels: string[] = tutor.yearGroups || [];
 
-  const matchPercentage = matchedStyles.length / studentStyles.length;
-  return Math.round(matchPercentage * 15);
+  if (!studentLevel || tutorLevels.length === 0) return 8; // neutral — one side hasn't filled this in
+
+  return tutorLevels.includes(studentLevel) ? 15 : 0;
 }
 
 function calculateScheduleMatch(student: any, tutor: any): number {
@@ -104,13 +121,20 @@ function calculateScheduleMatch(student: any, tutor: any): number {
   const studentTimes = student.availabilityTimes || [];
   const tutorTimes = tutor.availableTimes || [];
 
-  if (studentDays.length === 0 || tutorDays.length === 0) return 10; // neutral
+  // Neither the live "Add Child" form nor the live tutor signup form
+  // collects availability today (only an abandoned enhanced profile form
+  // does — see EnhancedTutorProfileForm.tsx, which nothing renders), so this
+  // is neutral for virtually every match right now. Kept at a modest weight
+  // rather than removed outright, since either side filling it in later
+  // (via a profile edit) should start counting immediately with no further
+  // changes needed here.
+  if (studentDays.length === 0 || tutorDays.length === 0) return 5; // neutral (half of 10)
 
   const matchedDays = studentDays.filter((d: string) => tutorDays.includes(d));
-  const dayScore = (matchedDays.length / studentDays.length) * 12;
+  const dayScore = (matchedDays.length / studentDays.length) * 6;
 
   const matchedTimes = studentTimes.filter((t: string) => tutorTimes.includes(t));
-  const timeScore = (matchedTimes.length / Math.max(studentTimes.length, 1)) * 8;
+  const timeScore = (matchedTimes.length / Math.max(studentTimes.length, 1)) * 4;
 
   return Math.round(dayScore + timeScore);
 }
@@ -146,53 +170,78 @@ function calculateBudgetMatch(student: any, tutor: any): number {
 }
 
 function calculateSENMatch(student: any, tutor: any): number {
-  const studentSEN = student.senSupport || [];
-  const tutorSEN = tutor.senExperience || [];
+  // Real child profiles (see AddChildDialog.tsx / parent-children-routes.tsx)
+  // store special needs as free text at `specialNeeds` — the structured
+  // `senSupport` array this function used to require exclusively is never
+  // populated by any live form, so a child with real, described special
+  // needs was always scored as if they had none. Prefer structured data when
+  // it exists (a future form could add it without any change here), fall
+  // back to the free-text field that's actually live today.
+  const structuredSEN: string[] = student.senSupport || [];
+  const hasStructuredSEN = structuredSEN.length > 0 && !structuredSEN.includes('None');
+  const senText = (student.specialNeeds || '').trim();
+  const hasSEN = hasStructuredSEN || senText.length > 0;
 
-  // If student has no SEN needs
-  if (studentSEN.length === 0 || studentSEN.includes('None')) {
-    return tutorSEN.includes('None') ? 15 : 10; // slight preference for tutors without SEN focus
+  const tutorSENList: string[] = tutor.senExperience || [];
+  const bioLower = (tutor.bio || '').toLowerCase();
+  const qualLower = (tutor.qualifications || '').toLowerCase();
+  const tutorHasSENExperience =
+    (tutorSENList.length > 0 && !tutorSENList.includes('None')) ||
+    bioLower.includes('sen') || bioLower.includes('special needs') ||
+    qualLower.includes('sen') || qualLower.includes('special needs');
+
+  if (!hasSEN) {
+    // No special needs described for this child — being an SEN specialist
+    // shouldn't count against a tutor, so this is full marks either way.
+    return 15;
   }
 
-  // If student has SEN needs but tutor has none
-  if (tutorSEN.includes('None') || tutorSEN.length === 0) {
-    return 0; // critical mismatch
+  if (!tutorHasSENExperience) return 0; // real, safety-relevant mismatch
+
+  if (hasStructuredSEN) {
+    const matchedSEN = structuredSEN.filter((s: string) => tutorSENList.includes(s));
+    return Math.round((matchedSEN.length / structuredSEN.length) * 15);
   }
 
-  // Calculate SEN match
-  const matchedSEN = studentSEN.filter((s: string) => tutorSEN.includes(s));
-  const matchPercentage = matchedSEN.length / studentSEN.length;
-
-  return Math.round(matchPercentage * 15);
+  return 15; // matched via the free-text/keyword signal — all-or-nothing
 }
 
-function calculateTeachingStyleMatch(student: any, tutor: any): number {
-  const studentPreferences = student.preferredTeachingStyle || [];
-  const tutorStyles = tutor.teachingStyle || [];
+/**
+ * Trust & Safety (25 points max) — the one dimension that's always backed by
+ * real data no matter what either side filled in on a form: DBS
+ * verification (5), a review-weighted rating (12), and actual
+ * session-attendance history (8).
+ */
+async function calculateTrustScore(tutor: any): Promise<{score: number, breakdown: any}> {
+  const tutorId = tutor.userId || tutor.id;
 
-  if (studentPreferences.length === 0 || tutorStyles.length === 0) return 5; // neutral
+  const dbsScore = tutor.dbsStatus === 'verified' ? 5 : 0;
 
-  const matchedStyles = studentPreferences.filter((s: string) => tutorStyles.includes(s));
-  const matchPercentage = matchedStyles.length / studentPreferences.length;
+  // Confidence-weighted rating: a tutor with one 5-star review shouldn't
+  // outrank one with 80 reviews averaging 4.7. Shrink toward a neutral prior
+  // in proportion to how few reviews exist, so a brand-new, unreviewed tutor
+  // gets a fair starting point — not falsely perfect (the old bug: search
+  // code elsewhere defaulted a missing rating to '5'), and not falsely zero.
+  const ratingStats = tutorId ? await kv.get(`tutor:rating:${tutorId}`) as any : null;
+  const reviewCount = ratingStats?.totalReviews || 0;
+  const avgRating = ratingStats?.averageRating || 0;
+  const PRIOR_RATING = 4.0;
+  const PRIOR_WEIGHT = 3;
+  const confidenceRating = reviewCount > 0
+    ? ((avgRating * reviewCount) + (PRIOR_RATING * PRIOR_WEIGHT)) / (reviewCount + PRIOR_WEIGHT)
+    : PRIOR_RATING;
+  const ratingScore = Math.round((confidenceRating / 5) * 12);
 
-  return Math.round(matchPercentage * 10);
-}
+  // Real no-show history (see updateTutorReliability in payment-routes.tsx),
+  // not a self-reported field. No history yet = benefit of the doubt.
+  const reliability = tutorId ? await kv.get(`tutor:reliability:${tutorId}`) as any : null;
+  const noShowRate = reliability?.noShowRate ?? 0;
+  const reliabilityScore = Math.max(0, Math.round(8 * (1 - noShowRate)));
 
-function calculateExperienceMatch(student: any, tutor: any): number {
-  const studentPreference = student.tutorExperienceLevel || 'no_preference';
-  const tutorLevel = tutor.experienceLevel || '';
-
-  if (studentPreference === 'no_preference') return 3; // neutral
-
-  const levelMap: Record<string, string[]> = {
-    'beginner': ['beginner'],
-    'intermediate': ['intermediate'],
-    'expert': ['expert', 'specialist'],
-    'specialist': ['specialist']
+  return {
+    score: dbsScore + ratingScore + reliabilityScore,
+    breakdown: { dbs: dbsScore, rating: ratingScore, reliability: reliabilityScore },
   };
-
-  const matchingLevels = levelMap[studentPreference] || [];
-  return matchingLevels.includes(tutorLevel) ? 5 : 2;
 }
 
 // Get matched tutors for a student
@@ -245,8 +294,8 @@ app.get('/match/student/:studentId', async (c) => {
     const tutors = [...kvTutors, ...extraDbTutors];
 
     // Calculate match scores for each tutor
-    const matches = tutors.map((tutor: any) => {
-      const { score, breakdown } = calculateMatchScore(student, tutor);
+    const matches = await Promise.all(tutors.map(async (tutor: any) => {
+      const { score, breakdown } = await calculateMatchScore(student, tutor);
       return {
         tutorId: tutor.userId || tutor.id,
         tutor: {
@@ -264,10 +313,10 @@ app.get('/match/student/:studentId', async (c) => {
         },
         matchScore: score,
         matchBreakdown: breakdown,
-        matchPercentage: Math.round((score / 100) * 100),
+        matchPercentage: Math.round(score),
         compatibility: score >= 75 ? 'Excellent' : score >= 60 ? 'Good' : score >= 45 ? 'Fair' : 'Low'
       };
-    });
+    }));
 
     // Sort by match score (highest first)
     matches.sort((a, b) => b.matchScore - a.matchScore);
@@ -323,8 +372,8 @@ app.get('/match/tutor/:tutorId', async (c) => {
     const students = allChildren.filter((s: any) => s.matchingEnabled);
 
     // Calculate match scores for each student
-    const matches = students.map((student: any) => {
-      const { score, breakdown } = calculateMatchScore(student, tutor);
+    const matches = await Promise.all(students.map(async (student: any) => {
+      const { score, breakdown } = await calculateMatchScore(student, tutor);
       return {
         studentId: student.id,
         student: {
@@ -336,10 +385,10 @@ app.get('/match/tutor/:tutorId', async (c) => {
         },
         matchScore: score,
         matchBreakdown: breakdown,
-        matchPercentage: Math.round((score / 100) * 100),
+        matchPercentage: Math.round(score),
         compatibility: score >= 75 ? 'Excellent' : score >= 60 ? 'Good' : score >= 45 ? 'Fair' : 'Low'
       };
-    });
+    }));
 
     // Sort by match score (highest first)
     matches.sort((a, b) => b.matchScore - a.matchScore);

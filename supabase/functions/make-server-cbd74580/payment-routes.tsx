@@ -124,6 +124,33 @@ async function hasOpenDisputeForBooking(bookingId: string): Promise<boolean> {
   }
 }
 
+/**
+ * Recomputes and caches a tutor's session-attendance reliability — real
+ * no-show history from actual bookings, not a self-reported field — for the
+ * Trust & Safety dimension of the Smart Match algorithm (see
+ * calculateTrustScore in smart-matching-routes.tsx). Called every time a
+ * booking's status is finalized to 'completed' or 'no_show' so the cache
+ * never drifts far from reality; recomputing from scratch each time (rather
+ * than incrementing counters) means an admin-resolved dispute that flips a
+ * booking's outcome is reflected correctly too.
+ */
+async function updateTutorReliability(tutorId: string): Promise<void> {
+  try {
+    const bookings = await db.getBookingsByTutorId(tutorId);
+    const completed = bookings.filter((b: any) => b.status === 'completed').length;
+    const noShows = bookings.filter((b: any) => b.status === 'no_show').length;
+    const total = completed + noShows;
+    await kv.set(`tutor:reliability:${tutorId}`, {
+      completedSessions: completed,
+      noShowSessions: noShows,
+      noShowRate: total > 0 ? noShows / total : 0,
+      lastUpdated: new Date().toISOString(),
+    });
+  } catch (e: any) {
+    console.warn(`updateTutorReliability(${tutorId}) failed (non-fatal):`, e.message);
+  }
+}
+
 async function releaseMaturedEarnings(tutorId: string): Promise<void> {
   let bookings: any[];
   try {
@@ -157,6 +184,7 @@ async function releaseMaturedEarnings(tutorId: string): Promise<void> {
     try {
       await db.releaseTutorBalance(tutorId, perSessionTutorAmount);
       await db.updateBookingStatus(booking.id, 'completed');
+      await updateTutorReliability(tutorId);
       await logAuditEvent({
         userId: tutorId,
         action: 'earnings_released_unconfirmed',
@@ -201,6 +229,7 @@ async function processSessionAttendance(
 
   if (!attended) {
     await db.updateBookingStatus(bookingId, 'no_show');
+    await updateTutorReliability(tutorId);
     await logAuditEvent({
       userId: tutorId,
       action: 'session_marked_no_show',
@@ -215,6 +244,7 @@ async function processSessionAttendance(
   const perSessionTutorAmount = (plan.price * 0.8) / booking.totalSessions;
   await db.releaseTutorBalance(tutorId, perSessionTutorAmount);
   await db.updateBookingStatus(bookingId, 'completed');
+  await updateTutorReliability(tutorId);
   await logAuditEvent({
     userId: tutorId,
     action: 'earnings_released_report_confirmed',

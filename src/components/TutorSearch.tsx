@@ -15,7 +15,6 @@ import {
   Shield,
   Clock,
   TrendingUp,
-  Sparkles,
   CheckCircle,
   AlertCircle,
   MessageSquare,
@@ -86,7 +85,6 @@ export function TutorSearch({
     dbsOnly: false,
   });
   const [allTutors, setAllTutors] = useState<any[]>([]);
-  const [recommendations, setRecommendations] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [invitedTutors, setInvitedTutors] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
@@ -97,7 +95,6 @@ export function TutorSearch({
   // Load all tutors on mount
   useEffect(() => {
     fetchTutors();
-    if (studentProfile) loadRecommendations();
   }, []);
 
   const fetchTutors = async () => {
@@ -116,23 +113,6 @@ export function TutorSearch({
     } finally {
       setLoading(false);
     }
-  };
-
-  const loadRecommendations = async () => {
-    try {
-      const res = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/search/recommendations`,
-        {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${session.access_token}` },
-          body: JSON.stringify({ studentProfile }),
-        }
-      );
-      if (res.ok) {
-        const data = await res.json();
-        setRecommendations(data.recommendations || []);
-      }
-    } catch { /* silent */ }
   };
 
   const handleInviteTutor = async (tutorId: string) => {
@@ -211,24 +191,20 @@ export function TutorSearch({
   }, [allTutors, keyword, selectedSubject, filters, sortBy]);
 
   const results = filteredTutors();
-  const recommendedIds = new Set(recommendations.map((r: any) => r.userId || r.id));
 
   const TutorCard = ({ tutor }: { tutor: any }) => {
     const tutorId = tutor.userId || tutor.id;
     const isInvited = invitedTutors.has(tutorId);
-    const isRecommended = recommendedIds.has(tutorId);
     const initials = `${tutor.firstName?.[0] || ''}${tutor.lastName?.[0] || ''}`;
-    const rating = tutor.rating ? parseFloat(tutor.rating).toFixed(1) : '5.0';
+    // tutor.rating is null (not 0) when a tutor genuinely has no reviews yet
+    // — showing a fabricated "5.0★" for an unrated tutor misrepresents them
+    // as verified-excellent when they're simply new.
+    const hasRating = tutor.rating !== null && tutor.rating !== undefined;
+    const rating = hasRating ? parseFloat(tutor.rating).toFixed(1) : null;
     const canBook = !!onBookSession;
 
     return (
-      <Card className={`overflow-hidden transition-all hover:shadow-md ${isRecommended ? 'ring-2 ring-purple-300' : 'border-gray-100'}`}>
-        {isRecommended && (
-          <div className="flex items-center gap-1.5 px-4 py-2 text-xs font-medium" style={{ backgroundColor: '#625d9c15', color: '#625d9c' }}>
-            <Sparkles className="w-3.5 h-3.5" />
-            Recommended Match
-          </div>
-        )}
+      <Card className="overflow-hidden transition-all hover:shadow-md border-gray-100">
         <CardContent className="pt-5 pb-4">
           <div className="flex items-start gap-3 mb-4">
             <Avatar className="w-14 h-14 flex-shrink-0">
@@ -260,10 +236,14 @@ export function TutorSearch({
                 </div>
               </div>
               <div className="flex items-center gap-2 mt-1.5 flex-wrap">
-                <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
-                  <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
-                  {rating}
-                </span>
+                {hasRating ? (
+                  <span className="flex items-center gap-1 text-xs text-amber-600 font-medium">
+                    <Star className="w-3 h-3 fill-amber-400 text-amber-400" />
+                    {rating}
+                  </span>
+                ) : (
+                  <span className="text-xs text-gray-400 font-medium">New tutor</span>
+                )}
                 {tutor.totalLessons > 0 && (
                   <span className="text-xs text-gray-400">{tutor.totalLessons} lessons</span>
                 )}
