@@ -61,6 +61,8 @@
     },
     server: {
       port: 3000,
-      open: true,
+      // Opening a browser makes no sense (and can hang) on a headless CI
+      // runner, which is exactly where Playwright's webServer boots this.
+      open: !process.env.CI,
     },
   });
