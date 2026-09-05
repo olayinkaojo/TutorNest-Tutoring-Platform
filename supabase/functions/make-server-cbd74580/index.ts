@@ -42,15 +42,11 @@ import { teacherRoutes } from './teacher-routes.tsx';
 import { teacherQuestionRoutes } from './teacher-question-routes.tsx';
 import { analyticsRoutes } from './analytics-routes.tsx';
 import { sessionAssignmentRoutes } from './session-assignment-routes.tsx';
-import { liveCollaborationRoutes } from './live-collaboration-routes.tsx';
 import tutorSessionReportsRoutes from './tutor-session-reports-routes.tsx';
 import paymentRoutes from './payment-routes.tsx';
 import { getProfile } from './db.tsx';
-import liveSessionRoutes from './live-session-routes.tsx';
 import payoutsComplete from './payouts-complete.tsx';
 import { tutorProfileRoutes } from './tutor-profile-routes.tsx';
-import { videoRoutes } from './video-routes.tsx';
-import { screenShareRoutes } from './screen-share-routes.tsx';
 import invoiceRoutes from './invoice-routes.tsx';
 import signupRoutes from './signup-routes.tsx';
 import { tutorSearchRoutes } from './tutor-search-routes.tsx';
@@ -540,29 +536,17 @@ app.route('/make-server-cbd74580/analytics', analyticsRoutes);
 // Register session assignment (workflow) routes
 app.route('/make-server-cbd74580', sessionAssignmentRoutes);
 
-// Register live collaboration (whiteboard) routes
-app.route('/make-server-cbd74580', liveCollaborationRoutes);
-
 // Register tutor session reports routes
 app.route('/make-server-cbd74580/tutor-session-reports', tutorSessionReportsRoutes);
 
 // Register payment routes
 app.route('/make-server-cbd74580', paymentRoutes);
 
-// Register live session routes
-app.route('/make-server-cbd74580', liveSessionRoutes);
-
 // Register payout routes (tutor payouts dashboard)
 app.route('/make-server-cbd74580/tutor/payouts', payoutsComplete);
 
 // Register invoice routes
 app.route('/make-server-cbd74580/invoices', invoiceRoutes);
-
-// Register video conference routes
-app.route('/make-server-cbd74580', videoRoutes);
-
-// Register screen sharing routes
-app.route('/make-server-cbd74580', screenShareRoutes);
 
 // Routes extracted to separate files
 app.route('/make-server-cbd74580', signupRoutes);

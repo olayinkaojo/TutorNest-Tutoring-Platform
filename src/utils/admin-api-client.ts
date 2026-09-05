@@ -376,73 +376,12 @@ const adminAPI = {
     return response.tutors || [];
   },
 
-  /**
-   * Get payout batches
-   */
-  async getPayoutBatches(accessToken?: string) {
-    // Return mock data for now - can be replaced with real API call
-    return [
-      {
-        id: '1',
-        batchNumber: 'BATCH-2024-W01',
-        scheduledDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        status: 'completed',
-        totalPayouts: 5,
-        totalAmount: 50000,
-        successfulCount: 5,
-        failedCount: 0,
-        createdAt: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        processedAt: new Date(Date.now() - 6 * 24 * 60 * 60 * 1000).toISOString(),
-      },
-    ];
-  },
-
-  /**
-   * Get payout batch details
-   */
-  async getPayoutBatchDetails(batchId: string, accessToken?: string) {
-    // Return mock data for now
-    return {
-      batch: {
-        id: batchId,
-        batchNumber: 'BATCH-2024-W01',
-        status: 'completed',
-        totalPayouts: 5,
-      },
-      payouts: [
-        {
-          id: '1',
-          tutorId: 'tutor1',
-          tutorName: 'John Tutor',
-          amount: 10000,
-          state: 'completed',
-          requestedAt: new Date().toISOString(),
-          completedAt: new Date().toISOString(),
-        },
-      ],
-    };
-  },
-
-  /**
-   * Approve a payout batch
-   */
-  async approveBatch(batchId: string, notes?: string, accessToken?: string) {
-    return { success: true, message: 'Batch approved' };
-  },
-
-  /**
-   * Process a payout batch
-   */
-  async processBatch(batchId: string, accessToken?: string) {
-    return { success: true, message: 'Batch processing started' };
-  },
-
-  /**
-   * Retry failed payouts in a batch
-   */
-  async retryFailedPayouts(batchId: string, accessToken?: string) {
-    return { success: true, message: 'Retry initiated for failed payouts' };
-  },
+  // The payout-batch mock functions that used to live here (getPayoutBatches,
+  // getPayoutBatchDetails, approveBatch, processBatch, retryFailedPayouts)
+  // backed AdminPayoutBatchManager.tsx — a fake admin "Payouts" screen that
+  // always returned hardcoded numbers. Removed along with that component;
+  // the real payout admin screen is AdminPayoutsManager.tsx, backed by real
+  // endpoints in payment-routes.tsx.
 };
 
 export default adminAPI;

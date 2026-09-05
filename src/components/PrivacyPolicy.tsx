@@ -166,7 +166,8 @@ export function PrivacyPolicy() {
             <div>
               <h3 className="text-lg font-medium mb-2">2. Information We Collect Automatically</h3>
               <ul className="text-gray-700 space-y-2 ml-4">
-                <li><strong>Usage Data:</strong> Pages visited, features used, time spent, session recordings</li>
+                <li><strong>Usage Data:</strong> Pages visited, features used, time spent</li>
+                <li><strong>Tutoring Session Recordings:</strong> Video and audio of live 1:1 tutoring sessions — see "Children's Privacy & Safeguarding" below for how these are used, accessed, and retained</li>
                 <li><strong>Device Information:</strong> IP address, browser type, operating system, device identifiers</li>
                 <li><strong>Location Data:</strong> Approximate location based on IP address</li>
                 <li><strong>Cookies:</strong> See our Cookie Policy for detailed information</li>
@@ -237,9 +238,8 @@ export function PrivacyPolicy() {
               tutor profiles are visible to parents during search
             </li>
             <li>
-              <strong>Service Providers:</strong> Payment processors (Flutterwave), video conferencing (Google Meet,
-              created via Google Calendar for tutors who connect it), email services (Resend), backend
-              infrastructure and file storage (Supabase)
+              <strong>Service Providers:</strong> Payment processors (Flutterwave), video conferencing and session
+              recording (Daily.co), email services (Resend), backend infrastructure and file storage (Supabase)
             </li>
             <li>
               <strong>Legal Requirements:</strong> Law enforcement, regulators, courts when legally required
@@ -261,8 +261,12 @@ export function PrivacyPolicy() {
           </div>
 
           <p className="text-gray-700 mb-4">
-            Tutors may connect their Google Calendar so that confirmed tutoring sessions are automatically added
-            to their own calendar. Our use and transfer of information received from Google APIs adheres to the{' '}
+            This platform previously offered a feature letting tutors connect their Google Calendar so that
+            confirmed tutoring sessions were automatically added to their own calendar. That feature is no longer
+            offered to new tutors — session details are now provided as a calendar invite file compatible with any
+            calendar app, requiring no account connection at all. A small number of tutors who connected Google
+            Calendar before this change may still have an active connection, which they can disconnect at any time;
+            our handling of any data from that connection continues to adhere to the{' '}
             <a
               href="https://developers.google.com/terms/api-services-user-data-policy"
               target="_blank"
@@ -337,7 +341,7 @@ export function PrivacyPolicy() {
           
           <ul className="text-gray-700 space-y-2 ml-4">
             <li><strong>Active accounts:</strong> Duration of account + 12 months</li>
-            <li><strong>Session recordings:</strong> 7-90 days (depending on subscription tier)</li>
+            <li><strong>Session recordings:</strong> Up to 365 days, then automatically deleted (an administrator may delete one sooner, or retain it longer only for an active safeguarding investigation)</li>
             <li><strong>Payment records:</strong> 7 years (tax and accounting requirements)</li>
             <li><strong>Dispute records:</strong> 6 years (standard contract dispute limitation period)</li>
             <li><strong>Safeguarding records:</strong> Indefinite (child protection requirements)</li>
@@ -413,10 +417,13 @@ export function PrivacyPolicy() {
             <li>• Parental consent required for children under 13</li>
             <li>• Parent/guardian controls over messaging and file sharing</li>
             <li>• All tutors submit photo ID and qualification documents, reviewed before they can teach</li>
+            <li>• All 1:1 tutoring sessions are recorded (video and audio) by default, as a safeguarding and quality-assurance measure — this is standard practice among online tutoring providers and a condition of using live sessions on the platform</li>
+            <li>• Session recordings can only be accessed by platform administrators for safeguarding investigations, complaints, or quality review — every access is logged against the accounts involved</li>
+            <li>• Recordings are kept for up to 365 days and then automatically deleted, unless an administrator needs to delete one sooner or retain it longer for an active investigation</li>
             <li>• Safeguarding policies and procedures in place</li>
             <li>• Designated Safeguarding Lead available</li>
           </ul>
-          
+
           <p className="text-gray-700 mt-4">
             <strong>Safeguarding concerns:</strong> Contact our Safeguarding Lead at{' '}
             <a href="mailto:safeguarding@knowledgefonsacademy.com" className="text-[#625d9c] underline">
