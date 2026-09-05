@@ -384,6 +384,12 @@ export function DisputeManager({ accessToken, userId, userRole }: DisputeManager
                       ))}
                     </SelectContent>
                   </Select>
+                  {formData.type === 'no-show' && selectedBooking && (
+                    <p className="text-xs text-amber-600 mt-1.5">
+                      Filing this holds the tutor's earnings for this session until an admin reviews it — you don't
+                      need to do anything else in the meantime.
+                    </p>
+                  )}
                 </div>
 
                 {/* If no session selected, manual party entry */}

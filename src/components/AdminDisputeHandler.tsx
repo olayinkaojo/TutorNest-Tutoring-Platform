@@ -378,6 +378,16 @@ export function AdminDisputeHandler({ accessToken, adminId }: AdminDisputeHandle
                   <SelectValue placeholder="Select outcome" />
                 </SelectTrigger>
                 <SelectContent>
+                  {selectedDispute?.sessionId && (
+                    <>
+                      <SelectItem value="session-confirmed-release-earnings">
+                        Session Confirmed — Release Tutor Earnings
+                      </SelectItem>
+                      <SelectItem value="no-show-confirmed-withhold-earnings">
+                        No-Show Confirmed — Withhold Tutor Earnings
+                      </SelectItem>
+                    </>
+                  )}
                   <SelectItem value="refund-100">Full Refund (100%)</SelectItem>
                   <SelectItem value="refund-50">Partial Refund (50%)</SelectItem>
                   <SelectItem value="credit">Credit Applied</SelectItem>
@@ -386,6 +396,12 @@ export function AdminDisputeHandler({ accessToken, adminId }: AdminDisputeHandle
                   <SelectItem value="escalated">Escalated</SelectItem>
                 </SelectContent>
               </Select>
+              {selectedDispute?.sessionId && (
+                <p className="text-xs text-gray-500 mt-1">
+                  This dispute is holding the tutor's earnings for that session until you choose one of the two
+                  session outcomes above (or leave it unresolved to keep holding them).
+                </p>
+              )}
             </div>
 
             <div>

@@ -3,6 +3,7 @@ import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { requireAdmin, requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
 import { logAuditEvent } from './activity-log.tsx';
+import { processSessionAttendance } from './payment-routes.tsx';
 
 const app = new Hono();
 
@@ -471,6 +472,11 @@ app.post('/disputes', async (c) => {
     await kv.set(`dispute:submittedBy:${submittedBy}:${disputeId}`, disputeId);
     await kv.set(`dispute:submittedAgainst:${submittedAgainst}:${disputeId}`, disputeId);
     await kv.set(`dispute:status:${dispute.status}:${disputeId}`, disputeId);
+    // Lets payment-routes.tsx cheaply check "does this booking have an open
+    // dispute?" before releasing earnings, instead of scanning every dispute.
+    if (sessionId) {
+      await kv.set(`dispute:session:${sessionId}:${disputeId}`, disputeId);
+    }
 
     await logAuditEvent({
       userId: submittedAgainst,
@@ -587,7 +593,32 @@ app.patch('/disputes/:disputeId', async (c) => {
       });
     }
 
-    return c.json({ success: true, dispute });
+    // A dispute tied to a specific session holds that session's earnings —
+    // see hasOpenDisputeForBooking in payment-routes.tsx, checked by both
+    // processSessionAttendance and the grace-period sweep. Once resolved
+    // with a payout-relevant outcome, act on it immediately rather than
+    // leaving the tutor to wonder whether the freeze ever lifts.
+    let attendanceResult: { released: boolean; amount?: number; reason?: string } | null = null;
+    if (
+      dispute.sessionId &&
+      (status === 'resolved' || status === 'closed') &&
+      (outcome === 'session-confirmed-release-earnings' || outcome === 'no-show-confirmed-withhold-earnings')
+    ) {
+      try {
+        const booking = await db.getBooking(dispute.sessionId);
+        if (booking) {
+          attendanceResult = await processSessionAttendance(
+            dispute.sessionId,
+            booking.tutorId,
+            outcome === 'session-confirmed-release-earnings',
+          );
+        }
+      } catch (e: any) {
+        console.warn('Dispute resolution: processSessionAttendance failed (non-fatal):', e.message);
+      }
+    }
+
+    return c.json({ success: true, dispute, attendanceResult });
   } catch (error) {
     return c.json({ error: 'Failed to update dispute', details: String(error) }, 500);
   }

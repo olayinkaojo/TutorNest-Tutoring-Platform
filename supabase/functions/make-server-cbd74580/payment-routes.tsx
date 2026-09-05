@@ -95,6 +95,35 @@ async function getUserFromToken(accessToken: string | undefined): Promise<any | 
 // flipped to 'completed' or 'no_show') is excluded by the status check below.
 const ATTENDANCE_REPORT_GRACE_HOURS = 72;
 
+/**
+ * A parent/student can file a dispute against a specific session (e.g. "the
+ * tutor didn't show up") via DisputeManager.tsx — POST /disputes, indexed at
+ * dispute:session:<bookingId>:<disputeId> (see reviews-disputes-routes.tsx).
+ * Before this existed, that dispute had no effect on the booking's payout at
+ * all: a tutor's own report still released their earnings immediately, and
+ * even a tutor who said nothing got paid automatically once the grace
+ * period elapsed. Checked by both processSessionAttendance and the sweep
+ * below — the moment a dispute is filed, this booking's earnings freeze
+ * until an admin resolves it one way or the other (see PATCH
+ * /disputes/:disputeId in reviews-disputes-routes.tsx, which calls
+ * processSessionAttendance directly once resolved).
+ */
+async function hasOpenDisputeForBooking(bookingId: string): Promise<boolean> {
+  try {
+    const indexKeys = await kv.getByPrefix(`dispute:session:${bookingId}`);
+    const disputeIds = indexKeys
+      .map((k: any) => (typeof k === 'string' ? k : k.value ?? k.key?.split(':').pop()))
+      .filter(Boolean);
+    if (disputeIds.length === 0) return false;
+
+    const disputes = (await Promise.all(disputeIds.map((id: string) => kv.get(`dispute:${id}`)))).filter(Boolean);
+    return disputes.some((d: any) => d.status !== 'resolved' && d.status !== 'closed');
+  } catch (e: any) {
+    console.warn(`hasOpenDisputeForBooking(${bookingId}) failed — treating as disputed to be safe:`, e.message);
+    return true; // fail closed: an error here should hold pay, not release it
+  }
+}
+
 async function releaseMaturedEarnings(tutorId: string): Promise<void> {
   let bookings: any[];
   try {
@@ -117,6 +146,8 @@ async function releaseMaturedEarnings(tutorId: string): Promise<void> {
 
     const hoursSinceEnd = (now - endDateTime) / (1000 * 60 * 60);
     if (hoursSinceEnd < ATTENDANCE_REPORT_GRACE_HOURS) continue; // give the tutor a window to report first
+
+    if (await hasOpenDisputeForBooking(booking.id)) continue; // frozen — see hasOpenDisputeForBooking above
 
     // Grace period elapsed with no report filed — release anyway so a
     // forgotten report doesn't hold pay hostage indefinitely, but log it as
@@ -157,6 +188,16 @@ async function processSessionAttendance(
 
   const plan = PAYMENT_PLANS[booking.planType];
   if (!plan) return { released: false, reason: 'unknown_plan' };
+
+  // A parent/student disputing this exact session overrides the tutor's own
+  // report — don't let a tutor's "attended: true" pay out over an open
+  // "the tutor didn't show up" dispute. The one exception is the dispute
+  // resolution flow itself calling back in here (see PATCH
+  // /disputes/:disputeId) — by the time it does, it has already persisted
+  // the dispute as resolved, so this check no longer sees it as open.
+  if (await hasOpenDisputeForBooking(bookingId)) {
+    return { released: false, reason: 'disputed' };
+  }
 
   if (!attended) {
     await db.updateBookingStatus(bookingId, 'no_show');
