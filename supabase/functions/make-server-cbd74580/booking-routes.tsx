@@ -153,6 +153,13 @@ app.get('/bookings', async (c) => {
       (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
       fallback;
 
+    // Same field every profile-photo upload writes (see
+    // profile-avatar-routes.tsx) — resolved here so every screen that reads
+    // a booking's tutor/student (Chatroom's contact list, StudentDashboard
+    // and ParentReviewsTab's session cards) can show a real photo instead of
+    // initials, without each of them re-implementing this lookup.
+    const resolvePhoto = (p: any): string | null => p?.photoUrl || p?.photo_url || null;
+
     const bookings = rawBookings.map((b) => {
       const tutor   = (b.tutorId && profileMap[b.tutorId])     || {};
       const student = (b.studentId && profileMap[b.studentId]) || {};
@@ -163,6 +170,9 @@ app.get('/bookings', async (c) => {
         tutorName:      resolveName(tutor,   'Tutor'),
         studentName:    resolveName(student, 'Student'),
         parentName:     resolveName(parent,  ''),
+        tutorPhoto:     resolvePhoto(tutor),
+        studentPhoto:   resolvePhoto(student),
+        parentPhoto:    resolvePhoto(parent),
         parentId:       b.userId,
         googleMeetLink: b.meetLink ?? null,
         price:          String(15000),

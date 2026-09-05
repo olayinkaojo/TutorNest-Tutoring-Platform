@@ -55,7 +55,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Badge } from './ui/badge';
 import { Progress } from './ui/progress';
 import { StudentGettingStartedCard } from './student/StudentGettingStartedCard';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { AvatarUpload } from './AvatarUpload';
 import { SessionCallModal } from './SessionCallModal';
 import {
@@ -943,6 +943,7 @@ export function StudentDashboard({
                               <div key={session.id} className={`flex items-start justify-between p-4 border rounded-lg ${startingSoon ? 'border-green-500 bg-green-50' : 'bg-blue-50'}`}>
                                 <div className="flex items-start gap-4 flex-1 min-w-0">
                                   <Avatar>
+                                    {session.tutorPhoto && <AvatarImage src={session.tutorPhoto} className="object-cover" />}
                                     <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
                                       {session.tutorName?.split(' ').map((n: string) => n[0]).join('') || 'T'}
                                     </AvatarFallback>
@@ -986,6 +987,7 @@ export function StudentDashboard({
                             <div key={session.id} className="flex items-start justify-between p-4 border rounded-lg">
                               <div className="flex items-start gap-4">
                                 <Avatar>
+                                  {session.tutorPhoto && <AvatarImage src={session.tutorPhoto} className="object-cover" />}
                                   <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
                                     {session.tutorName?.split(' ').map((n: string) => n[0]).join('') || 'T'}
                                   </AvatarFallback>

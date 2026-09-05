@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Star, MessageSquare, AlertTriangle, Loader2, TrendingUp, BookOpen, Calendar, CheckCircle } from 'lucide-react';
 import { ReviewsList } from './ReviewsList';
 import { DisputeManager } from './DisputeManager';
@@ -272,6 +272,7 @@ export function ParentReviewsTab({ accessToken, parentId }: ParentReviewsTabProp
                         <div className="flex items-center justify-between gap-4">
                           <div className="flex items-center gap-3 min-w-0">
                             <Avatar className="w-11 h-11 flex-shrink-0">
+                              {session.tutorPhoto && <AvatarImage src={session.tutorPhoto} className="object-cover" />}
                               <AvatarFallback
                                 style={{ backgroundColor: '#625d9c', color: 'white' }}
                                 className="font-semibold text-sm"

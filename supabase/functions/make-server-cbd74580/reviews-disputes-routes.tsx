@@ -141,6 +141,28 @@ app.post('/reviews', async (c) => {
   }
 });
 
+// Same field every profile-photo upload writes (see profile-avatar-routes.tsx)
+// — resolved live rather than baked into the review at submission time, so a
+// photo added later still shows up on old reviews.
+const reviewPhotoCache = new Map<string, string | null>();
+async function resolveReviewerPhoto(id: string | undefined | null): Promise<string | null> {
+  if (!id) return null;
+  if (reviewPhotoCache.has(id)) return reviewPhotoCache.get(id)!;
+  const p = ((await kv.get(`user:${id}`)) as any) ?? (await db.getProfile(id).catch(() => null));
+  const photo = p?.photoUrl || p?.photo_url || null;
+  reviewPhotoCache.set(id, photo);
+  return photo;
+}
+
+async function enrichReviewsWithPhotos(reviews: any[]): Promise<any[]> {
+  return Promise.all(reviews.map(async (r) => ({
+    ...r,
+    studentPhoto: await resolveReviewerPhoto(r.studentId),
+    parentPhoto: await resolveReviewerPhoto(r.parentId),
+    tutorPhoto: await resolveReviewerPhoto(r.tutorId),
+  })));
+}
+
 // GET /reviews — Fetch reviews filtered by tutorId, parentId, or sessionId
 app.get('/reviews', async (c) => {
   try {
@@ -161,7 +183,7 @@ app.get('/reviews', async (c) => {
       const all = await kv.getByPrefix('review:review_');
       const reviews = all.map((r: any) => (typeof r === 'object' && r.value ? r.value : r)).filter(Boolean);
       reviews.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      return c.json({ reviews });
+      return c.json({ reviews: await enrichReviewsWithPhotos(reviews) });
     }
 
     const reviews = (
@@ -170,7 +192,7 @@ app.get('/reviews', async (c) => {
 
     reviews.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 
-    return c.json({ reviews });
+    return c.json({ reviews: await enrichReviewsWithPhotos(reviews) });
   } catch (error) {
     console.error('Error fetching reviews:', error);
     return c.json({ error: 'Failed to fetch reviews', details: String(error) }, 500);

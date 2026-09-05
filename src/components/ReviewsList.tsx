@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from './ui/dialog';
 import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
@@ -261,6 +261,9 @@ export function ReviewsList({
               {/* Header row */}
               <div className="flex items-start gap-3 mb-3">
                 <Avatar className="w-10 h-10 flex-shrink-0">
+                  {(review.studentPhoto || review.parentPhoto) && (
+                    <AvatarImage src={review.studentPhoto || review.parentPhoto} className="object-cover" />
+                  )}
                   <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }} className="text-sm font-semibold">
                     {getInitials(review.studentName || 'Parent')}
                   </AvatarFallback>
@@ -366,6 +369,7 @@ export function ReviewsList({
                 <div className="mt-4 ml-[52px] pl-4 border-l-2 border-purple-200 bg-purple-50/50 rounded-r-lg py-3 pr-3">
                   <div className="flex items-center gap-2 mb-1">
                     <Avatar className="w-6 h-6">
+                      {review.tutorPhoto && <AvatarImage src={review.tutorPhoto} className="object-cover" />}
                       <AvatarFallback style={{ backgroundColor: '#5d9827', color: 'white' }} className="text-xs">
                         {getInitials(review.reply.tutorName || review.tutorName || 'T')}
                       </AvatarFallback>

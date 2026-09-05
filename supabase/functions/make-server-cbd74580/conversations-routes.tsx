@@ -151,6 +151,19 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
 
       const allMessages = await kv.getByPrefix('conv-message:');
 
+      // Resolved live (not baked in at conversation-creation time, unlike
+      // participantNames) so a photo uploaded after the conversation started
+      // still shows up — same field every profile-photo upload writes, see
+      // profile-avatar-routes.tsx.
+      const photoCache = new Map<string, string | null>();
+      const resolvePhoto = async (id: string): Promise<string | null> => {
+        if (photoCache.has(id)) return photoCache.get(id)!;
+        const p = ((await kv.get(`user:${id}`)) as any) ?? (await db.getProfile(id).catch(() => null));
+        const photo = p?.photoUrl || p?.photo_url || null;
+        photoCache.set(id, photo);
+        return photo;
+      };
+
       const conversationsWithDetails = await Promise.all(
         userConversations.map(async (conv: Record<string, unknown>) => {
           const convId = conv.id as string;
@@ -166,10 +179,15 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
             (msg: Record<string, unknown>) => msg.receiverId === userId && !msg.read,
           ).length;
 
+          const participantIds = (conv.participants as string[] | undefined) || [];
+          const participantPhotos: Record<string, string | null> = {};
+          await Promise.all(participantIds.map(async (pid) => { participantPhotos[pid] = await resolvePhoto(pid); }));
+
           return {
             ...conv,
             lastMessage,
             unreadCount,
+            participantPhotos,
           };
         }),
       );

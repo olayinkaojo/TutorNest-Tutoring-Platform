@@ -4,7 +4,7 @@ import { Button } from './ui/button';
 import { Input } from './ui/input';
 import { Badge } from './ui/badge';
 import { ScrollArea } from './ui/scroll-area';
-import { Avatar, AvatarFallback } from './ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from './ui/dialog';
 import {
   Send,
@@ -42,6 +42,7 @@ interface Conversation {
   channel?: string;
   participantRoles: Record<string, string>;
   participantNames: Record<string, string>;
+  participantPhotos?: Record<string, string | null>;
   lastMessage?: Message;
   unreadCount: number;
   updatedAt: string;
@@ -77,6 +78,7 @@ interface Contact {
   id: string;
   name: string;
   role: string;
+  photo?: string | null;
 }
 
 export function Chatroom({ session, userId, userName, userRole, initialContactId, initialContactName, initialContactRole }: ChatroomProps) {
@@ -361,6 +363,7 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
                 b.tutorName ||
                 (b.tutorFirstName ? `${b.tutorFirstName} ${b.tutorLastName || ''}`.trim() : 'Tutor'),
               role: 'tutor',
+              photo: b.tutorPhoto,
             });
           }
         }
@@ -378,6 +381,7 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
               id: tutorId,
               name: b.tutorName || b.tutorFullName || 'Tutor',
               role: 'tutor',
+              photo: b.tutorPhoto,
             });
           }
         }
@@ -394,6 +398,7 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
               id: b.parentId,
               name: b.parentName || b.userName || 'Parent',
               role: 'parent',
+              photo: b.parentPhoto,
             });
           }
           if (b.studentId && b.studentId !== userId && !seen.has(`s:${b.studentId}`)) {
@@ -402,6 +407,7 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
               id: b.studentId,
               name: b.studentName || b.studentFullName || 'Student',
               role: 'student',
+              photo: b.studentPhoto,
             });
           }
         }
@@ -497,6 +503,7 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
                     className="w-full flex items-center gap-3 p-3 hover:bg-gray-50 text-left transition-colors"
                   >
                     <Avatar>
+                      {contact.photo && <AvatarImage src={contact.photo} className="object-cover" />}
                       <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
                         {contact.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                       </AvatarFallback>
@@ -609,6 +616,9 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
                       <div className="flex items-start gap-3">
                         <div className="relative">
                           <Avatar>
+                            {otherParticipantId && conv.participantPhotos?.[otherParticipantId] && (
+                              <AvatarImage src={conv.participantPhotos[otherParticipantId]!} className="object-cover" />
+                            )}
                             <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
                               {otherParticipantName.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
                             </AvatarFallback>
@@ -655,10 +665,15 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
               <div className="p-4 border-b bg-gray-50">
                 <div className="flex items-center gap-3">
                   <Avatar>
+                    {(() => {
+                      const otherParticipantId = selectedConversation.participants.find(p => p !== userId);
+                      const photo = otherParticipantId ? selectedConversation.participantPhotos?.[otherParticipantId] : null;
+                      return photo ? <AvatarImage src={photo} className="object-cover" /> : null;
+                    })()}
                     <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
                       {(() => {
                         const otherParticipantId = selectedConversation.participants.find(p => p !== userId);
-                        const name = otherParticipantId 
+                        const name = otherParticipantId
                           ? selectedConversation.participantNames[otherParticipantId] || 'U'
                           : 'U';
                         return name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase();
