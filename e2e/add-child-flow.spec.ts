@@ -34,14 +34,13 @@ test.describe('Parent adds a child profile', () => {
     await expect(page).toHaveURL(/\/dashboard\/parent(\/.*)?$/, { timeout: 20000 });
 
     // 2) Open the Add Child dialog — the account may or may not already
-    // have children from other runs, so check both entry points.
-    const addFirstChild = page.getByRole('button', { name: /Add Your First Child/i });
-    const addAnotherChild = page.getByRole('button', { name: /Add Another Child/i });
-    if (await addFirstChild.isVisible({ timeout: 5000 }).catch(() => false)) {
-      await addFirstChild.click();
-    } else {
-      await addAnotherChild.first().click();
-    }
+    // have children from other runs, so accept either entry point. Uses
+    // waitFor (auto-retries) rather than isVisible() (a one-shot check with
+    // no auto-wait) so this doesn't race the dashboard's async children
+    // fetch that runs right after login.
+    const addChildButton = page.getByRole('button', { name: /Add (Your First|Another) Child/i }).first();
+    await addChildButton.waitFor({ state: 'visible', timeout: 15000 });
+    await addChildButton.click();
 
     // 3) Fill and submit the Add Child form.
     await page.locator('#firstName').fill(childFirstName);
