@@ -29,8 +29,12 @@ test.describe('Parent -> Child -> Student Journey', () => {
       await page.locator('#lastName').fill('Student');
       await page.locator('#dateOfBirth').fill('2012-09-01');
 
+      // AddChildDialog.tsx's real <SelectItem> text — this had drifted from
+      // "Year 3 (Primary 1)" (which no longer exists in the dropdown) ever
+      // since QA_PARENT_EMAIL/QA_PARENT_PASSWORD went unset, silently
+      // skipping this whole test and hiding the mismatch.
       await page.locator('#gradeLevel').click();
-      await page.getByRole('option', { name: 'Year 3 (Primary 1)' }).click();
+      await page.getByRole('option', { name: 'Primary 3 (P3) – Year 3' }).click();
 
       await page.getByLabel('Mathematics').check();
       await page.getByRole('button', { name: /^Add Child$/ }).click();
