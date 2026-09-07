@@ -122,18 +122,19 @@ app.post('/add-role', async (c) => {
     console.log(`User now has roles:`, updatedRoles);
 
     // Send congratulations email
+    const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
     const userProfile = await kv.get(`user:${userId}`) as any;
     if (userProfile?.email) {
       const emailData = emailTemplates.roleAdditionCongratulations(
         userProfile.fullName || userProfile.name || 'User',
         newRole,
-        `https://app.tutornest.org/dashboard`
+        `${appUrl}/dashboard`
       );
       await sendEmail({
         to: userProfile.email,
         subject: emailData.subject,
         html: emailData.html,
-        replyTo: 'support@tutornest.org'
+        replyTo: 'support@knowledgefonsacademy.com'
       });
     }
 
@@ -141,13 +142,13 @@ app.post('/add-role', async (c) => {
     if (newRole === 'tutor' && userProfile?.email) {
       const verificationEmailData = emailTemplates.tutorVerificationPending(
         userProfile.fullName || userProfile.name || 'Tutor',
-        `https://app.tutornest.org/tutor-dashboard`
+        `${appUrl}/tutor-dashboard`
       );
       await sendEmail({
         to: userProfile.email,
         subject: verificationEmailData.subject,
         html: verificationEmailData.html,
-        replyTo: 'support@tutornest.org'
+        replyTo: 'support@knowledgefonsacademy.com'
       });
     }
 
