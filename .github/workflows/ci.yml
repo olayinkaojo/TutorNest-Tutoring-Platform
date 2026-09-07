@@ -4,6 +4,7 @@ on:
   push:
     branches: [main, master]
   pull_request:
+  workflow_dispatch:
 
 jobs:
   build-and-test:
@@ -11,6 +12,11 @@ jobs:
     env:
       VITE_SUPABASE_PROJECT_ID: ${{ secrets.VITE_SUPABASE_PROJECT_ID }}
       VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+      # Gates e2e/parent-child-student-flow.spec.ts — without these it
+      # test.skip()s silently, so the parent->child->student journey (the
+      # actual feature, not just a build check) never really ran in CI.
+      QA_PARENT_EMAIL: ${{ secrets.QA_PARENT_EMAIL }}
+      QA_PARENT_PASSWORD: ${{ secrets.QA_PARENT_PASSWORD }}
     steps:
       - uses: actions/checkout@v4
 
