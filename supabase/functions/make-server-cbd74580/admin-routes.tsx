@@ -1,4 +1,5 @@
 import { Hono } from 'npm:hono@4';
+import { createClient } from 'npm:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
@@ -113,6 +114,152 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       return c.json({ count: stale.length, children: stale });
     } catch (error: any) {
       console.error('Error listing stale student logins:', error);
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
+  // ── Pre-launch financial reset ──────────────────────────────────────────
+  // Only Flutterwave's TEST API is wired in so far, so every payment,
+  // payout, refund, invoice, credit, and subscription record in the system
+  // represents fake money, regardless of which account (real or test) it's
+  // attached to. This clears all of it ahead of going live, while leaving
+  // every user account, booking, review, message, and document untouched —
+  // those aren't "money," and nothing here touches them.
+  //
+  // KV prefixes deleted outright: payment (covers payment:, payment_ref:,
+  // payment_invoice:), refund, balance_review, coupon_usage_, user_credits_,
+  // invoice_, user_invoices_, tax_report_, subscription_parent_,
+  // subscription_history_.
+  // KV records reset in place (kept, not deleted): coupon definitions
+  // (coupon_<id> / coupon_code_<code>) have their usageCount zeroed —
+  // the discount codes themselves are marketing config, not money, and
+  // stay defined; only the fake redemption tally resets.
+  // Postgres tables cleared entirely: payments, tutor_balance, payouts,
+  // trivia_subscriptions — all four gracefully recreate a fresh zero state
+  // on next real use (see getTutorBalance / getOrCreateTriviaSubscription),
+  // so deleting the rows outright is safe.
+  //
+  // Dry-run by default — returns full record contents (not just counts) as
+  // a backup export, changing nothing. Pass ?apply=true to actually delete;
+  // that call still returns the same backup, captured immediately before
+  // deletion, so the response itself is the pre-wipe snapshot to save.
+  const FINANCIAL_KV_DELETE_PREFIXES = [
+    'payment',
+    'refund',
+    'balance_review',
+    'coupon_usage_',
+    'user_credits_',
+    'invoice_',
+    'user_invoices_',
+    'tax_report_',
+    'subscription_parent_',
+    'subscription_history_',
+  ];
+  const FINANCIAL_PG_TABLES: { table: string; pkColumn: string }[] = [
+    { table: 'payments', pkColumn: 'id' },
+    { table: 'tutor_balance', pkColumn: 'tutor_id' },
+    { table: 'payouts', pkColumn: 'id' },
+    { table: 'trivia_subscriptions', pkColumn: 'id' },
+  ];
+
+  app.post('/make-server-cbd74580/admin/wipe-financial-test-data', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+      const adminProfile = await kv.get(`user:${userId}`) as any
+        ?? await db.getProfile(userId);
+      if (!adminProfile || adminProfile.role !== 'admin') {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
+
+      const apply = c.req.query('apply') === 'true';
+
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      const backup: Record<string, any[]> = {};
+      const counts: Record<string, number> = {};
+
+      // ── KV: full-delete prefixes ──
+      for (const prefix of FINANCIAL_KV_DELETE_PREFIXES) {
+        const { data, error } = await supabase
+          .from('kv_store_cbd74580')
+          .select('key, value')
+          .like('key', `${prefix}%`);
+        if (error) throw new Error(`KV scan failed for prefix "${prefix}": ${error.message}`);
+
+        backup[`kv:${prefix}`] = data ?? [];
+        counts[`kv:${prefix}`] = data?.length ?? 0;
+
+        if (apply && data && data.length > 0) {
+          const { error: delError } = await supabase
+            .from('kv_store_cbd74580')
+            .delete()
+            .like('key', `${prefix}%`);
+          if (delError) throw new Error(`KV delete failed for prefix "${prefix}": ${delError.message}`);
+        }
+      }
+
+      // ── KV: reset coupon usageCount to 0, keep the coupon definitions ──
+      const { data: couponRows, error: couponError } = await supabase
+        .from('kv_store_cbd74580')
+        .select('key, value')
+        .like('key', 'coupon_%')
+        .not('key', 'like', 'coupon_usage_%');
+      if (couponError) throw new Error(`Coupon scan failed: ${couponError.message}`);
+
+      const couponsWithUsage = (couponRows ?? []).filter((row: any) => (row.value?.usageCount ?? 0) > 0);
+      backup['coupon_usage_counters_before_reset'] = couponsWithUsage;
+      counts['coupon_definitions_with_usage_reset'] = couponsWithUsage.length;
+
+      if (apply && couponsWithUsage.length > 0) {
+        const updates = couponsWithUsage.map((row: any) => ({
+          key: row.key,
+          value: { ...row.value, usageCount: 0 },
+        }));
+        const { error: upsertError } = await supabase.from('kv_store_cbd74580').upsert(updates);
+        if (upsertError) throw new Error(`Coupon usageCount reset failed: ${upsertError.message}`);
+      }
+
+      // ── Postgres tables: delete every row ──
+      for (const { table, pkColumn } of FINANCIAL_PG_TABLES) {
+        const { data, error } = await supabase.from(table).select('*');
+        if (error) throw new Error(`Table scan failed for "${table}": ${error.message}`);
+
+        backup[`table:${table}`] = data ?? [];
+        counts[`table:${table}`] = data?.length ?? 0;
+
+        if (apply && data && data.length > 0) {
+          // PostgREST rejects a bare, unfiltered .delete() — this matches
+          // every row via "primary key is not null", which is always true.
+          const { error: delError } = await supabase.from(table).delete().not(pkColumn, 'is', null);
+          if (delError) throw new Error(`Delete failed for table "${table}": ${delError.message}`);
+        }
+      }
+
+      if (apply) {
+        await logAuditEvent({
+          userId,
+          action: 'financial_test_data_wiped',
+          category: 'payments' as ActivityCategory,
+          description: 'Wiped pre-launch test financial data ahead of live Flutterwave integration.',
+          severity: 'critical',
+          metadata: { counts },
+        });
+      }
+
+      return c.json({
+        success: true,
+        mode: apply ? 'apply' : 'dry_run',
+        counts,
+        backup,
+      });
+    } catch (error: any) {
+      console.error('Error wiping financial test data:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);
     }
   });
