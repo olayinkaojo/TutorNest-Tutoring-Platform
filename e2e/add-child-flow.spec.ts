@@ -4,15 +4,25 @@ import { test, expect } from '@playwright/test';
 // adding a child profile from the Parent Dashboard (AddChildDialog.tsx ->
 // POST /parent/add-child -> GET /parent/children/:parentId).
 //
-// Uses the shared QA_PARENT_EMAIL account (signs in via the standard
-// Supabase-auth-backed /auth page — not a fresh signup) rather than
-// provisioning a new account per run: POST /signup goes through this
-// backend's own CORS allowlist (see resolveAllowOrigin in index.ts),
-// which intentionally rejects any origin not on it, and a CI-hosted
-// localhost isn't on that list — confirmed directly (curl reproduced the
-// mismatched Access-Control-Allow-Origin header). That's a deliberate
-// security control on the real app, not something to route around from a
-// test, so this test avoids /signup entirely rather than depend on it.
+// KNOWN LIMITATION, confirmed 2026-09-07: this backend's CORS allowlist
+// (resolveAllowOrigin in index.ts) intentionally returns a mismatched
+// Access-Control-Allow-Origin for any request origin not on
+// ALLOWED_ORIGINS — a deliberate security control, not a bug. A
+// CI-hosted localhost is never going to be on that list, so *every*
+// write (POST/PUT/DELETE) this test makes to the custom edge function —
+// not just signup — fails in the browser with a generic "Failed to
+// fetch", confirmed via a captured screenshot showing that exact error
+// inside AddChildDialog.tsx after submit. Read-only calls and Supabase
+// Auth's own sign-in (used below) aren't affected, which is why login
+// always succeeds while this test's actual assertion doesn't.
+//
+// The underlying feature was verified directly instead, bypassing the
+// browser entirely: curl login -> POST /parent/add-child -> GET
+// /parent/children/:parentId round-tripped correctly against production.
+// This test is left enabled (rather than skipped) because a real fix —
+// adding the CI/test origin to ALLOWED_ORIGINS — would make it pass
+// without any change here; ask before doing that, since it's a
+// production security setting, not application code.
 const PARENT_EMAIL = process.env.QA_PARENT_EMAIL;
 const PARENT_PASSWORD = process.env.QA_PARENT_PASSWORD;
 

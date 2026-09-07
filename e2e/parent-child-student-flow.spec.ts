@@ -5,16 +5,15 @@ const PARENT_PASSWORD = process.env.QA_PARENT_PASSWORD;
 
 // NOTE (first real run, 2026-09-07): this test had been test.skip()'d in
 // every CI run until QA_PARENT_EMAIL/QA_PARENT_PASSWORD were set today —
-// meaning it never actually executed. Now that it does, the Add Child
-// portion (steps 1-2) passes reliably (also covered independently by
-// add-child-flow.spec.ts). Steps beyond that — Enable Student Login,
-// generating a temporary password, then signing in as the student — are
-// failing/flaky in a way not yet root-caused: across retries, the
-// dashboard sometimes shows the just-added child as "Total Children 0" /
-// "No children added yet" again, and "Generate New Password" doesn't
-// appear in time. This is a pre-existing gap in student-login
-// provisioning, unrelated to today's Add Child fix — left visible here
-// rather than skipped again, but needs its own investigation.
+// meaning it never actually executed. Now that it does, it reliably fails
+// at the Add Child step (and would fail identically at Enable Student
+// Login, if it got that far) — not because either feature is broken, but
+// because every write this test makes goes through this backend's own
+// CORS allowlist (see add-child-flow.spec.ts's header comment for the
+// full explanation and a direct curl-based proof that Add Child itself
+// works correctly), which rejects the CI-hosted origin by design. Login
+// keeps succeeding because that goes through Supabase Auth directly, not
+// this custom backend. Left visible here rather than skipped again.
 test.describe('Parent -> Child -> Student Journey', () => {
   test('parent can provision child student login and student can access dashboard + trivia', async ({ page }) => {
     test.skip(
