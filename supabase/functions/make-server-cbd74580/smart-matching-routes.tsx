@@ -89,9 +89,40 @@ function calculateSubjectMatch(student: any, tutor: any): number {
   return Math.min(25, (matchPercentage * 20) + bonusPoints);
 }
 
-// Maps a school year group to the same broad level buckets tutors select
+// Maps a child's grade level to the same broad level buckets tutors select
 // from on their profile (see tutor.yearGroups, collected by
-// TutorProfileForm.tsx).
+// TutorProfileForm.tsx). The real value stored at student.gradeLevel is the
+// code AddChildDialog.tsx's Select writes (e.g. 'primary_3', 'secondary_8',
+// 'sixth_form_12' — confirmed by reading that form directly), not a literal
+// "Year N" string. An earlier version of this mapping only recognised
+// "Year N" strings, which nothing in the live product ever actually sends —
+// making Level Match silently neutral for every single match, exactly the
+// kind of always-neutral dimension this file was just rewritten to remove.
+// "Year N" is still accepted as a fallback in case some other caller (e.g. a
+// DB profile) ever provides it directly.
+const GRADE_LEVEL_CODE_MAP: Record<string, string> = {
+  // No dedicated tutor bucket exists below Primary — nursery-age children
+  // are mapped to the Primary bucket as the closest realistic fit.
+  nursery_1: 'Primary (Year 1-6)',
+  nursery_2: 'Primary (Year 1-6)',
+  nursery_3: 'Primary (Year 1-6)',
+  primary_1: 'Primary (Year 1-6)',
+  primary_2: 'Primary (Year 1-6)',
+  primary_3: 'Primary (Year 1-6)',
+  primary_4: 'Primary (Year 1-6)',
+  primary_5: 'Primary (Year 1-6)',
+  primary_6: 'Primary (Year 1-6)',
+  secondary_7: 'KS3 (Year 7-9)',
+  secondary_8: 'KS3 (Year 7-9)',
+  secondary_9: 'KS3 (Year 7-9)',
+  secondary_10: 'GCSE (Year 10-11)',
+  secondary_11: 'GCSE (Year 10-11)',
+  // No dedicated tutor bucket above A-Level exists either — Post-Secondary
+  // is mapped to A-Level as the closest fit.
+  sixth_form_12: 'A-Level (Year 12-13)',
+  sixth_form_13: 'A-Level (Year 12-13)',
+};
+
 const YEAR_GROUP_LEVELS: [string[], string][] = [
   [['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6'], 'Primary (Year 1-6)'],
   [['Year 7', 'Year 8', 'Year 9'], 'KS3 (Year 7-9)'],
@@ -99,15 +130,16 @@ const YEAR_GROUP_LEVELS: [string[], string][] = [
   [['Year 12', 'Year 13'], 'A-Level (Year 12-13)'],
 ];
 
-function mapYearGroupToLevel(yearGroup: string): string {
+function mapGradeLevelToBucket(gradeLevel: string): string {
+  if (GRADE_LEVEL_CODE_MAP[gradeLevel]) return GRADE_LEVEL_CODE_MAP[gradeLevel];
   for (const [years, level] of YEAR_GROUP_LEVELS) {
-    if (years.includes(yearGroup)) return level;
+    if (years.includes(gradeLevel)) return level;
   }
   return '';
 }
 
 function calculateLevelMatch(student: any, tutor: any): number {
-  const studentLevel = mapYearGroupToLevel(student.gradeLevel || student.yearGroup || '');
+  const studentLevel = mapGradeLevelToBucket(student.gradeLevel || student.yearGroup || '');
   const tutorLevels: string[] = tutor.yearGroups || [];
 
   if (!studentLevel || tutorLevels.length === 0) return 8; // neutral — one side hasn't filled this in
