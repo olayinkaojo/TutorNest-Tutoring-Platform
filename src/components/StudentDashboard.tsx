@@ -279,10 +279,13 @@ export function StudentDashboard({
             await studentAPI.notifyProgressImprovement(
               session.access_token,
               academicStudentId,
-              previousScore,
-              latestScore,
-              latest.subject || 'General',
-              latest.tutorId
+              {
+                tutorId: latest.tutorId,
+                previousScore,
+                currentScore: latestScore,
+                subject: latest.subject || 'General',
+                improvementPercentage: improvementPct,
+              }
             );
 
             console.log(`Progress improvement detected: ${improvementPct.toFixed(1)}% in ${latest.subject}`);

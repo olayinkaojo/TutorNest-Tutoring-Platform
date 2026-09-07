@@ -995,8 +995,18 @@ app.post('/make-server-cbd74580/students/:studentId/notify-progress', async (c) 
       }, 400);
     }
 
-    // Security: Student or admin can notify tutors of progress
-    if (currentUserId !== studentId && currentUserId !== 'admin') {
+    // Security: the student themselves (or an admin) can notify tutors of
+    // progress. :studentId here is the *academic* id the rest of the
+    // student dashboard uses (see academicStudentId in
+    // StudentDashboard.tsx) — for a dependent student that's their linked
+    // child record's id, not their own Supabase Auth user id, so a bare
+    // `currentUserId !== studentId` check rejected every dependent student
+    // (the majority of students) unconditionally. Accept either identity.
+    const callerProfile = await kv.get(`user:${currentUserId}`) as any;
+    const isSelf = currentUserId === studentId;
+    const isLinkedDependent = callerProfile?.linkedChildId === studentId;
+    const isAdmin = callerProfile?.role === 'admin';
+    if (!isSelf && !isLinkedDependent && !isAdmin) {
       return c.json({ error: 'Unauthorized to report this student progress' }, 403);
     }
 

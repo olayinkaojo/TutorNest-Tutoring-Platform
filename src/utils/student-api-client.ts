@@ -277,24 +277,33 @@ export const studentAPI = {
   },
 
   /**
-   * Notify tutor of student progress improvement
+   * Notify tutor of student progress improvement.
+   *
+   * A single options object (not positional args) — the call site in
+   * StudentDashboard.tsx used to pass previousScore/currentScore/subject as
+   * bare positional numbers/strings that didn't line up with this
+   * function's old (accessToken, studentId, tutorId, data) signature at
+   * all, and the body field names sent (newScore/improvement) didn't match
+   * what POST /students/:studentId/notify-progress actually validates
+   * (currentScore/improvementPercentage) — so this call has never
+   * actually succeeded. Fixed on both ends.
    */
   async notifyProgressImprovement(
     accessToken: string,
     studentId: string,
-    tutorId: string,
     data: {
+      tutorId?: string;
       previousScore: number;
-      newScore: number;
+      currentScore: number;
       subject: string;
-      improvement: number;
+      improvementPercentage: number;
     }
   ) {
-    if (!studentId || !tutorId) {
-      throw new StudentAPIError('INVALID_INPUT', 'Student ID and Tutor ID required', 400);
+    if (!studentId) {
+      throw new StudentAPIError('INVALID_INPUT', 'Student ID required', 400);
     }
 
-    if (data.improvement < 5) {
+    if (data.improvementPercentage < 5) {
       // Only notify for significant improvements (>5%)
       return { success: false, reason: 'improvement_too_small' };
     }
@@ -305,11 +314,11 @@ export const studentAPI = {
       {
         method: 'POST',
         body: {
-          tutorId,
+          tutorId: data.tutorId,
           previousScore: data.previousScore,
-          newScore: data.newScore,
+          currentScore: data.currentScore,
           subject: data.subject,
-          improvement: data.improvement,
+          improvementPercentage: data.improvementPercentage,
         }
       }
     );
