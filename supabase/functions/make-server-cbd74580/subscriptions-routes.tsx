@@ -15,10 +15,8 @@ const SUBSCRIPTION_TIERS = [
     price: 19.99,
     currency: 'GBP',
     billingCycle: 'monthly',
-    maxChildren: 1,
     booksIncluded: 10, // Number of books accessible
     benefits: [
-      '1 child profile',
       'Access to 10 educational books',
       'Basic progress tracking',
       'Email support',
@@ -35,10 +33,8 @@ const SUBSCRIPTION_TIERS = [
     price: 39.99,
     currency: 'GBP',
     billingCycle: 'monthly',
-    maxChildren: 2,
     booksIncluded: 50, // More books accessible
     benefits: [
-      'Up to 2 child profiles',
       'Access to 50+ educational books',
       'Advanced progress tracking with analytics',
       'Priority email & chat support',
@@ -58,10 +54,8 @@ const SUBSCRIPTION_TIERS = [
     price: 79.99,
     currency: 'GBP',
     billingCycle: 'monthly',
-    maxChildren: 4,
     booksIncluded: 999, // Unlimited books
     benefits: [
-      'Up to 4 child profiles',
       'Unlimited access to all educational books',
       'Full analytics dashboard',
       '24/7 priority support',
@@ -91,7 +85,6 @@ app.get('/subscription-tiers', async (c) => {
       price: tier.price,
       currency: tier.currency,
       billingCycle: tier.billingCycle,
-      maxChildren: tier.maxChildren,
       sessionsPerChild: tier.sessionsPerChild,
       sessions: tier.sessionsPerChild, // For display compatibility
       benefits: tier.benefits,
@@ -301,7 +294,6 @@ app.post('/subscription/upgrade', async (c) => {
       tierId: newTier.id,
       tierName: newTier.name,
       price: newTier.price,
-      maxChildren: newTier.maxChildren,
       sessionsPerChild: newTier.sessionsPerChild,
       // Adjust sessions used proportionally
       sessionsUsed: Math.floor((currentSubscription.sessionsUsed / currentTier.sessionsPerChild) * newTier.sessionsPerChild),
@@ -619,51 +611,12 @@ app.post('/subscription/auto-renew', async (c) => {
   }
 });
 
-// Check if parent can add more children based on subscription tier
-app.get('/subscription/:parentId/can-add-child', async (c) => {
-  try {
-    const auth = await requireSelfOrAdmin(c, c.req.param('parentId'));
-    if (auth instanceof Response) return auth;
-    const parentId = c.req.param('parentId');
-    
-    const subscription = await kv.get(`subscription_parent_${parentId}`);
-    
-    if (!subscription || subscription.status !== 'active') {
-      return c.json({
-        success: false,
-        canAdd: false,
-        reason: 'No active subscription. Please subscribe to add children.',
-        requiresUpgrade: true
-      });
-    }
-
-    // Get current number of children
-    const children = await kv.get(`parent_children_${parentId}`) || [];
-    const currentChildCount = children.length;
-
-    const tier = SUBSCRIPTION_TIERS.find(t => t.id === subscription.tierId);
-    if (!tier) {
-      return c.json({ success: false, error: 'Subscription tier not found' }, 500);
-    }
-
-    const canAdd = currentChildCount < tier.maxChildren;
-
-    return c.json({
-      success: true,
-      canAdd,
-      currentChildren: currentChildCount,
-      maxChildren: tier.maxChildren,
-      tierName: tier.name,
-      reason: canAdd 
-        ? `You can add ${tier.maxChildren - currentChildCount} more child(ren)`
-        : `Your ${tier.name} plan supports up to ${tier.maxChildren} child${tier.maxChildren > 1 ? 'ren' : ''}. Upgrade to add more.`,
-      requiresUpgrade: !canAdd,
-      availableTiers: canAdd ? [] : SUBSCRIPTION_TIERS.filter(t => t.maxChildren > tier.maxChildren)
-    });
-  } catch (error) {
-    console.error(`Error checking child limit for parent ${c.req.param('parentId')}:`, error);
-    return c.json({ success: false, error: 'Failed to check child limit' }, 500);
-  }
-});
+// A "can this parent add another child" check used to live here, gating
+// additions against each tier's maxChildren. That model is gone — sessions
+// are paid per child per booking now, not gated by subscription tier — and
+// nothing ever called this endpoint (confirmed by grep across src/), so it's
+// removed rather than left to bit-rot alongside a limit that no longer
+// exists. See parent-children-routes.tsx's POST /add-child for the current,
+// unlimited-children behaviour.
 
 export default app;

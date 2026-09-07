@@ -13,7 +13,6 @@ interface Tier {
   billingCycle: string;
   sessions: number;
   sessionsPerChild?: number;
-  maxChildren?: number;
   benefits: string[];
   popular?: boolean;
   color: string;
@@ -47,11 +46,9 @@ export function SubscriptionTiers({ onSelectTier, currentTierId, isLoading = fal
           price: 9.99,
           currency: 'NGN',
           billingCycle: 'monthly',
-          maxChildren: 1,
           sessionsPerChild: 0,
           sessions: 0,
           benefits: [
-            '1 child profile',
             'Access to 50+ educational books',
             '100 downloadable worksheets per month',
             'Basic curriculum resources',
@@ -67,11 +64,9 @@ export function SubscriptionTiers({ onSelectTier, currentTierId, isLoading = fal
           price: 19.99,
           currency: 'NGN',
           billingCycle: 'monthly',
-          maxChildren: 2,
           sessionsPerChild: 0,
           sessions: 0,
           benefits: [
-            'Up to 2 child profiles',
             'Access to 200+ educational books',
             'Unlimited downloadable worksheets',
             'Full curriculum library access',
@@ -91,11 +86,9 @@ export function SubscriptionTiers({ onSelectTier, currentTierId, isLoading = fal
           price: 29.99,
           currency: 'NGN',
           billingCycle: 'monthly',
-          maxChildren: 4,
           sessionsPerChild: 0,
           sessions: 0,
           benefits: [
-            'Up to 4 child profiles',
             'Access to entire book library (500+ books)',
             'Unlimited downloadable worksheets',
             'Complete curriculum & syllabus access',
@@ -238,9 +231,6 @@ export function SubscriptionTiers({ onSelectTier, currentTierId, isLoading = fal
             </div>
             <p className="text-sm text-gray-600 mt-2">
               {tier.sessionsPerChild || tier.sessions} sessions per child/month
-            </p>
-            <p className="text-xs mt-1" style={{ color: tier.color }}>
-              {tier.maxChildren === 1 ? '1 child' : `Up to ${tier.maxChildren} children`}
             </p>
           </div>
 

@@ -214,14 +214,15 @@ parentChildrenRoutes.get('/children/:parentId', async (c) => {
 
     console.log('Successfully fetched', children.length, 'children');
 
-    // Get subscription info
+    // Get subscription info (tier still gates resource/book access — see
+    // Bookshop.tsx — there's no child-count limit tied to it anymore:
+    // sessions are paid per child per booking)
     const subscription = await kv.get(`subscription_parent_${parentId}`);
 
-    return c.json({ 
+    return c.json({
       children,
       subscription: {
-        tier: subscription?.tierName || 'basic',
-        limit: subscription?.maxChildren || 1
+        tier: subscription?.tierName || 'basic'
       }
     });
   } catch (error: any) {

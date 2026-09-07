@@ -13,7 +13,6 @@ import {
   Filter,
   Eye,
   Loader2,
-  AlertTriangle,
   CheckCircle2,
   UserPlus
 } from 'lucide-react';
@@ -55,7 +54,6 @@ interface ParentChildSummary {
   parentName: string;
   parentEmail: string;
   subscriptionTier: string;
-  childLimit: number;
   childrenCount: number;
   children: ChildProfile[];
 }
@@ -123,7 +121,6 @@ export function ChildProfileManagement({ adminId, accessToken }: ChildProfileMan
   const totalChildren = childProfiles.length;
   const activeChildren = childProfiles.filter(p => p.status === 'active').length;
   const totalSessions = childProfiles.reduce((sum, p) => sum + p.sessionStats.totalSessions, 0);
-  const parentsAtLimit = parentSummaries.filter(p => p.childrenCount >= p.childLimit).length;
 
   if (loading) {
     return (
@@ -163,7 +160,9 @@ export function ChildProfileManagement({ adminId, accessToken }: ChildProfileMan
         <Card className="p-4">
           <div className="flex items-center justify-between mb-2">
             <User className="w-5 h-5 text-blue-600" />
-            <Badge variant="outline">{parentsAtLimit} at limit</Badge>
+            <Badge variant="outline">
+              {parentSummaries.length > 0 ? (totalChildren / parentSummaries.length).toFixed(1) : 0} avg
+            </Badge>
           </div>
           <div className="text-2xl font-bold">{parentSummaries.length}</div>
           <div className="text-sm text-gray-600">Parent Accounts</div>
@@ -199,7 +198,7 @@ export function ChildProfileManagement({ adminId, accessToken }: ChildProfileMan
             <ul className="space-y-1 text-blue-800">
               <li>• <strong>No Separate Logins:</strong> Children do not have login credentials for COPPA/GDPR compliance</li>
               <li>• <strong>Parent-Managed:</strong> Parents switch between child profiles in their dashboard</li>
-              <li>• <strong>Subscription Limits:</strong> Basic (1 child), Standard (2 children), Premium (4 children)</li>
+              <li>• <strong>No Child Limit:</strong> Sessions are paid per child per booking, so parents can add as many children as they need</li>
               <li>• <strong>Admin Visibility:</strong> All child profiles visible here for support and moderation</li>
               <li>• <strong>Session Booking:</strong> Parents book sessions for specific children</li>
             </ul>
@@ -461,18 +460,9 @@ export function ChildProfileManagement({ adminId, accessToken }: ChildProfileMan
                   <p className="text-xs text-gray-600">{summary.parentEmail}</p>
                 </div>
                 <div className="text-right">
-                  <div className="flex items-center gap-2">
-                    <Badge className={
-                      summary.childrenCount >= summary.childLimit
-                        ? 'bg-red-100 text-red-800'
-                        : 'bg-green-100 text-green-800'
-                    }>
-                      {summary.childrenCount} / {summary.childLimit}
-                    </Badge>
-                  </div>
-                  <p className="text-xs text-gray-600 mt-1">
-                    {summary.childrenCount >= summary.childLimit ? 'At limit' : `${summary.childLimit - summary.childrenCount} remaining`}
-                  </p>
+                  <Badge className="bg-gray-100 text-gray-800">
+                    {summary.childrenCount} {summary.childrenCount === 1 ? 'child' : 'children'}
+                  </Badge>
                 </div>
               </div>
 
@@ -486,16 +476,6 @@ export function ChildProfileManagement({ adminId, accessToken }: ChildProfileMan
                     </div>
                   ))}
                 </div>
-              )}
-
-              {summary.childrenCount >= summary.childLimit && (
-                <Card className="mt-3 p-2 bg-amber-50 border-amber-200">
-                  <p className="text-xs text-amber-900">
-                    <AlertTriangle className="w-3 h-3 inline mr-1" />
-                    Parent has reached child limit for {summary.subscriptionTier} tier.
-                    They need to upgrade to add more children.
-                  </p>
-                </Card>
               )}
             </Card>
           ))}

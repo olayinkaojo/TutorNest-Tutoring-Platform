@@ -7,7 +7,7 @@ import { Textarea } from './ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Checkbox } from './ui/checkbox';
 import { Alert, AlertDescription } from './ui/alert';
-import { AlertCircle, Loader2, Crown, ArrowUpCircle } from 'lucide-react';
+import { AlertCircle, Loader2 } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 
 interface AddChildDialogProps {
@@ -58,7 +58,6 @@ export function AddChildDialog({ open, onOpenChange, parentId, accessToken, onCh
   const [selectedSubjects, setSelectedSubjects] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [requiresUpgrade, setRequiresUpgrade] = useState(false);
 
   const toggleSubject = (subject: string) => {
     setSelectedSubjects(prev => 
@@ -99,10 +98,6 @@ export function AddChildDialog({ open, onOpenChange, parentId, accessToken, onCh
       const data = await response.json();
 
       if (!response.ok) {
-        // Check if it's a subscription limit error
-        if (data.requiresUpgrade) {
-          setRequiresUpgrade(true);
-        }
         throw new Error(data.error || 'Failed to add child');
       }
 
@@ -116,7 +111,6 @@ export function AddChildDialog({ open, onOpenChange, parentId, accessToken, onCh
         specialNeeds: '',
       });
       setSelectedSubjects([]);
-      setRequiresUpgrade(false);
 
       onChildAdded();
       onOpenChange(false);
@@ -126,13 +120,6 @@ export function AddChildDialog({ open, onOpenChange, parentId, accessToken, onCh
     } finally {
       setLoading(false);
     }
-  };
-
-  const handleUpgrade = () => {
-    // Close the dialog and redirect to subscription tab
-    onOpenChange(false);
-    // Navigate to subscription tab (this would need to be implemented in the parent component)
-    window.location.hash = 'subscription';
   };
 
   return (
@@ -264,25 +251,6 @@ export function AddChildDialog({ open, onOpenChange, parentId, accessToken, onCh
             />
           </div>
 
-          {requiresUpgrade && (
-            <Alert className="bg-yellow-50 border-yellow-200">
-              <Crown className="h-4 w-4 text-yellow-600" />
-              <AlertDescription className="text-yellow-800">
-                <p className="font-medium mb-2">Subscription Limit Reached</p>
-                <p className="text-sm mb-3">{error}</p>
-                <Button
-                  type="button"
-                  onClick={handleUpgrade}
-                  className="text-white"
-                  style={{ backgroundColor: '#625d9c' }}
-                >
-                  <Crown className="w-4 h-4 mr-2" />
-                  Upgrade Subscription
-                </Button>
-              </AlertDescription>
-            </Alert>
-          )}
-
           <div className="flex justify-end gap-3 pt-4">
             <Button
               type="button"
@@ -294,7 +262,7 @@ export function AddChildDialog({ open, onOpenChange, parentId, accessToken, onCh
             </Button>
             <Button
               type="submit"
-              disabled={loading || requiresUpgrade}
+              disabled={loading}
               className="text-white"
               style={{ backgroundColor: '#625d9c' }}
             >

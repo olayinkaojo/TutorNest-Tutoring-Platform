@@ -387,86 +387,13 @@ app.route('/make-server-cbd74580', reviewsDisputesRoutes);
 // Register subscriptions routes
 app.route('/make-server-cbd74580', subscriptionsRoutes);
 
-// DIRECT SUBSCRIPTION TIERS ROUTE (debugging)
-// NOTE: Live tutoring is now direct payment - subscriptions are for books, resources, and platform features
-app.get('/make-server-cbd74580/subscription-tiers', async (c) => {
-  console.log('=== DIRECT /subscription-tiers endpoint called ===');
-  
-  const TIERS = [
-    {
-      id: 'basic',
-      name: 'Basic',
-      price: 19.99,
-      currency: 'GBP',
-      billingCycle: 'monthly',
-      maxChildren: 1,
-      booksIncluded: 10,
-      benefits: [
-        '1 child profile',
-        'Access to 10 educational books',
-        'Basic progress tracking',
-        'Email support',
-        'Standard tutor matching',
-        'Session recordings (7 days retention)',
-        'Access to content library',
-        'Pay-as-you-go for live tutoring sessions'
-      ],
-      color: '#625d9c'
-    },
-    {
-      id: 'standard',
-      name: 'Standard',
-      price: 39.99,
-      currency: 'GBP',
-      billingCycle: 'monthly',
-      maxChildren: 2,
-      booksIncluded: 50,
-      benefits: [
-        'Up to 2 child profiles',
-        'Access to 50+ educational books',
-        'Advanced progress tracking with analytics',
-        'Priority email & chat support',
-        'Priority tutor matching',
-        'Session recordings (30 days retention)',
-        'Full content library access',
-        'Personalized learning plans',
-        'Homework assignment tracking',
-        '10% discount on live tutoring sessions'
-      ],
-      popular: true,
-      color: '#5d9827'
-    },
-    {
-      id: 'premium',
-      name: 'Premium',
-      price: 79.99,
-      currency: 'GBP',
-      billingCycle: 'monthly',
-      maxChildren: 4,
-      booksIncluded: 999,
-      benefits: [
-        'Up to 4 child profiles',
-        'Unlimited access to all educational books',
-        'Full analytics dashboard',
-        '24/7 priority support',
-        'Dedicated tutor matching specialist',
-        'Unlimited session recordings',
-        'Advanced personalized learning plans',
-        'Homework & assignment tracking',
-        'Quarterly progress reviews',
-        'Early access to new features',
-        '20% discount on live tutoring sessions',
-        'Free monthly webinar access'
-      ],
-      color: '#625d9c'
-    }
-  ];
-
-  return c.json({
-    success: true,
-    tiers: TIERS
-  });
-});
+// A second, hardcoded copy of GET /subscription-tiers used to live here too
+// ("DIRECT SUBSCRIPTION TIERS ROUTE (debugging)") — registered after
+// subscriptionsRoutes is mounted above, so Hono's first-match routing meant
+// this one never actually served a request; it was also carrying the same
+// stale maxChildren/"N child profiles" language removed from
+// subscriptions-routes.tsx's real /subscription-tiers handler. Removed
+// rather than left to drift from the one route that's actually live.
 
 // Register Google Calendar routes — kept only for existing tutors' status/
 // disconnect checks (see BookingCalendar.tsx). Nothing writes new
@@ -558,29 +485,6 @@ app.route('/make-server-cbd74580', migrationRoutes);
 
 // Register profile avatar upload route
 app.route('/make-server-cbd74580', profileAvatarRoutes);
-
-// TEST ROUTE - Direct subscription tiers endpoint
-app.get('/make-server-cbd74580/subscription-tiers-test', async (c) => {
-  console.log('=== TEST ENDPOINT CALLED ===');
-  return c.json({
-    success: true,
-    message: 'Test endpoint working',
-    tiers: [
-      {
-        id: 'basic',
-        name: 'Basic',
-        price: 29.99,
-        currency: 'GBP',
-        billingCycle: 'monthly',
-        maxChildren: 1,
-        sessionsPerChild: 4,
-        sessions: 4,
-        benefits: ['Test benefit'],
-        color: '#625d9c'
-      }
-    ]
-  });
-});
 
 // ============================================
 // AUTHENTICATION ROUTES

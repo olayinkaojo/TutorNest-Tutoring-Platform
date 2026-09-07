@@ -1237,7 +1237,6 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
           parentName: (`${parent.firstName || ''} ${parent.lastName || ''}`.trim() || parent.fullName || parent.email || 'Unknown'),
           parentEmail: parent.email,
           subscriptionTier: subscription?.tierName || 'basic',
-          childLimit: subscription?.maxChildren || 1,
           childrenCount: children.length,
           children
         });
