@@ -45,3 +45,4 @@ Icon[]
 # Cache
 .cache/
 .parcel-cache/
+financial-data-backup-*.json
