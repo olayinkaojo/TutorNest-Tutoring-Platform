@@ -2,6 +2,120 @@ import { Hono } from 'npm:hono@4';
 import { createClient } from 'npm:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
+import { logAuditEvent } from './activity-log.tsx';
+
+const STUDENT_EMAIL_DOMAIN = '@student.knowledgefonsacademy.com';
+
+type ProvisionResult =
+  | { ok: true; authUserId: string; studentEmail: string; existingAccount?: boolean }
+  | { ok: false; status: number; error: string; details?: any };
+
+/**
+ * Creates (or links) the Supabase Auth user + KV profile behind a child's
+ * student login, and updates the child record. Shared by enable-login and
+ * regenerate-login so there's exactly one place that knows how a student
+ * login is built — the two used to duplicate this in full, which is how
+ * the domain-generation logic could drift out of sync in the first place.
+ */
+async function provisionStudentLogin(
+  supabase: ReturnType<typeof createClient>,
+  params: { child: any; childId: string; parentId: string; studentEmail?: string; password: string }
+): Promise<ProvisionResult> {
+  const { child, childId, parentId, password } = params;
+  const finalStudentEmail = params.studentEmail ||
+    `${child.firstName.toLowerCase()}.${child.lastName.toLowerCase()}.${childId.slice(-4)}${STUDENT_EMAIL_DOMAIN}`;
+
+  // Check if a user with this email already exists (defensive — legacy
+  // accounts or a re-run after a partial failure could collide).
+  let authUserId: string | null = null;
+  let existingAuthUser: any = null;
+  try {
+    const { data: users, error: listError } = await supabase.auth.admin.listUsers();
+    if (!listError && users) {
+      existingAuthUser = users.users.find((u: any) => u.email === finalStudentEmail);
+    }
+  } catch (err) {
+    console.log('provisionStudentLogin: could not check for existing user, will attempt creation:', err);
+  }
+
+  if (existingAuthUser) {
+    authUserId = existingAuthUser.id;
+    const existingProfile = await kv.get(`user:${authUserId}`) as any;
+    if (existingProfile) {
+      existingProfile.linkedChildId = childId;
+      existingProfile.linkedParentId = parentId;
+      await kv.set(`user:${authUserId}`, existingProfile);
+      await kv.set(`child:${childId}`, {
+        ...child,
+        studentLoginEnabled: true,
+        studentUserId: authUserId,
+        studentEmail: finalStudentEmail,
+      });
+      return { ok: true, authUserId, studentEmail: finalStudentEmail, existingAccount: true };
+    }
+  }
+
+  if (!existingAuthUser) {
+    const { data, error: authError } = await supabase.auth.admin.createUser({
+      email: finalStudentEmail,
+      password,
+      email_confirm: true,
+      user_metadata: {
+        role: 'student',
+        firstName: child.firstName,
+        lastName: child.lastName,
+        linkedChildId: childId,
+        linkedParentId: parentId,
+        isDependent: true,
+      },
+    });
+
+    if (authError || !data.user) {
+      console.error('provisionStudentLogin: error creating student auth:', authError);
+      return {
+        ok: false,
+        status: 500,
+        error: authError?.message || 'Failed to create student account',
+        details: authError,
+      };
+    }
+
+    // Force-confirm email regardless of project settings.
+    await supabase.auth.admin.updateUserById(data.user.id, { email_confirm: true });
+    authUserId = data.user.id;
+  }
+
+  const studentProfile = {
+    id: authUserId,
+    userId: authUserId,
+    role: 'student',
+    email: finalStudentEmail,
+    firstName: child.firstName,
+    lastName: child.lastName,
+    dateOfBirth: child.dateOfBirth,
+    grade: child.gradeLevel,
+    subjects: child.subjects || [],
+    learningGoals: child.learningGoals || [],
+    specialNeeds: child.specialNeeds,
+    linkedChildId: childId,
+    linkedParentId: parentId,
+    isDependent: true,
+    accountType: 'student',
+    createdAt: new Date().toISOString(),
+    createdBy: parentId,
+  };
+  await kv.set(`user:${authUserId}`, studentProfile);
+
+  await kv.set(`child:${childId}`, {
+    ...child,
+    studentLoginEnabled: true,
+    studentUserId: authUserId,
+    studentEmail: finalStudentEmail,
+    studentLoginEnabledAt: new Date().toISOString(),
+  });
+
+  return { ok: true, authUserId: authUserId!, studentEmail: finalStudentEmail };
+}
 
 export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) => Promise<string | null>) {
 
@@ -34,60 +148,8 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         return c.json({ error: 'Student login already enabled for this child' }, 400);
       }
 
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-
-      // Generate student email if not provided
-      const finalStudentEmail = studentEmail || 
-        `${child.firstName.toLowerCase()}.${child.lastName.toLowerCase()}.${childId.slice(-4)}@student.knowledgefonsacademy.com`;
-
-      // Check if a user with this email already exists
-      let authUserId = null;
-      let existingAuthUser = null;
-      
-      try {
-        // Try to get user by email
-        const { data: users, error: listError } = await supabase.auth.admin.listUsers();
-        if (!listError && users) {
-          existingAuthUser = users.users.find((u: any) => u.email === finalStudentEmail);
-        }
-      } catch (err) {
-        console.log('Could not check for existing user, will attempt creation:', err);
-      }
-
-      if (existingAuthUser) {
-        console.log('Student auth user already exists with this email:', finalStudentEmail);
-        authUserId = existingAuthUser.id;
-        
-        // Check if there's already a user profile for this auth user
-        const existingProfile = await kv.get(`user:${authUserId}`) as any;
-        if (existingProfile) {
-          // Link the existing profile to this child
-          console.log('Linking existing student profile to child:', childId);
-          existingProfile.linkedChildId = childId;
-          existingProfile.linkedParentId = parentId;
-          await kv.set(`user:${authUserId}`, existingProfile);
-          
-          // Update child profile
-          child.studentLoginEnabled = true;
-          child.studentUserId = authUserId;
-          child.studentEmail = finalStudentEmail;
-          await kv.set(`child:${childId}`, child);
-          
-          return c.json({ 
-            success: true,
-            message: 'Student login enabled (existing account linked)',
-            studentEmail: finalStudentEmail,
-            studentUserId: authUserId,
-            existingAccount: true
-          });
-        }
-      }
-
       // Generate secure password if requested
-      const password = generatePassword 
+      const password = generatePassword
         ? `${child.firstName}${Math.random().toString(36).slice(-8)}!`
         : body.password;
 
@@ -95,72 +157,15 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         return c.json({ error: 'Password required' }, 400);
       }
 
-      // Create Supabase auth user for student (only if doesn't exist)
-      let authData: any = null;
-      if (!existingAuthUser) {
-        const { data, error: authError } = await supabase.auth.admin.createUser({
-          email: finalStudentEmail,
-          password: password,
-          email_confirm: true,
-          user_metadata: {
-            role: 'student',
-            firstName: child.firstName,
-            lastName: child.lastName,
-            linkedChildId: childId,
-            linkedParentId: parentId,
-            isDependent: true
-          }
-        });
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
 
-        if (authError || !data.user) {
-          console.error('Error creating student auth:', authError);
-          return c.json({
-            error: authError?.message || 'Failed to create student account',
-            details: authError,
-            debugInfo: `Email: ${finalStudentEmail}, ChildId: ${childId}`
-          }, 500);
-        }
-
-        // Force-confirm email regardless of project settings
-        await supabase.auth.admin.updateUserById(data.user.id, { email_confirm: true });
-
-        authData = data;
-        authUserId = data.user.id;
-      } else {
-        // Use existing auth user but create a new profile
-        authData = { user: existingAuthUser };
-        authUserId = existingAuthUser.id;
+      const result = await provisionStudentLogin(supabase, { child, childId, parentId, studentEmail, password });
+      if (!result.ok) {
+        return c.json({ error: result.error, details: result.details, debugInfo: `ChildId: ${childId}` }, result.status);
       }
-
-      // Create student user profile
-      const studentProfile = {
-        id: authUserId,
-        userId: authUserId,
-        role: 'student',
-        email: finalStudentEmail,
-        firstName: child.firstName,
-        lastName: child.lastName,
-        dateOfBirth: child.dateOfBirth,
-        grade: child.gradeLevel,
-        subjects: child.subjects || [],
-        learningGoals: child.learningGoals || [],
-        specialNeeds: child.specialNeeds,
-        linkedChildId: childId,
-        linkedParentId: parentId,
-        isDependent: true,
-        accountType: 'student',
-        createdAt: new Date().toISOString(),
-        createdBy: parentId
-      };
-
-      await kv.set(`user:${authUserId}`, studentProfile);
-
-      // Update child profile with student login info
-      child.studentLoginEnabled = true;
-      child.studentUserId = authUserId;
-      child.studentEmail = finalStudentEmail;
-      child.studentLoginEnabledAt = new Date().toISOString();
-      await kv.set(`child:${childId}`, child);
 
       // Create notification for parent
       const notificationId = `notification:${Date.now()}`;
@@ -169,25 +174,108 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         userId: parentId,
         type: 'info',
         title: 'Student Login Enabled',
-        message: `Student login has been enabled for ${child.firstName}. Email: ${finalStudentEmail}`,
+        message: `Student login has been enabled for ${child.firstName}. Email: ${result.studentEmail}`,
         read: false,
         priority: 'medium',
         createdAt: new Date().toISOString(),
         metadata: {
           childId,
-          studentEmail: finalStudentEmail
+          studentEmail: result.studentEmail
         }
       });
 
-      return c.json({ 
-        success: true, 
-        studentUserId: authUserId,
-        studentEmail: finalStudentEmail,
+      return c.json({
+        success: true,
+        studentUserId: result.authUserId,
+        studentEmail: result.studentEmail,
         temporaryPassword: generatePassword ? password : undefined,
-        message: 'Student login enabled successfully'
+        message: result.existingAccount ? 'Student login enabled (existing account linked)' : 'Student login enabled successfully',
+        existingAccount: result.existingAccount,
       });
     } catch (error: any) {
       console.error('Error enabling student login:', error);
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
+  // Regenerate student login (Parent-initiated) — e.g. the child's email
+  // was generated under an old domain (see the tutornest.org -> ... ->
+  // knowledgefonsacademy.com migration), the temporary password was lost,
+  // or the parent just wants a clean credential reset. Deletes the old
+  // auth user outright (rather than leaving a disabled, dangling account —
+  // the audit log below is the durable record of what happened, not a
+  // live-but-unusable credential) and provisions a brand new one via the
+  // same path enable-login uses, so the two can never drift apart again.
+  app.post('/make-server-cbd74580/student-auth/regenerate-login', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const parentId = await getUserId(accessToken ?? null);
+
+      if (!parentId) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+
+      const body = await c.req.json();
+      const { childId } = body;
+
+      const child = await kv.get(`child:${childId}`) as any;
+      if (!child) {
+        return c.json({ error: 'Child profile not found' }, 404);
+      }
+
+      if (child.parentId !== parentId) {
+        return c.json({ error: 'Unauthorized: Not your child' }, 403);
+      }
+
+      if (!child.studentLoginEnabled || !child.studentUserId) {
+        return c.json({ error: 'Student login is not currently enabled for this child — use enable-login instead.' }, 400);
+      }
+
+      const supabase = createClient(
+        Deno.env.get('SUPABASE_URL') ?? '',
+        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
+      );
+
+      const oldAuthUserId = child.studentUserId;
+      const oldEmail = child.studentEmail;
+
+      const { error: deleteError } = await supabase.auth.admin.deleteUser(oldAuthUserId);
+      if (deleteError) {
+        // Non-fatal: still provision a fresh login even if cleanup of the
+        // old one failed (e.g. it was already gone) — being unable to
+        // delete a stale account shouldn't block getting a working one.
+        console.warn(`regenerate-login: failed to delete old auth user ${oldAuthUserId} (continuing):`, deleteError.message);
+      }
+      await kv.del(`user:${oldAuthUserId}`);
+
+      const newPassword = `${child.firstName}${Math.random().toString(36).slice(-8)}!`;
+      const result = await provisionStudentLogin(supabase, {
+        child: { ...child, studentLoginEnabled: false },
+        childId,
+        parentId,
+        password: newPassword,
+      });
+      if (!result.ok) {
+        return c.json({ error: result.error, details: result.details }, result.status);
+      }
+
+      await logAuditEvent({
+        userId: parentId,
+        action: 'student_login_regenerated',
+        category: 'account',
+        description: `Student login regenerated for child ${childId}: ${oldEmail || 'unknown'} -> ${result.studentEmail}.`,
+        metadata: { childId, oldAuthUserId, oldEmail, newAuthUserId: result.authUserId, newEmail: result.studentEmail },
+      });
+
+      return c.json({
+        success: true,
+        studentUserId: result.authUserId,
+        studentEmail: result.studentEmail,
+        temporaryPassword: newPassword,
+        message: 'Student login regenerated successfully. The previous login credentials no longer work.',
+      });
+    } catch (error: any) {
+      console.error('Error regenerating student login:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);
     }
   });

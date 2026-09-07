@@ -1,5 +1,4 @@
 import { Hono } from 'npm:hono@4';
-import { createClient } from 'npm:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
@@ -66,25 +65,25 @@ function userCreatedMonthKey(u: any): string | null {
 
 const SUBJECT_PIE_COLORS = ['#625d9c', '#5d9827', '#3b82f6', '#f59e0b', '#8b5cf6', '#ec4899', '#14b8a6', '#f43f5e'];
 
-// A child's student-login email (student-auth-routes.tsx's enable-login
-// handler) is generated once, at creation, and stored permanently — it's
-// never revisited. Domain history: tutornest.org (earliest) ->
-// tutornest.com -> knowledgefonsacademy.com (fixed in ea3ee70,
-// 2026-09-05). Any child whose login was set up before that fix is still
-// carrying an old-domain address as their *actual* Supabase Auth sign-in
-// email, not just a cosmetic label.
+// A child's student-login email (student-auth-routes.tsx's
+// provisionStudentLogin helper) is generated once, at creation, and stored
+// permanently — it's never revisited. Domain history: tutornest.org
+// (earliest) -> tutornest.com -> knowledgefonsacademy.com (fixed in
+// ea3ee70, 2026-09-05). Any child whose login was set up before that fix
+// is still carrying an old-domain address as their *actual* Supabase Auth
+// sign-in email, not just a cosmetic label. Rather than an admin-run bulk
+// migration mutating live credentials, affected families use
+// POST /student-auth/regenerate-login (self-serve, parent-initiated) to
+// get a fresh, correctly-domained login. This endpoint is read-only: it
+// just surfaces who still needs to do that.
 const OLD_STUDENT_EMAIL_DOMAINS = ['@student.tutornest.org', '@student.tutornest.com'];
-const NEW_STUDENT_EMAIL_DOMAIN = '@student.knowledgefonsacademy.com';
 
 export function adminRoutes(app: Hono, getUserId: (token: string | null) => Promise<string | null>) {
 
-  // One-time repair for the domain migration above. Updates the real
-  // Supabase Auth user's email (the actual login credential) plus the
-  // mirrored user:<id> KV profile and the child record — a plain KV edit
-  // alone would leave the child unable to sign in with the address shown.
-  // Dry-run by default (lists what it would change); pass ?apply=true to
-  // actually make the changes.
-  app.post('/make-server-cbd74580/admin/migrate-student-login-domains', async (c) => {
+  // Lists children whose stored student-login email still carries a
+  // pre-migration domain — see the comment above. Read-only diagnostic;
+  // nothing here mutates any account.
+  app.get('/make-server-cbd74580/admin/stale-student-logins', async (c) => {
     try {
       const accessToken = c.req.header('Authorization')?.split(' ')[1];
       const userId = await getUserId(accessToken ?? null);
@@ -96,87 +95,24 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         return c.json({ error: 'Forbidden' }, 403);
       }
 
-      const apply = c.req.query('apply') === 'true';
-
-      const supabase = createClient(
-        Deno.env.get('SUPABASE_URL') ?? '',
-        Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? ''
-      );
-
       const allChildren = await kv.getByPrefix('child:');
-      const candidates = allChildren.filter((child: any) =>
-        child?.studentLoginEnabled &&
-        typeof child.studentEmail === 'string' &&
-        OLD_STUDENT_EMAIL_DOMAINS.some((domain) => child.studentEmail.endsWith(domain))
-      );
+      const stale = allChildren
+        .filter((child: any) =>
+          child?.studentLoginEnabled &&
+          typeof child.studentEmail === 'string' &&
+          OLD_STUDENT_EMAIL_DOMAINS.some((domain) => child.studentEmail.endsWith(domain))
+        )
+        .map((child: any) => ({
+          childId: child.id,
+          parentId: child.parentId,
+          firstName: child.firstName,
+          lastName: child.lastName,
+          currentEmail: child.studentEmail,
+        }));
 
-      const results: any[] = [];
-
-      for (const child of candidates) {
-        const oldEmail = child.studentEmail as string;
-        const matchedDomain = OLD_STUDENT_EMAIL_DOMAINS.find((d) => oldEmail.endsWith(d))!;
-        const newEmail = oldEmail.slice(0, -matchedDomain.length) + NEW_STUDENT_EMAIL_DOMAIN;
-
-        const entry: Record<string, any> = { childId: child.id, studentUserId: child.studentUserId, oldEmail, newEmail };
-
-        if (!child.studentUserId) {
-          entry.status = 'skipped_no_auth_user';
-          results.push(entry);
-          continue;
-        }
-
-        if (!apply) {
-          entry.status = 'would_migrate';
-          results.push(entry);
-          continue;
-        }
-
-        try {
-          const { error: authUpdateError } = await supabase.auth.admin.updateUserById(
-            child.studentUserId,
-            { email: newEmail, email_confirm: true }
-          );
-          if (authUpdateError) {
-            entry.status = 'failed';
-            entry.error = authUpdateError.message;
-            results.push(entry);
-            continue;
-          }
-
-          const studentProfile = await kv.get(`user:${child.studentUserId}`) as any;
-          if (studentProfile) {
-            studentProfile.email = newEmail;
-            await kv.set(`user:${child.studentUserId}`, studentProfile);
-          }
-
-          child.studentEmail = newEmail;
-          await kv.set(`child:${child.id}`, child);
-
-          await logAuditEvent({
-            userId,
-            action: 'student_login_domain_migrated',
-            category: 'account' as ActivityCategory,
-            description: `Migrated student login email for child ${child.id} from ${oldEmail} to ${newEmail}.`,
-            metadata: { childId: child.id, studentUserId: child.studentUserId, oldEmail, newEmail },
-          });
-
-          entry.status = 'migrated';
-          results.push(entry);
-        } catch (err: any) {
-          entry.status = 'failed';
-          entry.error = err.message;
-          results.push(entry);
-        }
-      }
-
-      return c.json({
-        success: true,
-        mode: apply ? 'apply' : 'dry_run',
-        totalCandidates: candidates.length,
-        results,
-      });
+      return c.json({ count: stale.length, children: stale });
     } catch (error: any) {
-      console.error('Error migrating student login domains:', error);
+      console.error('Error listing stale student logins:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);
     }
   });

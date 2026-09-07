@@ -6,8 +6,15 @@ import { Input } from './ui/input';
 import { Label } from './ui/label';
 import { Alert, AlertDescription } from './ui/alert';
 import { Badge } from './ui/badge';
-import { UserPlus, Key, Copy, Check, AlertCircle, LogIn, UserX } from 'lucide-react';
+import { UserPlus, Key, Copy, Check, AlertCircle, LogIn, UserX, RefreshCw } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+
+// Domain history: tutornest.org (earliest) -> tutornest.com ->
+// knowledgefonsacademy.com. A login's email is generated once, at
+// creation, and never revisited — so a child set up before the current
+// domain still shows one of these. Surfaced here so a parent doesn't have
+// to notice by accident; "Regenerate Login" fixes it in one click.
+const OUTDATED_EMAIL_DOMAINS = ['tutornest.org', 'tutornest.com'];
 
 interface ChildProfile {
   id: string;
@@ -35,6 +42,9 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
   const [resetPassword, setResetPassword] = useState('');
   const [copied, setCopied] = useState(false);
   const [showResetPanel, setShowResetPanel] = useState(false);
+  const [regenerated, setRegenerated] = useState<{ email: string; password: string } | null>(null);
+
+  const isOutdatedEmail = !!child.studentEmail && OUTDATED_EMAIL_DOMAINS.some((d) => child.studentEmail!.includes(d));
 
   const handleEnableLogin = async () => {
     setLoading(true);
@@ -155,6 +165,47 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
     }
   };
 
+  const handleRegenerateLogin = async () => {
+    if (!confirm(
+      `This creates a brand new login for ${child.firstName} with a fresh email and password — ` +
+      `the current login (${child.studentEmail || 'existing account'}) will stop working immediately. Continue?`
+    )) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+    setRegenerated(null);
+
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/student-auth/regenerate-login`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${accessToken}`,
+            'Content-Type': 'application/json'
+          },
+          body: JSON.stringify({ childId: child.id })
+        }
+      );
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to regenerate student login');
+      }
+
+      setRegenerated({ email: data.studentEmail, password: data.temporaryPassword });
+      onUpdate();
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
@@ -164,33 +215,82 @@ export function StudentLoginManager({ child, accessToken, onUpdate }: StudentLog
   return (
     <div className="space-y-2">
       {child.studentLoginEnabled ? (
-        <div className="flex items-center gap-2 flex-wrap">
-          <Badge variant="default" className="flex items-center gap-1">
-            <LogIn className="size-3" />
-            Student Login Active
-          </Badge>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleResetPassword}
-            disabled={loading}
-          >
-            <Key className="size-4 mr-1" />
-            Generate New Password
-          </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDisableLogin}
-            disabled={loading}
-          >
-            <UserX className="size-4 mr-1" />
-            Disable Login
-          </Button>
-          {child.studentEmail && (
-            <div className="text-sm text-muted-foreground">
-              Email: <span className="font-mono">{child.studentEmail}</span>
-            </div>
+        <div className="space-y-2">
+          <div className="flex items-center gap-2 flex-wrap">
+            <Badge variant="default" className="flex items-center gap-1">
+              <LogIn className="size-3" />
+              Student Login Active
+            </Badge>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetPassword}
+              disabled={loading}
+            >
+              <Key className="size-4 mr-1" />
+              Generate New Password
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleRegenerateLogin}
+              disabled={loading}
+            >
+              <RefreshCw className="size-4 mr-1" />
+              Regenerate Login
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleDisableLogin}
+              disabled={loading}
+            >
+              <UserX className="size-4 mr-1" />
+              Disable Login
+            </Button>
+            {child.studentEmail && (
+              <div className="text-sm text-muted-foreground">
+                Email: <span className="font-mono">{child.studentEmail}</span>
+              </div>
+            )}
+          </div>
+
+          {isOutdatedEmail && !regenerated && (
+            <Alert className="border-amber-300 bg-amber-50">
+              <AlertCircle className="size-4 text-amber-600" />
+              <AlertDescription className="text-amber-800">
+                This login was created before a domain update and won't match our current address —
+                click <strong>Regenerate Login</strong> above to issue {child.firstName} a fresh one.
+              </AlertDescription>
+            </Alert>
+          )}
+
+          {regenerated && (
+            <Alert className="border-green-300 bg-green-50">
+              <Check className="size-4 text-green-600" />
+              <AlertDescription>
+                <div className="space-y-1">
+                  <p className="font-medium text-green-800">Login regenerated</p>
+                  <p className="text-sm">Email: <span className="font-mono">{regenerated.email}</span></p>
+                  <div className="flex items-center gap-2">
+                    <p className="text-sm">Password: <span className="font-mono font-bold">{regenerated.password}</span></p>
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => copyToClipboard(`${regenerated.email} / ${regenerated.password}`)}
+                    >
+                      {copied ? <Check className="size-4" /> : <Copy className="size-4" />}
+                    </Button>
+                  </div>
+                  <p className="text-xs text-green-700">
+                    The previous login no longer works — share these new credentials with {child.firstName}.
+                  </p>
+                  <Button size="sm" variant="outline" className="mt-1 h-6 text-xs" onClick={() => setRegenerated(null)}>
+                    Dismiss
+                  </Button>
+                </div>
+              </AlertDescription>
+            </Alert>
           )}
         </div>
       ) : (
