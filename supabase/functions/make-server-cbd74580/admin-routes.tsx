@@ -226,9 +226,22 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       // ── Postgres tables: delete every row ──
+      const skippedTables: Record<string, string> = {};
       for (const { table, pkColumn } of FINANCIAL_PG_TABLES) {
         const { data, error } = await supabase.from(table).select('*');
-        if (error) throw new Error(`Table scan failed for "${table}": ${error.message}`);
+        if (error) {
+          // A table that was designed in code but never actually migrated
+          // (e.g. trivia_subscriptions) has nothing to wipe — treat as
+          // empty rather than failing the whole operation over it.
+          if (error.code === 'PGRST205' || /schema cache/i.test(error.message)) {
+            console.warn(`wipe-financial-test-data: table "${table}" doesn't exist, skipping:`, error.message);
+            skippedTables[table] = error.message;
+            backup[`table:${table}`] = [];
+            counts[`table:${table}`] = 0;
+            continue;
+          }
+          throw new Error(`Table scan failed for "${table}": ${error.message}`);
+        }
 
         backup[`table:${table}`] = data ?? [];
         counts[`table:${table}`] = data?.length ?? 0;
@@ -255,6 +268,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       return c.json({
         success: true,
         mode: apply ? 'apply' : 'dry_run',
+        skippedTables,
         counts,
         backup,
       });
