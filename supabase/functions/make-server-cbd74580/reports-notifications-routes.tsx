@@ -1021,9 +1021,14 @@ app.post('/make-server-cbd74580/students/:studentId/notify-progress', async (c) 
       });
     }
 
-    // Get student info
-    const student = await kv.get(`student:${studentId}`) as any;
-    const studentName = student?.name || 'Student';
+    // Get student info — dependent students are stored at child:<id>
+    // (the id this route's :studentId actually is, per academicStudentId
+    // in StudentDashboard.tsx); an independent 18+ student's own profile
+    // lives at user:<id> instead. student:<id> was never a real key,
+    // so this always fell back to the generic name below.
+    const student = (await kv.get(`child:${studentId}`)) as any
+      ?? (await kv.get(`user:${studentId}`)) as any;
+    const studentName = student?.firstName || student?.name || 'Student';
 
     // Notify tutor(s) of progress
     const targetTutorId = tutorId as string || 'all-tutors';
