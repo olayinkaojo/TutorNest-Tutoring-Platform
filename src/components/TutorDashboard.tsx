@@ -446,7 +446,15 @@ export function TutorDashboard({
         setPastStudents(pastStudentDetails.filter(Boolean));
       }
 
-      // Check if tutor has set any availability slots
+      // Check if tutor has set any availability slots. GET /availability/:id
+      // always responds with { schedule: { Monday: {...}, ... }, timezone }
+      // — even the "nothing configured yet" default — never a top-level
+      // `availability` or `slots` field, so the old
+      // `availData.availability || availData.slots || availData` chain
+      // always fell through to the whole (always-truthy) response object.
+      // That made availabilitySet true for every tutor immediately,
+      // including ones who'd never touched the Availability tab — the
+      // "please set your availability" prompt could never actually show.
       try {
         const tutorId = profile.id || profile.userId;
         const availRes = await fetch(
@@ -455,8 +463,9 @@ export function TutorDashboard({
         );
         if (availRes.ok) {
           const availData = await availRes.json();
-          const slots = availData.availability || availData.slots || availData;
-          setAvailabilitySet(Array.isArray(slots) ? slots.length > 0 : !!slots);
+          const days = Object.values(availData?.schedule || {}) as { enabled?: boolean; slots?: unknown[] }[];
+          const hasRealAvailability = days.some((day) => day?.enabled && (day.slots?.length ?? 0) > 0);
+          setAvailabilitySet(hasRealAvailability);
         }
       } catch {
         // non-critical — leave as false
