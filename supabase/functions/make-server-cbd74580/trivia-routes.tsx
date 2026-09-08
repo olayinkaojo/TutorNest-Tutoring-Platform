@@ -2,6 +2,7 @@ import { Hono } from 'npm:hono@4';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
+import { getUserStats, updateUserStats, checkAndAwardAchievements } from './achievement-service.tsx';
 
 const app = new Hono();
 
@@ -235,12 +236,26 @@ app.post('/submit', async (c) => {
 
     console.log('Trivia submit successful: Score:', score, '| XP:', totalXP, '| Rank:', userRank);
 
+    // Feed the shared achievement system (see achievement-service.tsx) —
+    // without this, XP earned here never reached user:<id>:stats, so
+    // checkAndAwardAchievements had nothing real to check against and the
+    // Achievements tab could never show a badge earned from playing trivia.
+    let newBadges: string[] = [];
+    try {
+      const achievementStats = await getUserStats(user.id);
+      await updateUserStats(user.id, { totalXP: (achievementStats.totalXP || 0) + totalXP });
+      newBadges = await checkAndAwardAchievements(user.id);
+    } catch (err) {
+      console.warn('Trivia submit: achievement update failed (non-fatal):', err);
+    }
+
     return c.json({
       success: true,
       result: triviaResult,
       stats: updatedStats,
       rank: userRank,
-      totalPlayers: leaderboard.entries.length
+      totalPlayers: leaderboard.entries.length,
+      newBadges,
     });
   } catch (error) {
     console.error('Error submitting trivia - Full error:', error);

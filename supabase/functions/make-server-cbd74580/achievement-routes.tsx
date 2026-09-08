@@ -1,4 +1,5 @@
 import { Hono } from 'npm:hono@4';
+import { verifyUser } from './route-auth.tsx';
 import {
   getUserBadges,
   BADGE_DEFINITIONS,
@@ -21,7 +22,7 @@ export const achievementRoutes = new Hono();
 // GET /achievements/user-achievements - Get user's badges and stats
 achievementRoutes.get("/user-achievements", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     if (!userId) {
       return c.json({ error: "Unauthorized" }, 401);
     }
@@ -51,7 +52,7 @@ achievementRoutes.get("/user-achievements", async (c) => {
 // GET /achievements/progress - Get progress toward next badges
 achievementRoutes.get("/progress", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     if (!userId) {
       return c.json({ error: "Unauthorized" }, 401);
     }
@@ -117,7 +118,7 @@ achievementRoutes.get("/all", async (c) => {
 // GET /achievements/compare/:friendId - Compare achievements with friend
 achievementRoutes.get("/compare/:friendId", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     const friendId = c.req.param("friendId");
 
     if (!userId) {
@@ -134,7 +135,7 @@ achievementRoutes.get("/compare/:friendId", async (c) => {
 // POST /achievements/claim - Claim/check for new achievements
 achievementRoutes.post("/claim", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     if (!userId) {
       return c.json({ error: "Unauthorized" }, 401);
     }
@@ -180,7 +181,7 @@ achievementRoutes.post("/claim", async (c) => {
 // GET /achievements/stats - Get detailed user achievement stats
 achievementRoutes.get("/stats", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     if (!userId) {
       return c.json({ error: "Unauthorized" }, 401);
     }

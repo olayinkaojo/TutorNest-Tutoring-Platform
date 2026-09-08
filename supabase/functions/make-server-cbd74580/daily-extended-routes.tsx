@@ -6,6 +6,7 @@ import { createClient } from "jsr:@supabase/supabase-js@2";
 import * as kv from "./kv_store.tsx";
 import * as dailyChallengeService from "./daily-challenge-service.tsx";
 import * as timeAttackService from "./time-attack-service.tsx";
+import { getUserStats, updateUserStats, checkAndAwardAchievements } from "./achievement-service.tsx";
 
 const app = new Hono();
 
@@ -90,11 +91,28 @@ app.post("/daily-challenge/submit", async (c) => {
       return c.json({ ...result }, 200);
     }
 
+    // Feed the shared achievement system (see achievement-service.tsx) —
+    // otherwise a completed daily challenge never reaches user:<id>:stats
+    // and can never unlock a badge or count toward the Achievements tab.
+    let newBadges: string[] = [];
+    try {
+      const achievementStats = await getUserStats(userData.user.id);
+      await updateUserStats(userData.user.id, {
+        dailyChallengesCompleted: (achievementStats.dailyChallengesCompleted || 0) + 1,
+        totalXP: (achievementStats.totalXP || 0) + (result.xpReward?.totalXp || 0),
+        currentStreak: result.streakInfo?.currentStreak ?? achievementStats.currentStreak,
+      });
+      newBadges = await checkAndAwardAchievements(userData.user.id);
+    } catch (err) {
+      console.warn('Daily challenge submit: achievement update failed (non-fatal):', err);
+    }
+
     return c.json({
       success: true,
       message: result.message,
       xpReward: result.xpReward,
       streakInfo: result.streakInfo,
+      newBadges,
     });
   } catch (error) {
     console.error("Error submitting daily challenge:", error);
@@ -328,7 +346,22 @@ app.post("/time-attack/:sessionId/complete", async (c) => {
       /* non-fatal */
     }
 
-    return c.json(result);
+    let newBadges: string[] = [];
+    if (result.success) {
+      try {
+        const achievementStats = await getUserStats(userData.user.id);
+        const isPerfect = result.results.accuracy >= 100;
+        await updateUserStats(userData.user.id, {
+          totalXP: (achievementStats.totalXP || 0) + (result.results.totalXp || 0),
+          perfectTimeAttackGames: (achievementStats.perfectTimeAttackGames || 0) + (isPerfect ? 1 : 0),
+        });
+        newBadges = await checkAndAwardAchievements(userData.user.id);
+      } catch (err) {
+        console.warn('Time attack complete: achievement update failed (non-fatal):', err);
+      }
+    }
+
+    return c.json({ ...result, newBadges });
   } catch (error) {
     console.error("Error completing time attack:", error);
     return c.json({ error: "Failed to complete time attack" }, 500);

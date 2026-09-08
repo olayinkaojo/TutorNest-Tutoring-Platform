@@ -46,3 +46,4 @@ Icon[]
 .cache/
 .parcel-cache/
 financial-data-backup-*.json
+financial-data-wipe-applied-*.json

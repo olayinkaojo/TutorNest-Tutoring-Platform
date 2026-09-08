@@ -66,8 +66,49 @@ export async function updateUserStats(userId: string, updates: Partial<UserStats
     const current = await getUserStats(userId);
     const updated = { ...current, ...updates, userId };
     await kv.set([`user:${userId}:stats`], updated);
+    await updateAchievementLeaderboard(userId, updated);
   } catch {
     // Silent fail
+  }
+}
+
+/**
+ * Keeps achievement-leaderboard:global in sync — GET /achievements/leaderboard
+ * (leaderboard-achievements.tsx) reads this key, but nothing ever wrote to
+ * it, so that leaderboard was always empty regardless of how many badges
+ * anyone actually earned. Called from the one place every game mode already
+ * routes through (updateUserStats) rather than duplicating this in each of
+ * trivia/daily-challenge/time-attack/battle's own completion handlers.
+ */
+async function updateAchievementLeaderboard(userId: string, stats: UserStats): Promise<void> {
+  try {
+    const leaderboardKey = [`achievement-leaderboard:global`];
+    const data = await kv.get(leaderboardKey);
+    const entries: any[] = data?.value?.entries || [];
+
+    const badges = await getUserBadges(userId);
+    const profile = (await kv.get([`user:${userId}`]))?.value as any;
+    const username = profile?.firstName || profile?.full_name || profile?.name || 'Student';
+
+    const existingIndex = entries.findIndex((e) => e.userId === userId);
+    const entry = {
+      userId,
+      username,
+      badgesUnlocked: badges.length,
+      totalXP: stats.totalXP || 0,
+    };
+
+    if (existingIndex >= 0) {
+      entries[existingIndex] = entry;
+    } else {
+      entries.push(entry);
+    }
+
+    entries.sort((a, b) => (b.badgesUnlocked - a.badgesUnlocked) || (b.totalXP - a.totalXP));
+
+    await kv.set(leaderboardKey, { entries: entries.slice(0, 200) });
+  } catch {
+    // Non-fatal — the leaderboard just won't reflect this update.
   }
 }
 

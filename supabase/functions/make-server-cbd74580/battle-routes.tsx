@@ -5,6 +5,7 @@ import { Hono } from "npm:hono@4";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import * as db from "./db.tsx";
 import * as multiplayerBattleService from "./multiplayer-battle-service.tsx";
+import { getUserStats, updateUserStats, checkAndAwardAchievements } from "./achievement-service.tsx";
 
 const app = new Hono();
 
@@ -161,6 +162,32 @@ app.post("/battle/:battleId/answer", async (c) => {
       Number(answerIndex),
       Number(timeMs)
     );
+
+    // Feed the shared achievement system (see achievement-service.tsx) once
+    // the battle actually concludes — both players get battlesPlayed, the
+    // winner also gets battleWins. Without this, finishing battles never
+    // reached user:<id>:stats and could never unlock a badge.
+    if (result.battleComplete) {
+      try {
+        const battle = await multiplayerBattleService.getBattleStatus(battleId);
+        const player1Id = battle?.player1?.userId;
+        const player2Id = battle?.player2?.userId;
+        const winnerId = battle?.winner;
+        for (const playerId of [player1Id, player2Id].filter(Boolean) as string[]) {
+          const achievementStats = await getUserStats(playerId);
+          await updateUserStats(playerId, {
+            battlesPlayed: (achievementStats.battlesPlayed || 0) + 1,
+            battleWins: (achievementStats.battleWins || 0) + (playerId === winnerId ? 1 : 0),
+            battleWinStreak: playerId === winnerId
+              ? (achievementStats.battleWinStreak || 0) + 1
+              : 0,
+          });
+          await checkAndAwardAchievements(playerId);
+        }
+      } catch (err) {
+        console.warn('Battle answer: achievement update failed (non-fatal):', err);
+      }
+    }
 
     return c.json(result);
   } catch (error) {

@@ -1,4 +1,5 @@
 import { Hono } from 'npm:hono@4';
+import { verifyUser } from './route-auth.tsx';
 import { getAllTopics, getTopic, getTopicLeaderboard, getTopicMastery, getRecommendedTopics } from "./topic-service.tsx";
 import {
   getUserLearningPaths,
@@ -20,7 +21,7 @@ export const topicRoutes = new Hono();
 // GET /topics/all - All available topics with user's mastery
 topicRoutes.get("/all", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     const topics = await getAllTopics();
 
     const topicsWithProgress = await Promise.all(
@@ -46,7 +47,7 @@ topicRoutes.get("/all", async (c) => {
 // GET /topics/:topicId - Topic details with user progress
 topicRoutes.get("/:topicId", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     const topicId = c.req.param("topicId");
 
     const topic = await getTopic(topicId);
@@ -76,7 +77,7 @@ topicRoutes.get("/:topicId", async (c) => {
 // GET /topics/recommended/topics - Get recommended topics for user
 topicRoutes.get("/recommended/topics", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     if (!userId) {
       return c.json({ error: "Unauthorized" }, 401);
     }
@@ -99,7 +100,7 @@ topicRoutes.get("/recommended/topics", async (c) => {
 // GET /learning-paths/all - Get all user's learning paths
 topicRoutes.get("/learning-paths/all", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     if (!userId) {
       return c.json({ error: "Unauthorized" }, 401);
     }
@@ -126,7 +127,7 @@ topicRoutes.get("/learning-paths/all", async (c) => {
 // GET /learning-paths/:topicId/path - Get specific learning path
 topicRoutes.get("/learning-paths/:topicId/path", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     const topicId = c.req.param("topicId");
 
     if (!userId) {
@@ -149,7 +150,7 @@ topicRoutes.get("/learning-paths/:topicId/path", async (c) => {
 // POST /learning-paths/start - Start new learning path
 topicRoutes.post("/learning-paths/start", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     if (!userId) {
       return c.json({ error: "Unauthorized" }, 401);
     }
@@ -173,7 +174,7 @@ topicRoutes.post("/learning-paths/start", async (c) => {
 // POST /topics/:topicId/complete-level - Complete topic level
 topicRoutes.post("/:topicId/complete-level", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     const topicId = c.req.param("topicId");
 
     if (!userId) {
@@ -218,7 +219,7 @@ topicRoutes.get("/:topicId/leaderboard", async (c) => {
 // GET /progress/history - User's progress history
 topicRoutes.get("/progress/history", async (c) => {
   try {
-    const userId = c.req.header("x-user-id");
+    const userId = await verifyUser(c);
     if (!userId) {
       return c.json({ error: "Unauthorized" }, 401);
     }

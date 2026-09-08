@@ -156,6 +156,12 @@ export function StudentDashboard({
   const [callBookingId, setCallBookingId] = useState<string | null>(null);
   const [progressImprovement, setProgressImprovement] = useState<{ subject: string; improvement: number } | null>(null);
   const [lastReportCheck, setLastReportCheck] = useState<Date | null>(null);
+  const [achievements, setAchievements] = useState<any[]>([]);
+  const [achievementStats, setAchievementStats] = useState({ unlockedCount: 0, totalCount: 0 });
+  const [achievementLeaderboard, setAchievementLeaderboard] = useState<any[]>([]);
+  const [topics, setTopics] = useState<any[]>([]);
+  const [learningPaths, setLearningPaths] = useState<any[]>([]);
+  const [recommendedTopics, setRecommendedTopics] = useState<any[]>([]);
   const academicStudentId = profile.linkedChildId || profile.id || profile.userId;
 
   const validTabs = new Set([
@@ -217,6 +223,99 @@ export function StudentDashboard({
       /* non-fatal */
     }
   }, [session?.access_token]);
+
+  /**
+   * Achievements + Learning Paths tabs used to render hardcoded empty
+   * props (achievements={[]}, activePaths={[]}, <TopicGrid /> with no
+   * props at all) — the backend behind them was real (badges, topics,
+   * learning-path tracking) but nothing ever fetched it. Merges
+   * /achievements/all (every badge definition) with
+   * /achievements/user-achievements (which ones this student has actually
+   * unlocked) since the latter alone only lists unlocked badges, not the
+   * full catalog the panel needs to show locked ones too.
+   */
+  const loadAchievementsAndTopics = useCallback(async () => {
+    const token = session?.access_token;
+    if (!token) return;
+    const headers = edgeFunctionHeaders(token);
+
+    try {
+      const [allBadgesRes, userAchievementsRes, leaderboardRes] = await Promise.all([
+        fetch(edgeFunctionUrl('achievements/all'), { headers }),
+        fetch(edgeFunctionUrl('achievements/user-achievements'), { headers }),
+        fetch(edgeFunctionUrl('achievements/leaderboard?limit=50'), { headers }),
+      ]);
+
+      if (allBadgesRes.ok && userAchievementsRes.ok) {
+        const allData = await allBadgesRes.json();
+        const userData = await userAchievementsRes.json();
+        const unlockedIds = new Set((userData.achievements || []).map((a: any) => a.id));
+        const merged = (allData.badges || []).map((badge: any) => ({
+          ...badge,
+          unlocked: unlockedIds.has(badge.id),
+        }));
+        setAchievements(merged);
+        setAchievementStats({
+          unlockedCount: userData.unlockedCount || 0,
+          totalCount: userData.totalCount || merged.length,
+        });
+      }
+
+      if (leaderboardRes.ok) {
+        const data = await leaderboardRes.json();
+        setAchievementLeaderboard(data.leaderboard || []);
+      }
+    } catch (err) {
+      console.error('Error loading achievements:', err);
+    }
+
+    try {
+      const [topicsRes, pathsRes, recommendedRes] = await Promise.all([
+        fetch(edgeFunctionUrl('topics/all'), { headers }),
+        fetch(edgeFunctionUrl('topics/learning-paths/all'), { headers }),
+        fetch(edgeFunctionUrl('topics/recommended/topics?limit=3'), { headers }),
+      ]);
+
+      if (topicsRes.ok) {
+        const data = await topicsRes.json();
+        setTopics(data.topics || []);
+      }
+      if (pathsRes.ok) {
+        const data = await pathsRes.json();
+        setLearningPaths(data.paths || []);
+      }
+      if (recommendedRes.ok) {
+        const data = await recommendedRes.json();
+        setRecommendedTopics(data.recommended || []);
+      }
+    } catch (err) {
+      console.error('Error loading topics/learning paths:', err);
+    }
+  }, [session?.access_token]);
+
+  useEffect(() => {
+    if (session?.access_token) {
+      loadAchievementsAndTopics();
+    }
+  }, [session?.access_token, loadAchievementsAndTopics]);
+
+  /** Starts (or resumes) a learning path for the clicked topic, then refreshes. */
+  const handleStartLearningPath = useCallback(async (topicId: string) => {
+    const token = session?.access_token;
+    if (!token) return;
+    try {
+      const res = await fetch(edgeFunctionUrl('topics/learning-paths/start'), {
+        method: 'POST',
+        headers: { ...edgeFunctionHeaders(token), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ topicId }),
+      });
+      if (res.ok) {
+        await loadAchievementsAndTopics();
+      }
+    } catch (err) {
+      console.error('Error starting learning path:', err);
+    }
+  }, [session?.access_token, loadAchievementsAndTopics]);
 
   useEffect(() => {
     setProfile((prev) => ({ ...prev, ...initialProfile }));
@@ -1248,14 +1347,14 @@ export function StudentDashboard({
 
               {/* Achievement Panel */}
               <AchievementPanel
-                achievements={[]}
-                unlockedCount={0}
-                totalCount={20}
+                achievements={achievements}
+                unlockedCount={achievementStats.unlockedCount}
+                totalCount={achievementStats.totalCount}
               />
 
               {/* Leaderboard */}
               <LeaderboardAchievements
-                leaderboard={[]}
+                leaderboard={achievementLeaderboard}
                 currentUserId={profile.userId}
                 limit={50}
               />
@@ -1267,12 +1366,12 @@ export function StudentDashboard({
           <TabsContent value="learning-paths">
             <ErrorBoundary>
               <div className="space-y-6">
-              <TopicGrid />
-              <LearningPathProgress 
-                activePaths={[]}
-                recommendedTopics={[]}
-                onPathClick={(topicId) => console.log('Path clicked:', topicId)}
-                onRecommendedClick={(topicId) => console.log('Recommended clicked:', topicId)}
+              <TopicGrid topics={topics} onTopicClick={handleStartLearningPath} />
+              <LearningPathProgress
+                activePaths={learningPaths}
+                recommendedTopics={recommendedTopics}
+                onPathClick={handleStartLearningPath}
+                onRecommendedClick={handleStartLearningPath}
               />
             </div>
             </ErrorBoundary>
