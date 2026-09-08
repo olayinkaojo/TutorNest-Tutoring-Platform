@@ -227,8 +227,8 @@ export const BADGE_DEFINITIONS: Record<string, Badge> = {
 
 export async function getUserBadges(userId: string): Promise<string[]> {
   try {
-    const data = await kv.get([`user:${userId}:achievements`]);
-    return data?.value?.achieved || [];
+    const data = await kv.get(`user:${userId}:achievements`);
+    return data?.achieved || [];
   } catch {
     return [];
   }
@@ -236,17 +236,17 @@ export async function getUserBadges(userId: string): Promise<string[]> {
 
 export async function addBadgeToUser(userId: string, badgeId: string): Promise<boolean> {
   try {
-    const achievementKey = [`user:${userId}:achievements`];
+    const achievementKey = `user:${userId}:achievements`;
     const current = await kv.get(achievementKey);
-    const achieved = current?.value?.achieved || [];
+    const achieved = current?.achieved || [];
 
     if (achieved.includes(badgeId)) return false;
 
     const updated = {
       achieved: [...achieved, badgeId],
-      progress: current?.value?.progress || {},
+      progress: current?.progress || {},
       unlockDates: {
-        ...(current?.value?.unlockDates || {}),
+        ...(current?.unlockDates || {}),
         [badgeId]: new Date().toISOString(),
       },
     };
@@ -260,8 +260,8 @@ export async function addBadgeToUser(userId: string, badgeId: string): Promise<b
 
 export async function getBadgeStats(badgeId: string): Promise<any> {
   try {
-    const data = await kv.get([`badge:${badgeId}:stats`]);
-    return data?.value || { totalUnlocks: 0, userCount: 0, rarity: "unknown" };
+    const data = await kv.get(`badge:${badgeId}:stats`);
+    return data || { totalUnlocks: 0, userCount: 0, rarity: "unknown" };
   } catch {
     return { totalUnlocks: 0, userCount: 0, rarity: "unknown" };
   }
@@ -269,7 +269,7 @@ export async function getBadgeStats(badgeId: string): Promise<any> {
 
 export async function updateBadgeStats(badgeId: string, stats: any): Promise<void> {
   try {
-    await kv.set([`badge:${badgeId}:stats`], stats);
+    await kv.set(`badge:${badgeId}:stats`, stats);
   } catch {
     // Silent fail
   }

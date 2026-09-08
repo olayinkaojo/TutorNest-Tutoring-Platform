@@ -13,11 +13,11 @@ export interface LearningPath {
 
 export async function getUserLearningPaths(userId: string): Promise<LearningPath[]> {
   try {
-    const key = [`user:${userId}:learning-paths`];
+    const key = `user:${userId}:learning-paths`;
     const data = await kv.get(key);
-    if (!data?.value) return [];
+    if (!data) return [];
 
-    const active = data.value.active || [];
+    const active = data.active || [];
     const paths: LearningPath[] = [];
 
     for (const topicId of active) {
@@ -33,12 +33,12 @@ export async function getUserLearningPaths(userId: string): Promise<LearningPath
 
 export async function getLearningPath(userId: string, topicId: string): Promise<LearningPath | null> {
   try {
-    const key = [`user:${userId}:topic:${topicId}:progress`];
+    const key = `user:${userId}:topic:${topicId}:progress`;
     const data = await kv.get(key);
 
-    if (!data?.value) return null;
+    if (!data) return null;
 
-    const progress = data.value;
+    const progress = data;
     const topic = TOPICS[topicId];
     if (!topic) return null;
 
@@ -76,21 +76,21 @@ export async function startLearningPath(userId: string, topicId: string): Promis
     const topic = TOPICS[topicId];
     if (!topic) return false;
 
-    const key = [`user:${userId}:learning-paths`];
+    const key = `user:${userId}:learning-paths`;
     const current = await kv.get(key);
-    const active = current?.value?.active || [];
+    const active = current?.active || [];
 
     if (!active.includes(topicId)) {
       const updated = {
         active: [...active, topicId],
-        completed: current?.value?.completed || [],
-        recommended: current?.value?.recommended || [],
-        timeToMastery: current?.value?.timeToMastery || {},
+        completed: current?.completed || [],
+        recommended: current?.recommended || [],
+        timeToMastery: current?.timeToMastery || {},
       };
       await kv.set(key, updated);
 
       // Initialize progress
-      const progressKey = [`user:${userId}:topic:${topicId}:progress`];
+      const progressKey = `user:${userId}:topic:${topicId}:progress`;
       const now = new Date().toISOString();
       await kv.set(progressKey, {
         currentLevel: 1,
@@ -129,9 +129,9 @@ export async function completeLearningPathLevel(
     const levelData = topic.levels[level - 1];
     if (!levelData) return { levelComplete: false, topicMastered: false };
 
-    const progressKey = [`user:${userId}:topic:${topicId}:progress`];
+    const progressKey = `user:${userId}:topic:${topicId}:progress`;
     const current = await kv.get(progressKey);
-    const progress = current?.value || {};
+    const progress = current || {};
 
     const levelProgress = progress.levelProgress || {};
     levelProgress[level] = {
@@ -210,9 +210,9 @@ export async function getRecommendedNextTopics(userId: string, limit: number = 3
 
 export async function getTopicPathCompletion(userId: string, topicId: string): Promise<number> {
   try {
-    const progressKey = [`user:${userId}:topic:${topicId}:progress`];
+    const progressKey = `user:${userId}:topic:${topicId}:progress`;
     const data = await kv.get(progressKey);
-    const progress = data?.value;
+    const progress = data;
 
     if (!progress) return 0;
 
@@ -227,12 +227,12 @@ export async function getTopicPathCompletion(userId: string, topicId: string): P
 export async function updateTopicRecommendations(userId: string): Promise<void> {
   try {
     const recommended = await getRecommendedNextTopics(userId, 5);
-    const key = [`user:${userId}:learning-paths`];
+    const key = `user:${userId}:learning-paths`;
     const current = await kv.get(key);
 
-    if (current?.value) {
+    if (current) {
       const updated = {
-        ...current.value,
+        ...current,
         recommended,
       };
       await kv.set(key, updated);

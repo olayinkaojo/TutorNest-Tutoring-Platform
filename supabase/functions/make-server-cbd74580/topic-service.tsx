@@ -233,9 +233,9 @@ export async function getTopicsBySubject(subject: string): Promise<Topic[]> {
 
 export async function getTopicMastery(userId: string, topicId: string): Promise<number> {
   try {
-    const key = [`user:${userId}:topic:${topicId}:progress`];
+    const key = `user:${userId}:topic:${topicId}:progress`;
     const data = await kv.get(key);
-    return data?.value?.masteryScore || 0;
+    return data?.masteryScore || 0;
   } catch {
     return 0;
   }
@@ -243,9 +243,9 @@ export async function getTopicMastery(userId: string, topicId: string): Promise<
 
 export async function getUserTopicsList(userId: string): Promise<string[]> {
   try {
-    const key = [`user:${userId}:learning-paths`];
+    const key = `user:${userId}:learning-paths`;
     const data = await kv.get(key);
-    return data?.value?.active || [];
+    return data?.active || [];
   } catch {
     return [];
   }
@@ -253,9 +253,9 @@ export async function getUserTopicsList(userId: string): Promise<string[]> {
 
 export async function getRecommendedTopics(userId: string, limit: number = 3): Promise<string[]> {
   try {
-    const key = [`user:${userId}:learning-paths`];
+    const key = `user:${userId}:learning-paths`;
     const data = await kv.get(key);
-    return (data?.value?.recommended || []).slice(0, limit);
+    return (data?.recommended || []).slice(0, limit);
   } catch {
     return Object.keys(TOPICS).slice(0, limit);
   }
@@ -263,10 +263,10 @@ export async function getRecommendedTopics(userId: string, limit: number = 3): P
 
 export async function getTopicLeaderboard(topicId: string, limit: number = 10): Promise<any[]> {
   try {
-    const key = [`topic:${topicId}:leaderboard`];
+    const key = `topic:${topicId}:leaderboard`;
     const data = await kv.get(key);
-    if (data?.value?.entries) {
-      return data.value.entries.slice(0, limit).map((entry: any, index: number) => ({
+    if (data?.entries) {
+      return data.entries.slice(0, limit).map((entry: any, index: number) => ({
         ...entry,
         rank: index + 1,
       }));
@@ -279,9 +279,9 @@ export async function getTopicLeaderboard(topicId: string, limit: number = 10): 
 
 export async function updateTopicLeaderboard(topicId: string, userId: string, masteryScore: number): Promise<void> {
   try {
-    const key = [`topic:${topicId}:leaderboard`];
+    const key = `topic:${topicId}:leaderboard`;
     const data = await kv.get(key);
-    const entries = data?.value?.entries || [];
+    const entries = data?.entries || [];
 
     // Remove old entry if exists
     const filtered = entries.filter((e: any) => e.userId !== userId);

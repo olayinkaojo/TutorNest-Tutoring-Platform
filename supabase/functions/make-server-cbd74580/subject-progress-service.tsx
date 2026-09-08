@@ -14,9 +14,9 @@ export interface TopicProgress {
 
 export async function getTopicProgress(userId: string, topicId: string): Promise<TopicProgress | null> {
   try {
-    const key = [`user:${userId}:topic:${topicId}:progress`];
+    const key = `user:${userId}:topic:${topicId}:progress`;
     const data = await kv.get(key);
-    return data?.value || null;
+    return data || null;
   } catch {
     return null;
   }
@@ -37,7 +37,7 @@ export async function updateTopicProgress(
       lastActivityDate: new Date().toISOString(),
     };
 
-    await kv.set([`user:${userId}:topic:${topicId}:progress`], updated);
+    await kv.set(`user:${userId}:topic:${topicId}:progress`, updated);
   } catch {
     // Silent fail
   }
@@ -67,36 +67,28 @@ export async function calculateMasteryScore(userId: string, topicId: string): Pr
   }
 }
 
+// Dead code, not fixed: calls kv.list(), which this project's kv_store.tsx
+// (a Postgres-backed shim, not Deno's native KV) never exported — every
+// call would throw immediately. Nothing in this codebase calls
+// getUserProgress either, so it's been silently broken and unreachable
+// since it was written. Left as a marker rather than guessed at — a real
+// fix means using kv.getByPrefix(`user:${userId}:topic:`) instead, which
+// returns values only (not keys), so topicId would need to come from a
+// field on each stored progress record rather than parsed out of its key.
 export async function getUserProgress(userId: string): Promise<Record<string, TopicProgress>> {
-  try {
-    const progressMap: Record<string, TopicProgress> = {};
-
-    // List all progress keys for this user
-    const keys = await kv.list({ prefix: [`user:${userId}:topic:`] });
-    for await (const entry of keys) {
-      const data = await kv.get(entry.key);
-      if (data?.value) {
-        const topicId = (entry.key[2] as string).replace(":progress", "");
-        progressMap[topicId] = data.value;
-      }
-    }
-
-    return progressMap;
-  } catch {
-    return {};
-  }
+  return {};
 }
 
 export async function getProgressHistory(userId: string, topicId: string, days: number = 7): Promise<any[]> {
   try {
-    const key = [`user:${userId}:topic:${topicId}:history`];
+    const key = `user:${userId}:topic:${topicId}:history`;
     const data = await kv.get(key);
-    if (!data?.value?.snapshots) return [];
+    if (!data?.snapshots) return [];
 
     const now = Date.now();
     const cutoffTime = now - days * 24 * 60 * 60 * 1000;
 
-    return data.value.snapshots.filter((snapshot: any) => new Date(snapshot.date).getTime() > cutoffTime);
+    return data.snapshots.filter((snapshot: any) => new Date(snapshot.date).getTime() > cutoffTime);
   } catch {
     return [];
   }
@@ -108,9 +100,9 @@ export async function recordProgressSnapshot(
   snapshot: any
 ): Promise<void> {
   try {
-    const key = [`user:${userId}:topic:${topicId}:history`];
+    const key = `user:${userId}:topic:${topicId}:history`;
     const current = await kv.get(key);
-    const snapshots = current?.value?.snapshots || [];
+    const snapshots = current?.snapshots || [];
 
     // Keep only last 30 days
     const now = Date.now();

@@ -17,7 +17,7 @@ export async function updateAchievementLeaderboard(): Promise<void> {
 
     // For now, leaderboard is built on-demand
     // In production, would maintain a separate leaderboard cache
-    const leaderboardKey = [`achievement-leaderboard:global`];
+    const leaderboardKey = `achievement-leaderboard:global`;
     await kv.set(leaderboardKey, { lastUpdated: new Date().toISOString(), entries });
   } catch {
     // Silent fail
@@ -26,11 +26,11 @@ export async function updateAchievementLeaderboard(): Promise<void> {
 
 export async function getAchievementLeaderboard(limit: number = 100): Promise<any[]> {
   try {
-    const leaderboardKey = [`achievement-leaderboard:global`];
+    const leaderboardKey = `achievement-leaderboard:global`;
     const data = await kv.get(leaderboardKey);
 
-    if (data?.value?.entries) {
-      return data.value.entries.slice(0, limit);
+    if (data?.entries) {
+      return data.entries.slice(0, limit);
     }
 
     return [];

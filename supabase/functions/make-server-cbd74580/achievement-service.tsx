@@ -27,11 +27,11 @@ export interface UserStats {
 
 export async function getUserStats(userId: string): Promise<UserStats> {
   try {
-    const statsKey = [`user:${userId}:stats`];
+    const statsKey = `user:${userId}:stats`;
     const data = await kv.get(statsKey);
 
-    if (data?.value) {
-      return data.value as UserStats;
+    if (data) {
+      return data as UserStats;
     }
 
     return createDefaultStats(userId);
@@ -80,7 +80,7 @@ export async function updateUserStats(userId: string, updates: Partial<UserStats
   try {
     const current = await getUserStats(userId);
     const updated = { ...current, ...updates, userId };
-    await kv.set([`user:${userId}:stats`], updated);
+    await kv.set(`user:${userId}:stats`, updated);
     await updateAchievementLeaderboard(userId, updated);
   } catch {
     // Silent fail
@@ -97,12 +97,12 @@ export async function updateUserStats(userId: string, updates: Partial<UserStats
  */
 async function updateAchievementLeaderboard(userId: string, stats: UserStats): Promise<void> {
   try {
-    const leaderboardKey = [`achievement-leaderboard:global`];
+    const leaderboardKey = `achievement-leaderboard:global`;
     const data = await kv.get(leaderboardKey);
-    const entries: any[] = data?.value?.entries || [];
+    const entries: any[] = data?.entries || [];
 
     const badges = await getUserBadges(userId);
-    const profile = (await kv.get([`user:${userId}`]))?.value as any;
+    const profile = (await kv.get(`user:${userId}`)) as any;
     const username = profile?.firstName || profile?.full_name || profile?.name || 'Student';
 
     const existingIndex = entries.findIndex((e) => e.userId === userId);
@@ -141,9 +141,9 @@ export async function checkAndAwardAchievements(userId: string): Promise<string[
             newBadges.push(badgeId);
 
             // Update badge unlock count
-            const statsKey = [`badge:${badgeId}:stats`];
+            const statsKey = `badge:${badgeId}:stats`;
             const badgeStats = await kv.get(statsKey);
-            const current = badgeStats?.value || { totalUnlocks: 0 };
+            const current = badgeStats || { totalUnlocks: 0 };
             await kv.set(statsKey, {
               ...current,
               totalUnlocks: (current.totalUnlocks || 0) + 1,
