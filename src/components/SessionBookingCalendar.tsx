@@ -198,34 +198,20 @@ export function SessionBookingCalendar({
     setError('');
 
     try {
+      // A bare GET /tutors was tried first here, but no such route has ever
+      // existed on the backend — every load silently ate a guaranteed 404
+      // before falling through to this, the only endpoint that actually
+      // works. Call it directly.
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tutors`,
-        { headers: { Authorization: `Bearer ${session.access_token}` } }
-      );
-
-      if (response.ok) {
-        const data = await response.json();
-        const normalized = normalizeTutors(data.tutors || []);
-        if (normalized.length > 0) {
-          setTutors(normalized);
-          // Auto-select pre-selected tutor after load
-          if (preSelectedTutorId && normalized.some(t => t.id === preSelectedTutorId)) {
-            setSelectedTutor(preSelectedTutorId);
-          }
-          return;
-        }
-      }
-
-      const fallbackResponse = await fetch(
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/search/tutors?minPrice=0&maxPrice=10000&minRating=0&dbsRequired=false`,
         { headers: { Authorization: `Bearer ${session.access_token}` } }
       );
 
-      if (!fallbackResponse.ok) throw new Error('Failed to fetch tutors');
-      const fallbackData = await fallbackResponse.json();
-      const normalized2 = normalizeTutors(fallbackData.tutors || []);
-      setTutors(normalized2);
-      if (preSelectedTutorId && normalized2.some(t => t.id === preSelectedTutorId)) {
+      if (!response.ok) throw new Error('Failed to fetch tutors');
+      const data = await response.json();
+      const normalized = normalizeTutors(data.tutors || []);
+      setTutors(normalized);
+      if (preSelectedTutorId && normalized.some(t => t.id === preSelectedTutorId)) {
         setSelectedTutor(preSelectedTutorId);
       }
     } catch (err: any) {
