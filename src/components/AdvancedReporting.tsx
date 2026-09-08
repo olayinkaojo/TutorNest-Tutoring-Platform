@@ -1,177 +1,184 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from './ui/select';
-import {
-  FileText,
   Download,
-  Calendar,
   TrendingUp,
-  TrendingDown,
   Target,
   Award,
   AlertCircle,
   CheckCircle,
-  BarChart3,
-  PieChart as PieChartIcon
+  Loader2,
 } from 'lucide-react';
 import {
   LineChart,
   Line,
-  BarChart,
-  Bar,
-  PieChart,
-  Pie,
-  Cell,
   XAxis,
   YAxis,
   CartesianGrid,
   Tooltip,
-  Legend,
   ResponsiveContainer,
-  Area,
-  AreaChart,
-  ComposedChart,
-  Scatter
 } from 'recharts';
+import { edgeFunctionUrl, edgeFunctionHeaders } from '../utils/supabase-edge-fetch';
 
 interface AdvancedReportingProps {
   userId: string;
   userType: 'student' | 'tutor' | 'parent' | 'admin';
+  accessToken?: string;
 }
 
-export function AdvancedReporting({ userId, userType }: AdvancedReportingProps) {
-  const [dateRange, setDateRange] = useState('last-30-days');
-  const [selectedStudent, setSelectedStudent] = useState('all');
-  const [reportType, setReportType] = useState('overview');
+interface TutorPerformanceData {
+  averageRating: number;
+  totalReviews: number;
+  onTimeStartPercentage: number;
+  rebookingRate: number;
+  reportCompletionRate: number;
+  totalSessions: number;
+  activeStudents: number;
+  responseTime: number;
+  ratingTrend: { date: string; rating: number }[];
+  strengths: string[];
+  improvementAreas: string[];
+  coachingTips: { id: string; category: string; tip: string; priority: 'high' | 'medium' | 'low'; relatedMetric: string }[];
+}
 
-  // Mock data - replace with actual API calls
-  const performanceData = [
-    { date: '2024-10-15', math: 75, english: 82, science: 78, attendance: 100 },
-    { date: '2024-10-22', math: 78, english: 85, science: 80, attendance: 100 },
-    { date: '2024-10-29', math: 82, english: 87, science: 83, attendance: 100 },
-    { date: '2024-11-05', math: 85, english: 90, science: 85, attendance: 100 },
-    { date: '2024-11-12', math: 88, english: 92, science: 87, attendance: 100 }
-  ];
+const priorityColor: Record<string, { bg: string; border: string; text: string; badge: string }> = {
+  high: { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800', badge: '#f59e0b' },
+  medium: { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800', badge: '#625d9c' },
+  low: { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-800', badge: '#5d9827' },
+};
 
-  const subjectBreakdown = [
-    { subject: 'Mathematics', sessions: 12, hours: 18, avgScore: 85, improvement: 12 },
-    { subject: 'English', sessions: 10, hours: 15, avgScore: 90, improvement: 8 },
-    { subject: 'Science', sessions: 8, hours: 12, avgScore: 83, improvement: 9 }
-  ];
+/**
+ * This whole component used to render entirely hardcoded demo data —
+ * performanceData, subjectBreakdown, learningPatterns, competencyMap,
+ * goalTracking, predictiveInsights (complete with a fabricated "confidence
+ * %" on each one) were static arrays, zero API calls, identical for every
+ * tutor regardless of real performance. Only ever rendered here with
+ * userType="tutor" (see TutorDashboard.tsx), so this rewrite is scoped to
+ * that case specifically rather than the unused student/parent/admin
+ * branches the old prop implied.
+ *
+ * GET /tutor-performance/:tutorId (progress-analytics-routes.tsx) already
+ * computes real metrics from real bookings/reports/reviews — it just
+ * powers a different tab (TutorPerformanceDashboard.tsx). Wired here
+ * instead of inventing a second backend. Two fields in that response are
+ * themselves still static server-side (strengths, responseTime) — not
+ * fixed here, out of scope for this component, but worth knowing they're
+ * not fully real yet either.
+ *
+ * Removed rather than faked: Subject Breakdown, Learning Patterns
+ * (time-of-day), the Skills Competency Map, and Goal Tracking (with due
+ * dates) — none of these have any real backing data anywhere in the app
+ * (no per-subject session scores, no time-of-day tracking, no skills
+ * system, no goals system). "Insights" now shows the API's real
+ * coachingTips (honest priority levels, no invented confidence numbers)
+ * instead of fabricated predictions.
+ */
+export function AdvancedReporting({ userId, userType, accessToken }: AdvancedReportingProps) {
+  const [data, setData] = useState<TutorPerformanceData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const learningPatterns = [
-    { day: 'Mon', morning: 2, afternoon: 5, evening: 1 },
-    { day: 'Tue', morning: 3, afternoon: 4, evening: 2 },
-    { day: 'Wed', morning: 1, afternoon: 6, evening: 1 },
-    { day: 'Thu', morning: 2, afternoon: 5, evening: 3 },
-    { day: 'Fri', morning: 4, afternoon: 3, evening: 2 }
-  ];
-
-  const competencyMap = [
-    { skill: 'Problem Solving', current: 85, target: 90 },
-    { skill: 'Critical Thinking', current: 78, target: 85 },
-    { skill: 'Communication', current: 92, target: 95 },
-    { skill: 'Time Management', current: 70, target: 80 },
-    { skill: 'Research', current: 88, target: 90 }
-  ];
-
-  const goalTracking = [
-    {
-      goal: 'Master Quadratic Equations',
-      progress: 75,
-      target: 100,
-      status: 'on-track',
-      dueDate: '2024-12-01'
-    },
-    {
-      goal: 'Improve Essay Writing',
-      progress: 45,
-      target: 100,
-      status: 'needs-attention',
-      dueDate: '2024-12-15'
-    },
-    {
-      goal: 'Science Project Completion',
-      progress: 90,
-      target: 100,
-      status: 'ahead',
-      dueDate: '2024-11-30'
+  useEffect(() => {
+    if (userType !== 'tutor' || !userId) {
+      setLoading(false);
+      return;
     }
-  ];
 
-  const predictiveInsights = [
-    {
-      type: 'success',
-      title: 'Strong Progress in Mathematics',
-      description: 'Based on current trajectory, expected to achieve A grade by end of term',
-      confidence: 92
-    },
-    {
-      type: 'warning',
-      title: 'Time Management Needs Attention',
-      description: 'Late submissions detected. Consider additional time management support',
-      confidence: 78
-    },
-    {
-      type: 'info',
-      title: 'Optimal Learning Time',
-      description: 'Performance peaks between 3-5 PM. Consider scheduling complex topics during this window',
-      confidence: 85
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(edgeFunctionUrl(`tutor-performance/${userId}`), {
+          headers: edgeFunctionHeaders(accessToken || ''),
+        });
+        if (!res.ok) throw new Error('Failed to load performance data');
+        const json = await res.json();
+        if (!cancelled) setData(json);
+      } catch (err: any) {
+        if (!cancelled) setError(err.message || 'Failed to load performance data');
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [userId, userType, accessToken]);
+
+  const exportReport = (format: 'json' | 'csv') => {
+    if (!data) return;
+    const filename = `performance-report-${new Date().toISOString().slice(0, 10)}.${format}`;
+    let blob: Blob;
+    if (format === 'json') {
+      blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    } else {
+      const rows = [
+        ['Metric', 'Value'],
+        ['Average Rating', data.averageRating.toFixed(1)],
+        ['Total Reviews', String(data.totalReviews)],
+        ['Total Sessions', String(data.totalSessions)],
+        ['Active Students', String(data.activeStudents)],
+        ['On-Time Start %', `${data.onTimeStartPercentage}%`],
+        ['Re-booking Rate', `${data.rebookingRate}%`],
+        ['Report Completion Rate', `${data.reportCompletionRate}%`],
+      ];
+      blob = new Blob([rows.map((r) => r.join(',')).join('\n')], { type: 'text/csv' });
     }
-  ];
-
-  const exportReport = (format: string) => {
-    console.log(`Exporting report as ${format}`);
-    // Implement actual export logic
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
   };
+
+  if (userType !== 'tutor') {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-gray-500">
+          Analytics for this role aren't available yet.
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (loading) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-gray-500">
+          <Loader2 className="w-6 h-6 animate-spin mx-auto mb-2" />
+          Loading your performance data…
+        </CardContent>
+      </Card>
+    );
+  }
+
+  if (error || !data) {
+    return (
+      <Card>
+        <CardContent className="py-12 text-center text-gray-500">
+          {error || 'No performance data available yet.'}
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <div className="space-y-6">
-      {/* Report Controls */}
+      {/* Export */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-wrap items-center gap-4">
-            <Select value={dateRange} onValueChange={setDateRange}>
-              <SelectTrigger className="w-48">
-                <SelectValue placeholder="Select date range" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="last-7-days">Last 7 Days</SelectItem>
-                <SelectItem value="last-30-days">Last 30 Days</SelectItem>
-                <SelectItem value="last-3-months">Last 3 Months</SelectItem>
-                <SelectItem value="last-6-months">Last 6 Months</SelectItem>
-                <SelectItem value="last-year">Last Year</SelectItem>
-                <SelectItem value="custom">Custom Range</SelectItem>
-              </SelectContent>
-            </Select>
-
-            {userType === 'parent' && (
-              <Select value={selectedStudent} onValueChange={setSelectedStudent}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Select student" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Students</SelectItem>
-                  <SelectItem value="student1">Emma Johnson</SelectItem>
-                  <SelectItem value="student2">Oliver Smith</SelectItem>
-                </SelectContent>
-              </Select>
-            )}
-
+            <p className="text-sm text-gray-600">Based on your real bookings, reports, and reviews.</p>
             <div className="flex-1" />
-
-            <Button variant="outline" onClick={() => exportReport('pdf')}>
+            <Button variant="outline" onClick={() => exportReport('json')}>
               <Download className="w-4 h-4 mr-2" />
-              Export PDF
+              Export JSON
             </Button>
             <Button variant="outline" onClick={() => exportReport('csv')}>
               <Download className="w-4 h-4 mr-2" />
@@ -186,11 +193,11 @@ export function AdvancedReporting({ userId, userType }: AdvancedReportingProps) 
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-600">Avg Performance</p>
+              <p className="text-sm text-gray-600">Average Rating</p>
               <TrendingUp className="w-4 h-4 text-green-600" />
             </div>
-            <h2 className="mb-1">86%</h2>
-            <p className="text-xs text-green-600">+5.2% vs last period</p>
+            <h2 className="mb-1">{data.averageRating.toFixed(1)}★</h2>
+            <p className="text-xs text-gray-600">{data.totalReviews} review{data.totalReviews !== 1 ? 's' : ''}</p>
           </CardContent>
         </Card>
 
@@ -200,304 +207,130 @@ export function AdvancedReporting({ userId, userType }: AdvancedReportingProps) 
               <p className="text-sm text-gray-600">Total Sessions</p>
               <CheckCircle className="w-4 h-4" style={{ color: '#625d9c' }} />
             </div>
-            <h2 className="mb-1">30</h2>
-            <p className="text-xs text-gray-600">45 hours total</p>
+            <h2 className="mb-1">{data.totalSessions}</h2>
+            <p className="text-xs text-gray-600">{data.activeStudents} student{data.activeStudents !== 1 ? 's' : ''}</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-600">Goals On Track</p>
+              <p className="text-sm text-gray-600">Re-booking Rate</p>
               <Target className="w-4 h-4" style={{ color: '#5d9827' }} />
             </div>
-            <h2 className="mb-1">2 / 3</h2>
-            <p className="text-xs text-gray-600">67% completion rate</p>
+            <h2 className="mb-1">{data.rebookingRate}%</h2>
+            <p className="text-xs text-gray-600">students who booked again</p>
           </CardContent>
         </Card>
 
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between mb-2">
-              <p className="text-sm text-gray-600">Attendance</p>
+              <p className="text-sm text-gray-600">On-Time Start</p>
               <Award className="w-4 h-4 text-blue-600" />
             </div>
-            <h2 className="mb-1">100%</h2>
-            <p className="text-xs text-blue-600">Perfect attendance!</p>
+            <h2 className="mb-1">{data.onTimeStartPercentage}%</h2>
+            <p className="text-xs text-gray-600">of sessions started on time</p>
           </CardContent>
         </Card>
       </div>
 
-      {/* Tabs for Different Report Views */}
-      <Tabs value={reportType} onValueChange={setReportType}>
+      <Tabs defaultValue="overview">
         <TabsList>
-          <TabsTrigger value="overview">Overview</TabsTrigger>
-          <TabsTrigger value="performance">Performance</TabsTrigger>
-          <TabsTrigger value="goals">Goals & Progress</TabsTrigger>
-          <TabsTrigger value="insights">Insights</TabsTrigger>
+          <TabsTrigger value="overview">Rating Trend</TabsTrigger>
+          <TabsTrigger value="improvement">Improvement Areas</TabsTrigger>
+          <TabsTrigger value="insights">Coaching Tips</TabsTrigger>
         </TabsList>
 
-        {/* Overview Tab */}
         <TabsContent value="overview" className="space-y-6">
-          {/* Performance Trends */}
           <Card>
             <CardHeader>
-              <CardTitle>Performance Trends</CardTitle>
-              <CardDescription>Subject scores over time</CardDescription>
+              <CardTitle>Rating Trend</CardTitle>
+              <CardDescription>Your last {data.ratingTrend.length} reviews over time</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <LineChart data={performanceData}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="date" tickFormatter={(date) => new Date(date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} />
-                  <YAxis domain={[0, 100]} />
-                  <Tooltip />
-                  <Legend />
-                  <Line type="monotone" dataKey="math" stroke="#625d9c" strokeWidth={2} name="Mathematics" />
-                  <Line type="monotone" dataKey="english" stroke="#5d9827" strokeWidth={2} name="English" />
-                  <Line type="monotone" dataKey="science" stroke="#3b82f6" strokeWidth={2} name="Science" />
-                </LineChart>
-              </ResponsiveContainer>
+              {data.ratingTrend.length > 0 ? (
+                <ResponsiveContainer width="100%" height={300}>
+                  <LineChart data={data.ratingTrend}>
+                    <CartesianGrid strokeDasharray="3 3" />
+                    <XAxis
+                      dataKey="date"
+                      tickFormatter={(d) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                    />
+                    <YAxis domain={[0, 5]} />
+                    <Tooltip labelFormatter={(d) => new Date(d as string).toLocaleDateString()} />
+                    <Line type="monotone" dataKey="rating" stroke="#625d9c" strokeWidth={2} name="Rating" />
+                  </LineChart>
+                </ResponsiveContainer>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-8">No reviews yet — trends will appear once students start reviewing your sessions.</p>
+              )}
             </CardContent>
           </Card>
 
-          {/* Subject Breakdown */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Subject Breakdown</CardTitle>
-              <CardDescription>Detailed performance by subject</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {subjectBreakdown.map((subject, index) => (
-                  <div key={index} className="p-4 border rounded-lg">
-                    <div className="flex items-center justify-between mb-3">
-                      <h4>{subject.subject}</h4>
-                      <Badge style={{ backgroundColor: subject.improvement > 10 ? '#5d9827' : '#625d9c', color: 'white' }}>
-                        +{subject.improvement}% improvement
-                      </Badge>
-                    </div>
-                    <div className="grid grid-cols-3 gap-4 text-center">
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Sessions</p>
-                        <p className="text-xl">{subject.sessions}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Hours</p>
-                        <p className="text-xl">{subject.hours}</p>
-                      </div>
-                      <div>
-                        <p className="text-sm text-gray-600 mb-1">Avg Score</p>
-                        <p className="text-xl">{subject.avgScore}%</p>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+          {data.strengths.length > 0 && (
+            <Card>
+              <CardHeader>
+                <CardTitle>Strengths</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <ul className="space-y-2">
+                  {data.strengths.map((s, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm">
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0 mt-0.5" />
+                      {s}
+                    </li>
+                  ))}
+                </ul>
+              </CardContent>
+            </Card>
+          )}
+        </TabsContent>
 
-          {/* Learning Patterns */}
+        <TabsContent value="improvement" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Learning Patterns</CardTitle>
-              <CardDescription>Optimal study times throughout the week</CardDescription>
+              <CardTitle>Areas to Improve</CardTitle>
+              <CardDescription>Based on your real metrics — punctuality, report turnaround, and re-booking rate</CardDescription>
             </CardHeader>
             <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <BarChart data={learningPatterns}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="day" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="morning" fill="#625d9c" name="Morning (9-12)" />
-                  <Bar dataKey="afternoon" fill="#5d9827" name="Afternoon (12-5)" />
-                  <Bar dataKey="evening" fill="#3b82f6" name="Evening (5-8)" />
-                </BarChart>
-              </ResponsiveContainer>
+              {data.improvementAreas.length > 0 ? (
+                <ul className="space-y-3">
+                  {data.improvementAreas.map((area, i) => (
+                    <li key={i} className="flex items-start gap-3 p-3 border rounded-lg">
+                      <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
+                      <span className="text-sm">{area}</span>
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-8">No improvement areas flagged right now — your metrics are looking good.</p>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
 
-        {/* Performance Tab */}
-        <TabsContent value="performance" className="space-y-6">
-          {/* Competency Map */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Skills Competency Map</CardTitle>
-              <CardDescription>Current level vs target for key skills</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {competencyMap.map((skill, index) => (
-                  <div key={index}>
-                    <div className="flex justify-between mb-2">
-                      <span>{skill.skill}</span>
-                      <span className="text-sm text-gray-600">{skill.current}% / {skill.target}%</span>
-                    </div>
-                    <div className="relative">
-                      <div className="w-full h-8 bg-gray-200 rounded-full overflow-hidden">
-                        <div
-                          className="h-full rounded-full flex items-center justify-end pr-2"
-                          style={{
-                            width: `${skill.current}%`,
-                            backgroundColor: skill.current >= skill.target ? '#5d9827' : '#625d9c'
-                          }}
-                        >
-                          <span className="text-xs text-white">{skill.current}%</span>
-                        </div>
-                      </div>
-                      <div
-                        className="absolute top-0 h-8 border-r-2 border-dashed border-gray-600"
-                        style={{ left: `${skill.target}%` }}
-                      />
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Comparative Analysis */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Comparative Analysis</CardTitle>
-              <CardDescription>Performance vs class average</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <ResponsiveContainer width="100%" height={300}>
-                <ComposedChart data={subjectBreakdown}>
-                  <CartesianGrid strokeDasharray="3 3" />
-                  <XAxis dataKey="subject" />
-                  <YAxis />
-                  <Tooltip />
-                  <Legend />
-                  <Bar dataKey="avgScore" fill="#625d9c" name="Your Score" />
-                  <Line type="monotone" dataKey="improvement" stroke="#5d9827" strokeWidth={2} name="Improvement %" />
-                </ComposedChart>
-              </ResponsiveContainer>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Goals Tab */}
-        <TabsContent value="goals" className="space-y-6">
-          <Card>
-            <CardHeader>
-              <CardTitle>Goal Tracking</CardTitle>
-              <CardDescription>Monitor progress towards learning objectives</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-4">
-                {goalTracking.map((goal, index) => {
-                  const getStatusIcon = () => {
-                    if (goal.status === 'ahead') return <CheckCircle className="w-5 h-5 text-green-600" />;
-                    if (goal.status === 'needs-attention') return <AlertCircle className="w-5 h-5 text-orange-600" />;
-                    return <Target className="w-5 h-5 text-blue-600" />;
-                  };
-
-                  const getStatusColor = () => {
-                    if (goal.status === 'ahead') return '#5d9827';
-                    if (goal.status === 'needs-attention') return '#f59e0b';
-                    return '#625d9c';
-                  };
-
-                  return (
-                    <div key={index} className="p-4 border rounded-lg">
-                      <div className="flex items-start justify-between mb-3">
-                        <div className="flex items-start gap-3">
-                          {getStatusIcon()}
-                          <div>
-                            <h4 className="mb-1">{goal.goal}</h4>
-                            <p className="text-sm text-gray-600">Due: {new Date(goal.dueDate).toLocaleDateString()}</p>
-                          </div>
-                        </div>
-                        <Badge style={{ backgroundColor: getStatusColor(), color: 'white' }}>
-                          {goal.status.replace('-', ' ')}
-                        </Badge>
-                      </div>
-                      <div className="relative">
-                        <div className="w-full h-3 bg-gray-200 rounded-full overflow-hidden">
-                          <div
-                            className="h-full rounded-full"
-                            style={{
-                              width: `${goal.progress}%`,
-                              backgroundColor: getStatusColor()
-                            }}
-                          />
-                        </div>
-                        <p className="text-xs text-gray-600 mt-1">{goal.progress}% complete</p>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-        </TabsContent>
-
-        {/* Insights Tab */}
         <TabsContent value="insights" className="space-y-6">
           <Card>
             <CardHeader>
-              <CardTitle>Predictive Insights</CardTitle>
-              <CardDescription>Personalized recommendations and predictions</CardDescription>
+              <CardTitle>Coaching Tips</CardTitle>
+              <CardDescription>Personalized suggestions based on your real performance metrics</CardDescription>
             </CardHeader>
             <CardContent>
               <div className="space-y-4">
-                {predictiveInsights.map((insight, index) => {
-                  const getInsightColor = () => {
-                    if (insight.type === 'success') return { bg: 'bg-green-50', border: 'border-green-200', text: 'text-green-800' };
-                    if (insight.type === 'warning') return { bg: 'bg-orange-50', border: 'border-orange-200', text: 'text-orange-800' };
-                    return { bg: 'bg-blue-50', border: 'border-blue-200', text: 'text-blue-800' };
-                  };
-
-                  const colors = getInsightColor();
-
+                {data.coachingTips.map((tip) => {
+                  const colors = priorityColor[tip.priority] || priorityColor.medium;
                   return (
-                    <div key={index} className={`p-4 border rounded-lg ${colors.bg} ${colors.border}`}>
+                    <div key={tip.id} className={`p-4 border rounded-lg ${colors.bg} ${colors.border}`}>
                       <div className="flex items-start justify-between mb-2">
-                        <h4 className={colors.text}>{insight.title}</h4>
-                        <Badge variant="outline">{insight.confidence}% confidence</Badge>
+                        <h4 className={colors.text}>{tip.category}</h4>
+                        <Badge style={{ backgroundColor: colors.badge, color: 'white' }}>{tip.priority} priority</Badge>
                       </div>
-                      <p className={`text-sm ${colors.text}`}>{insight.description}</p>
+                      <p className={`text-sm ${colors.text}`}>{tip.tip}</p>
+                      <p className="text-xs text-gray-500 mt-2">Related to: {tip.relatedMetric}</p>
                     </div>
                   );
                 })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Action Recommendations */}
-          <Card>
-            <CardHeader>
-              <CardTitle>Recommended Actions</CardTitle>
-              <CardDescription>Next steps to optimize learning outcomes</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="space-y-3">
-                <div className="flex items-start gap-3 p-3 border rounded-lg">
-                  <CheckCircle className="w-5 h-5 text-green-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="mb-1">Schedule Additional Math Sessions</h4>
-                    <p className="text-sm text-gray-600">Current momentum suggests 2 more sessions could achieve A grade target</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 border rounded-lg">
-                  <AlertCircle className="w-5 h-5 text-orange-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="mb-1">Focus on Time Management</h4>
-                    <p className="text-sm text-gray-600">Consider scheduling a time management skills session with tutor</p>
-                  </div>
-                </div>
-                <div className="flex items-start gap-3 p-3 border rounded-lg">
-                  <Target className="w-5 h-5 text-blue-600 flex-shrink-0 mt-0.5" />
-                  <div>
-                    <h4 className="mb-1">Optimize Study Schedule</h4>
-                    <p className="text-sm text-gray-600">Book complex topics during peak performance hours (3-5 PM)</p>
-                  </div>
-                </div>
               </div>
             </CardContent>
           </Card>

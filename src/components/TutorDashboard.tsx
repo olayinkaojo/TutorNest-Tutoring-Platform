@@ -1380,7 +1380,13 @@ export function TutorDashboard({
               </TabsContent>
 
               <TabsContent value="analytics">
-                <AdvancedReporting userId={profile.id || profile.userId} userType="tutor" />
+                {session && (
+                  <AdvancedReporting
+                    userId={profile.id || profile.userId}
+                    userType="tutor"
+                    accessToken={session.access_token}
+                  />
+                )}
               </TabsContent>
             </Tabs>
           </TabsContent>
