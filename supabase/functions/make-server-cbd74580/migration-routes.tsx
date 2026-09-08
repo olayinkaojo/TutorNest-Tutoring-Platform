@@ -27,7 +27,11 @@ migrationRoutes.post('/admin/migrate-kv-to-postgres', async (c) => {
     for (const b of kvBookings) {
       try {
         if (!b.id) continue;
-        // Try to create — if it already exists (duplicate key), skip
+        // Try to create — if it already exists (duplicate key), skip.
+        // bookingsMigrated only increments on genuine success — it used to
+        // run unconditionally right after this await, double-counting rows
+        // that were actually skipped (duplicate) or errored.
+        let created = false;
         await db.createBooking({
           id: b.id,
           paymentId: b.paymentId || b.payment_id || '',
@@ -45,6 +49,8 @@ migrationRoutes.post('/admin/migrate-kv-to-postgres', async (c) => {
           status: b.status || 'scheduled',
           paymentStatus: b.paymentStatus || b.payment_status || 'pending',
           meetLink: b.googleMeetLink || b.meetLink || undefined,
+        }).then(() => {
+          created = true;
         }).catch((e: any) => {
           // Duplicate — already migrated
           if (e.message?.includes('duplicate') || e.message?.includes('unique')) {
@@ -53,7 +59,7 @@ migrationRoutes.post('/admin/migrate-kv-to-postgres', async (c) => {
             results.errors.push(`booking ${b.id}: ${e.message}`);
           }
         });
-        results.bookingsMigrated++;
+        if (created) results.bookingsMigrated++;
       } catch (e: any) {
         results.errors.push(`booking ${b.id}: ${e.message}`);
       }
@@ -68,6 +74,7 @@ migrationRoutes.post('/admin/migrate-kv-to-postgres', async (c) => {
     for (const p of kvPayments) {
       try {
         if (!p.id || !p.reference) continue;
+        let created = false;
         await db.createPayment({
           id: p.id,
           userId: p.userId || p.user_id || '',
@@ -80,6 +87,8 @@ migrationRoutes.post('/admin/migrate-kv-to-postgres', async (c) => {
           startTime: p.startTime || p.time || '00:00',
           subject: p.subject || null,
           status: p.status || 'pending',
+        }).then(() => {
+          created = true;
         }).catch((e: any) => {
           if (e.message?.includes('duplicate') || e.message?.includes('unique')) {
             results.paymentsSkipped++;
@@ -87,7 +96,7 @@ migrationRoutes.post('/admin/migrate-kv-to-postgres', async (c) => {
             results.errors.push(`payment ${p.id}: ${e.message}`);
           }
         });
-        results.paymentsMigrated++;
+        if (created) results.paymentsMigrated++;
       } catch (e: any) {
         results.errors.push(`payment ${p.id}: ${e.message}`);
       }

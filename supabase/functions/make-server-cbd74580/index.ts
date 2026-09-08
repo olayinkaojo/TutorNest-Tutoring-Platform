@@ -1459,69 +1459,19 @@ app.post('/make-server-cbd74580/verifications/appeal', async (c) => {
   }
 });
 
-// Get tutor documents (admin or tutor themselves)
-app.get('/make-server-cbd74580/tutors/:userId/documents/:documentType', async (c) => {
-  try {
-    const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    const requesterId = await getUserId(accessToken ?? null);
-
-    if (!requesterId) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
-
-    const targetUserId = c.req.param('userId');
-    const documentType = c.req.param('documentType');
-
-    // Check if requester is viewing their own documents or is admin
-    // TODO: Add proper admin role check
-    if (requesterId !== targetUserId) {
-      // For now, allow any authenticated user (should be restricted to admins)
-    }
-
-    const userProfile = await kv.get(`user:${targetUserId}`) as any;
-    if (!userProfile || !userProfile.documents) {
-      return c.json({ error: 'Documents not found' }, 404);
-    }
-
-    const supabase = getSupabaseClient();
-    const bucketName = 'make-cbd74580-tutor-documents';
-
-    let documentPath = null;
-
-    switch (documentType) {
-      case 'photo':
-        documentPath = userProfile.documents.photo;
-        break;
-      case 'id':
-        documentPath = userProfile.documents.idDocument;
-        break;
-      case 'dbs':
-        documentPath = userProfile.documents.dbsDocument;
-        break;
-      default:
-        return c.json({ error: 'Invalid document type' }, 400);
-    }
-
-    if (!documentPath) {
-      return c.json({ error: 'Document not found' }, 404);
-    }
-
-    // Generate signed URL (valid for 1 hour)
-    const { data, error } = await supabase.storage
-      .from(bucketName)
-      .createSignedUrl(documentPath, 3600);
-
-    if (error) {
-      console.error('Error creating signed URL:', error);
-      return c.json({ error: 'Failed to retrieve document' }, 500);
-    }
-
-    return c.json({ url: data.signedUrl });
-  } catch (error: any) {
-    console.error('Error fetching document:', error);
-    return c.json({ error: error.message || 'Internal server error' }, 500);
-  }
-});
+// REMOVED: GET /tutors/:userId/documents/:documentType (2026-09-08).
+// This route had two independent bugs: (1) its admin check was a literal
+// no-op empty `if` block — any authenticated user could fetch a signed URL
+// to any tutor's ID/DBS document by userId; (2) it read
+// userProfile.documents.{photo,idDocument,dbsDocument}, a nested field
+// never written anywhere in this codebase (real fields are
+// photo_url/dbsCertificateUrl/etc.), so even a fixed version of this route
+// would 404 for every real tutor. The three admin-UI buttons that called it
+// were deleted too — the "Uploaded Certificates & Documents" section on the
+// same tab already covers this via the correctly-secured
+// GET /documents/:documentId/download?userRole=admin (documents-routes.tsx),
+// which re-verifies the caller's real stored role rather than trusting the
+// query param.
 
 // Check DBS expiry (background job or manual trigger)
 app.post('/make-server-cbd74580/admin/check-dbs-expiry', async (c) => {

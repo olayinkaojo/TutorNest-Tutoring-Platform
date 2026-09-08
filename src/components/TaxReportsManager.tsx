@@ -8,7 +8,7 @@ import { Badge } from './ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner@2.0.3';
-import { projectId, publicAnonKey } from '../utils/supabase/info.tsx';
+import { projectId } from '../utils/supabase/info.tsx';
 import { FileText, Download, TrendingUp, DollarSign, Calendar, Plus } from 'lucide-react';
 
 interface TaxReport {
@@ -31,9 +31,10 @@ interface TaxReport {
 
 interface TaxReportsManagerProps {
   adminId: string;
+  accessToken: string;
 }
 
-export function TaxReportsManager({ adminId }: TaxReportsManagerProps) {
+export function TaxReportsManager({ adminId, accessToken }: TaxReportsManagerProps) {
   const [reports, setReports] = useState<TaxReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [generating, setGenerating] = useState(false);
@@ -54,14 +55,20 @@ export function TaxReportsManager({ adminId }: TaxReportsManagerProps) {
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/tax/reports`,
         {
           headers: {
-            Authorization: `Bearer ${publicAnonKey}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         }
       );
 
+      if (!response.ok) {
+        throw new Error(`Failed to load tax reports (${response.status})`);
+      }
+
       const data = await response.json();
       if (data.success) {
         setReports(data.reports);
+      } else {
+        throw new Error(data.error || 'Failed to load tax reports');
       }
     } catch (error) {
       console.error('Error fetching tax reports:', error);
@@ -93,7 +100,7 @@ export function TaxReportsManager({ adminId }: TaxReportsManagerProps) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${publicAnonKey}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             reportType,
@@ -134,7 +141,7 @@ export function TaxReportsManager({ adminId }: TaxReportsManagerProps) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${publicAnonKey}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             startDate: start,

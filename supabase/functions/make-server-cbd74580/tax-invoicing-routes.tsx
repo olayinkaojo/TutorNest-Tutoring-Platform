@@ -465,10 +465,12 @@ app.post('/tax/reports/generate', async (c) => {
       return c.json({ success: false, error: 'Missing required fields' }, 400);
     }
 
-    // Fetch all invoices in the date range
+    // Fetch all invoices in the date range. kv.getByPrefix() already
+    // returns unwrapped values, not {key, value} pairs — mapping .value
+    // off each item produced `undefined`, which then crashed the next
+    // .filter() on inv.issueDate (always a 500).
     const allInvoicesData = await kv.getByPrefix('invoice_inv_');
     const invoices: Invoice[] = allInvoicesData
-      .map(item => item.value)
       .filter(inv => {
         const invoiceDate = new Date(inv.issueDate);
         return invoiceDate >= new Date(startDate) && invoiceDate <= new Date(endDate) && inv.status === 'paid';
@@ -508,7 +510,6 @@ app.post('/tax/reports/generate', async (c) => {
     // Get refunds in the period (from refund manager)
     const refundsData = await kv.getByPrefix('refund_');
     const refunds = refundsData
-      .map(item => item.value)
       .filter(ref => {
         const refundDate = new Date(ref.processedAt || ref.requestedAt);
         return refundDate >= new Date(startDate) && refundDate <= new Date(endDate) && ref.status === 'completed';
@@ -564,8 +565,7 @@ app.get('/tax/reports', async (c) => {
   try {
     const auth = await requireAdmin(c);
     if (auth instanceof Response) return auth;
-    const reportsData = await kv.getByPrefix('tax_report_');
-    const reports = reportsData.map(item => item.value);
+    const reports = await kv.getByPrefix('tax_report_');
 
     // Sort by creation date descending
     reports.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
@@ -594,7 +594,6 @@ app.post('/tax/export', async (c) => {
     // Fetch all invoices in the date range
     const allInvoicesData = await kv.getByPrefix('invoice_inv_');
     const invoices: Invoice[] = allInvoicesData
-      .map(item => item.value)
       .filter(inv => {
         const invoiceDate = new Date(inv.issueDate);
         return invoiceDate >= new Date(startDate) && invoiceDate <= new Date(endDate);

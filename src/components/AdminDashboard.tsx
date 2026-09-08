@@ -500,11 +500,15 @@ export function AdminDashboard({
           </TabsContent>
 
           <TabsContent value="coupons">
-            <CouponManager adminId={profile.id || profile.userId} />
+            {session && (
+              <CouponManager adminId={profile.id || profile.userId} accessToken={session.access_token} />
+            )}
           </TabsContent>
 
           <TabsContent value="taxreports">
-            <TaxReportsManager adminId={profile.id || profile.userId} />
+            {session && (
+              <TaxReportsManager adminId={profile.id || profile.userId} accessToken={session.access_token} />
+            )}
           </TabsContent>
 
           <TabsContent value="payments">

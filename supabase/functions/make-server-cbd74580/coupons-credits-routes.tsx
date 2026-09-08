@@ -165,8 +165,10 @@ app.get('/coupons/all', async (c) => {
   try {
     const auth = await requireAdmin(c);
     if (auth instanceof Response) return auth;
-    const couponsData = await kv.getByPrefix('coupon_cpn_');
-    const coupons = couponsData.map(item => item.value);
+    // kv.getByPrefix() already returns unwrapped values, not {key, value}
+    // pairs (that's Deno-native-KV convention, not this shim's) — mapping
+    // .value off each item silently produced an array of undefined.
+    const coupons = await kv.getByPrefix('coupon_cpn_');
 
     return c.json({
       success: true,

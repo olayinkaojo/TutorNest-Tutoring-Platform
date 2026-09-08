@@ -10,7 +10,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Textarea } from './ui/textarea';
 import { Switch } from './ui/switch';
 import { toast } from 'sonner@2.0.3';
-import { projectId, publicAnonKey } from '../utils/supabase/info.tsx';
+import { projectId } from '../utils/supabase/info.tsx';
 import { Plus, Percent, PoundSterling, Calendar, Users, Edit, Trash2, XCircle } from 'lucide-react';
 
 interface Coupon {
@@ -29,9 +29,10 @@ interface Coupon {
 
 interface CouponManagerProps {
   adminId: string;
+  accessToken: string;
 }
 
-export function CouponManager({ adminId }: CouponManagerProps) {
+export function CouponManager({ adminId, accessToken }: CouponManagerProps) {
   const [coupons, setCoupons] = useState<Coupon[]>([]);
   const [loading, setLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
@@ -56,14 +57,20 @@ export function CouponManager({ adminId }: CouponManagerProps) {
         `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/coupons/all`,
         {
           headers: {
-            Authorization: `Bearer ${publicAnonKey}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         }
       );
 
+      if (!response.ok) {
+        throw new Error(`Failed to load coupons (${response.status})`);
+      }
+
       const data = await response.json();
       if (data.success) {
         setCoupons(data.coupons);
+      } else {
+        throw new Error(data.error || 'Failed to load coupons');
       }
     } catch (error) {
       console.error('Error fetching coupons:', error);
@@ -110,7 +117,7 @@ export function CouponManager({ adminId }: CouponManagerProps) {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',
-            Authorization: `Bearer ${publicAnonKey}`,
+            Authorization: `Bearer ${accessToken}`,
           },
           body: JSON.stringify({
             code: code.toUpperCase().trim(),
@@ -148,7 +155,7 @@ export function CouponManager({ adminId }: CouponManagerProps) {
         {
           method: 'POST',
           headers: {
-            Authorization: `Bearer ${publicAnonKey}`,
+            Authorization: `Bearer ${accessToken}`,
           },
         }
       );

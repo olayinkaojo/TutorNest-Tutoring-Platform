@@ -17,7 +17,6 @@ import {
   FileText,
   AlertTriangle,
   User,
-  Shield,
   Download,
   Flag,
   RefreshCw,
@@ -41,7 +40,6 @@ interface VerificationMetrics {
 interface VerificationRecord {
   userId: string;
   profile: any;
-  documents: { dbs: string | null; qualifications: any[]; insurance: string | null };
   submittedAt: string;
   status?: string;
   reviewer?: string;
@@ -234,19 +232,6 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
     }
   };
 
-  const viewDocument = async (userId: string, docType: string) => {
-    try {
-      const res = await fetch(`${BASE}/tutors/${userId}/documents/${docType}`, {
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (!res.ok) throw new Error('Could not retrieve document');
-      const data = await res.json();
-      window.open(data.url, '_blank');
-    } catch (err: any) {
-      setError(err.message);
-    }
-  };
-
   // Load the selected tutor's profile-tab certificate uploads.
   useEffect(() => {
     const userId = selected?.userId;
@@ -326,8 +311,6 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
   const dataIssues = p ? getDataIssues(p) : [];
   const riskFlags = p ? getRiskFlags(p) : [];
   const hasPhoto = !!(p?.photoUrl || p?.photo_url);
-  const hasDbs = !!selected?.documents?.dbs;
-  const hasInsurance = !!selected?.documents?.insurance;
 
   // ─── Loading skeleton ─────────────────────────────────────────────────────
   if (loading) {
@@ -661,57 +644,6 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
                     Click a document to open it in a new tab. Documents expire after 1 hour.
                   </p>
 
-                  {hasPhoto && (
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-3"
-                      onClick={() => viewDocument(selected.userId, 'photo')}
-                    >
-                      <User className="w-4 h-4 text-purple-500" />
-                      Profile Photo
-                      <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
-                    </Button>
-                  )}
-
-                  {hasDbs && (
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-3"
-                      onClick={() => viewDocument(selected.userId, 'dbs')}
-                    >
-                      <Shield className="w-4 h-4 text-blue-500" />
-                      DBS Certificate
-                      <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
-                    </Button>
-                  )}
-
-                  {hasInsurance && (
-                    <Button
-                      variant="outline"
-                      className="w-full justify-start gap-3"
-                      onClick={() => viewDocument(selected.userId, 'insurance')}
-                    >
-                      <FileText className="w-4 h-4 text-green-500" />
-                      Insurance Document
-                      <CheckCircle className="w-4 h-4 ml-auto text-green-600" />
-                    </Button>
-                  )}
-
-                  {selected.documents?.qualifications?.length > 0 && (
-                    <div className="rounded-lg border p-3 bg-gray-50">
-                      <p className="text-xs font-medium text-gray-600 mb-1">Qualification Certificates</p>
-                      {selected.documents.qualifications.map((url: string, i: number) => (
-                        <button
-                          key={i}
-                          onClick={() => window.open(url, '_blank')}
-                          className="text-sm text-blue-600 underline block"
-                        >
-                          Certificate {i + 1}
-                        </button>
-                      ))}
-                    </div>
-                  )}
-
                   {/* Certificates the tutor uploaded from their dashboard profile tab */}
                   <div className="pt-3 border-t">
                     <p className="text-xs font-medium text-gray-600 mb-2">
@@ -745,7 +677,7 @@ export function EnhancedAdminVerificationDashboard({ session }: AdminVerificatio
                     )}
                   </div>
 
-                  {!hasPhoto && !hasDbs && !hasInsurance && !selected.documents?.qualifications?.length && uploadedDocs.length === 0 && !loadingUploadedDocs && (
+                  {!hasPhoto && uploadedDocs.length === 0 && !loadingUploadedDocs && (
                     <div className="text-center py-10">
                       <FileText className="w-10 h-10 mx-auto text-gray-300 mb-3" />
                       <p className="text-sm text-gray-500">No documents uploaded by this tutor</p>
