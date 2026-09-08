@@ -372,12 +372,22 @@ export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
           rating: r.rating || 0,
         }));
 
-      // Strengths (from positive feedback)
-      const strengths = [
-        'Clear explanations and patient teaching style',
-        'Excellent preparation and structured lessons',
-        'Strong rapport with students',
-      ];
+      // Strengths, pulled from the tutor's own post-session report notes
+      // (report.strengths — a free-text field, not tags). Note: this is
+      // NOT frequency-aggregated like improvementAreas below is, on
+      // purpose — strengths/areasForImprovement are freeform paragraphs,
+      // so counting exact-string repeats would mostly just return each
+      // one once anyway (rarely typed identically twice) and misleadingly
+      // imply a "most common" ranking that doesn't really apply to prose.
+      // Most recent distinct notes, newest first, is the honest version.
+      const strengths = Array.from(
+        new Set(
+          tutorReports
+            .filter((r: any) => r.strengths?.trim())
+            .sort((a: any, b: any) => new Date(b.sessionDate).getTime() - new Date(a.sessionDate).getTime())
+            .map((r: any) => r.strengths.trim())
+        )
+      ).slice(0, 5);
 
       // Improvement areas based on metrics
       const improvementAreas: string[] = [];
