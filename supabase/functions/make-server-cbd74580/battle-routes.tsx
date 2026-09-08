@@ -163,30 +163,40 @@ app.post("/battle/:battleId/answer", async (c) => {
       Number(timeMs)
     );
 
-    // Feed the shared achievement system (see achievement-service.tsx) once
-    // the battle actually concludes — both players get battlesPlayed, the
-    // winner also gets battleWins. Without this, finishing battles never
-    // reached user:<id>:stats and could never unlock a badge.
-    if (result.battleComplete) {
-      try {
+    // Feed the shared achievement system (see achievement-service.tsx).
+    // recordBattleCompletion (already written there, never called from
+    // anywhere) needs an xpEarned figure this battle system has no real
+    // concept of — there's no per-battle XP anywhere else in the app —
+    // so rather than invent one, update the fields that are genuinely
+    // observable here: fastestAnswerTime from this real answer's timeMs
+    // for whoever just answered, every time; battlesPlayed/battleWins/
+    // battleWinStreak for both players once the battle actually concludes.
+    // Without any of this, finishing battles never reached
+    // user:<id>:stats and could never unlock a badge.
+    try {
+      const answererStats = await getUserStats(userData.user.id);
+      await updateUserStats(userData.user.id, {
+        fastestAnswerTime: Math.min(answererStats.fastestAnswerTime, Number(timeMs)),
+      });
+      await checkAndAwardAchievements(userData.user.id);
+
+      if (result.battleComplete) {
         const battle = await multiplayerBattleService.getBattleStatus(battleId);
         const player1Id = battle?.player1?.userId;
         const player2Id = battle?.player2?.userId;
         const winnerId = battle?.winner;
         for (const playerId of [player1Id, player2Id].filter(Boolean) as string[]) {
-          const achievementStats = await getUserStats(playerId);
+          const stats = await getUserStats(playerId);
           await updateUserStats(playerId, {
-            battlesPlayed: (achievementStats.battlesPlayed || 0) + 1,
-            battleWins: (achievementStats.battleWins || 0) + (playerId === winnerId ? 1 : 0),
-            battleWinStreak: playerId === winnerId
-              ? (achievementStats.battleWinStreak || 0) + 1
-              : 0,
+            battlesPlayed: (stats.battlesPlayed || 0) + 1,
+            battleWins: (stats.battleWins || 0) + (playerId === winnerId ? 1 : 0),
+            battleWinStreak: playerId === winnerId ? (stats.battleWinStreak || 0) + 1 : 0,
           });
           await checkAndAwardAchievements(playerId);
         }
-      } catch (err) {
-        console.warn('Battle answer: achievement update failed (non-fatal):', err);
       }
+    } catch (err) {
+      console.warn('Battle answer: achievement update failed (non-fatal):', err);
     }
 
     return c.json(result);

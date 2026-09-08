@@ -40,17 +40,32 @@ export async function getUserStats(userId: string): Promise<UserStats> {
   }
 }
 
+// A "no data yet" sentinel for answer-time fields — large and finite
+// rather than Infinity. updateUserStats spreads {...current, ...updates}
+// through kv.set on every call, and this object goes through JSON
+// serialization to get there: JSON.stringify(Infinity) silently becomes
+// `null`, and null coerces to 0 in a numeric comparison — so any update
+// that didn't happen to also set these two fields would have quietly
+// turned "no data" into 0 on its very first save, permanently satisfying
+// "answered in under 5/3 seconds" for an account that had never answered
+// anything.
+const NO_ANSWER_TIME_YET = 999_999_999;
+
 function createDefaultStats(userId: string): UserStats {
   return {
     userId,
     dailyChallengesCompleted: 0,
-    fastestAnswerTime: Infinity,
+    fastestAnswerTime: NO_ANSWER_TIME_YET,
     battlesPlayed: 0,
     battleWins: 0,
     friendBattleWins: 0,
     currentStreak: 0,
     battleWinStreak: 0,
-    averageAnswerTime: 0,
+    // Confirmed live: with the old `0` default, a test student unlocked
+    // this badge from their very first (incorrectly-answered!) daily
+    // challenge submission — before this fix, updateUserStats had never
+    // even run for them yet.
+    averageAnswerTime: NO_ANSWER_TIME_YET,
     globalRank: 999999,
     badgesUnlocked: 0,
     perfectTimeAttackGames: 0,
