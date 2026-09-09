@@ -86,6 +86,22 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    // Don't make any redirect decision off session/profile while the initial
+    // getSession()+fetchProfile() round trip is still in flight — both start
+    // out null on every fresh page load (including a plain browser refresh,
+    // or any redirect back into the app from elsewhere, e.g. the Google
+    // Calendar OAuth callback), so this effect used to fire on that
+    // transient not-yet-loaded state: null session → bounce to /auth, then
+    // session-but-no-profile-yet → bounce to /select-role, then profile
+    // finally arrives but the pathname is now /select-role, not the
+    // original deep link, so it falls through to the generic "send them to
+    // their role's dashboard" branch below — landing on the bare role path
+    // with no tab and no query string, having silently dropped whichever
+    // tab (and e.g. ?calendar=connected) the user was actually on. Waiting
+    // for loading to actually settle avoids deciding anything on stale
+    // nulls in the first place.
+    if (loading) return;
+
     if (!session) {
       if (location.pathname.startsWith('/dashboard') || location.pathname === '/select-role') {
         navigateTo('/auth', { replace: true });
@@ -108,7 +124,7 @@ export default function App() {
     ) {
       navigateTo(rolePath, { replace: true });
     }
-  }, [session, profile, location.pathname]);
+  }, [session, profile, location.pathname, loading]);
 
   const fetchProfile = async (accessToken: string) => {
     try {
