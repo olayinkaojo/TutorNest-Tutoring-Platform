@@ -258,79 +258,121 @@ async function getAccessToken(userId: string): Promise<string | null> {
   return tokens.accessToken;
 }
 
+export interface CreateEventParams {
+  summary: string;
+  description?: string;
+  startDateTime: string; // local wall-clock, no offset — paired with timeZone below
+  endDateTime: string;
+  timeZone?: string; // defaults to Africa/Lagos, the platform's one reference timezone (matches the .ics invites)
+  attendees?: string[];
+  location?: string;
+  /** RFC 5545 value with no "RRULE:" prefix, e.g. from calendar-ics.tsx's buildWeeklyRRule(). Omit for a one-off event. */
+  recurrenceRule?: string;
+  /** Attach a Google Meet link. Defaults to true, matching the original behaviour. */
+  addMeet?: boolean;
+}
+
+/**
+ * Creates an event on a user's connected Google Calendar. Exported so
+ * payment-routes.tsx can push the same recurring series a tutor's .ics
+ * invite already describes onto their Google Calendar too, for tutors who
+ * opt in — not just from the HTTP route below.
+ */
+export async function createGoogleCalendarEvent(
+  userId: string,
+  params: CreateEventParams
+): Promise<{ success: boolean; event?: any; error?: string; notConnected?: boolean }> {
+  const googleAccessToken = await getAccessToken(userId);
+
+  if (!googleAccessToken) {
+    return { success: false, notConnected: true, error: 'Google Calendar not connected or token expired' };
+  }
+
+  const timeZone = params.timeZone || 'Africa/Lagos';
+  const addMeet = params.addMeet !== false;
+
+  const event: Record<string, any> = {
+    summary: params.summary,
+    description: params.description,
+    start: { dateTime: params.startDateTime, timeZone },
+    end: { dateTime: params.endDateTime, timeZone },
+    location: params.location || 'Knowledge Fons Academy Virtual Classroom',
+    reminders: {
+      useDefault: false,
+      overrides: [
+        { method: 'email', minutes: 24 * 60 },
+        { method: 'popup', minutes: 30 },
+      ],
+    },
+  };
+
+  if (params.attendees?.length) {
+    event.attendees = params.attendees.map((email: string) => ({ email }));
+  }
+  if (params.recurrenceRule) {
+    event.recurrence = [`RRULE:${params.recurrenceRule}`];
+  }
+  if (addMeet) {
+    event.conferenceData = {
+      createRequest: {
+        requestId: crypto.randomUUID(),
+        conferenceSolutionKey: { type: 'hangoutsMeet' },
+      },
+    };
+  }
+
+  try {
+    const response = await fetch(
+      `https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=${addMeet ? 1 : 0}`,
+      {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${googleAccessToken}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(event),
+      }
+    );
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error('Failed to create calendar event:', errText);
+      return { success: false, error: 'Failed to create calendar event' };
+    }
+
+    const createdEvent = await response.json();
+    return { success: true, event: createdEvent };
+  } catch (error: any) {
+    console.error('Error creating calendar event:', error);
+    return { success: false, error: error.message || 'Internal error' };
+  }
+}
+
 // Create a calendar event
 app.post('/make-server-cbd74580/google-calendar/events', async (c) => {
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    
+
     if (!accessToken) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
-    
+
     const supabase = c.get('supabase');
     const userId = await getUserId(accessToken, supabase);
-    
+
     if (!userId) {
       return c.json({ error: 'Unauthorized' }, 401);
     }
-    
+
     const { summary, description, startDateTime, endDateTime, attendees, location } = await c.req.json();
-    
-    const googleAccessToken = await getAccessToken(userId);
-    
-    if (!googleAccessToken) {
-      return c.json({ error: 'Google Calendar not connected or token expired' }, 400);
+
+    const result = await createGoogleCalendarEvent(userId, { summary, description, startDateTime, endDateTime, attendees, location });
+
+    if (!result.success) {
+      return c.json({ error: result.error }, result.notConnected ? 400 : 500);
     }
-    
-    // Create event in Google Calendar
-    const event = {
-      summary,
-      description,
-      start: {
-        dateTime: startDateTime,
-        timeZone: 'Africa/Lagos',
-      },
-      end: {
-        dateTime: endDateTime,
-        timeZone: 'Africa/Lagos',
-      },
-      attendees: attendees?.map((email: string) => ({ email })) || [],
-      location: location || 'Knowledge Fons Academy Virtual Classroom',
-      reminders: {
-        useDefault: false,
-        overrides: [
-          { method: 'email', minutes: 24 * 60 },
-          { method: 'popup', minutes: 30 },
-        ],
-      },
-      conferenceData: {
-        createRequest: {
-          requestId: crypto.randomUUID(),
-          conferenceSolutionKey: {
-            type: 'hangoutsMeet'
-          }
-        }
-      }
-    };
-    
-    const response = await fetch('https://www.googleapis.com/calendar/v3/calendars/primary/events?conferenceDataVersion=1', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${googleAccessToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify(event),
-    });
-    
-    if (!response.ok) {
-      const error = await response.text();
-      console.error('Failed to create calendar event:', error);
-      return c.json({ error: 'Failed to create calendar event' }, 500);
-    }
-    
-    const createdEvent = await response.json();
-    
-    return c.json({ success: true, event: createdEvent });
+
+    return c.json({ success: true, event: result.event });
   } catch (error: any) {
     console.error('Error creating calendar event:', error);
     return c.json({ error: error.message || 'Internal server error' }, 500);

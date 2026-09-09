@@ -55,23 +55,34 @@ export interface IcsSeriesOptions {
 }
 
 /**
+ * RFC 5545 RRULE value (no "RRULE:" prefix) for "the same tutoring slot,
+ * every week, for N sessions" — shared between the .ics invite below and
+ * the optional Google Calendar sync (google-calendar-routes.tsx), so a
+ * tutor who also connects Google Calendar gets one recurring event that
+ * matches the .ics everyone gets, not a second, differently-shaped series.
+ */
+export function buildWeeklyRRule(startDate: string, sessionsPerWeek: 1 | 2, totalSessions: number): string {
+  const startDateObj = new Date(startDate + 'T12:00:00+01:00');
+  const startDay = WEEKDAY_ICS[startDateObj.getDay()];
+
+  let byDay = startDay;
+  if (sessionsPerWeek === 2) {
+    const secondDateObj = new Date(startDateObj);
+    secondDateObj.setDate(secondDateObj.getDate() + 3);
+    byDay = `${startDay},${WEEKDAY_ICS[secondDateObj.getDay()]}`;
+  }
+
+  return `FREQ=WEEKLY;BYDAY=${byDay};COUNT=${totalSessions}`;
+}
+
+/**
  * Builds a single recurring VEVENT covering the whole plan (all weekly
  * sessions as one calendar entry, matching how a real calendar app should
  * represent "the same tutoring slot, every week" — not one invite per
  * session).
  */
 export function buildIcsContent(opts: IcsSeriesOptions): string {
-  const startDateObj = new Date(opts.startDate + 'T12:00:00+01:00');
-  const startDay = WEEKDAY_ICS[startDateObj.getDay()];
-
-  let byDay = startDay;
-  if (opts.sessionsPerWeek === 2) {
-    const secondDateObj = new Date(startDateObj);
-    secondDateObj.setDate(secondDateObj.getDate() + 3);
-    byDay = `${startDay},${WEEKDAY_ICS[secondDateObj.getDay()]}`;
-  }
-
-  const rrule = `FREQ=WEEKLY;BYDAY=${byDay};COUNT=${opts.totalSessions}`;
+  const rrule = buildWeeklyRRule(opts.startDate, opts.sessionsPerWeek, opts.totalSessions);
 
   const lines = [
     'BEGIN:VCALENDAR',

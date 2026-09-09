@@ -261,12 +261,12 @@ export function PrivacyPolicy() {
           </div>
 
           <p className="text-gray-700 mb-4">
-            This platform previously offered a feature letting tutors connect their Google Calendar so that
-            confirmed tutoring sessions were automatically added to their own calendar. That feature is no longer
-            offered to new tutors — session details are now provided as a calendar invite file compatible with any
-            calendar app, requiring no account connection at all. A small number of tutors who connected Google
-            Calendar before this change may still have an active connection, which they can disconnect at any time;
-            our handling of any data from that connection continues to adhere to the{' '}
+            Every confirmed tutoring session comes with a calendar invite file compatible with any calendar app
+            (Google, Outlook, Apple, or otherwise) — no account connection required. Tutors who use Google Calendar
+            can optionally connect it as well, so sessions are added automatically and scheduling conflicts with
+            their existing calendar are flagged; this is entirely optional and can be turned off at any time from a
+            tutor's profile settings without affecting the calendar invite every booking already sends. Our
+            handling of any data from a Google Calendar connection adheres to the{' '}
             <a
               href="https://developers.google.com/terms/api-services-user-data-policy"
               target="_blank"

@@ -4,8 +4,9 @@ import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 import { logAuditEvent } from './activity-log.tsx';
-import { buildIcsContent, createCalendarDownloadLink } from './calendar-ics.tsx';
+import { buildIcsContent, createCalendarDownloadLink, buildWeeklyRRule } from './calendar-ics.tsx';
 import { createDailyRoom } from './daily-video-routes.tsx';
+import { createGoogleCalendarEvent } from './google-calendar-routes.tsx';
 
 const app = new Hono();
 
@@ -1254,10 +1255,13 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
   await db.updateBookingsMeetLink(bookingIds, meetLink);
   console.log(`Meet link set for payment ${payment.id} (recorded: ${recordedSessions}):`, meetLink);
 
+  // First session date, shared by the .ics invite and the optional Google
+  // Calendar sync below — both describe the same recurring series.
+  const firstDate = bookingDates[0].toISOString().split('T')[0];
+
   // ── Calendar invite (.ics) — no OAuth, works with any calendar app ────────
   let calendarLink: string | null = null;
   try {
-    const firstDate = bookingDates[0].toISOString().split('T')[0];
     const icsContent = buildIcsContent({
       uid: `plan-${payment.id}`,
       summary: `Knowledge Fons Academy: ${payment.subject ?? 'Tutoring Session'}`,
@@ -1272,6 +1276,31 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
     calendarLink = await createCalendarDownloadLink(icsContent);
   } catch (icsErr: any) {
     console.warn('Calendar invite (.ics) creation skipped (non-fatal):', icsErr.message);
+  }
+
+  // ── Google Calendar sync (optional) ────────────────────────────────────────
+  // Only for tutors who've explicitly connected their own Google Calendar —
+  // everyone else already got the .ics invite above, which needs no account
+  // at all. One recurring event for the whole plan, same RRULE as the .ics,
+  // so a connected tutor doesn't end up with two differently-shaped series.
+  try {
+    const hasGoogleCalendar = await kv.get(`google_calendar_tokens:${payment.tutorId}`);
+    if (hasGoogleCalendar) {
+      const rrule = buildWeeklyRRule(firstDate, plan.sessionsPerWeek as 1 | 2, plan.sessions);
+      const result = await createGoogleCalendarEvent(payment.tutorId, {
+        summary: `Knowledge Fons Academy: ${payment.subject ?? 'Tutoring Session'}`,
+        description: `${plan.name} (${plan.sessions} sessions) — Knowledge Fons Academy. Join link: ${meetLink}`,
+        startDateTime: `${firstDate}T${payment.startTime}:00`,
+        endDateTime: `${firstDate}T${endTime}:00`,
+        location: meetLink,
+        recurrenceRule: rrule,
+      });
+      if (!result.success) {
+        console.warn(`Google Calendar sync skipped for tutor ${payment.tutorId} (non-fatal):`, result.error);
+      }
+    }
+  } catch (gcalErr: any) {
+    console.warn('Google Calendar sync skipped (non-fatal):', gcalErr.message);
   }
 
   // ── Send professional emails (non-fatal) ───────────────────────────────────

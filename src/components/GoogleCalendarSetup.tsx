@@ -1,0 +1,289 @@
+import { useState, useEffect } from 'react';
+import { toast } from 'sonner';
+import { Button } from './ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
+import { Alert, AlertDescription } from './ui/alert';
+import { Badge } from './ui/badge';
+import { Calendar, CheckCircle, XCircle, Loader2, ExternalLink, AlertCircle } from 'lucide-react';
+import { projectId } from '../utils/supabase/info';
+
+interface GoogleCalendarSetupProps {
+  session: any;
+  onConnectionChange?: (connected: boolean) => void;
+}
+
+/**
+ * Optional add-on for tutors who use Google Calendar. Every tutor already
+ * gets a .ics calendar invite by email on booking confirmation (works with
+ * any calendar app, no account needed) — this is strictly additive on top
+ * of that, for tutors who want their sessions to show up alongside their
+ * existing Google Calendar and get real conflict warnings, which a static
+ * .ics file can't provide. Re-enabled 2026-09-09 after Google approved
+ * verification for the calendar/calendar.events scopes this uses (see
+ * PrivacyPolicy.tsx for the current, non-retired wording).
+ */
+export function GoogleCalendarSetup({ session, onConnectionChange }: GoogleCalendarSetupProps) {
+  const [loading, setLoading] = useState(false);
+  const [connected, setConnected] = useState(false);
+  const [connectedAt, setConnectedAt] = useState<string | null>(null);
+  const [error, setError] = useState('');
+  const [success, setSuccess] = useState('');
+  const [checkingStatus, setCheckingStatus] = useState(true);
+
+  useEffect(() => {
+    checkConnectionStatus();
+  }, []);
+
+  // The OAuth callback is handled server-side (edge function
+  // /google-calendar/callback). Google redirects to the edge function → it
+  // exchanges the code → redirects back here with ?calendar=connected or
+  // ?calendar=error. No ?code= ever hits the React app, so nothing here
+  // intercepts it or logs the user out mid-flow.
+  useEffect(() => {
+    const urlParams = new URLSearchParams(window.location.search);
+    const calendar = urlParams.get('calendar');
+    const msg = urlParams.get('msg');
+    if (!calendar) return;
+
+    if (calendar === 'connected') {
+      toast.success('Google Calendar connected! Your sessions will now sync automatically.');
+      checkConnectionStatus();
+    } else if (calendar === 'error') {
+      const label = msg === 'exchange_failed' ? 'Token exchange failed — please try connecting again.'
+        : msg === 'invalid_state' ? 'Session expired — please try connecting again.'
+        : msg === 'not_configured' ? 'Google Calendar isn\'t configured right now — please try again later.'
+        : `Connection failed: ${msg || 'unknown error'}`;
+      setError(label);
+      toast.error(label);
+    }
+
+    urlParams.delete('calendar');
+    urlParams.delete('msg');
+    const query = urlParams.toString();
+    window.history.replaceState({}, '', window.location.pathname + (query ? `?${query}` : ''));
+  }, []);
+
+  const checkConnectionStatus = async () => {
+    setCheckingStatus(true);
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/google-calendar/status`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      if (response.ok) {
+        const data = await response.json();
+        setConnected(data.connected);
+        setConnectedAt(data.connectedAt);
+        onConnectionChange?.(data.connected);
+      }
+    } catch (err: any) {
+      console.error('Error checking connection status:', err);
+    } finally {
+      setCheckingStatus(false);
+    }
+  };
+
+  const handleConnect = async () => {
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/google-calendar/auth-url`,
+        {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        window.location.href = data.authUrl;
+      } else {
+        setError(data.error || 'Failed to initiate Google Calendar connection');
+        setLoading(false);
+      }
+    } catch (err: any) {
+      console.error('Error initiating OAuth:', err);
+      setError('An error occurred while initiating connection');
+      setLoading(false);
+    }
+  };
+
+  const handleDisconnect = async () => {
+    if (!confirm('Are you sure you want to disconnect Google Calendar? Future sessions will not be synced to your calendar — you\'ll still get a calendar invite by email for every booking.')) {
+      return;
+    }
+
+    setLoading(true);
+    setError('');
+    setSuccess('');
+
+    try {
+      const response = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/google-calendar/disconnect`,
+        {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        }
+      );
+
+      const data = await response.json();
+
+      if (response.ok) {
+        setSuccess('Google Calendar disconnected successfully');
+        setConnected(false);
+        setConnectedAt(null);
+        onConnectionChange?.(false);
+      } else {
+        setError(data.error || 'Failed to disconnect Google Calendar');
+      }
+    } catch (err: any) {
+      console.error('Error disconnecting:', err);
+      setError('An error occurred while disconnecting');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  if (checkingStatus) {
+    return (
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Calendar className="w-5 h-5" />
+            Google Calendar (optional)
+          </CardTitle>
+          <CardDescription>
+            Checking connection status...
+          </CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="w-8 h-8 animate-spin text-gray-400" />
+          </div>
+        </CardContent>
+      </Card>
+    );
+  }
+
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex items-center gap-2">
+          <Calendar className="w-5 h-5" />
+          Google Calendar (optional)
+        </CardTitle>
+        <CardDescription>
+          Every booking already sends you a calendar invite by email that works with any calendar app.
+          Connect Google Calendar here too if you want your sessions to show up automatically and get
+          warned about scheduling conflicts.
+        </CardDescription>
+      </CardHeader>
+      <CardContent className="space-y-4">
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{error}</AlertDescription>
+          </Alert>
+        )}
+
+        {success && (
+          <Alert className="border-green-200 bg-green-50">
+            <CheckCircle className="h-4 w-4 text-green-600" />
+            <AlertDescription className="text-green-800">{success}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center gap-3">
+            {connected ? (
+              <CheckCircle className="w-5 h-5 text-green-600" />
+            ) : (
+              <XCircle className="w-5 h-5 text-gray-400" />
+            )}
+            <div>
+              <p className="font-medium">
+                {connected ? 'Connected' : 'Not Connected'}
+              </p>
+              {connectedAt && (
+                <p className="text-xs text-gray-500">
+                  Connected on {new Date(connectedAt).toLocaleDateString()}
+                </p>
+              )}
+            </div>
+          </div>
+          <Badge variant={connected ? 'default' : 'secondary'}>
+            {connected ? 'Active' : 'Inactive'}
+          </Badge>
+        </div>
+
+        {!connected && (
+          <div className="space-y-3">
+            <h4 className="font-medium">Benefits of connecting:</h4>
+            <ul className="space-y-2 text-sm text-gray-600">
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <span>Sessions automatically appear on your Google Calendar, not just via email invite</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <span>Get reminders before sessions start</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <span>Real scheduling-conflict warnings against your existing calendar</span>
+              </li>
+              <li className="flex items-start gap-2">
+                <CheckCircle className="w-4 h-4 text-green-600 mt-0.5 flex-shrink-0" />
+                <span>Access Google Meet links for virtual sessions</span>
+              </li>
+            </ul>
+          </div>
+        )}
+
+        <div className="flex gap-2 pt-4">
+          {connected ? (
+            <Button
+              variant="outline"
+              onClick={handleDisconnect}
+              disabled={loading}
+              className="w-full"
+            >
+              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              Disconnect Google Calendar
+            </Button>
+          ) : (
+            <Button
+              onClick={handleConnect}
+              disabled={loading}
+              className="w-full text-white"
+              style={{ backgroundColor: '#625d9c' }}
+            >
+              {loading && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Connect Google Calendar
+            </Button>
+          )}
+        </div>
+
+        <Alert>
+          <AlertCircle className="h-4 w-4" />
+          <AlertDescription className="text-xs">
+            By connecting Google Calendar, you allow Knowledge Fons Academy to create, read, and manage calendar events on your behalf. Entirely optional — you can disconnect at any time, and your booking confirmations keep coming by email either way.
+          </AlertDescription>
+        </Alert>
+      </CardContent>
+    </Card>
+  );
+}
