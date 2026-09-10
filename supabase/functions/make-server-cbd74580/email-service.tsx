@@ -1,6 +1,10 @@
 // Load Resend only when sending email. A top-level `import "npm:resend"` + `new Resend()` can throw
 // during module init and take down the whole Edge Function worker (HTTP 503 BOOT_ERROR).
-const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "noreply@resend.dev"; // Switch to noreply@knowledgefonsacademy.com once domain is verified in Resend
+// knowledgefonsacademy.com has been verified in Resend for 2 months (confirmed
+// 2026-09-10) — the old fallback here (noreply@resend.dev, Resend's shared
+// sandbox address) was stale from before that, never updated once the real
+// domain was ready. An explicit FROM_EMAIL secret still overrides this if set.
+const FROM_EMAIL = Deno.env.get("FROM_EMAIL") || "noreply@knowledgefonsacademy.com";
 
 export interface EmailData {
   to: string;
