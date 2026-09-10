@@ -24,6 +24,44 @@ function containsContactInfo(content: string): boolean {
   return pattern.test(content);
 }
 
+// ── Secondary indices ────────────────────────────────────────────────────
+// Without these, listing a user's conversations or reading one thread meant
+// kv.getByPrefix('conversation:') / kv.getByPrefix('conv-message:') — a full
+// scan of every conversation and every message on the ENTIRE platform, every
+// time, filtered down in memory. Chatroom.tsx polls the messages endpoint
+// every 8 seconds while a thread is open and the conversation list every 30
+// seconds, from every dashboard — so that scan ran constantly, and its cost
+// grows with total platform message volume, not with any one user's or
+// conversation's actual size. These two index keys make both reads O(this
+// user's conversations) / O(this conversation's messages) instead.
+//
+// Existing conversations/messages created before this fix have no index
+// entries yet — see backfillConversationIndices in migration-routes.tsx,
+// run once after deploying this.
+
+async function addToConversationIndex(userId: string, conversationId: string): Promise<void> {
+  const key = `conv-index:${userId}`;
+  const ids = ((await kv.get(key)) as string[] | null) ?? [];
+  if (!ids.includes(conversationId)) {
+    ids.push(conversationId);
+    await kv.set(key, ids);
+  }
+}
+
+async function appendToMessageIndex(conversationId: string, messageId: string): Promise<void> {
+  const key = `conv-messages-index:${conversationId}`;
+  const ids = ((await kv.get(key)) as string[] | null) ?? [];
+  ids.push(messageId);
+  await kv.set(key, ids);
+}
+
+async function getConversationMessages(conversationId: string): Promise<Record<string, unknown>[]> {
+  const ids = ((await kv.get(`conv-messages-index:${conversationId}`)) as string[] | null) ?? [];
+  if (!ids.length) return [];
+  const messages = await kv.mget(ids);
+  return messages.filter(Boolean) as Record<string, unknown>[];
+}
+
 export const conversationsRoutes = (app: Hono, getUserId: Function) => {
   // Mark conversation read (no-op compatibility — read receipts happen on GET messages)
   app.post('/make-server-cbd74580/conversations/:conversationId/read', async (c) => {
@@ -111,10 +149,16 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
           participantNames: {
             [participantId]: participantName || 'User',
           },
+          lastMessage: null as Record<string, unknown> | null,
+          unreadCounts: {} as Record<string, number>,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         };
         await kv.set(conversationId, conversation);
+        await Promise.all([
+          addToConversationIndex(p1, conversationId),
+          addToConversationIndex(p2, conversationId),
+        ]);
       }
 
       return c.json({ conversation });
@@ -137,19 +181,17 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
 
       const persona = (c.req.query('persona') || 'all').toLowerCase();
 
-      const allConversations = await kv.getByPrefix('conversation:');
+      const myConversationIds = ((await kv.get(`conv-index:${userId}`)) as string[] | null) ?? [];
+      const myConversationsRaw = myConversationIds.length ? await kv.mget(myConversationIds) : [];
 
-      const userConversations = allConversations.filter((conv: Record<string, unknown>) => {
-        const parts = conv.participants as string[] | undefined;
-        if (!parts?.includes(userId)) return false;
-        return conversationMatchesPersona(
-          conv as { channel?: string; participantRoles?: Record<string, string> },
-          persona,
-          userId,
-        );
-      });
-
-      const allMessages = await kv.getByPrefix('conv-message:');
+      const userConversations = (myConversationsRaw.filter(Boolean) as Record<string, unknown>[]).filter(
+        (conv: Record<string, unknown>) =>
+          conversationMatchesPersona(
+            conv as { channel?: string; participantRoles?: Record<string, string> },
+            persona,
+            userId,
+          ),
+      );
 
       // Resolved live (not baked in at conversation-creation time, unlike
       // participantNames) so a photo uploaded after the conversation started
@@ -164,29 +206,19 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
         return photo;
       };
 
+      // lastMessage and unreadCount are denormalized onto the conversation
+      // object itself (kept in sync by the send/mark-read handlers below),
+      // so no message lookup is needed just to render the inbox list.
       const conversationsWithDetails = await Promise.all(
         userConversations.map(async (conv: Record<string, unknown>) => {
-          const convId = conv.id as string;
-          const convMessages = allMessages
-            .filter((msg: Record<string, unknown>) => msg.conversationId === convId)
-            .sort(
-              (a: Record<string, unknown>, b: Record<string, unknown>) =>
-                new Date(String(b.createdAt)).getTime() - new Date(String(a.createdAt)).getTime(),
-            );
-
-          const lastMessage = convMessages[0];
-          const unreadCount = convMessages.filter(
-            (msg: Record<string, unknown>) => msg.receiverId === userId && !msg.read,
-          ).length;
-
+          const unreadCounts = (conv.unreadCounts as Record<string, number> | undefined) ?? {};
           const participantIds = (conv.participants as string[] | undefined) || [];
           const participantPhotos: Record<string, string | null> = {};
           await Promise.all(participantIds.map(async (pid) => { participantPhotos[pid] = await resolvePhoto(pid); }));
 
           return {
             ...conv,
-            lastMessage,
-            unreadCount,
+            unreadCount: unreadCounts[userId] ?? 0,
             participantPhotos,
           };
         }),
@@ -228,22 +260,27 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
         return c.json({ error: 'Unauthorized to view this conversation' }, 403);
       }
 
-      const allMessages = await kv.getByPrefix('conv-message:');
-      const conversationMessages = allMessages
-        .filter((m: Record<string, unknown>) => m.conversationId === conversationId)
-        .sort(
-          (a: Record<string, unknown>, b: Record<string, unknown>) =>
-            new Date(String(a.createdAt)).getTime() - new Date(String(b.createdAt)).getTime(),
-        );
+      const conversationMessages = (await getConversationMessages(conversationId)).sort(
+        (a: Record<string, unknown>, b: Record<string, unknown>) =>
+          new Date(String(a.createdAt)).getTime() - new Date(String(b.createdAt)).getTime(),
+      );
 
       const unreadMessages = conversationMessages.filter(
         (msg: Record<string, unknown>) => msg.receiverId === userId && !msg.read,
       );
 
-      for (const msg of unreadMessages) {
-        (msg as { read: boolean; readAt?: string }).read = true;
-        (msg as { readAt?: string }).readAt = new Date().toISOString();
-        await kv.set(msg.id as string, msg);
+      if (unreadMessages.length) {
+        for (const msg of unreadMessages) {
+          (msg as { read: boolean; readAt?: string }).read = true;
+          (msg as { readAt?: string }).readAt = new Date().toISOString();
+          await kv.set(msg.id as string, msg);
+        }
+        // Keep the inbox-list unread count (denormalized on the conversation,
+        // see GET /conversations) in sync with what was just marked read.
+        const unreadCounts = { ...(((conversation.unreadCounts as Record<string, number>) ?? {})) };
+        unreadCounts[userId] = 0;
+        conversation.unreadCounts = unreadCounts;
+        await kv.set(conversationId, conversation);
       }
 
       return c.json({ messages: conversationMessages });
@@ -315,8 +352,19 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
       };
 
       await kv.set(message.id, message);
+      await appendToMessageIndex(conversationId, message.id);
 
       conversation.updatedAt = new Date().toISOString();
+      conversation.lastMessage = {
+        id: message.id,
+        senderId: message.senderId,
+        content: message.content,
+        createdAt: message.createdAt,
+        read: message.read,
+      };
+      const unreadCounts = { ...(((conversation.unreadCounts as Record<string, number>) ?? {})) };
+      unreadCounts[receiverId] = (unreadCounts[receiverId] ?? 0) + 1;
+      conversation.unreadCounts = unreadCounts;
       await kv.set(conversationId, conversation);
 
       const logEntry = {
@@ -507,10 +555,9 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
       const conversation = (await kv.get(conversationId)) as Record<string, unknown> | null;
       if (!conversation) return c.json({ error: 'Conversation not found' }, 404);
 
-      const allMessages = await kv.getByPrefix('conv-message:');
-      const messages = allMessages
-        .filter((m: any) => m.conversationId === conversationId)
-        .sort((a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime());
+      const messages = (await getConversationMessages(conversationId)).sort(
+        (a: any, b: any) => new Date(a.createdAt).getTime() - new Date(b.createdAt).getTime(),
+      );
 
       const participantIds = (conversation.participants as string[] | undefined) || [];
       const adminId = userId;

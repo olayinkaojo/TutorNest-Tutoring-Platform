@@ -2,6 +2,7 @@ import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
+import { getIndexedItems } from './kv-index-helpers.tsx';
 
 export const notificationsRoutes = (app: Hono, getUserId: Function) => {
 
@@ -62,9 +63,15 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       let bookingNotifications: any[] = [];
       
       try {
-        // Merge KV bookings (legacy) and DB bookings for reminder generation
+        // Merge KV bookings (legacy — no code path creates a NEW kv-native
+        // booking any more, POST /bookings is a disabled stub) and DB
+        // bookings for reminder generation. booking-index:<userId> is
+        // backfilled once by POST /admin/backfill-booking-index
+        // (migration-routes.tsx), covering every tutorId/studentId/parentId
+        // on every existing legacy booking — since no new ones are ever
+        // added to KV, that backfill never goes stale.
         const [kvBookings, dbBookings] = await Promise.all([
-          kv.getByPrefix('booking:'),
+          getIndexedItems(`booking-index:${safeUserId}`),
           db.getBookingsByUserId(safeUserId).catch(() => [] as any[]),
         ]);
         const kvBookingIds = new Set(kvBookings.map((b: any) => b.id));
