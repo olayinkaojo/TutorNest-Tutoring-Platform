@@ -352,8 +352,7 @@ signupRoutes.post('/resend-confirmation', async (c) => {
 
     if (linkError || !linkData?.properties?.action_link) {
       console.error('resend-confirmation: could not generate link:', linkError?.message);
-      // TEMPORARY diagnostic detail — remove once the real cause is confirmed.
-      return c.json({ error: 'Could not resend right now', debugStage: 'generateLink', debugDetail: linkError?.message }, 500);
+      return c.json({ error: 'Could not resend right now' }, 500);
     }
 
     const name = (user.user_metadata as any)?.name || 'there';
@@ -363,15 +362,13 @@ signupRoutes.post('/resend-confirmation', async (c) => {
 
     if (!sendResult.success) {
       console.error('resend-confirmation: sendEmail failed:', sendResult.error);
-      // TEMPORARY diagnostic detail — remove once the real cause is confirmed.
-      return c.json({ error: 'Could not resend right now', debugStage: 'sendEmail', debugDetail: sendResult.error }, 500);
+      return c.json({ error: 'Could not resend right now' }, 500);
     }
 
     return c.json({ success: true });
   } catch (error: any) {
     console.error('resend-confirmation error:', error);
-    // TEMPORARY diagnostic detail — remove once the real cause is confirmed.
-    return c.json({ error: error.message || 'Internal server error', debugStage: 'exception', debugDetail: error.message }, 500);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
   }
 });
 
