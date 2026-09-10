@@ -8,7 +8,7 @@
 // - Admin Notifications
 // - System Alerts
 
-type NotificationType = 
+type NotificationType =
   | 'payment_initiated'
   | 'payment_received'
   | 'payment_failed'
@@ -27,7 +27,17 @@ type NotificationType =
   | 'tutor_verified'
   | 'account_sanctioned'
   | 'dispute_filed'
-  | 'system_alert';
+  | 'system_alert'
+  // Widened 2026-09-10 when every other notification-creation call site
+  // in the codebase (14 of them, across 9 files) was migrated to this one
+  // function, to fix the same class of unbounded-scan cost the equivalent
+  // conversation/booking indices already fixed — GET /notifications/:userId
+  // is polled every 30 seconds from every dashboard, and used to
+  // kv.getByPrefix('notification:') across the whole platform every time.
+  // Rather than invent a second index under a different key, this file's
+  // existing (already correct, already live for bookshop purchases)
+  // user_notifications:<userId> index became the one canonical index.
+  | (string & {});
 
 interface NotificationPayload {
   type: NotificationType;
@@ -37,8 +47,10 @@ interface NotificationPayload {
   message: string;
   description?: string;
   actionUrl?: string;
-  metadata: Record<string, any>;
-  priority?: 'low' | 'normal' | 'high' | 'critical';
+  data?: Record<string, any>; // alias for metadata — several migrated call sites already called their field `data`
+  metadata?: Record<string, any>;
+  priority?: 'low' | 'normal' | 'high' | 'critical' | 'medium';
+  read?: boolean; // always false for a new notification; accepted so migrated call sites can pass it through unchanged
   sendEmail?: boolean;
   sendInApp?: boolean;
 }
@@ -83,7 +95,7 @@ export async function createNotification(
       actionUrl: payload.actionUrl,
       read: false,
       priority: payload.priority || 'normal',
-      metadata: payload.metadata,
+      metadata: payload.metadata ?? payload.data ?? {},
       createdAt: new Date().toISOString(),
       sentVia: {
         email: payload.sendEmail !== false,

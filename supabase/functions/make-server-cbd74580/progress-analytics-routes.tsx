@@ -1,5 +1,6 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import { createNotification } from './notification-broker.tsx';
 
 export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
 
@@ -75,17 +76,13 @@ export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
       await kv.set(`report:${bookingId}`, report);
 
       // Create notification for parent
-      const notification = {
-        id: `notification:${Date.now()}`,
+      await createNotification(kv, {
         userId: booking.parentId,
         type: 'session_report',
         title: 'New Session Report Available',
         message: `${booking.tutorName} has completed a report for ${booking.studentName}'s session.`,
         data: { bookingId, reportId: report.id },
-        read: false,
-        createdAt: new Date().toISOString(),
-      };
-      await kv.set(notification.id, notification);
+      });
 
       // Schedule auto-lock after 48 hours
       const lockTime = new Date(Date.now() + 48 * 60 * 60 * 1000).toISOString();

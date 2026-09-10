@@ -3,6 +3,7 @@ import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { verifyAccessToken } from './route-auth.tsx';
 import { releaseMaturedEarnings } from './payment-routes.tsx';
+import { createNotification } from './notification-broker.tsx';
 
 const payoutsComplete = new Hono();
 
@@ -230,18 +231,13 @@ payoutsComplete.post('/request', async (c) => {
     const adminUsers = (await kv.getByPrefix('user:')) as any[];
     const admins = adminUsers.filter((u: any) => u.role === 'admin');
     for (const admin of admins) {
-      const notificationId = `notification_${Date.now()}_${admin.id}`;
-      const notification = {
-        id: notificationId,
+      await createNotification(kv, {
         userId: admin.id,
         type: 'payout_request',
         title: 'New Payout Request',
         message: `${tutorProfile.full_name || 'A tutor'} has requested a payout of ₦${amount}`,
         actionUrl: `/admin/dashboard?tab=payouts`,
-        read: false,
-        createdAt: new Date().toISOString(),
-      };
-      await kv.set(notificationId, notification);
+      });
     }
 
     return c.json({

@@ -10,6 +10,7 @@ import {
   isEligibleMessagingPair,
   type MessagingChannel,
 } from './messaging-access.tsx';
+import { createNotification } from './notification-broker.tsx';
 
 async function requireAdminProfile(userId: string): Promise<any | null> {
   const profile = ((await kv.get(`user:${userId}`)) as any) ?? (await db.getProfile(userId));
@@ -381,18 +382,14 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
       const recipientPrefs = await kv.get(`notification-preferences:${receiverId}`) as Record<string, unknown> | null;
 
       if (!recipientPrefs || (recipientPrefs.inApp as { messages?: boolean } | undefined)?.messages !== false) {
-        const notification = {
-          id: `notification:${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+        await createNotification(kv, {
           userId: receiverId,
           type: 'message',
           title: 'New Message',
           message: `You have a new message from ${message.senderName}`,
           data: { conversationId, messageId: message.id },
-          read: false,
           priority: 'medium',
-          createdAt: new Date().toISOString(),
-        };
-        await kv.set(notification.id, notification);
+        });
       }
 
       return c.json({ message });

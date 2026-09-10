@@ -3,6 +3,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 import { logAuditEvent } from './activity-log.tsx';
+import { createNotification } from './notification-broker.tsx';
 
 const STUDENT_EMAIL_DOMAIN = '@student.knowledgefonsacademy.com';
 
@@ -168,16 +169,12 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       }
 
       // Create notification for parent
-      const notificationId = `notification:${Date.now()}`;
-      await kv.set(notificationId, {
-        id: notificationId,
+      await createNotification(kv, {
         userId: parentId,
         type: 'info',
         title: 'Student Login Enabled',
         message: `Student login has been enabled for ${child.firstName}. Email: ${result.studentEmail}`,
-        read: false,
         priority: 'medium',
-        createdAt: new Date().toISOString(),
         metadata: {
           childId,
           studentEmail: result.studentEmail

@@ -36,4 +36,9 @@ curl -s -X POST "$SUPA_URL/functions/v1/make-server-cbd74580/admin/backfill-book
   -H "Authorization: Bearer $TOKEN" -H "apikey: $ANON" | python3 -m json.tool
 
 echo
-echo "Done. Both are safe to re-run if anything above shows an error you want to retry."
+echo "=== Backfilling notification index ==="
+curl -s -X POST "$SUPA_URL/functions/v1/make-server-cbd74580/admin/backfill-notification-index" \
+  -H "Authorization: Bearer $TOKEN" -H "apikey: $ANON" | python3 -m json.tool
+
+echo
+echo "Done. All three are safe to re-run if anything above shows an error you want to retry."

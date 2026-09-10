@@ -7,6 +7,7 @@ import { logAuditEvent } from './activity-log.tsx';
 import { buildIcsContent, createCalendarDownloadLink, buildWeeklyRRule } from './calendar-ics.tsx';
 import { createDailyRoom } from './daily-video-routes.tsx';
 import { createGoogleCalendarEvent } from './google-calendar-routes.tsx';
+import { createNotification } from './notification-broker.tsx';
 
 const app = new Hono();
 
@@ -470,15 +471,11 @@ app.post('/payments/verify/:reference', async (c) => {
     }
 
     // Create notification for tutor
-    const notificationId = `notification_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-    await kv.set(`notification:${notificationId}`, {
-      id: notificationId,
+    await createNotification(kv, {
       userId: payment.tutorId,
       type: 'payment_received',
       title: 'Payment Received',
       message: `You've earned ₦${tutorAmount.toLocaleString()} from a session booking. Funds are pending in your balance.`,
-      read: false,
-      createdAt: new Date().toISOString(),
       metadata: {
         paymentId: payment.id,
         bookingId: payment.bookingId,

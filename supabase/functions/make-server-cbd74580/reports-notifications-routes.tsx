@@ -2,6 +2,7 @@ import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { processSessionAttendance } from './payment-routes.tsx';
+import { createNotification as brokerCreateNotification } from './notification-broker.tsx';
 
 // Create a route handler function that can receive getUserId
 export function reportsNotificationsRoutes(app: Hono, getUserId: Function) {
@@ -683,17 +684,15 @@ function sanitizeReportText(text: string): string {
 }
 
 // Helper functions
+// Delegates to notification-broker.tsx's createNotification (which
+// maintains the user_notifications:<userId> index GET /notifications/:userId
+// now reads from — see that file and notifications-routes.tsx — instead of
+// duplicating a second, unindexed write path here), while keeping this
+// function's own signature/return shape so its 6 call sites in this file
+// don't need to change.
 async function createNotification(data: any) {
-  // Use the same ID format as notifications-routes.tsx for consistency
-  const notificationId = `notification:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-  const notification = {
-    id: notificationId,
-    ...data,
-    read: false,
-    createdAt: new Date().toISOString(),
-  };
-  await kv.set(`notification:${notificationId}`, notification);
-  return notification;
+  const result = await brokerCreateNotification(kv, data);
+  return { id: result.notificationId, ...data, read: false, createdAt: new Date().toISOString() };
 }
 
 async function sendEmailNotification(data: any) {
@@ -1033,8 +1032,7 @@ app.post('/make-server-cbd74580/students/:studentId/notify-progress', async (c) 
     // Notify tutor(s) of progress
     const targetTutorId = tutorId as string || 'all-tutors';
 
-    const notification = {
-      id: `prog-${studentId}-${Date.now()}`,
+    const notificationPayload = {
       userId: tutorId || 'admin-group',
       type: 'progress',
       title: 'Student Progress Alert',
@@ -1051,11 +1049,9 @@ app.post('/make-server-cbd74580/students/:studentId/notify-progress', async (c) 
         timestamp: new Date().toISOString(),
         tutorId: tutorId || 'all',
       },
-      createdAt: new Date().toISOString(),
-      readAt: null,
     };
-
-    await kv.set(`notification:${notification.id}`, notification);
+    const notificationResult = await brokerCreateNotification(kv, notificationPayload);
+    const notification = { id: notificationResult.notificationId, ...notificationPayload, createdAt: new Date().toISOString() };
 
     // Also track progress milestone in student record
     const progressRecord = await kv.get(`progress:${studentId}`) as any || {};

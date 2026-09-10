@@ -3,6 +3,7 @@ import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 import { getIndexedItems } from './kv-index-helpers.tsx';
+import { createNotification as brokerCreateNotification } from './notification-broker.tsx';
 
 export const notificationsRoutes = (app: Hono, getUserId: Function) => {
 
@@ -41,14 +42,16 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       // Always use the authenticated user's ID for security, not the URL parameter
       const safeUserId = currentUserId;
       
-      // Get notifications from both KV (legacy) and DB (new) in parallel
-      const [kvAllNotifications, dbNotifications] = await Promise.all([
-        kv.getByPrefix('notification:'),
+      // Get notifications from both KV (legacy — indexed via
+      // user_notifications:<userId>, maintained by every notification-
+      // creation call site through notification-broker.tsx's
+      // createNotification; see that file's comment) and DB (new) in
+      // parallel. Existing notifications from before this fix are backfilled
+      // once by POST /admin/backfill-notification-index.
+      const [kvUserNotifications, dbNotifications] = await Promise.all([
+        getIndexedItems(`user_notifications:${safeUserId}`),
         db.getNotificationsByUser(safeUserId).catch(() => [] as any[]),
       ]);
-
-      const kvUserNotifications = kvAllNotifications
-        .filter((n: any) => n.userId === safeUserId);
 
       // Merge: DB notifications take precedence (deduplicate by id)
       const kvIds = new Set(kvUserNotifications.map((n: any) => n.id));
@@ -238,8 +241,7 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       }
 
       const userId = c.req.param('userId');
-      const allNotifications = await kv.getByPrefix('notification:');
-      const userNotifications = allNotifications.filter((n: any) => n.userId === userId);
+      const userNotifications = await getIndexedItems(`user_notifications:${userId}`);
 
       for (const notification of userNotifications) {
         notification.read = true;
@@ -352,7 +354,12 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
     }
   });
 
-  // Helper function to create notification
+  // Helper function to create notification. Delegates to
+  // notification-broker.tsx's createNotification (which maintains the
+  // user_notifications:<userId> index GET /notifications/:userId now reads
+  // from, instead of duplicating a second, unindexed write path here) while
+  // keeping this function's own positional-args signature so its 6 call
+  // sites below don't need to change.
   const createNotification = async (
     userId: string,
     type: string,
@@ -361,8 +368,9 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
     priority: string = 'medium',
     data?: any
   ) => {
+    const result = await brokerCreateNotification(kv, { userId, type, title, message, priority: priority as any, data });
     const notification = {
-      id: `notification:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`,
+      id: result.notificationId,
       userId,
       type,
       title,
@@ -372,8 +380,6 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       priority,
       createdAt: new Date().toISOString(),
     };
-
-    await kv.set(notification.id, notification);
 
     // TODO: Send email notification based on user preferences
     // This would integrate with an email service like SendGrid, AWS SES, etc.

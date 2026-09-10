@@ -4,6 +4,7 @@ import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 import { logAuditEvent, ActivityCategory } from './activity-log.tsx';
+import { createNotification } from './notification-broker.tsx';
 
 // Helper function to format timestamp
 function formatTimestamp(timestamp: string): string {
@@ -2268,19 +2269,14 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       await kv.set(verificationId, verification);
 
       // Create notification for tutor
-      const notificationId = `notification:${tutorId}:${Date.now()}`;
-      const notification = {
-        id: notificationId,
+      await createNotification(kv, {
         userId: tutorId,
         type: action === 'approve' ? 'verification_approved' : 'verification_rejected',
         title: action === 'approve' ? 'Verification Approved!' : 'Verification Rejected',
-        message: action === 'approve' 
+        message: action === 'approve'
           ? 'Your tutor profile has been verified. You can now start accepting bookings!'
           : `Your verification was not approved. Reason: ${rejectionReason}`,
-        read: false,
-        createdAt: new Date().toISOString()
-      };
-      await kv.set(notificationId, notification);
+      });
 
       // Create audit log
       await logAuditEvent({

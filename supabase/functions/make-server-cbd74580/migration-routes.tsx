@@ -267,4 +267,57 @@ migrationRoutes.post('/admin/backfill-booking-index', async (c) => {
   return c.json({ success: true, results });
 });
 
+// POST /admin/backfill-notification-index
+// One-time backfill for user_notifications:<userId>, notification-broker.tsx's
+// index that GET /notifications/:userId and POST /notifications/:userId/
+// read-all now read from instead of kv.getByPrefix('notification:') across
+// the whole platform (that endpoint is polled every 30 seconds from every
+// dashboard). Every notification-creation call site in the codebase (14 of
+// them, across 9 files, as of 2026-09-10) now goes through
+// notification-broker.tsx's createNotification, which already maintains
+// this index going forward — this backfill only needs to cover
+// notifications created before that migration. Safe/idempotent to run more
+// than once; merges with anything already indexed rather than overwriting.
+migrationRoutes.post('/admin/backfill-notification-index', async (c) => {
+  const accessToken = c.req.header('Authorization')?.split(' ')[1];
+  const userId = await getUserIdFromToken(accessToken);
+  if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+  const adminUser = await kv.get(`user:${userId}`);
+  if (!adminUser || adminUser.role !== 'admin') return c.json({ error: 'Admin only' }, 403);
+
+  const results = { notificationsProcessed: 0, userIndexEntries: 0, errors: [] as string[] };
+
+  try {
+    const allNotifications = await kv.getByPrefix('notification:');
+    const userIndex = new Map<string, Set<string>>();
+
+    for (const n of allNotifications as any[]) {
+      if (!n?.id || !n?.userId) continue;
+      if (!userIndex.has(n.userId)) userIndex.set(n.userId, new Set());
+      userIndex.get(n.userId)!.add(n.id);
+      results.notificationsProcessed++;
+    }
+
+    const userIds = [...userIndex.keys()];
+    const existingIndices = userIds.length ? await kv.mget(userIds.map((id) => `user_notifications:${id}`)) : [];
+    const writes = userIds.map((uid, i) => {
+      const existing = (existingIndices[i] as string[] | undefined) ?? [];
+      const merged = new Set([...existing, ...(userIndex.get(uid) ?? [])]);
+      return { key: `user_notifications:${uid}`, value: [...merged] };
+    });
+    results.userIndexEntries = writes.length;
+
+    const CHUNK = 200;
+    for (let i = 0; i < writes.length; i += CHUNK) {
+      const chunk = writes.slice(i, i + CHUNK);
+      await kv.mset(chunk.map((w) => w.key), chunk.map((w) => w.value));
+    }
+  } catch (e: any) {
+    results.errors.push(e.message);
+  }
+
+  return c.json({ success: true, results });
+});
+
 export default migrationRoutes;
