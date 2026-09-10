@@ -1,16 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
-import { AdminUserManagement } from './AdminUserManagement';
-import { EnhancedAdminVerificationDashboard } from './EnhancedAdminVerificationDashboard';
-import { AdminAnalytics } from './AdminAnalytics';
-import { AdminActivityFeed } from './AdminActivityFeed';
-import { AdminDisputeHandler } from './AdminDisputeHandler';
-import { CouponManager } from './CouponManager';
-import { TaxReportsManager } from './TaxReportsManager';
-import { AdminPaymentMonitoring } from './AdminPaymentMonitoring';
-import { AdminPayoutsManager } from './AdminPayoutsManager';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { RoleSwitcher } from './RoleSwitcher';
-import { CurriculumUploader } from './admin/CurriculumUploader';
-import { ResourcesUploader } from './admin/ResourcesUploader';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { projectId } from '../utils/supabase/info';
 import { edgeFunctionHeaders, edgeFunctionUrl } from '../utils/supabase-edge-fetch';
@@ -20,6 +9,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
+import { Skeleton } from './ui/skeleton';
 import { 
   Shield, 
   Users, 
@@ -40,13 +30,31 @@ import KFALogo from './KFALogo';
 import { NotificationCenter } from './NotificationCenter';
 import { AdminDashboardHealthCheck } from './AdminDashboardHealthCheck';
 import { PlatformOverview } from './admin/PlatformOverview';
-import { SystemAlertsPanel } from './SystemAlertsPanel';
-import { ChildProfileManagement } from './admin/ChildProfileManagement';
-import { AuditLogViewer } from './admin/AuditLogViewer';
-import { DocumentAuditTrail } from './admin/DocumentAuditTrail';
-import { ChatSafeguardingViewer } from './admin/ChatSafeguardingViewer';
-import { RecordingsViewer } from './admin/RecordingsViewer';
 import adminAPI from '../utils/admin-api-client';
+
+// Lazy-loaded: each is only needed once its own tab is opened.
+// AdminDashboardHealthCheck/PlatformOverview stay eager above — they're the
+// Overview tab, active by default, so lazy-loading them would only add a
+// Suspense flicker with no benefit. NotificationCenter also stays eager:
+// it's rendered a second time, unconditionally, as the header bell — see
+// below — so it's already needed on every load regardless of tab.
+const SystemAlertsPanel = lazy(() => import('./SystemAlertsPanel').then(m => ({ default: m.SystemAlertsPanel })));
+const AdminUserManagement = lazy(() => import('./AdminUserManagement').then(m => ({ default: m.AdminUserManagement })));
+const EnhancedAdminVerificationDashboard = lazy(() => import('./EnhancedAdminVerificationDashboard').then(m => ({ default: m.EnhancedAdminVerificationDashboard })));
+const AdminAnalytics = lazy(() => import('./AdminAnalytics').then(m => ({ default: m.AdminAnalytics })));
+const AdminActivityFeed = lazy(() => import('./AdminActivityFeed').then(m => ({ default: m.AdminActivityFeed })));
+const AdminDisputeHandler = lazy(() => import('./AdminDisputeHandler').then(m => ({ default: m.AdminDisputeHandler })));
+const CouponManager = lazy(() => import('./CouponManager').then(m => ({ default: m.CouponManager })));
+const TaxReportsManager = lazy(() => import('./TaxReportsManager').then(m => ({ default: m.TaxReportsManager })));
+const AdminPaymentMonitoring = lazy(() => import('./AdminPaymentMonitoring').then(m => ({ default: m.AdminPaymentMonitoring })));
+const AdminPayoutsManager = lazy(() => import('./AdminPayoutsManager').then(m => ({ default: m.AdminPayoutsManager })));
+const ChildProfileManagement = lazy(() => import('./admin/ChildProfileManagement').then(m => ({ default: m.ChildProfileManagement })));
+const CurriculumUploader = lazy(() => import('./admin/CurriculumUploader').then(m => ({ default: m.CurriculumUploader })));
+const ResourcesUploader = lazy(() => import('./admin/ResourcesUploader').then(m => ({ default: m.ResourcesUploader })));
+const AuditLogViewer = lazy(() => import('./admin/AuditLogViewer').then(m => ({ default: m.AuditLogViewer })));
+const DocumentAuditTrail = lazy(() => import('./admin/DocumentAuditTrail').then(m => ({ default: m.DocumentAuditTrail })));
+const ChatSafeguardingViewer = lazy(() => import('./admin/ChatSafeguardingViewer').then(m => ({ default: m.ChatSafeguardingViewer })));
+const RecordingsViewer = lazy(() => import('./admin/RecordingsViewer').then(m => ({ default: m.RecordingsViewer })));
 
 interface UserProfile {
   id?: string;
@@ -63,6 +71,11 @@ interface AdminDashboardProps {
   onRoleSwitch?: (role: string) => void;
   initialTab?: string;
   onTabChange?: (tab: string) => void;
+}
+
+// Shared Suspense fallback for the lazy-loaded tabs above.
+function TabFallback() {
+  return <Skeleton className="h-64 w-full rounded-lg" />;
 }
 
 export function AdminDashboard({
@@ -463,7 +476,9 @@ export function AdminDashboard({
 
           <TabsContent value="alerts">
             {session && (
-              <SystemAlertsPanel session={session} />
+              <Suspense fallback={<TabFallback />}>
+                <SystemAlertsPanel session={session} />
+              </Suspense>
             )}
           </TabsContent>
 
@@ -475,103 +490,135 @@ export function AdminDashboard({
 
           <TabsContent value="users">
             {session && (
-              <AdminUserManagement session={session} filterRequest={usersFilterRequest} />
+              <Suspense fallback={<TabFallback />}>
+                <AdminUserManagement session={session} filterRequest={usersFilterRequest} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="verification">
             {session && (
-              <EnhancedAdminVerificationDashboard session={session} />
+              <Suspense fallback={<TabFallback />}>
+                <EnhancedAdminVerificationDashboard session={session} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="analytics">
             {session && (
-              <AdminAnalytics session={session} />
+              <Suspense fallback={<TabFallback />}>
+                <AdminAnalytics session={session} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="activity">
             {session && (
-              <AdminActivityFeed session={session} />
+              <Suspense fallback={<TabFallback />}>
+                <AdminActivityFeed session={session} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="disputes">
             {session && (
-              <AdminDisputeHandler 
-                accessToken={session.access_token} 
-                adminId={profile.id || profile.userId}
-              />
+              <Suspense fallback={<TabFallback />}>
+                <AdminDisputeHandler
+                  accessToken={session.access_token}
+                  adminId={profile.id || profile.userId}
+                />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="coupons">
             {session && (
-              <CouponManager adminId={profile.id || profile.userId} accessToken={session.access_token} />
+              <Suspense fallback={<TabFallback />}>
+                <CouponManager adminId={profile.id || profile.userId} accessToken={session.access_token} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="taxreports">
             {session && (
-              <TaxReportsManager adminId={profile.id || profile.userId} accessToken={session.access_token} />
+              <Suspense fallback={<TabFallback />}>
+                <TaxReportsManager adminId={profile.id || profile.userId} accessToken={session.access_token} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="payments">
-            <AdminPaymentMonitoring />
+            <Suspense fallback={<TabFallback />}>
+              <AdminPaymentMonitoring />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="payouts">
-            <AdminPayoutsManager />
+            <Suspense fallback={<TabFallback />}>
+              <AdminPayoutsManager />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="childprofiles">
             {session && (
-              <ChildProfileManagement 
-                adminId={profile.id || profile.userId}
-                accessToken={session.access_token}
-              />
+              <Suspense fallback={<TabFallback />}>
+                <ChildProfileManagement
+                  adminId={profile.id || profile.userId}
+                  accessToken={session.access_token}
+                />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="curriculum">
             {session && (
-              <CurriculumUploader 
-                accessToken={session.access_token}
-              />
+              <Suspense fallback={<TabFallback />}>
+                <CurriculumUploader
+                  accessToken={session.access_token}
+                />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="resources">
             {session && (
-              <ResourcesUploader
-                accessToken={session.access_token}
-              />
+              <Suspense fallback={<TabFallback />}>
+                <ResourcesUploader
+                  accessToken={session.access_token}
+                />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="auditlog">
             {session && (
-              <AuditLogViewer accessToken={session.access_token} />
+              <Suspense fallback={<TabFallback />}>
+                <AuditLogViewer accessToken={session.access_token} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="documenttrail">
             {session && (
-              <DocumentAuditTrail accessToken={session.access_token} />
+              <Suspense fallback={<TabFallback />}>
+                <DocumentAuditTrail accessToken={session.access_token} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="safeguarding">
             {session && (
-              <ChatSafeguardingViewer accessToken={session.access_token} />
+              <Suspense fallback={<TabFallback />}>
+                <ChatSafeguardingViewer accessToken={session.access_token} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="recordings">
             {session && (
-              <RecordingsViewer accessToken={session.access_token} />
+              <Suspense fallback={<TabFallback />}>
+                <RecordingsViewer accessToken={session.access_token} />
+              </Suspense>
             )}
           </TabsContent>
 

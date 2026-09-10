@@ -1,11 +1,10 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, lazy, Suspense } from 'react';
 import { toast } from 'sonner';
 import { Skeleton } from './ui/skeleton';
 import { UpcomingLessonsCard } from './UpcomingLessonsCard';
 import { MultiSelectFilter, SelectedFilterBadges } from './MultiSelectFilter';
 import { StudentAssessmentForm } from './StudentAssessmentForm';
 import { getSupabaseClient } from '../utils/supabase/client';
-import { Bookshop } from './Bookshop';
 import { RoleSwitcher } from './RoleSwitcher';
 import { AddRoleCard } from './AddRoleCard';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
@@ -42,23 +41,28 @@ import { formatNaira } from '../utils/currency';
 import KFALogo from './KFALogo';
 import { MobileNavigation } from './MobileNavigation';
 import { NotificationCenter } from './NotificationCenter';
-import { TutorProfileEditor } from './TutorProfileEditor';
-import { GoogleCalendarSetup } from './GoogleCalendarSetup';
-
-import { TutorAvailabilityManager } from './TutorAvailabilityManager';
-import { BookingManager } from './BookingManager';
-import { TutorPerformanceDashboard } from './TutorPerformanceDashboard';
-import { TutorPayoutDashboard } from './TutorPayoutDashboard';
-import { ResourcesHub } from './ResourcesHub';
-import { TutorCurriculumViewer } from './TutorCurriculumViewer';
-import { AdvancedReporting } from './AdvancedReporting';
-import { TutorReviewsTab } from './TutorReviewsTab';
-import { TutorSessionReports } from './TutorSessionReports';
 import { TutorStatsSection } from './tutor/TutorStatsSection';
 import { TutorOverviewTab } from './tutor/TutorOverviewTab';
 import { StudentProgressWidget } from './StudentProgressWidget';
-import { Chatroom } from './Chatroom';
 import { DocumentManager } from './DocumentManager';
+
+// Lazy-loaded: each of these is only needed once its own tab is opened, but
+// was previously bundled eagerly into every tutor's first page load
+// regardless of which tab they actually used — ~886KB unminified pulled in
+// for e.g. a tutor who only ever visits Overview/Bookings. See each tab's
+// TabsContent below for the matching <Suspense> boundary.
+const TutorProfileEditor = lazy(() => import('./TutorProfileEditor').then(m => ({ default: m.TutorProfileEditor })));
+const GoogleCalendarSetup = lazy(() => import('./GoogleCalendarSetup').then(m => ({ default: m.GoogleCalendarSetup })));
+const TutorAvailabilityManager = lazy(() => import('./TutorAvailabilityManager').then(m => ({ default: m.TutorAvailabilityManager })));
+const BookingManager = lazy(() => import('./BookingManager').then(m => ({ default: m.BookingManager })));
+const TutorPerformanceDashboard = lazy(() => import('./TutorPerformanceDashboard').then(m => ({ default: m.TutorPerformanceDashboard })));
+const TutorPayoutDashboard = lazy(() => import('./TutorPayoutDashboard').then(m => ({ default: m.TutorPayoutDashboard })));
+const ResourcesHub = lazy(() => import('./ResourcesHub').then(m => ({ default: m.ResourcesHub })));
+const TutorCurriculumViewer = lazy(() => import('./TutorCurriculumViewer').then(m => ({ default: m.TutorCurriculumViewer })));
+const AdvancedReporting = lazy(() => import('./AdvancedReporting').then(m => ({ default: m.AdvancedReporting })));
+const TutorReviewsTab = lazy(() => import('./TutorReviewsTab').then(m => ({ default: m.TutorReviewsTab })));
+const TutorSessionReports = lazy(() => import('./TutorSessionReports').then(m => ({ default: m.TutorSessionReports })));
+const Chatroom = lazy(() => import('./Chatroom').then(m => ({ default: m.Chatroom })));
 import tutorAPI from '../utils/tutor-api-client';
 import { parseWAT, bookingDateLabel, formatRawTimeWAT, WAT_TIMEZONE } from '../utils/timezone';
 import { AvatarUpload } from './AvatarUpload';
@@ -81,6 +85,11 @@ interface TutorDashboardProps {
   onRoleAdded?: () => void;
   initialTab?: string;
   onTabChange?: (tab: string) => void;
+}
+
+// Shared Suspense fallback for the lazy-loaded tabs above.
+function TabFallback() {
+  return <Skeleton className="h-64 w-full rounded-lg" />;
 }
 
 export function TutorDashboard({
@@ -1152,13 +1161,15 @@ export function TutorDashboard({
                     </div>
                   </CardContent>
                 </Card>
-                <TutorProfileEditor
-                  session={session}
-                  tutorId={profile.id || profile.userId}
-                  currentProfile={profile}
-                  onProfileUpdated={fetchDashboardData}
-                />
-                <GoogleCalendarSetup session={session} />
+                <Suspense fallback={<TabFallback />}>
+                  <TutorProfileEditor
+                    session={session}
+                    tutorId={profile.id || profile.userId}
+                    currentProfile={profile}
+                    onProfileUpdated={fetchDashboardData}
+                  />
+                  <GoogleCalendarSetup session={session} />
+                </Suspense>
               </div>
             )}
           </TabsContent>
@@ -1171,12 +1182,14 @@ export function TutorDashboard({
                   <CardDescription>Communicate with parents and students</CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <Chatroom
-                    session={session}
-                    userId={profile.id || profile.userId || ''}
-                    userName={profile.full_name || profile.email || 'Tutor'}
-                    userRole="tutor"
-                  />
+                  <Suspense fallback={<TabFallback />}>
+                    <Chatroom
+                      session={session}
+                      userId={profile.id || profile.userId || ''}
+                      userName={profile.full_name || profile.email || 'Tutor'}
+                      userRole="tutor"
+                    />
+                  </Suspense>
                 </CardContent>
               </Card>
             )}
@@ -1192,13 +1205,17 @@ export function TutorDashboard({
 
           <TabsContent value="availability">
             {session && (
-              <TutorAvailabilityManager session={session} tutorId={profile.id || profile.userId} />
+              <Suspense fallback={<TabFallback />}>
+                <TutorAvailabilityManager session={session} tutorId={profile.id || profile.userId} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="bookings">
             {session && (
-              <BookingManager session={session} userRole="tutor" userId={profile.id || profile.userId} />
+              <Suspense fallback={<TabFallback />}>
+                <BookingManager session={session} userRole="tutor" userId={profile.id || profile.userId} />
+              </Suspense>
             )}
           </TabsContent>
 
@@ -1347,22 +1364,30 @@ export function TutorDashboard({
 
           <TabsContent value="performance">
             {session && (
-              <TutorPerformanceDashboard session={session} tutorId={profile.id || profile.userId} />
+              <Suspense fallback={<TabFallback />}>
+                <TutorPerformanceDashboard session={session} tutorId={profile.id || profile.userId} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="payouts">
             {session && (
-              <TutorPayoutDashboard session={session} tutorId={profile.id || profile.userId} />
+              <Suspense fallback={<TabFallback />}>
+                <TutorPayoutDashboard session={session} tutorId={profile.id || profile.userId} />
+              </Suspense>
             )}
           </TabsContent>
 
           <TabsContent value="resources">
-            <ResourcesHub session={session} userId={profile.id || profile.userId || ''} userRole="tutor" />
+            <Suspense fallback={<TabFallback />}>
+              <ResourcesHub session={session} userId={profile.id || profile.userId || ''} userRole="tutor" />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="curriculum">
-            <TutorCurriculumViewer session={session} />
+            <Suspense fallback={<TabFallback />}>
+              <TutorCurriculumViewer session={session} />
+            </Suspense>
           </TabsContent>
 
           <TabsContent value="reporting">
@@ -1374,20 +1399,24 @@ export function TutorDashboard({
 
               <TabsContent value="session-reports">
                 {session && (
-                  <TutorSessionReports 
-                    tutorId={profile.id || profile.userId}
-                    accessToken={session.access_token}
-                  />
+                  <Suspense fallback={<TabFallback />}>
+                    <TutorSessionReports
+                      tutorId={profile.id || profile.userId}
+                      accessToken={session.access_token}
+                    />
+                  </Suspense>
                 )}
               </TabsContent>
 
               <TabsContent value="analytics">
                 {session && (
-                  <AdvancedReporting
-                    userId={profile.id || profile.userId}
-                    userType="tutor"
-                    accessToken={session.access_token}
-                  />
+                  <Suspense fallback={<TabFallback />}>
+                    <AdvancedReporting
+                      userId={profile.id || profile.userId}
+                      userType="tutor"
+                      accessToken={session.access_token}
+                    />
+                  </Suspense>
                 )}
               </TabsContent>
             </Tabs>
@@ -1395,10 +1424,12 @@ export function TutorDashboard({
 
           <TabsContent value="reviews">
             {session && (
-              <TutorReviewsTab 
-                accessToken={session.access_token} 
-                tutorId={profile.id || profile.userId}
-              />
+              <Suspense fallback={<TabFallback />}>
+                <TutorReviewsTab
+                  accessToken={session.access_token}
+                  tutorId={profile.id || profile.userId}
+                />
+              </Suspense>
             )}
           </TabsContent>
 

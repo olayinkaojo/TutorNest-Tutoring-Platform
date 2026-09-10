@@ -15,16 +15,12 @@ import { MobileNavigation } from './MobileNavigation';
 import { UpcomingLessonsCard } from './UpcomingLessonsCard';
 import { SessionCallModal } from './SessionCallModal';
 import { CurriculumPDFViewer } from './CurriculumPDFViewer';
-import { ParentContentLibrary } from './ParentContentLibrary';
 import { AddChildDialog } from './AddChildDialog';
 import { EditChildDialog } from './EditChildDialog';
 import { ChildProfileSwitcher } from './parent/ChildProfileSwitcher';
 import { SessionBookingCalendar } from './SessionBookingCalendar';
-import { BookingManager } from './BookingManager';
-import { Chatroom } from './Chatroom';
 import { DocumentManager } from './DocumentManager';
-import { ResourcesHub } from './ResourcesHub';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
 import { toast } from 'sonner';
 import { Skeleton } from './ui/skeleton';
 import { Button } from './ui/button';
@@ -39,13 +35,19 @@ import { RoleSwitcher } from './RoleSwitcher';
 import { Alert, AlertDescription } from './ui/alert';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Badge } from './ui/badge';
-import { Bookshop } from './Bookshop';
-import { ContentLibrary } from './ContentLibrary';
-import { SubscriptionsPage } from './SubscriptionsPage';
 import { PaymentMethodManager } from './PaymentMethodManager';
-import { ParentPaymentsDashboard } from './ParentPaymentsDashboard';
 import { AvatarUpload } from './AvatarUpload';
 import { SmartTutorMatches } from './SmartTutorMatches';
+
+// Lazy-loaded: only needed once its own tab is opened. ContentLibrary,
+// SubscriptionsPage, and ParentContentLibrary (previously imported here too)
+// were dead imports — ResourcesHub is what's actually rendered on the
+// Resources tab; removed rather than lazy-loading code that never runs.
+const BookingManager = lazy(() => import('./BookingManager').then(m => ({ default: m.BookingManager })));
+const Chatroom = lazy(() => import('./Chatroom').then(m => ({ default: m.Chatroom })));
+const Bookshop = lazy(() => import('./Bookshop').then(m => ({ default: m.Bookshop })));
+const ResourcesHub = lazy(() => import('./ResourcesHub').then(m => ({ default: m.ResourcesHub })));
+const ParentPaymentsDashboard = lazy(() => import('./ParentPaymentsDashboard').then(m => ({ default: m.ParentPaymentsDashboard })));
 
 interface UserProfile {
   id: string;
@@ -63,6 +65,11 @@ interface ParentDashboardProps {
   onBecomeTutor?: () => void; // Add callback for becoming a tutor
   initialTab?: string;
   onTabChange?: (tab: string) => void;
+}
+
+// Shared Suspense fallback for the lazy-loaded tabs above.
+function TabFallback() {
+  return <Skeleton className="h-64 w-full rounded-lg" />;
 }
 
 export function ParentDashboard({
@@ -990,12 +997,14 @@ export function ParentDashboard({
                 </TabsContent>
 
                 <TabsContent value="my-bookings">
-                  <BookingManager
-                    session={session}
-                    userRole="parent"
-                    userId={profile.id || profile.userId}
-                    studentId={activeChildId ?? undefined}
-                  />
+                  <Suspense fallback={<TabFallback />}>
+                    <BookingManager
+                      session={session}
+                      userRole="parent"
+                      userId={profile.id || profile.userId}
+                      studentId={activeChildId ?? undefined}
+                    />
+                  </Suspense>
                 </TabsContent>
               </Tabs>
             ) : (
@@ -1128,15 +1137,17 @@ export function ParentDashboard({
           {/* Messages Tab */}
           <TabsContent value="messages">
             {session ? (
-              <Chatroom 
-                session={session}
-                userId={profile.id || profile.userId}
-                userName={profile.full_name || profile.name || 'Parent'}
-                userRole="parent"
-                initialContactId={initialMessageTutor?.id}
-                initialContactName={initialMessageTutor?.name}
-                initialContactRole="tutor"
-              />
+              <Suspense fallback={<TabFallback />}>
+                <Chatroom
+                  session={session}
+                  userId={profile.id || profile.userId}
+                  userName={profile.full_name || profile.name || 'Parent'}
+                  userRole="parent"
+                  initialContactId={initialMessageTutor?.id}
+                  initialContactName={initialMessageTutor?.name}
+                  initialContactRole="tutor"
+                />
+              </Suspense>
             ) : (
               <Card>
                 <CardContent className="py-12 text-center text-gray-500">
@@ -1170,19 +1181,23 @@ export function ParentDashboard({
           {/* Bookshop Tab */}
           <TabsContent value="bookshop">
             {session && (
-              <Bookshop session={session} subscriptionTier={subscriptionTier} />
+              <Suspense fallback={<TabFallback />}>
+                <Bookshop session={session} subscriptionTier={subscriptionTier} />
+              </Suspense>
             )}
           </TabsContent>
 
           {/* Resources Tab */}
           <TabsContent value="resources">
             {session ? (
-              <ResourcesHub
-                session={session}
-                userId={profile.id || profile.userId}
-                userRole="parent"
-                gradeLevel={activeChild?.gradeLevel}
-              />
+              <Suspense fallback={<TabFallback />}>
+                <ResourcesHub
+                  session={session}
+                  userId={profile.id || profile.userId}
+                  userRole="parent"
+                  gradeLevel={activeChild?.gradeLevel}
+                />
+              </Suspense>
             ) : (
               <Card>
                 <CardContent className="py-12 text-center text-gray-500">
@@ -1196,7 +1211,9 @@ export function ParentDashboard({
           {/* Payments Tab */}
           <TabsContent value="payments">
             {session && (
-              <ParentPaymentsDashboard accessToken={session.access_token} />
+              <Suspense fallback={<TabFallback />}>
+                <ParentPaymentsDashboard accessToken={session.access_token} />
+              </Suspense>
             )}
           </TabsContent>
 

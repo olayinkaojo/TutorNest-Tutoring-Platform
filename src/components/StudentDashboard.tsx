@@ -1,35 +1,37 @@
 import { parseWAT } from '../utils/timezone';
-import { Bookshop } from './Bookshop';
-import { ParentContentLibrary } from './ParentContentLibrary';
-import { Chatroom } from './Chatroom';
 import { DocumentManager } from './DocumentManager';
-import { ResourcesHub } from './ResourcesHub';
-import { CurriculumPDFViewer } from './CurriculumPDFViewer';
-import { SessionReportsViewer } from './SessionReportsViewer';
 import ErrorBoundary from './ErrorBoundary';
-import { TriviaGame } from './TriviaGame';
-import { TriviaLeaderboard } from './TriviaLeaderboard';
-import { GamificationSystem } from './GamificationSystem';
-import { DailyChallenge } from './trivia/DailyChallenge';
-import { TimeAttackMode } from './trivia/TimeAttackMode';
-import { BattleArena } from './trivia/BattleArena';
-import AchievementPanel from './achievements/AchievementPanel';
-import AchievementNotification from './achievements/AchievementNotification';
-import LeaderboardAchievements from './achievements/LeaderboardAchievements';
-import TopicGrid from './learning/TopicGrid';
-import LearningPath from './learning/LearningPath';
-import TopicDetails from './learning/TopicDetails';
-import LearningPathProgress from './learning/LearningPathProgress';
-import SubjectLeaderboard from './learning/SubjectLeaderboard';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { getSupabaseClient } from '../utils/supabase/client';
 import { edgeFunctionUrl, edgeFunctionHeaders } from '../utils/supabase-edge-fetch';
 import { NotificationCenter } from './NotificationCenter';
 import { MobileNavigation } from './MobileNavigation';
-import { StudentAssessmentsList } from './StudentAssessmentsList';
 import KFALogo from './KFALogo';
 import studentAPI, { StudentAPIError } from '../utils/student-api-client';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useState, useEffect, useRef, useCallback, lazy, Suspense } from 'react';
+import { Skeleton } from './ui/skeleton';
+
+// Lazy-loaded: each is only needed once its own tab is opened.
+// ParentContentLibrary, LearningPath, TopicDetails, and SubjectLeaderboard
+// (previously imported here too) were dead imports — never rendered;
+// removed rather than lazy-loading code that never runs.
+const Bookshop = lazy(() => import('./Bookshop').then(m => ({ default: m.Bookshop })));
+const Chatroom = lazy(() => import('./Chatroom').then(m => ({ default: m.Chatroom })));
+const ResourcesHub = lazy(() => import('./ResourcesHub').then(m => ({ default: m.ResourcesHub })));
+const CurriculumPDFViewer = lazy(() => import('./CurriculumPDFViewer').then(m => ({ default: m.CurriculumPDFViewer })));
+const SessionReportsViewer = lazy(() => import('./SessionReportsViewer').then(m => ({ default: m.SessionReportsViewer })));
+const TriviaGame = lazy(() => import('./TriviaGame').then(m => ({ default: m.TriviaGame })));
+const TriviaLeaderboard = lazy(() => import('./TriviaLeaderboard').then(m => ({ default: m.TriviaLeaderboard })));
+const GamificationSystem = lazy(() => import('./GamificationSystem').then(m => ({ default: m.GamificationSystem })));
+const DailyChallenge = lazy(() => import('./trivia/DailyChallenge').then(m => ({ default: m.DailyChallenge })));
+const TimeAttackMode = lazy(() => import('./trivia/TimeAttackMode').then(m => ({ default: m.TimeAttackMode })));
+const BattleArena = lazy(() => import('./trivia/BattleArena').then(m => ({ default: m.BattleArena })));
+const AchievementPanel = lazy(() => import('./achievements/AchievementPanel'));
+const AchievementNotification = lazy(() => import('./achievements/AchievementNotification'));
+const LeaderboardAchievements = lazy(() => import('./achievements/LeaderboardAchievements'));
+const TopicGrid = lazy(() => import('./learning/TopicGrid'));
+const LearningPathProgress = lazy(() => import('./learning/LearningPathProgress'));
+const StudentAssessmentsList = lazy(() => import('./StudentAssessmentsList').then(m => ({ default: m.StudentAssessmentsList })));
 import {
   LineChart,
   Line,
@@ -97,6 +99,11 @@ interface StudentDashboardProps {
   onSignOut: () => void;
   initialTab?: string;
   onTabChange?: (tab: string) => void;
+}
+
+// Shared Suspense fallback for the lazy-loaded tabs above.
+function TabFallback() {
+  return <Skeleton className="h-64 w-full rounded-lg" />;
 }
 
 export function StudentDashboard({
@@ -1001,10 +1008,12 @@ export function StudentDashboard({
                     <CardDescription>Detailed feedback from your tutors</CardDescription>
                   </CardHeader>
                   <CardContent>
-                    <StudentAssessmentsList 
-                      studentId={academicStudentId}
-                      accessToken={session.access_token}
-                    />
+                    <Suspense fallback={<TabFallback />}>
+                      <StudentAssessmentsList
+                        studentId={academicStudentId}
+                        accessToken={session.access_token}
+                      />
+                    </Suspense>
                   </CardContent>
                 </Card>
               )}
@@ -1192,21 +1201,24 @@ export function StudentDashboard({
           {/* Session Reports Tab */}
           <TabsContent value="reports">
             <ErrorBoundary>
+              <Suspense fallback={<TabFallback />}>
               {session && (
-                <SessionReportsViewer 
+                <SessionReportsViewer
                 userId={profile.id || profile.userId}
                 accessToken={session.access_token}
                 viewType="student"
               />
               )}
+              </Suspense>
             </ErrorBoundary>
           </TabsContent>
 
           {/* Curriculum Tab */}
           <TabsContent value="curriculum">
             <ErrorBoundary>
+              <Suspense fallback={<TabFallback />}>
               {session && profile.gradeLevel ? (
-                <CurriculumPDFViewer 
+                <CurriculumPDFViewer
                 gradeLevel={profile.gradeLevel || profile.grade || 'year_1'}
                 accessToken={session.access_token}
                 studentName={studentName}
@@ -1219,14 +1231,16 @@ export function StudentDashboard({
                 </CardContent>
               </Card>
             )}
+              </Suspense>
             </ErrorBoundary>
           </TabsContent>
 
           {/* Messages Tab */}
           <TabsContent value="messages">
             <ErrorBoundary>
+              <Suspense fallback={<TabFallback />}>
               {session ? (
-                <Chatroom 
+                <Chatroom
                 session={session}
                 userId={profile.id || profile.userId}
                 userName={studentName}
@@ -1240,6 +1254,7 @@ export function StudentDashboard({
                 </CardContent>
               </Card>
             )}
+              </Suspense>
             </ErrorBoundary>
           </TabsContent>
 
@@ -1247,7 +1262,7 @@ export function StudentDashboard({
           <TabsContent value="documents">
             <ErrorBoundary>
               {session ? (
-                <DocumentManager 
+                <DocumentManager
                 session={session}
                 userId={profile.id || profile.userId}
                 userRole="student"
@@ -1266,15 +1281,18 @@ export function StudentDashboard({
           {/* Bookshop Tab */}
           <TabsContent value="bookshop">
             <ErrorBoundary>
+              <Suspense fallback={<TabFallback />}>
               {session && (
                 <Bookshop session={session} subscriptionTier="basic" />
               )}
+              </Suspense>
             </ErrorBoundary>
           </TabsContent>
 
           {/* Resources Tab */}
           <TabsContent value="resources">
             <ErrorBoundary>
+              <Suspense fallback={<TabFallback />}>
               {session ? (
                 <ResourcesHub
                 session={session}
@@ -1290,12 +1308,14 @@ export function StudentDashboard({
                 </CardContent>
               </Card>
             )}
+              </Suspense>
             </ErrorBoundary>
           </TabsContent>
 
           {/* Gamification Tab */}
           <TabsContent value="gamification">
             <ErrorBoundary>
+              <Suspense fallback={<TabFallback />}>
               <div className="space-y-6">
               {/* World-Class Trivia Section */}
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 mb-6">
@@ -1314,8 +1334,8 @@ export function StudentDashboard({
               </div>
 
               {/* Original Trivia Challenge Game */}
-              <TriviaGame 
-                userId={profile.userId} 
+              <TriviaGame
+                userId={profile.userId}
                 grade={profile.gradeLevel || profile.grade || 'year_1'}
                 onXPEarned={(xp) => {
                   // Refresh gamification system when XP is earned
@@ -1325,7 +1345,7 @@ export function StudentDashboard({
               />
 
               {/* Trivia Leaderboard */}
-              <TriviaLeaderboard 
+              <TriviaLeaderboard
                 userId={profile.userId}
                 grade={profile.gradeLevel || profile.grade || 'year_1'}
               />
@@ -1333,11 +1353,13 @@ export function StudentDashboard({
               {/* Main Gamification System */}
               <GamificationSystem key={gamificationKey} userId={profile.userId} userType="student" />
             </div>
+              </Suspense>
             </ErrorBoundary>
           </TabsContent>
 
           <TabsContent value="achievements">
             <ErrorBoundary>
+              <Suspense fallback={<TabFallback />}>
               <div className="space-y-6">
               {/* Achievement Notification */}
               <AchievementNotification
@@ -1359,12 +1381,14 @@ export function StudentDashboard({
                 limit={50}
               />
             </div>
+              </Suspense>
             </ErrorBoundary>
           </TabsContent>
 
           {/* Learning Paths Tab */}
           <TabsContent value="learning-paths">
             <ErrorBoundary>
+              <Suspense fallback={<TabFallback />}>
               <div className="space-y-6">
               <TopicGrid topics={topics} onTopicClick={handleStartLearningPath} />
               <LearningPathProgress
@@ -1374,6 +1398,7 @@ export function StudentDashboard({
                 onRecommendedClick={handleStartLearningPath}
               />
             </div>
+              </Suspense>
             </ErrorBoundary>
           </TabsContent>
         </Tabs>
