@@ -928,15 +928,36 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       }
 
       const allUsers = await kv.getByPrefix('user:');
-      
+
+      // A user's role field on their own user:<id> record only ever holds
+      // whichever role they're CURRENTLY active as — /switch-role
+      // (role-management-routes.tsx) overwrites it every time someone
+      // toggles dashboards. Someone who's added both parent and tutor roles
+      // and is currently sat in their tutor dashboard shows here as a plain
+      // "Tutor", with no sign they're also a parent, and the opposite the
+      // moment they switch back — this list needs the full set of roles
+      // (user_roles:<id>, maintained by add-role), not just the active one.
+      const userIds = allUsers.map((u: any) => u.id || u.userId).filter(Boolean);
+      const roleLists = userIds.length ? await kv.mget(userIds.map((id: string) => `user_roles:${id}`)) : [];
+      const rolesByUserId = new Map<string, string[]>(
+        userIds.map((id: string, i: number) => [id, (roleLists[i] as string[] | undefined) ?? []]),
+      );
+
       // Enhance users with additional admin data
       const enhancedUsers = allUsers.map((user: any) => {
         const resolvedName =
           user.full_name || user.fullName || user.name ||
           `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.email || 'Unknown';
+        const storedRoles = rolesByUserId.get(user.id || user.userId) ?? [];
+        // storedRoles only exists for users who've been through the add-role
+        // flow at least once — everyone else just has their one signup role.
+        const allRoles = storedRoles.length
+          ? Array.from(new Set([...storedRoles, ...(user.role ? [user.role] : [])]))
+          : (user.role ? [user.role] : []);
         return {
           ...user,
           displayName: resolvedName,
+          allRoles,
           status: user.suspended ? 'suspended' : user.banned ? 'banned' : user.deleted ? 'deleted' : 'active',
           verificationStatus: user.verificationStatus || (user.role === 'tutor' ? 'pending' : 'verified'),
           totalSessions: user.totalSessions || 0,

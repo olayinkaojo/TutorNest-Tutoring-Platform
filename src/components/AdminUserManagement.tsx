@@ -105,6 +105,14 @@ function getUserInitials(user: any): string {
   return 'UT';
 }
 
+// A dual-role user's own `role` field only reflects whichever dashboard
+// they're currently active in (switching overwrites it) — `allRoles`
+// (from GET /admin/users, backed by user_roles:<id>) is every role they've
+// actually added, and what "does this user have role X" should check.
+function hasRole(user: any, role: string): boolean {
+  return (user?.allRoles?.length ? user.allRoles : [user?.role]).includes(role);
+}
+
 // Yes / No / undefined (so unset booleans are hidden rather than shown as "No").
 function formatBool(value: any): string | undefined {
   if (value === true || value === 'true') return 'Yes';
@@ -205,8 +213,11 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
   const experienceYears = pick(ps.experienceYears, su.experienceYears, su.experience_years);
   const travelRadius = pick(ps.travelRadius, su.travelRadius, su.travel_radius);
 
-  // Grouped, populated-only sections for the profile dialog.
-  const tutorSections = selectedUser?.role === 'tutor' ? [
+  // Grouped, populated-only sections for the profile dialog. Checks
+  // hasRole, not selectedUser.role directly — a dual-role user's tutor
+  // profile fields shouldn't disappear just because they're currently
+  // active in their parent (or student) dashboard.
+  const tutorSections = hasRole(selectedUser, 'tutor') ? [
     {
       title: 'Professional background',
       icon: Briefcase,
@@ -301,9 +312,13 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
       );
     }
 
-    // Role filter
+    // Role filter — match on every role a dual-role user has, not just
+    // whichever one is currently active (user.role changes every time they
+    // switch dashboards, so filtering on that alone would hide e.g. a
+    // parent-who's-also-a-tutor from the "Tutor" filter whenever they
+    // happen to be sat in their parent dashboard).
     if (roleFilter !== 'all') {
-      filtered = filtered.filter(user => user.role === roleFilter);
+      filtered = filtered.filter(user => hasRole(user, roleFilter));
     }
 
     // Status filter
@@ -418,7 +433,7 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
       if (user.suspended) {
         return <Badge variant="destructive">Suspended</Badge>;
       }
-      if (user.role === 'tutor') {
+      if (hasRole(user, 'tutor')) {
         switch (user.verificationStatus) {
           case 'verified':
             return <Badge variant="default" style={{ backgroundColor: '#5d9827' }}>Verified</Badge>;
@@ -439,6 +454,13 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4 flex-1">
               <Avatar className="w-12 h-12">
+                {(user.photo_url || user.photoUrl) && (
+                  <img
+                    src={user.photo_url || user.photoUrl}
+                    alt={getUserDisplayName(user)}
+                    className="w-full h-full object-cover rounded-full"
+                  />
+                )}
                 <AvatarFallback style={{ backgroundColor: getRoleColor(user.role), color: 'white' }}>
                   {getUserInitials(user)}
                 </AvatarFallback>
@@ -453,22 +475,29 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
                 <p className="text-sm text-gray-600 mb-2">{user.email}</p>
 
                 <div className="flex items-center gap-3 text-sm text-gray-600">
-                  <Badge 
-                    key="role-badge"
-                    variant="outline" 
-                    style={{ backgroundColor: `${getRoleColor(user.role || 'none')}15`, color: getRoleColor(user.role || 'none') }}
-                  >
-                    {user.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'No Role'}
-                  </Badge>
-                  
-                  {user.role === 'tutor' && user.dbsStatus === 'verified' && (
+                  {/* A dual-role user (e.g. parent who also became a tutor) only
+                      has one "active" role on their own record — switching
+                      dashboards overwrites it — so allRoles (every role
+                      they've ever added, from the admin/users endpoint) is
+                      what's shown here, not just the current one. */}
+                  {(user.allRoles?.length ? user.allRoles : [user.role || 'none']).map((r: string) => (
+                    <Badge
+                      key={`role-badge-${r}`}
+                      variant="outline"
+                      style={{ backgroundColor: `${getRoleColor(r)}15`, color: getRoleColor(r) }}
+                    >
+                      {r && r !== 'none' ? r.charAt(0).toUpperCase() + r.slice(1) : 'No Role'}
+                    </Badge>
+                  ))}
+
+                  {hasRole(user, 'tutor') && user.dbsStatus === 'verified' && (
                     <span key="dbs-badge" className="flex items-center gap-1 text-green-600">
                       <Shield className="w-3 h-3" />
                       DBS Verified
                     </span>
                   )}
-                  
-                  {user.role === 'tutor' && (
+
+                  {hasRole(user, 'tutor') && (
                     <span key="rate-badge" className="flex items-center gap-1">
                       <DollarSign className="w-3 h-3" />
                       £{user.hourlyRate || 'N/A'}/hr
@@ -480,7 +509,7 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
                   </span>
                 </div>
 
-                {user.role === 'tutor' && user.subjects && Array.isArray(user.subjects) && (
+                {hasRole(user, 'tutor') && user.subjects && Array.isArray(user.subjects) && (
                   <div className="flex gap-1 mt-2 flex-wrap">
                     {user.subjects.slice(0, 3).map((subject: string, index: number) => (
                       <Badge key={`subject-${user.userId}-${index}`} variant="secondary" className="text-xs">
@@ -584,19 +613,19 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600 mb-1">Tutors</p>
-            <h3>{users.filter(u => u.role === 'tutor').length}</h3>
+            <h3>{users.filter(u => hasRole(u, 'tutor')).length}</h3>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600 mb-1">Parents</p>
-            <h3>{users.filter(u => u.role === 'parent').length}</h3>
+            <h3>{users.filter(u => hasRole(u, 'parent')).length}</h3>
           </CardContent>
         </Card>
         <Card>
           <CardContent className="pt-6">
             <p className="text-sm text-gray-600 mb-1">Students</p>
-            <h3>{users.filter(u => u.role === 'student').length}</h3>
+            <h3>{users.filter(u => hasRole(u, 'student')).length}</h3>
           </CardContent>
         </Card>
       </div>
@@ -610,7 +639,7 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
           </CardDescription>
         </CardHeader>
         <CardContent>
-          {users.filter(user => user.role === 'tutor').length === 0 ? (
+          {users.filter(user => hasRole(user, 'tutor')).length === 0 ? (
             <div className="py-10 text-center text-gray-500">
               <Users className="w-10 h-10 mx-auto mb-3 text-gray-300" />
               <p>No tutor profiles found</p>
@@ -618,11 +647,18 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
           ) : (
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
               {users
-                .filter(user => user.role === 'tutor')
+                .filter(user => hasRole(user, 'tutor'))
                 .map((user) => (
                   <div key={`tutor-browser-${user.userId}`} className="rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-start gap-3">
                       <Avatar className="w-12 h-12">
+                        {(user.photo_url || user.photoUrl) && (
+                          <img
+                            src={user.photo_url || user.photoUrl}
+                            alt={getUserDisplayName(user)}
+                            className="w-full h-full object-cover rounded-full"
+                          />
+                        )}
                         <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
                           {getUserInitials(user)}
                         </AvatarFallback>
@@ -757,7 +793,7 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
               <DialogHeader className="sr-only">
                 <DialogTitle>{getUserDisplayName(selectedUser)}</DialogTitle>
                 <DialogDescription>
-                  {selectedUser.role === 'tutor' ? 'Tutor profile and verification details' : 'User profile details'}
+                  {hasRole(selectedUser, 'tutor') ? 'Tutor profile and verification details' : 'User profile details'}
                 </DialogDescription>
               </DialogHeader>
 
@@ -779,10 +815,15 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
                       <h3 className="text-xl font-semibold truncate">{getUserDisplayName(selectedUser)}</h3>
-                      <Badge className="bg-white/20 text-white hover:bg-white/20 border-0">
-                        {selectedUser.role ? selectedUser.role.charAt(0).toUpperCase() + selectedUser.role.slice(1) : 'Unknown'}
-                      </Badge>
-                      {selectedUser.role === 'tutor' && (
+                      {((selectedUser.allRoles?.length ? selectedUser.allRoles : [selectedUser.role]).filter(Boolean) as string[]).map((r) => (
+                        <Badge key={`detail-role-${r}`} className="bg-white/20 text-white hover:bg-white/20 border-0">
+                          {r.charAt(0).toUpperCase() + r.slice(1)}
+                        </Badge>
+                      ))}
+                      {!selectedUser.allRoles?.length && !selectedUser.role && (
+                        <Badge className="bg-white/20 text-white hover:bg-white/20 border-0">Unknown</Badge>
+                      )}
+                      {hasRole(selectedUser, 'tutor') && (
                         <Badge
                           className="border-0"
                           style={{
@@ -850,19 +891,19 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
                   );
                 })}
 
-                {selectedUser.role === 'tutor' && (pick(ps.bio, su.bio)) && (
+                {hasRole(selectedUser, 'tutor') && (pick(ps.bio, su.bio)) && (
                   <SectionCard title="Bio" icon={FileText}>
                     <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{pick(ps.bio, su.bio)}</p>
                   </SectionCard>
                 )}
 
-                {selectedUser.role === 'tutor' && (pick(ps.qualifications, su.qualifications)) && (
+                {hasRole(selectedUser, 'tutor') && (pick(ps.qualifications, su.qualifications)) && (
                   <SectionCard title="Qualifications" icon={GraduationCap}>
                     <p className="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed">{pick(ps.qualifications, su.qualifications)}</p>
                   </SectionCard>
                 )}
 
-                {selectedUser.role !== 'tutor' && (
+                {!hasRole(selectedUser, 'tutor') && (
                   <SectionCard title="Contact" icon={Mail}>
                     <div className="divide-y divide-gray-100">
                       <InfoField label="Email" value={selectedUser.email} />
@@ -874,9 +915,17 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
 
                 <SectionCard title="Account & activity" icon={Award}>
                   <div className="divide-y divide-gray-100">
-                    <InfoField label="Role" value={selectedUser.role ? selectedUser.role.charAt(0).toUpperCase() + selectedUser.role.slice(1) : undefined} />
+                    <InfoField
+                      label={(selectedUser.allRoles?.length ?? 0) > 1 ? 'Roles' : 'Role'}
+                      value={
+                        (selectedUser.allRoles?.length ? selectedUser.allRoles : [selectedUser.role])
+                          .filter(Boolean)
+                          .map((r: string) => r.charAt(0).toUpperCase() + r.slice(1))
+                          .join(', ') || undefined
+                      }
+                    />
                     <InfoField label="Status" value={(selectedUser.status || 'active').charAt(0).toUpperCase() + (selectedUser.status || 'active').slice(1)} />
-                    {selectedUser.role === 'tutor' && (
+                    {hasRole(selectedUser, 'tutor') && (
                       <InfoField label="Verification" value={(selectedUser.verificationStatus || 'pending').charAt(0).toUpperCase() + (selectedUser.verificationStatus || 'pending').slice(1)} />
                     )}
                     <InfoField label="Total sessions" value={selectedUser.totalSessions || 0} />
