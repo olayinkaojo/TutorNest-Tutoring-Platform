@@ -24,6 +24,21 @@ export default function App() {
   const [signupData, setSignupData] = useState<SignupData | null>(null);
   const [staffMode, setStaffMode] = useState(false);
 
+  // Clicking the emailed confirmation link redirects back here with the
+  // result in the URL hash (Supabase's default implicit flow) — e.g.
+  // #access_token=...&type=signup. supabase-js's own detectSessionInUrl
+  // consumes and strips that hash as part of establishing the session, so
+  // it has to be read here, synchronously, during the very first render
+  // (a lazy useState initializer runs before any effect — including
+  // supabase-js's own internal session detection — has a chance to run).
+  // Previously this redirect landed on a blank sign-in form with no
+  // acknowledgement that anything had happened.
+  const [emailConfirmationType] = useState<string | null>(() => {
+    if (typeof window === 'undefined') return null;
+    const match = /[#&]type=(signup|invite|email_change)\b/.exec(window.location.hash);
+    return match ? match[1] : null;
+  });
+
   const navigateTo = (path: string, options?: { replace?: boolean }) => {
     const { replace = false } = options || {};
     const current = `${location.pathname}${location.search}`;
@@ -84,6 +99,30 @@ export default function App() {
       subscription.unsubscribe();
     };
   }, []);
+
+  // Acknowledge the confirmation link once the app has actually settled
+  // (not during the loading spinner, and not before we know whether it
+  // also auto-signed the user in) rather than silently landing them
+  // somewhere with no feedback that anything happened.
+  useEffect(() => {
+    if (loading || !emailConfirmationType) return;
+    if (emailConfirmationType === 'signup') {
+      toast.success(
+        session
+          ? 'Email confirmed — you’re all set and signed in.'
+          : 'Email confirmed! You can now sign in.',
+        { duration: 6000 },
+      );
+    } else if (emailConfirmationType === 'invite') {
+      toast.success('Invitation accepted — welcome to Knowledge Fons Academy!', { duration: 6000 });
+    } else if (emailConfirmationType === 'email_change') {
+      toast.success('Your new email address has been confirmed.', { duration: 6000 });
+    }
+    // Intentionally excludes emailConfirmationType/session from deps — this
+    // is a one-time acknowledgement the instant loading finishes, not
+    // something that should re-fire if session changes again later.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading]);
 
   useEffect(() => {
     // Don't make any redirect decision off session/profile while the initial
