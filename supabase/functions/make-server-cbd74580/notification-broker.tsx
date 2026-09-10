@@ -83,8 +83,20 @@ export async function createNotification(
   payload: NotificationPayload
 ): Promise<{ success: boolean; notificationId: string; error?: string }> {
   try {
-    const notificationId = `notification_${Date.now()}_${crypto.randomUUID().replace(/-/g, '')}`;
-    
+    // The id IS the KV key (matches every other notification-creation site
+    // in the codebase) — this used to be generated without the
+    // "notification:" prefix while the actual kv.set below added it
+    // separately, so a notification's own .id field never matched its real
+    // KV key. That broke two things silently: the index below (pushing an
+    // id that doesn't resolve to anything via kv.mget) and POST
+    // /notifications/:notificationId/read (kv.get(notificationId) using the
+    // unprefixed id would never find the record). Only reachable for
+    // bookshop purchases before this function became the one place every
+    // notification-creation site in the codebase goes through, so it went
+    // unnoticed until GET /notifications/:userId started reading from this
+    // index instead of a full scan.
+    const notificationId = `notification:${Date.now()}_${crypto.randomUUID().replace(/-/g, '')}`;
+
     const notification: NotificationMessage = {
       id: notificationId,
       userId: payload.userId,
@@ -104,7 +116,7 @@ export async function createNotification(
     };
 
     // Store in KV (primary storage)
-    await kv.set(`notification:${notificationId}`, notification);
+    await kv.set(notificationId, notification);
 
     // Add to user's notification list for quick retrieval
     const userNotificationsKey = `user_notifications:${payload.userId}`;
@@ -121,7 +133,7 @@ export async function createNotification(
       for (const secondaryUserId of payload.secondaryUserIds) {
         const secondaryNotification: NotificationMessage = {
           ...notification,
-          id: `notification_${Date.now()}_${crypto.randomUUID().replace(/-/g, '')}`,
+          id: `notification:${Date.now()}_${crypto.randomUUID().replace(/-/g, '')}`,
           userId: secondaryUserId,
           metadata: {
             ...notification.metadata,
@@ -129,7 +141,7 @@ export async function createNotification(
           },
         };
 
-        await kv.set(`notification:${secondaryNotification.id}`, secondaryNotification);
+        await kv.set(secondaryNotification.id, secondaryNotification);
 
         const secondaryKey = `user_notifications:${secondaryUserId}`;
         const secondaryList = (await kv.get(secondaryKey)) as string[] || [];
