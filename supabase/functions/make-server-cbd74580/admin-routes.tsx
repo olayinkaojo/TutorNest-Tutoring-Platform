@@ -5,6 +5,7 @@ import * as db from './db.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
 import { logAuditEvent, ActivityCategory } from './activity-log.tsx';
 import { createNotification } from './notification-broker.tsx';
+import { getIndexedItems } from './kv-index-helpers.tsx';
 
 // Helper function to format timestamp
 function formatTimestamp(timestamp: string): string {
@@ -297,8 +298,18 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       const month = c.req.query('month') ? parseInt(c.req.query('month')!) : new Date().getMonth() + 1;
 
       // ── Fetch from both KV (legacy) and DB (new) in parallel ──────────────
+      // user:/booking:/payment:/system-alert: are genuine full-platform
+      // aggregates (total tutors, total revenue this month, active alert
+      // count) — there's no per-owner index that fixes "sum every payment on
+      // the platform"; a real fix means migrating these to real Postgres
+      // COUNT/SUM queries or global running counters, a bigger undertaking
+      // deliberately deferred (this endpoint is admin-only, low-traffic,
+      // unlike the per-user hot paths that got that treatment). notification:
+      // is different — it's only ever used below for one specific admin's
+      // own unread count, so it gets the same per-owner index everything
+      // else uses.
       const [
-        kvUsers, kvBookings, kvPayments, kvAlerts, kvNotifications,
+        kvUsers, kvBookings, kvPayments, kvAlerts, kvOwnNotifications,
         dbBookings, dbPayments,
       ] = await Promise.all([
         kv.getByPrefix('user:'),
@@ -310,7 +321,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         // matched zero rows, so "Active Alerts" on the dashboard has been
         // showing 0 no matter how many real alerts existed.
         kv.getByPrefix('system-alert:'),
-        kv.getByPrefix('notification:'),
+        getIndexedItems(`user_notifications:${userId}`),
         db.getAllBookingsForAdmin(year, month),
         db.getAllPaymentsForAdmin(year, month),
       ]);
@@ -380,7 +391,7 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       ).length;
 
       // Unread notifications: KV count + DB count
-      const kvUnread = kvNotifications.filter((n: any) => n.userId === userId && !n.read).length;
+      const kvUnread = kvOwnNotifications.filter((n: any) => !n.read).length;
       const dbUnread = await db.getUnreadNotificationCount(userId).catch(() => 0);
       const unreadNotifications = kvUnread + dbUnread;
 

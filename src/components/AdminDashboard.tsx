@@ -171,14 +171,21 @@ export function AdminDashboard({
     refetchStats();
   }, [selectedYear, selectedMonth]);
 
-  // Poll for stats updates every 30 seconds
+  // Poll for stats updates every 3 minutes. This endpoint does several
+  // genuine full-platform aggregates (total tutors, revenue this month,
+  // active alerts) that can't be fixed with a per-owner index the way other
+  // hot paths were — a real fix means migrating those to real Postgres
+  // COUNT/SUM queries or global counters, deliberately deferred since this
+  // is a low-traffic, admin-only dashboard. 30s was overkill for numbers
+  // that don't need to-the-second freshness; this cuts the request rate ~6x
+  // for near-zero cost.
   useEffect(() => {
     const interval = setInterval(async () => {
       const token = await getAccessToken();
       if (token) {
         fetchDashboardStats(token);
       }
-    }, 30000);
+    }, 180000);
     return () => clearInterval(interval);
   }, []);
 
