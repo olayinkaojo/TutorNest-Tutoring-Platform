@@ -109,7 +109,16 @@ signupRoutes.post('/signup', async (c) => {
 
     const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
 
-    // Step 1: Create user via admin client — auto-confirm so they can sign in immediately
+    // Step 1: Create user via admin client. email_confirm is deliberately
+    // false — signing up should require confirming the email actually
+    // belongs to the signer before the account is usable. It was `true`
+    // here (auto-confirmed) at some point, which combined with the
+    // magiclink-type verification email generated below (a login shortcut,
+    // not an actual confirmation gate) meant the "requiresEmailConfirmation"
+    // field this endpoint returns was always false and email verification
+    // never actually gated anything, despite the signup UI already showing
+    // real "confirm your email" copy (ParentSignup.tsx/TutorSignup.tsx) —
+    // that copy was accurate-looking but not backed by anything.
     const userRole = role || profileData?.role || null;
 
     // Frontend already blocks submission on this (ParentSignup.tsx,
@@ -124,7 +133,7 @@ signupRoutes.post('/signup', async (c) => {
       email,
       password,
       user_metadata: { name, role: userRole },
-      email_confirm: true,
+      email_confirm: false,
     });
 
     if (error) {
@@ -138,12 +147,15 @@ signupRoutes.post('/signup', async (c) => {
       return c.json({ error: 'Failed to create account - no user data returned' }, 500);
     }
 
-    // Step 2: Generate verification link and send confirmation email via Resend
+    // Step 2: Generate a real signup-confirmation link and send it via Resend.
+    // type must be 'signup' (not 'magiclink' — a login shortcut that doesn't
+    // confirm anything) so visiting it actually marks the email confirmed.
     const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
     try {
       const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
-        type: 'magiclink',
+        type: 'signup',
         email,
+        password,
         options: { redirectTo: appUrl },
       });
 
@@ -256,7 +268,7 @@ signupRoutes.post('/signup', async (c) => {
     console.log('Signup successful for:', email);
     return c.json({
       success: true,
-      requiresEmailConfirmation: false,
+      requiresEmailConfirmation: true,
       userId: data.user.id,
       isAdmin,
       session: null,

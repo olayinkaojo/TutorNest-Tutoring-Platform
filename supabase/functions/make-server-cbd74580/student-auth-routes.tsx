@@ -421,8 +421,9 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
       try {
         const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
-          type: 'magiclink',
+          type: 'signup',
           email,
+          password,
           options: { redirectTo: appUrl },
         });
         if (!linkError && linkData?.properties?.action_link) {
@@ -553,8 +554,9 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       const appUrl2 = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
       try {
         const { data: linkData2, error: linkError2 } = await supabase.auth.admin.generateLink({
-          type: 'magiclink',
+          type: 'signup',
           email,
+          password,
           options: { redirectTo: appUrl2 },
         });
         if (!linkError2 && linkData2?.properties?.action_link) {

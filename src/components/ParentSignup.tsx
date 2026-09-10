@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { getSupabaseClient } from '../utils/supabase/client';
 import {
   PARENT_ONBOARDING_DRAFT_KEY,
   passwordStrength,
@@ -52,6 +53,7 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [step, setStep] = useState(1);
 
   const [email, setEmail] = useState(initialData?.email || '');
@@ -312,6 +314,16 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
     }
   };
 
+  const handleResendConfirmation = async () => {
+    setResendState('sending');
+    try {
+      const { error: resendError } = await getSupabaseClient().auth.resend({ type: 'signup', email });
+      setResendState(resendError ? 'error' : 'sent');
+    } catch {
+      setResendState('error');
+    }
+  };
+
   const stepIndicator = (
     <div className="mb-8" aria-label="Signup progress">
       <div className="flex items-center justify-between gap-2 mb-3">
@@ -400,6 +412,25 @@ export function ParentSignup({ onBackToSignIn, initialData, onSignupSuccess }: P
             >
               Continue to sign in
             </button>
+            <p className="text-center text-sm text-gray-500 mt-4">
+              Didn&apos;t get the email?{' '}
+              {resendState === 'sent' ? (
+                <span className="text-emerald-700 font-medium">Sent again — check your inbox and spam folder.</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResendConfirmation}
+                  disabled={resendState === 'sending'}
+                  className="font-medium underline disabled:opacity-50"
+                  style={{ color: '#625d9c' }}
+                >
+                  {resendState === 'sending' ? 'Sending…' : 'Resend confirmation email'}
+                </button>
+              )}
+              {resendState === 'error' && (
+                <span className="block text-red-600 mt-1">Couldn&apos;t resend right now — please try again in a moment.</span>
+              )}
+            </p>
           </div>
         ) : (
           <div className="bg-white rounded-3xl shadow-xl p-6 sm:p-8">

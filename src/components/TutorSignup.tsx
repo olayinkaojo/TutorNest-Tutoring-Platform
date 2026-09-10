@@ -187,6 +187,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   const [emailExists, setEmailExists] = useState(false);
   const [isExistingUser, setIsExistingUser] = useState(false);
   const [emailConfirmationSent, setEmailConfirmationSent] = useState(false);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoPreview, setPhotoPreview] = useState<string | null>(null);
   const [photoUploading, setPhotoUploading] = useState(false);
@@ -767,6 +768,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
         clearOnboardingDraft();
         // Email confirmation required — show the "check your email" screen
         setEmailConfirmationSent(true);
+        setResendState('idle');
         return;
       } else {
         // Existing user updating their tutor profile
@@ -900,6 +902,16 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
     }
   };
 
+  const handleResendConfirmation = async () => {
+    setResendState('sending');
+    try {
+      const { error: resendError } = await getSupabaseClient().auth.resend({ type: 'signup', email });
+      setResendState(resendError ? 'error' : 'sent');
+    } catch {
+      setResendState('error');
+    }
+  };
+
   const stepLabels = ['Account', 'Professional', 'Preferences', 'Expertise', 'Verify'];
   const renderStepIndicator = () => (
     <div className="mb-8" aria-label="Onboarding progress">
@@ -1017,6 +1029,25 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
             >
               Continue to sign in
             </button>
+            <p className="text-center text-sm text-gray-500 mt-4">
+              Didn&apos;t get the email?{' '}
+              {resendState === 'sent' ? (
+                <span className="text-emerald-700 font-medium">Sent again — check your inbox and spam folder.</span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={handleResendConfirmation}
+                  disabled={resendState === 'sending'}
+                  className="font-medium underline disabled:opacity-50"
+                  style={{ color: '#625d9c' }}
+                >
+                  {resendState === 'sending' ? 'Sending…' : 'Resend confirmation email'}
+                </button>
+              )}
+              {resendState === 'error' && (
+                <span className="block text-red-600 mt-1">Couldn&apos;t resend right now — please try again in a moment.</span>
+              )}
+            </p>
           </div>
         ) : (
 
