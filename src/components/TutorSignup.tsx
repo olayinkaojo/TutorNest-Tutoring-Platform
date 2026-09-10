@@ -905,8 +905,18 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
   const handleResendConfirmation = async () => {
     setResendState('sending');
     try {
-      const { error: resendError } = await getSupabaseClient().auth.resend({ type: 'signup', email });
-      setResendState(resendError ? 'error' : 'sent');
+      // Goes through the app's own signup email pathway (Resend, same
+      // branded template as the original) rather than supabase-js's native
+      // auth.resend(), which uses Supabase's own separate email system.
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/resend-confirmation`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${publicAnonKey}` },
+          body: JSON.stringify({ email }),
+        }
+      );
+      setResendState(res.ok ? 'sent' : 'error');
     } catch {
       setResendState('error');
     }
@@ -1004,7 +1014,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
               <li className="flex gap-2">
                 <CheckCircle className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" aria-hidden />
                 <span>
-                  <strong>Confirm your email</strong> — click the link Supabase sends so we know this inbox is yours.
+                  <strong>Confirm your email</strong> — click the link we just sent so we know this inbox is yours.
                 </span>
               </li>
               <li className="flex gap-2">

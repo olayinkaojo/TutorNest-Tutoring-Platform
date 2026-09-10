@@ -303,4 +303,73 @@ signupRoutes.post('/signup', async (c) => {
   }
 });
 
+// Resend the signup confirmation email. The frontend used to call
+// supabase-js's native auth.resend({type:'signup'}) directly — that sends
+// through Supabase's own built-in auth email system, a completely separate
+// pathway from the one actual signup uses (generateLink + this app's own
+// Resend-based sendEmail, for a properly branded template). Whatever
+// Supabase's native mailer needs (its own SMTP config, its own rate limits)
+// is independent of whether the app's real email pathway works at all, so
+// "resend" and "the original email" could succeed or fail for entirely
+// different reasons — exactly the inconsistency a real user hit. This
+// route makes resend use the identical pathway as the original email.
+signupRoutes.post('/resend-confirmation', async (c) => {
+  try {
+    const { email } = await c.req.json();
+    if (!email) {
+      return c.json({ error: 'Email is required' }, 400);
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL');
+    const serviceRoleKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+    if (!supabaseUrl || !serviceRoleKey) {
+      return c.json({ error: 'Server configuration error' }, 500);
+    }
+    const adminSupabase = createClient(supabaseUrl, serviceRoleKey);
+
+    // Look up the existing user for their name/role (needed for the email
+    // template) — generateLink itself only needs the email.
+    const { data: listData, error: listError } = await adminSupabase.auth.admin.listUsers();
+    if (listError) {
+      console.error('resend-confirmation: could not list users:', listError.message);
+      return c.json({ error: 'Could not resend right now' }, 500);
+    }
+    const user = listData.users.find((u) => u.email?.toLowerCase() === email.toLowerCase());
+    if (!user) {
+      // Don't reveal whether an email is registered.
+      return c.json({ success: true });
+    }
+    if (user.email_confirmed_at) {
+      return c.json({ success: true, alreadyConfirmed: true });
+    }
+
+    const appUrl = Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
+    const { data: linkData, error: linkError } = await adminSupabase.auth.admin.generateLink({
+      type: 'signup',
+      email,
+      options: { redirectTo: appUrl },
+    });
+
+    if (linkError || !linkData?.properties?.action_link) {
+      console.error('resend-confirmation: could not generate link:', linkError?.message);
+      return c.json({ error: 'Could not resend right now' }, 500);
+    }
+
+    const name = (user.user_metadata as any)?.name || 'there';
+    const role = (user.user_metadata as any)?.role || 'user';
+    const confirmTpl = emailTemplates.signupConfirmEmail(name, role, linkData.properties.action_link);
+    const sendResult = await sendEmail({ to: email, subject: confirmTpl.subject, html: confirmTpl.html });
+
+    if (!sendResult.success) {
+      console.error('resend-confirmation: sendEmail failed:', sendResult.error);
+      return c.json({ error: 'Could not resend right now' }, 500);
+    }
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error('resend-confirmation error:', error);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
 export default signupRoutes;

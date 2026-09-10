@@ -1,5 +1,6 @@
 import { useState, useRef } from 'react';
 import { getSupabaseClient } from '../utils/supabase/client';
+import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { Mail, Eye, EyeOff, AlertCircle, Shield } from 'lucide-react';
 import { Button } from './ui/button';
 import { Input } from './ui/input';
@@ -28,6 +29,8 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [loading, setLoading] = useState(false);
+  const [emailNotConfirmed, setEmailNotConfirmed] = useState(false);
+  const [resendState, setResendState] = useState<'idle' | 'sending' | 'sent' | 'error'>('idle');
   const [isStaffMode, setIsStaffMode] = useState(!!staffMode);
 
   // Secret: click the logo 5 times within 2 seconds to reveal staff login
@@ -63,6 +66,8 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
     e.preventDefault();
     setError('');
     setSuccess('');
+    setEmailNotConfirmed(false);
+    setResendState('idle');
 
     // Validation
     if (!validateEmail(email)) {
@@ -114,7 +119,8 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
       if (error) {
         // Handle email not confirmed error
         if (error.message.includes('Email not confirmed')) {
-          throw new Error('⚠️ Email Not Confirmed: Please check your email for a confirmation link, OR disable email confirmation in your Supabase Dashboard (Authentication → Email → Turn OFF "Confirm email"). See EMAIL_CONFIRMATION_FIX.md for detailed instructions.');
+          setEmailNotConfirmed(true);
+          throw new Error('Please confirm your email before signing in — check your inbox for the confirmation link we sent when you signed up.');
         }
         if (error.message.includes('Invalid login credentials')) {
           throw new Error('Invalid email or password. Please double-check your credentials. If you just signed up, your account may need a moment — try again or use "Forgot Password" to reset it.');
@@ -130,6 +136,23 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
       setError(err.message || 'An error occurred. Please try again.');
     } finally {
       setLoading(false);
+    }
+  };
+
+  const handleResendConfirmation = async () => {
+    setResendState('sending');
+    try {
+      const res = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/resend-confirmation`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${publicAnonKey}` },
+          body: JSON.stringify({ email }),
+        }
+      );
+      setResendState(res.ok ? 'sent' : 'error');
+    } catch {
+      setResendState('error');
     }
   };
 
@@ -153,9 +176,7 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
       // Check if it's a provider not enabled error
       if (err.message?.includes('provider is not enabled') || err.error_code === 'validation_failed') {
         const providerName = provider.charAt(0).toUpperCase() + provider.slice(1);
-        setError(
-          `${providerName} login is not yet configured. To enable ${providerName} authentication, please follow the setup instructions at: https://supabase.com/docs/guides/auth/social-login/auth-${provider}`
-        );
+        setError(`${providerName} sign-in isn't available yet — please sign in with your email and password instead.`);
       } else {
         setError(
           err.message || `Failed to authenticate with ${provider}. Please try again.`
@@ -210,7 +231,28 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
           {error && (
             <Alert className="mb-4 bg-red-50 border-red-200">
               <AlertCircle className="h-4 w-4 text-red-600" />
-              <AlertDescription className="text-red-800">{error}</AlertDescription>
+              <AlertDescription className="text-red-800">
+                {error}
+                {emailNotConfirmed && (
+                  <span className="block mt-2">
+                    {resendState === 'sent' ? (
+                      <span className="text-emerald-700 font-medium">Sent — check your inbox and spam folder.</span>
+                    ) : (
+                      <button
+                        type="button"
+                        onClick={handleResendConfirmation}
+                        disabled={resendState === 'sending'}
+                        className="font-medium underline disabled:opacity-50"
+                      >
+                        {resendState === 'sending' ? 'Sending…' : 'Resend confirmation email'}
+                      </button>
+                    )}
+                    {resendState === 'error' && (
+                      <span className="block text-red-700 mt-1">Couldn&apos;t resend right now — please try again in a moment.</span>
+                    )}
+                  </span>
+                )}
+              </AlertDescription>
             </Alert>
           )}
 

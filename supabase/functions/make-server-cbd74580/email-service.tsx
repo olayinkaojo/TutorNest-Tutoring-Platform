@@ -54,7 +54,7 @@ export const emailTemplates = {
             <!-- Header -->
             <tr>
               <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+                <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -162,7 +162,7 @@ export const emailTemplates = {
             <!-- Header -->
             <tr>
               <td style="background:linear-gradient(135deg,#5d9827 0%,#7ab84e 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+                <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -264,7 +264,7 @@ export const emailTemplates = {
           <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
             <tr>
               <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+                <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -329,6 +329,7 @@ export const emailTemplates = {
       <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:#ffffff;padding:20px 36px 8px;text-align:center;"><img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="140" style="display:block;margin:0 auto;max-width:160px;height:auto;" /></td></tr>
           <tr><td style="background:#22c55e;padding:18px 36px;text-align:center;">
             <p style="margin:0;color:#fff;font-size:16px;font-weight:700;">Payment successful</p>
           </td></tr>
@@ -356,7 +357,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#0ea5e9;padding:14px 40px;text-align:center;">
@@ -426,7 +427,7 @@ export const emailTemplates = {
           <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
             <tr>
               <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+                <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -493,7 +494,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#22c55e;padding:14px 40px;text-align:center;">
@@ -535,7 +536,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#22c55e;padding:14px 40px;text-align:center;">
@@ -588,7 +589,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#f59e0b;padding:14px 40px;text-align:center;">
@@ -640,7 +641,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#0ea5e9;padding:14px 40px;text-align:center;">
@@ -696,7 +697,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#16a34a;padding:14px 40px;text-align:center;">
@@ -742,7 +743,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#6b7280;padding:14px 40px;text-align:center;">
@@ -781,7 +782,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#625d9c;padding:14px 40px;text-align:center;">
@@ -840,7 +841,7 @@ export const emailTemplates = {
             <!-- Header -->
             <tr>
               <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+                <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -996,7 +997,7 @@ export const emailTemplates = {
             <!-- Header -->
             <tr>
               <td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-                <h1 style="margin:0;color:#ffffff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+                <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
                 <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
               </td>
             </tr>
@@ -1144,7 +1145,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#22c55e;padding:14px 40px;text-align:center;">
@@ -1187,7 +1188,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#5d9827 0%,#16a34a 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#22c55e;padding:14px 40px;text-align:center;">
@@ -1249,7 +1250,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#ef4444;padding:14px 40px;text-align:center;">
@@ -1309,7 +1310,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#f59e0b;padding:14px 40px;text-align:center;">
@@ -1371,7 +1372,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:${newRole === 'tutor' ? 'linear-gradient(135deg,#5d9827 0%,#16a34a 100%)' : 'linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%)'};padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#22c55e;padding:14px 40px;text-align:center;">
@@ -1455,7 +1456,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:32px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:24px;font-weight:700;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:14px;">${headline}</p>
           </td></tr>
           <tr><td style="padding:32px 40px;">
@@ -1494,6 +1495,7 @@ export const emailTemplates = {
       <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:#ffffff;padding:20px 36px 8px;text-align:center;"><img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="140" style="display:block;margin:0 auto;max-width:160px;height:auto;" /></td></tr>
           <tr><td style="background:linear-gradient(135deg,#0ea5e9 0%,#6366f1 100%);padding:28px 36px;text-align:center;">
             <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">📅 Session rescheduled</p>
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.9);font-size:13px;">${movedByLabel}</p>
@@ -1538,6 +1540,7 @@ export const emailTemplates = {
       <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:#ffffff;padding:20px 36px 8px;text-align:center;"><img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="140" style="display:block;margin:0 auto;max-width:160px;height:auto;" /></td></tr>
           <tr><td style="background:linear-gradient(135deg,#5d9827 0%,#16a34a 100%);padding:28px 36px;text-align:center;">
             <p style="margin:0;color:#fff;font-size:16px;font-weight:600;">${isReschedule ? 'Session rescheduled' : 'Session confirmed'}</p>
           </td></tr>
@@ -1576,6 +1579,7 @@ export const emailTemplates = {
       <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:#ffffff;padding:20px 36px 8px;text-align:center;"><img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="140" style="display:block;margin:0 auto;max-width:160px;height:auto;" /></td></tr>
           <tr><td style="background:#22c55e;padding:18px 36px;text-align:center;">
             <p style="margin:0;color:#fff;font-size:16px;font-weight:700;">Payment successful</p>
           </td></tr>
@@ -1610,6 +1614,7 @@ export const emailTemplates = {
       <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:#ffffff;padding:20px 36px 8px;text-align:center;"><img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="140" style="display:block;margin:0 auto;max-width:160px;height:auto;" /></td></tr>
           <tr><td style="background:linear-gradient(135deg,#5d9827 0%,#4d7c0f 100%);padding:24px 36px;text-align:center;">
             <p style="margin:0;color:#fff;font-size:16px;font-weight:600;">New payment on Knowledge Fons Academy</p>
           </td></tr>
@@ -1638,7 +1643,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#0ea5e9;padding:14px 40px;text-align:center;">
@@ -1693,7 +1698,7 @@ export const emailTemplates = {
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:26px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy</h1>
+            <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
             <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
           </td></tr>
           <tr><td style="background:#f59e0b;padding:14px 40px;text-align:center;">
@@ -1747,9 +1752,10 @@ export const emailTemplates = {
       <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
       <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:24px 0;"><tr><td align="center">
         <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:#ffffff;padding:20px 36px 8px;text-align:center;"><img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="140" style="display:block;margin:0 auto;max-width:160px;height:auto;" /></td></tr>
           <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:28px 40px;text-align:center;">
-            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Knowledge Fons Academy Admin</h1>
-            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:13px;">Internal Notification</p>
+            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Admin Notification</h1>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:13px;">Internal — not sent to parents or tutors</p>
           </td></tr>
           <tr><td style="background:#0ea5e9;padding:12px 40px;text-align:center;">
             <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">🔔 &nbsp;New Tutor Application</p>
