@@ -55,6 +55,7 @@ const AuditLogViewer = lazy(() => import('./admin/AuditLogViewer').then(m => ({ 
 const DocumentAuditTrail = lazy(() => import('./admin/DocumentAuditTrail').then(m => ({ default: m.DocumentAuditTrail })));
 const ChatSafeguardingViewer = lazy(() => import('./admin/ChatSafeguardingViewer').then(m => ({ default: m.ChatSafeguardingViewer })));
 const RecordingsViewer = lazy(() => import('./admin/RecordingsViewer').then(m => ({ default: m.RecordingsViewer })));
+const SessionReportsAdmin = lazy(() => import('./admin/SessionReportsAdmin').then(m => ({ default: m.SessionReportsAdmin })));
 
 interface UserProfile {
   id?: string;
@@ -127,6 +128,7 @@ export function AdminDashboard({
     'curriculum',
     'resources',
     'auditlog',
+    'sessionreports',
   ]);
 
   useEffect(() => {
@@ -433,6 +435,7 @@ export function AdminDashboard({
             <TabsTrigger value="documenttrail">Document Trail</TabsTrigger>
             <TabsTrigger value="safeguarding">Safeguarding</TabsTrigger>
             <TabsTrigger value="recordings">Recordings</TabsTrigger>
+            <TabsTrigger value="sessionreports">Session Reports</TabsTrigger>
           </TabsList>
 
           <TabsContent value="overview">
@@ -618,6 +621,14 @@ export function AdminDashboard({
             {session && (
               <Suspense fallback={<TabFallback />}>
                 <RecordingsViewer accessToken={session.access_token} />
+              </Suspense>
+            )}
+          </TabsContent>
+
+          <TabsContent value="sessionreports">
+            {session && (
+              <Suspense fallback={<TabFallback />}>
+                <SessionReportsAdmin session={session} accessToken={session.access_token} />
               </Suspense>
             )}
           </TabsContent>
