@@ -160,6 +160,18 @@ app.get('/bookings', async (c) => {
     // initials, without each of them re-implementing this lookup.
     const resolvePhoto = (p: any): string | null => p?.photoUrl || p?.photo_url || null;
 
+    // Attach each booking's post-session report, if one exists (submitted
+    // via POST /bookings/:bookingId/report, stored at `report:<bookingId>`).
+    // Without this, the frontend has no way to know a report already exists:
+    // the "awaiting a report" banner on the tutor dashboard could never
+    // clear, and BookingManager.tsx's Submit/View-report buttons reset to
+    // "not yet reported" on every reload.
+    const reportKeys = rawBookings.map((b) => `report:${b.id}`);
+    const reportValues = reportKeys.length ? await kv.mget(reportKeys) : [];
+    const reportByBookingId = new Map<string, any>(
+      rawBookings.map((b, i) => [b.id, reportValues[i] ?? null]),
+    );
+
     const bookings = rawBookings.map((b) => {
       const tutor   = (b.tutorId && profileMap[b.tutorId])     || {};
       const student = (b.studentId && profileMap[b.studentId]) || {};
@@ -177,6 +189,7 @@ app.get('/bookings', async (c) => {
         googleMeetLink: b.meetLink ?? null,
         price:          String(15000),
         createdAt:      new Date().toISOString(),
+        report:         reportByBookingId.get(b.id) ?? null,
       };
     });
 
