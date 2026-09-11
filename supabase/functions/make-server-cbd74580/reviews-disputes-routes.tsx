@@ -1,7 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
-import { requireAdmin, requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
+import { requireAdmin, requireSelfOrAdmin, verifyUser, isAdmin } from './route-auth.tsx';
 import { logAuditEvent } from './activity-log.tsx';
 import { processSessionAttendance } from './payment-routes.tsx';
 
@@ -494,44 +494,56 @@ app.post('/disputes', async (c) => {
   }
 });
 
-// GET /disputes — Fetch disputes for a user or admin
+// GET /disputes — Fetch disputes for a user, or every dispute for an admin.
+//
+// SECURITY: this used to trust two client-supplied query params instead of
+// the caller's actual verified identity: (1) `role=admin` alone unlocked
+// every dispute on the platform, and requireSelfOrAdmin(c, userId) always
+// passes when userId is the caller's own id — so any signed-in parent or
+// tutor could call `?userId=<their own id>&role=admin` with their own
+// perfectly valid token and read every other user's dispute descriptions,
+// evidence, and admin notes. (2) Separately, passing `status` alone (no
+// role trick needed) returned every dispute with that status platform-wide,
+// completely ignoring userId — so `?userId=<own id>&status=pending` leaked
+// the same data even without the role param. Both branches ran before the
+// self-vs-admin distinction from the auth check above was ever consulted
+// again. Fixed by deriving admin-ness from isAdmin(callerId) — the server's
+// own record of the verified caller — never from what the request claims.
 app.get('/disputes', async (c) => {
   try {
     const filterUserId = c.req.query('userId');
+    let callerId: string;
     if (filterUserId) {
       const auth = await requireSelfOrAdmin(c, filterUserId);
       if (auth instanceof Response) return auth;
+      callerId = auth;
     } else {
       const auth = await requireAdmin(c);
       if (auth instanceof Response) return auth;
+      callerId = auth;
     }
-    const userId = c.req.query('userId');
+
     const status = c.req.query('status');
-    const role = c.req.query('role');
+    const callerIsAdmin = await isAdmin(callerId);
 
-    let disputeIds: string[] = [];
-
-    if (role === 'admin') {
+    let disputes: any[];
+    if (callerIsAdmin) {
       const all = await kv.getByPrefix('dispute:dispute_');
-      const disputes = all.map((d: any) => (typeof d === 'object' && d.value ? d.value : d)).filter(Boolean);
-      disputes.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
-      return c.json({ disputes });
-    }
-
-    if (status) {
-      const keys = await kv.getByPrefix(`dispute:status:${status}`);
-      disputeIds = keys.map((k: any) => (typeof k === 'string' ? k : k.value)).filter(Boolean);
-    } else if (userId) {
-      const submittedKeys = await kv.getByPrefix(`dispute:submittedBy:${userId}`);
-      const againstKeys = await kv.getByPrefix(`dispute:submittedAgainst:${userId}`);
+      disputes = all.map((d: any) => (typeof d === 'object' && d.value ? d.value : d)).filter(Boolean);
+      if (status) disputes = disputes.filter((d: any) => d.status === status);
+    } else {
+      // Non-admin: always scoped to the caller's own verified id, never the
+      // raw query param — requireSelfOrAdmin already forces filterUserId to
+      // equal callerId for a non-admin caller, but building the index keys
+      // from callerId directly removes any remaining reliance on that.
+      const submittedKeys = await kv.getByPrefix(`dispute:submittedBy:${callerId}`);
+      const againstKeys = await kv.getByPrefix(`dispute:submittedAgainst:${callerId}`);
       const sIds = submittedKeys.map((k: any) => (typeof k === 'string' ? k : k.value)).filter(Boolean);
       const aIds = againstKeys.map((k: any) => (typeof k === 'string' ? k : k.value)).filter(Boolean);
-      disputeIds = [...new Set([...sIds, ...aIds])];
+      const disputeIds = [...new Set([...sIds, ...aIds])];
+      disputes = (await Promise.all(disputeIds.map((id: string) => kv.get(`dispute:${id}`)))).filter(Boolean);
+      if (status) disputes = disputes.filter((d: any) => d.status === status);
     }
-
-    const disputes = (
-      await Promise.all(disputeIds.map((id: string) => kv.get(`dispute:${id}`)))
-    ).filter(Boolean);
 
     disputes.sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
 

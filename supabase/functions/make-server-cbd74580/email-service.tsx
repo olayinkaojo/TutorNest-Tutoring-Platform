@@ -353,8 +353,23 @@ export const emailTemplates = {
       </td></tr></table></body></html>`,
   }),
 
-  // Session report notification — world-class
-  sessionReportNotification: (parentName: string, tutorName: string, studentName: string, subject: string, date: string, progressStatus: string, reportLink: string) => ({
+  // Session report notification — world-class. Sent when a tutor submits a
+  // real post-session report (PostSessionReport.tsx / POST
+  // /bookings/:bookingId/report), the only report system left in the app —
+  // this template used to describe a different, now-deleted freeform-
+  // notebook report shape (a `progressStatus` enum that field never existed
+  // on a real report) and had zero real callers, since the only code that
+  // ever invoked it was that deleted notebook system.
+  sessionReportNotification: (
+    parentName: string,
+    tutorName: string,
+    studentName: string,
+    subject: string,
+    date: string,
+    engagementLabel: string,
+    reportLink: string,
+    reviewLink: string,
+  ) => ({
     subject: `Session report ready — ${studentName} with ${tutorName}`,
     html: `
       <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
@@ -393,19 +408,22 @@ export const emailTemplates = {
                     <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${date}</td>
                   </tr>
                   <tr>
-                    <td style="padding:7px 0;font-size:14px;color:#6b7280;">📈 Progress</td>
-                    <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${progressStatus.charAt(0).toUpperCase() + progressStatus.slice(1)}</td>
+                    <td style="padding:7px 0;font-size:14px;color:#6b7280;">🙋 Engagement</td>
+                    <td style="padding:7px 0;font-size:14px;color:#111827;font-weight:600;">${engagementLabel}</td>
                   </tr>
                 </table>
               </td></tr>
             </table>
-            <div style="text-align:center;margin-bottom:24px;">
+            <div style="text-align:center;margin-bottom:16px;">
               <a href="${reportLink}" style="display:inline-block;background:#625d9c;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">View Full Report</a>
+            </div>
+            <div style="text-align:center;margin-bottom:24px;">
+              <a href="${reviewLink}" style="display:inline-block;color:#625d9c;font-size:14px;font-weight:600;padding:6px 12px;text-decoration:none;border-bottom:1px solid #625d9c;">⭐ Rate this session</a>
             </div>
             <table width="100%" cellpadding="0" cellspacing="0" style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:8px;margin-bottom:24px;">
               <tr><td style="padding:16px 24px;">
                 <p style="margin:0;font-size:14px;color:#1e40af;line-height:1.6;">
-                  💡 Reports help you track your child's progress over time. Review strengths, areas for improvement, and homework set by the tutor.
+                  💡 Reports help you track your child's progress over time. Review strengths, areas for improvement, and homework set by the tutor — and a quick rating helps other families choose the right tutor too.
                 </p>
               </td></tr>
             </table>

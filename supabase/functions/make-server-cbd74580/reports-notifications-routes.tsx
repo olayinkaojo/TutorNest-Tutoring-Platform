@@ -5,6 +5,7 @@ import { processSessionAttendance } from './payment-routes.tsx';
 import { createNotification as brokerCreateNotification } from './notification-broker.tsx';
 import { collectBookingsForUser } from './messaging-access.tsx';
 import { resolveProfiles, resolveName } from './profile-resolution.tsx';
+import { sendEmail, emailTemplates } from './email-service.tsx';
 
 // Create a route handler function that can receive getUserId
 /**
@@ -216,13 +217,42 @@ app.post('/make-server-cbd74580/bookings/:bookingId/report', async (c) => {
         metadata: { bookingId, reportId: report.id }
       });
 
-      // Send email notification
-      await sendEmailNotification({
-        to: parentId,
-        subject: 'New Session Report Available',
-        template: 'session-report',
-        data: { booking, report }
-      });
+      // Send the parent a real email — this used to call a local
+      // sendEmailNotification stub that only ever console.log'd, so a
+      // report being submitted produced an in-app notification but no
+      // actual email (removed that stub now that this calls the real
+      // sendEmail/emailTemplates pipeline instead). Includes a review CTA
+      // per Olayinka's request: the most natural moment to ask a parent to
+      // rate the session is right when they're told it's done and there's
+      // something to read.
+      const parentProfileMap = await resolveProfiles([parentId]);
+      const parentProfile = parentProfileMap[parentId];
+      const parentEmail = parentProfile?.email;
+      if (parentEmail) {
+        const parentName = resolveName(parentProfileMap, parentId, 'there');
+        const appUrl = Deno.env.get('VITE_APP_URL') || Deno.env.get('FRONTEND_URL') || 'https://app.knowledgefonsacademy.com';
+        const formattedDate = booking.date
+          ? new Date(`${booking.date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+          : '';
+        const engagementLabels: Record<string, string> = {
+          excellent: 'Excellent',
+          good: 'Good',
+          satisfactory: 'Satisfactory',
+          needs_improvement: 'Needs Improvement',
+        };
+        const engagementLabel = engagementLabels[report.studentEngagement as string] || 'Not specified';
+        const tpl = emailTemplates.sessionReportNotification(
+          parentName,
+          tutorName,
+          studentName,
+          booking.subject || booking.notes || 'Tutoring session',
+          formattedDate,
+          engagementLabel,
+          `${appUrl}/dashboard/parent/session-reports`,
+          `${appUrl}/dashboard/parent/reviews`,
+        );
+        await sendEmail({ to: parentEmail, ...tpl }).catch((e) => console.warn('session report email (parent):', e));
+      }
     } catch (e: any) {
       console.warn('Report notification/email (non-fatal):', e.message);
     }
@@ -792,12 +822,6 @@ function sanitizeReportText(text: string): string {
 async function createNotification(data: any) {
   const result = await brokerCreateNotification(kv, data);
   return { id: result.notificationId, ...data, read: false, createdAt: new Date().toISOString() };
-}
-
-async function sendEmailNotification(data: any) {
-  // In production, integrate with SendGrid, Mailgun, etc.
-  console.log('Email notification:', data);
-  // TODO: Implement email sending
 }
 
 async function updateTutorRating(tutorId: string, newRating: number) {
