@@ -6,6 +6,9 @@ import { sendEmail, emailTemplates } from './email-service.tsx';
 import { logAuditEvent, ActivityCategory } from './activity-log.tsx';
 import { createNotification } from './notification-broker.tsx';
 import { getIndexedItems } from './kv-index-helpers.tsx';
+import { resolveProfiles, resolveName } from './profile-resolution.tsx';
+import { collectBookingsForUser } from './messaging-access.tsx';
+import { getReportsForBookings } from './reports-notifications-routes.tsx';
 
 // Helper function to format timestamp
 function formatTimestamp(timestamp: string): string {
@@ -2718,32 +2721,10 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         }),
       );
 
-      const profileIds = [
-        ...new Set(
-          [...bookingById.values()].flatMap((b: any) =>
-            [b.tutorId, b.studentId, b.userId ?? b.parentId].filter(Boolean),
-          ),
-        ),
-      ];
-      const profileMap: Record<string, any> = {};
-      await Promise.all(
-        profileIds.map(async (id) => {
-          const dbProfile = await db.getProfile(id).catch(() => null);
-          if (dbProfile) { profileMap[id] = dbProfile; return; }
-          const kvUser = await kv.get(`user:${id}`).catch(() => null);
-          if (kvUser) { profileMap[id] = kvUser; return; }
-          const kvChild = await kv.get(`child:${id}`).catch(() => null);
-          if (kvChild) profileMap[id] = kvChild;
-        }),
+      const profileIds = [...bookingById.values()].flatMap((b: any) =>
+        [b.tutorId, b.studentId, b.userId ?? b.parentId],
       );
-      const resolveName = (id: string | undefined, fallback: string): string => {
-        const p = id ? profileMap[id] : null;
-        return (
-          p?.fullName || p?.full_name || p?.name ||
-          (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
-          fallback
-        );
-      };
+      const profileMap = await resolveProfiles(profileIds);
 
       const enriched = reports.map((r) => {
         const booking = bookingById.get(r.bookingId);
@@ -2752,9 +2733,9 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
           tutorId: booking?.tutorId,
           studentId: booking?.studentId,
           parentId: booking?.userId ?? booking?.parentId,
-          tutorName: resolveName(booking?.tutorId, 'Unknown tutor'),
-          studentName: resolveName(booking?.studentId, 'Unknown student'),
-          parentName: resolveName(booking?.userId ?? booking?.parentId, ''),
+          tutorName: resolveName(profileMap, booking?.tutorId, 'Unknown tutor'),
+          studentName: resolveName(profileMap, booking?.studentId, 'Unknown student'),
+          parentName: resolveName(profileMap, booking?.userId ?? booking?.parentId, ''),
           subject: booking?.subject,
           sessionDate: booking?.date,
           startTime: booking?.startTime,
@@ -2768,6 +2749,91 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
     } catch (err: any) {
       console.error('Error fetching session reports for admin:', err);
       return c.json({ error: err.message || 'Failed to fetch session reports' }, 500);
+    }
+  });
+
+  // One-call "everything about this person" view for the Users tab's
+  // detail panel — children, bookings, payments, and session reports, all
+  // touching the given user, instead of an admin piecing that together by
+  // hand across the Users/Payments/Bookings/Session-Reports tabs. Built
+  // first for parents (children + every child's activity); tutorId/
+  // studentId still resolve bookings/payments/reports correctly since
+  // collectBookingsForUser and db.getPaymentsByUserId aren't parent-only —
+  // children just comes back empty for a non-parent.
+  app.get('/make-server-cbd74580/admin/users/:userId/family-overview', async (c) => {
+    try {
+      const userId = c.req.param('userId');
+
+      // Children: parent_children:<id> is the same live-maintained index
+      // parent-children-routes.tsx keeps in sync on every add — unlike the
+      // now-removed notebook system, this one is real.
+      const childIds = ((await kv.get(`parent_children:${userId}`)) as string[] | null) ?? [];
+      const children = (
+        await Promise.all(
+          childIds.map(async (rawId) => {
+            const key = rawId.startsWith('child:') ? rawId : `child:${rawId}`;
+            const child = await kv.get(key).catch(() => null);
+            if (!child) return null;
+            return {
+              id: child.id,
+              firstName: child.firstName,
+              lastName: child.lastName,
+              age: calculateAge(child.dateOfBirth),
+              gradeLevel: child.gradeLevel,
+              subjects: child.subjects || [],
+            };
+          }),
+        )
+      ).filter(Boolean);
+
+      // Bookings: every booking touching this identity, however it relates
+      // (as the paying parent, the tutor, or the student) — same resolution
+      // GET /bookings and messaging already rely on.
+      const bookings = await collectBookingsForUser(userId);
+      const bookingProfileIds = bookings.flatMap((b: any) => [
+        b.tutorId ?? b.tutor_id,
+        b.studentId ?? b.student_id,
+      ]);
+      const bookingProfiles = await resolveProfiles(bookingProfileIds);
+      const enrichedBookings = bookings
+        .map((b: any) => ({
+          id: b.id,
+          tutorName: resolveName(bookingProfiles, b.tutorId ?? b.tutor_id, 'Tutor'),
+          studentName: resolveName(bookingProfiles, b.studentId ?? b.student_id, 'Student'),
+          subject: b.subject,
+          date: b.date,
+          startTime: b.startTime ?? b.start_time,
+          endTime: b.endTime ?? b.end_time,
+          status: b.status,
+        }))
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+      const bookingCounts = {
+        total: enrichedBookings.length,
+        upcoming: enrichedBookings.filter((b) => b.status === 'confirmed').length,
+        completed: enrichedBookings.filter((b) => b.status === 'completed').length,
+        cancelled: enrichedBookings.filter((b) => b.status === 'cancelled').length,
+      };
+
+      // Payments: real Postgres payment history for this identity.
+      const payments = await db.getPaymentsByUserId(userId).catch(() => [] as any[]);
+      const totalSpent = payments
+        .filter((p: any) => p.status === 'successful' || p.status === 'completed')
+        .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+
+      // Session reports: reuse the exact same bookings-to-reports
+      // resolution GET /my-session-reports uses for a person's own view —
+      // admin sees the identical data, just for someone else's identity.
+      const reports = await getReportsForBookings(bookings);
+
+      return c.json({
+        children,
+        bookings: { ...bookingCounts, recent: enrichedBookings.slice(0, 5) },
+        payments: { totalSpent, recent: payments.slice(0, 5) },
+        reports: { total: reports.length, recent: reports.slice(0, 5) },
+      });
+    } catch (err: any) {
+      console.error('Error fetching family overview for admin:', err);
+      return c.json({ error: err.message || 'Failed to fetch family overview' }, 500);
     }
   });
 

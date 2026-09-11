@@ -4,8 +4,60 @@ import * as db from './db.tsx';
 import { processSessionAttendance } from './payment-routes.tsx';
 import { createNotification as brokerCreateNotification } from './notification-broker.tsx';
 import { collectBookingsForUser } from './messaging-access.tsx';
+import { resolveProfiles, resolveName } from './profile-resolution.tsx';
 
 // Create a route handler function that can receive getUserId
+/**
+ * Batch-fetches the report:<bookingId> record for each given booking (if
+ * one exists) and enriches it with tutor/student names + session details
+ * pulled off the booking itself, since a report record doesn't carry those.
+ * Shared by GET /my-session-reports and admin's per-user family overview
+ * (admin-routes.tsx) — extracted so this exact resolution logic doesn't
+ * drift the way it already had across three near-identical copies before
+ * profile-resolution.tsx existed.
+ */
+export async function getReportsForBookings(bookings: any[]): Promise<any[]> {
+  const bookingIds = bookings.map((b: any) => b.id).filter(Boolean);
+  if (bookingIds.length === 0) return [];
+
+  const reportValues = await kv.mget(bookingIds.map((id: string) => `report:${id}`));
+  const bookingById = new Map(bookings.map((b: any) => [b.id, b]));
+
+  const profileIds = bookings.flatMap((b: any) => [
+    b.tutorId ?? b.tutor_id,
+    b.studentId ?? b.student_id,
+    b.userId ?? b.user_id ?? b.parentId,
+  ]);
+  const profileMap = await resolveProfiles(profileIds);
+
+  const reports = bookingIds
+    .map((id: string, i: number) => {
+      const report = reportValues[i] as any;
+      if (!report) return null;
+      const booking: any = bookingById.get(id) || {};
+      const tutorId = booking.tutorId ?? booking.tutor_id;
+      const studentId = booking.studentId ?? booking.student_id;
+      const parentId = booking.userId ?? booking.user_id ?? booking.parentId;
+      return {
+        ...report,
+        bookingId: id,
+        tutorId,
+        studentId,
+        parentId,
+        tutorName: resolveName(profileMap, tutorId, 'Tutor'),
+        studentName: resolveName(profileMap, studentId, 'Student'),
+        subject: booking.subject,
+        sessionDate: booking.date,
+        startTime: booking.startTime ?? booking.start_time,
+        endTime: booking.endTime ?? booking.end_time,
+      };
+    })
+    .filter(Boolean) as any[];
+
+  reports.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+  return reports;
+}
+
 export function reportsNotificationsRoutes(app: Hono, getUserId: Function) {
   
 // TEST ROUTE - Verify notifications endpoint is accessible
@@ -230,71 +282,7 @@ app.get('/make-server-cbd74580/my-session-reports', async (c) => {
     }
 
     const bookings = await collectBookingsForUser(callerId);
-    const bookingIds = bookings.map((b: any) => b.id).filter(Boolean);
-    if (bookingIds.length === 0) {
-      return c.json({ reports: [] });
-    }
-
-    const reportValues = await kv.mget(bookingIds.map((id: string) => `report:${id}`));
-    const bookingById = new Map(bookings.map((b: any) => [b.id, b]));
-
-    // Resolve tutor/student/parent display names once per unique person,
-    // same DB-profile -> KV-user -> KV-child fallback order used elsewhere
-    // (GET /bookings, GET /admin/session-reports) since participants can be
-    // Postgres accounts, KV-only accounts, or a KV-only child profile.
-    const profileIds = [
-      ...new Set(
-        bookings.flatMap((b: any) =>
-          [b.tutorId ?? b.tutor_id, b.studentId ?? b.student_id, b.userId ?? b.user_id ?? b.parentId].filter(Boolean),
-        ),
-      ),
-    ];
-    const profileMap: Record<string, any> = {};
-    await Promise.all(
-      profileIds.map(async (id: string) => {
-        const dbProfile = await db.getProfile(id).catch(() => null);
-        if (dbProfile) { profileMap[id] = dbProfile; return; }
-        const kvUser = await kv.get(`user:${id}`).catch(() => null);
-        if (kvUser) { profileMap[id] = kvUser; return; }
-        const kvChild = await kv.get(`child:${id}`).catch(() => null);
-        if (kvChild) profileMap[id] = kvChild;
-      }),
-    );
-    const resolveName = (id: string | undefined, fallback: string): string => {
-      const p = id ? profileMap[id] : null;
-      return (
-        p?.fullName || p?.full_name || p?.name ||
-        (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
-        fallback
-      );
-    };
-
-    const reports = bookingIds
-      .map((id: string, i: number) => {
-        const report = reportValues[i] as any;
-        if (!report) return null;
-        const booking: any = bookingById.get(id) || {};
-        const tutorId = booking.tutorId ?? booking.tutor_id;
-        const studentId = booking.studentId ?? booking.student_id;
-        const parentId = booking.userId ?? booking.user_id ?? booking.parentId;
-        return {
-          ...report,
-          bookingId: id,
-          tutorId,
-          studentId,
-          parentId,
-          tutorName: resolveName(tutorId, 'Tutor'),
-          studentName: resolveName(studentId, 'Student'),
-          subject: booking.subject,
-          sessionDate: booking.date,
-          startTime: booking.startTime ?? booking.start_time,
-          endTime: booking.endTime ?? booking.end_time,
-        };
-      })
-      .filter(Boolean) as any[];
-
-    reports.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
-
+    const reports = await getReportsForBookings(bookings);
     return c.json({ reports });
   } catch (error: any) {
     console.error('Error fetching my-session-reports:', error);
