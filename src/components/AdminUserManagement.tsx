@@ -976,15 +976,20 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
                   </SectionCard>
                 )}
 
-                {!hasRole(selectedUser, 'tutor') && (
-                  <SectionCard title="Contact" icon={Mail}>
-                    <div className="divide-y divide-gray-100">
-                      <InfoField label="Email" value={selectedUser.email} />
-                      <InfoField label="Phone" value={pick(ps.phone, su.phone)} />
-                      <InfoField label="Location" value={pick(ps.location, su.location)} />
-                    </div>
-                  </SectionCard>
-                )}
+                {/* Shown for everyone, not just non-tutors — TutorSignup.tsx
+                    collects phone and location too, so hiding this card
+                    for any tutor (and therefore for a dual-role parent+
+                    tutor, whose phone/location genuinely came from their
+                    parent signup) meant admin could never see a tutor's
+                    phone number or location at all. Each field self-hides
+                    when empty, so this never renders as a dead card. */}
+                <SectionCard title="Contact" icon={Mail}>
+                  <div className="divide-y divide-gray-100">
+                    <InfoField label="Email" value={selectedUser.email} />
+                    <InfoField label="Phone" value={pick(ps.phone, su.phone)} />
+                    <InfoField label="Location" value={pick(ps.location, su.location)} />
+                  </div>
+                </SectionCard>
 
                 <SectionCard title="Account & activity" icon={Award}>
                   <div className="divide-y divide-gray-100">
