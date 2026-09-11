@@ -8,6 +8,8 @@
 // - Admin Notifications
 // - System Alerts
 
+import * as db from './db.tsx';
+
 type NotificationType =
   | 'payment_initiated'
   | 'payment_received'
@@ -55,101 +57,52 @@ interface NotificationPayload {
   sendInApp?: boolean;
 }
 
-interface NotificationMessage {
-  id: string;
-  userId: string;
-  type: NotificationType;
-  title: string;
-  message: string;
-  description?: string;
-  actionUrl?: string;
-  read: boolean;
-  readAt?: string;
-  priority: 'low' | 'normal' | 'high' | 'critical';
-  metadata: Record<string, any>;
-  createdAt: string;
-  sentVia: {
-    email: boolean;
-    inApp: boolean;
-  };
-}
-
 // ═══════════════════════════════════════════════════════════════════════════════
 // CORE NOTIFICATION BROKER
 // ═══════════════════════════════════════════════════════════════════════════════
 
 export async function createNotification(
-  kv: any,
+  // `kv` is no longer used to store notifications — Postgres is now the
+  // single source of truth (see the 2026-09-11 migration and
+  // notifications-routes.tsx). Kept as the first parameter anyway so none
+  // of this function's ~9 call sites across the codebase need to change.
+  _kv: any,
   payload: NotificationPayload
 ): Promise<{ success: boolean; notificationId: string; error?: string }> {
   try {
-    // The id IS the KV key (matches every other notification-creation site
-    // in the codebase) — this used to be generated without the
-    // "notification:" prefix while the actual kv.set below added it
-    // separately, so a notification's own .id field never matched its real
-    // KV key. That broke two things silently: the index below (pushing an
-    // id that doesn't resolve to anything via kv.mget) and POST
-    // /notifications/:notificationId/read (kv.get(notificationId) using the
-    // unprefixed id would never find the record). Only reachable for
-    // bookshop purchases before this function became the one place every
-    // notification-creation site in the codebase goes through, so it went
-    // unnoticed until GET /notifications/:userId started reading from this
-    // index instead of a full scan.
-    const notificationId = `notification:${Date.now()}_${crypto.randomUUID().replace(/-/g, '')}`;
+    const metadata = payload.metadata ?? payload.data ?? {};
+    const priority = payload.priority || 'normal';
+    const sentViaEmail = payload.sendEmail !== false;
+    const sentViaInApp = payload.sendInApp !== false;
 
-    const notification: NotificationMessage = {
-      id: notificationId,
+    const { id: notificationId } = await db.createNotification({
       userId: payload.userId,
       type: payload.type,
       title: payload.title,
       message: payload.message,
       description: payload.description,
       actionUrl: payload.actionUrl,
-      read: false,
-      priority: payload.priority || 'normal',
-      metadata: payload.metadata ?? payload.data ?? {},
-      createdAt: new Date().toISOString(),
-      sentVia: {
-        email: payload.sendEmail !== false,
-        inApp: payload.sendInApp !== false,
-      },
-    };
-
-    // Store in KV (primary storage)
-    await kv.set(notificationId, notification);
-
-    // Add to user's notification list for quick retrieval
-    const userNotificationsKey = `user_notifications:${payload.userId}`;
-    const userNotifications = (await kv.get(userNotificationsKey)) as string[] || [];
-    userNotifications.push(notificationId);
-    // Keep only last 100 notifications
-    if (userNotifications.length > 100) {
-      userNotifications.shift();
-    }
-    await kv.set(userNotificationsKey, userNotifications);
+      priority,
+      metadata,
+      sentViaEmail,
+      sentViaInApp,
+    });
 
     // If high/critical priority, also notify secondary users (e.g., admin for critical)
     if (payload.secondaryUserIds && (payload.priority === 'high' || payload.priority === 'critical')) {
       for (const secondaryUserId of payload.secondaryUserIds) {
-        const secondaryNotification: NotificationMessage = {
-          ...notification,
-          id: `notification:${Date.now()}_${crypto.randomUUID().replace(/-/g, '')}`,
+        await db.createNotification({
           userId: secondaryUserId,
-          metadata: {
-            ...notification.metadata,
-            originalRecipient: payload.userId,
-          },
-        };
-
-        await kv.set(secondaryNotification.id, secondaryNotification);
-
-        const secondaryKey = `user_notifications:${secondaryUserId}`;
-        const secondaryList = (await kv.get(secondaryKey)) as string[] || [];
-        secondaryList.push(secondaryNotification.id);
-        if (secondaryList.length > 100) {
-          secondaryList.shift();
-        }
-        await kv.set(secondaryKey, secondaryList);
+          type: payload.type,
+          title: payload.title,
+          message: payload.message,
+          description: payload.description,
+          actionUrl: payload.actionUrl,
+          priority,
+          metadata: { ...metadata, originalRecipient: payload.userId },
+          sentViaEmail,
+          sentViaInApp,
+        }).catch((e) => console.error('[NotificationBroker] secondary recipient failed:', secondaryUserId, e));
       }
     }
 

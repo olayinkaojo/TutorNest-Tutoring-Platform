@@ -92,17 +92,27 @@ CREATE TABLE IF NOT EXISTS tutor_balance (
 -- ─── Notifications ─────────────────────────────────────────────────────────────
 
 CREATE TABLE IF NOT EXISTS notifications (
-  id         UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  user_id    UUID NOT NULL,
-  type       TEXT NOT NULL,
-  title      TEXT,
-  message    TEXT,
-  read       BOOLEAN NOT NULL DEFAULT FALSE,
-  metadata   JSONB,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  id             UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id        UUID NOT NULL,
+  type           TEXT NOT NULL,
+  title          TEXT,
+  message        TEXT,
+  description    TEXT,
+  action_url     TEXT,
+  priority       TEXT NOT NULL DEFAULT 'normal',
+  read           BOOLEAN NOT NULL DEFAULT FALSE,
+  read_at        TIMESTAMPTZ,
+  sent_via_email BOOLEAN NOT NULL DEFAULT TRUE,
+  sent_via_in_app BOOLEAN NOT NULL DEFAULT TRUE,
+  metadata       JSONB,
+  -- Set only for rows backfilled from the old KV-based notification store;
+  -- lets that one-off backfill be re-run without duplicating rows.
+  legacy_kv_id   TEXT,
+  created_at     TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 CREATE INDEX IF NOT EXISTS notifications_user_id ON notifications (user_id, created_at DESC);
+CREATE UNIQUE INDEX IF NOT EXISTS notifications_legacy_kv_id_uidx ON notifications (legacy_kv_id) WHERE legacy_kv_id IS NOT NULL;
 
 -- ─── Payouts ───────────────────────────────────────────────────────────────────
 

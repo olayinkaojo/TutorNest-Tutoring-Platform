@@ -658,18 +658,42 @@ export async function createNotification(notification: {
   type: string;
   title: string;
   message: string;
+  description?: string;
+  actionUrl?: string;
+  priority?: string;
   metadata?: Record<string, unknown>;
-}): Promise<void> {
-  const { error } = await db()
+  sentViaEmail?: boolean;
+  sentViaInApp?: boolean;
+  /** Set only when backfilling a pre-existing KV notification record — lets that backfill be re-run without duplicating rows. */
+  legacyKvId?: string;
+  /** Set only when backfilling, to preserve the KV record's original timestamp instead of defaulting to now(). */
+  createdAt?: string;
+  /** Set only when backfilling, to preserve whether the KV record had already been read. */
+  read?: boolean;
+  readAt?: string;
+}): Promise<{ id: string }> {
+  const { data, error } = await db()
     .from('notifications')
     .insert({
       user_id: notification.userId,
       type: notification.type,
       title: notification.title,
       message: notification.message,
+      description: notification.description ?? null,
+      action_url: notification.actionUrl ?? null,
+      priority: notification.priority ?? 'normal',
       metadata: notification.metadata ?? null,
-    });
+      sent_via_email: notification.sentViaEmail ?? true,
+      sent_via_in_app: notification.sentViaInApp ?? true,
+      legacy_kv_id: notification.legacyKvId ?? null,
+      ...(notification.createdAt ? { created_at: notification.createdAt } : {}),
+      ...(notification.read !== undefined ? { read: notification.read } : {}),
+      ...(notification.readAt ? { read_at: notification.readAt } : {}),
+    })
+    .select('id')
+    .single();
   if (error) throw new Error(error.message);
+  return { id: data.id };
 }
 
 export async function getNotificationsByUser(userId: string): Promise<{
@@ -678,9 +702,14 @@ export async function getNotificationsByUser(userId: string): Promise<{
   type: string;
   title: string;
   message: string;
+  description?: string;
+  actionUrl?: string;
   read: boolean;
+  readAt?: string;
+  priority: string;
   metadata: any;
   createdAt: string;
+  sentVia: { email: boolean; inApp: boolean };
 }[]> {
   const { data, error } = await db()
     .from('notifications')
@@ -694,16 +723,52 @@ export async function getNotificationsByUser(userId: string): Promise<{
     type: row.type,
     title: row.title,
     message: row.message,
+    description: row.description ?? undefined,
+    actionUrl: row.action_url ?? undefined,
     read: row.read,
+    readAt: row.read_at ?? undefined,
+    priority: row.priority ?? 'normal',
     metadata: row.metadata,
     createdAt: row.created_at,
+    sentVia: { email: row.sent_via_email ?? true, inApp: row.sent_via_in_app ?? true },
   }));
 }
 
 export async function markNotificationRead(notificationId: string): Promise<void> {
   const { error } = await db()
     .from('notifications')
-    .update({ read: true })
+    .update({ read: true, read_at: new Date().toISOString() })
+    .eq('id', notificationId);
+  if (error) throw new Error(error.message);
+}
+
+/** Marks every unread notification for a user as read. Returns how many rows changed. */
+export async function markAllNotificationsRead(userId: string): Promise<number> {
+  const { data, error } = await db()
+    .from('notifications')
+    .update({ read: true, read_at: new Date().toISOString() })
+    .eq('user_id', userId)
+    .eq('read', false)
+    .select('id');
+  if (error) throw new Error(error.message);
+  return (data ?? []).length;
+}
+
+/** Returns the owning user_id of a notification, or null if it doesn't exist — lets a caller enforce ownership before deleting. */
+export async function getNotificationOwner(notificationId: string): Promise<string | null> {
+  const { data, error } = await db()
+    .from('notifications')
+    .select('user_id')
+    .eq('id', notificationId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  return data?.user_id ?? null;
+}
+
+export async function deleteNotification(notificationId: string): Promise<void> {
+  const { error } = await db()
+    .from('notifications')
+    .delete()
     .eq('id', notificationId);
   if (error) throw new Error(error.message);
 }

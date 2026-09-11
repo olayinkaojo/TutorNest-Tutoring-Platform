@@ -320,4 +320,65 @@ migrationRoutes.post('/admin/backfill-notification-index', async (c) => {
   return c.json({ success: true, results });
 });
 
+// POST /admin/backfill-notifications-to-postgres
+// One-time copy of every pre-existing KV notification record into Postgres,
+// now the sole source of truth for notifications (2026-09-11 — see
+// notification-broker.tsx and notifications-routes.tsx). Safe to run more
+// than once: each row's legacy_kv_id is unique-indexed, so a rerun just hits
+// conflict errors on rows already migrated and skips them rather than
+// duplicating. Does NOT delete the KV records — they're simply no longer
+// read from once this has run once.
+migrationRoutes.post('/admin/backfill-notifications-to-postgres', async (c) => {
+  const accessToken = c.req.header('Authorization')?.split(' ')[1];
+  const userId = await getUserIdFromToken(accessToken);
+  if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+
+  const adminUser = await kv.get(`user:${userId}`);
+  if (!adminUser || adminUser.role !== 'admin') return c.json({ error: 'Admin only' }, 403);
+
+  const results = { processed: 0, migrated: 0, alreadyMigrated: 0, skippedInvalid: 0, errors: [] as string[] };
+
+  try {
+    const kvNotifications = await kv.getByPrefix('notification:');
+
+    for (const n of kvNotifications as any[]) {
+      results.processed++;
+      if (!n?.id || !n?.userId || !n?.type) {
+        results.skippedInvalid++;
+        continue;
+      }
+      try {
+        await db.createNotification({
+          userId: n.userId,
+          type: n.type,
+          title: n.title ?? '',
+          message: n.message ?? '',
+          description: n.description,
+          actionUrl: n.actionUrl,
+          priority: n.priority ?? 'normal',
+          metadata: n.metadata ?? {},
+          sentViaEmail: n.sentVia?.email,
+          sentViaInApp: n.sentVia?.inApp,
+          legacyKvId: n.id,
+          createdAt: n.createdAt,
+          read: n.read,
+          readAt: n.readAt,
+        });
+        results.migrated++;
+      } catch (e: any) {
+        // Unique violation on legacy_kv_id — already migrated by a previous run.
+        if (e?.message?.includes('duplicate key') || e?.message?.includes('legacy_kv_id')) {
+          results.alreadyMigrated++;
+        } else {
+          results.errors.push(`${n.id}: ${e.message}`);
+        }
+      }
+    }
+  } catch (e: any) {
+    results.errors.push(e.message);
+  }
+
+  return c.json({ success: true, results });
+});
+
 export default migrationRoutes;

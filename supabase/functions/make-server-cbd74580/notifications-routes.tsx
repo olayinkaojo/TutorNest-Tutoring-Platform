@@ -42,23 +42,11 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       // Always use the authenticated user's ID for security, not the URL parameter
       const safeUserId = currentUserId;
       
-      // Get notifications from both KV (legacy — indexed via
-      // user_notifications:<userId>, maintained by every notification-
-      // creation call site through notification-broker.tsx's
-      // createNotification; see that file's comment) and DB (new) in
-      // parallel. Existing notifications from before this fix are backfilled
-      // once by POST /admin/backfill-notification-index.
-      const [kvUserNotifications, dbNotifications] = await Promise.all([
-        getIndexedItems(`user_notifications:${safeUserId}`),
-        db.getNotificationsByUser(safeUserId).catch(() => [] as any[]),
-      ]);
-
-      // Merge: DB notifications take precedence (deduplicate by id)
-      const kvIds = new Set(kvUserNotifications.map((n: any) => n.id));
-      const userNotifications = [
-        ...kvUserNotifications,
-        ...dbNotifications.filter((n) => !kvIds.has(n.id)),
-      ].sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      // Postgres is the sole source of truth for notifications (as of
+      // 2026-09-11 — see notification-broker.tsx and db.tsx). Notifications
+      // created before that migration were one-off backfilled by
+      // POST /admin/backfill-notifications-to-postgres.
+      const userNotifications = await db.getNotificationsByUser(safeUserId).catch(() => [] as any[]);
 
       console.log('Found', userNotifications.length, 'notifications for user');
       
@@ -211,16 +199,10 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
 
       const notificationId = c.req.param('notificationId');
 
-      // Try KV first, then DB
-      const kvNotification = await kv.get(notificationId) as any;
-      if (kvNotification) {
-        kvNotification.read = true;
-        await kv.set(notificationId, kvNotification);
-      } else {
-        // May be a UUID from the notifications table
-        await db.markNotificationRead(notificationId).catch(() => {
-          // Silent fail — booking-generated notifications (booking-notification:xxx) are ephemeral
-        });
+      // Dynamically-generated booking reminders (id starts with
+      // "booking-notification:") aren't real rows — nothing to persist.
+      if (!notificationId.startsWith('booking-notification:')) {
+        await db.markNotificationRead(notificationId).catch(() => {});
       }
 
       return c.json({ success: true });
@@ -240,13 +222,11 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
         return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const userId = c.req.param('userId');
-      const userNotifications = await getIndexedItems(`user_notifications:${userId}`);
-
-      for (const notification of userNotifications) {
-        notification.read = true;
-        await kv.set(notification.id, notification);
-      }
+      // Always use the authenticated user's own id, not the URL param —
+      // this previously fetched currentUserId but never actually compared
+      // it against the requested :userId, so any signed-in user could mark
+      // another user's notifications read.
+      await db.markAllNotificationsRead(currentUserId);
 
       return c.json({ success: true });
     } catch (error: any) {
@@ -266,11 +246,11 @@ export const notificationsRoutes = (app: Hono, getUserId: Function) => {
       }
 
       const notificationId = c.req.param('notificationId');
-      const existing = await kv.get(notificationId) as any;
-      if (existing && existing.userId && existing.userId !== userId) {
+      const ownerId = await db.getNotificationOwner(notificationId);
+      if (ownerId && ownerId !== userId) {
         return c.json({ error: 'Forbidden' }, 403);
       }
-      await kv.del(notificationId);
+      await db.deleteNotification(notificationId);
 
       return c.json({ success: true });
     } catch (error: any) {
