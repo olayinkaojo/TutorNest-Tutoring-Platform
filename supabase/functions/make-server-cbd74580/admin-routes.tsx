@@ -2753,13 +2753,14 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
   });
 
   // One-call "everything about this person" view for the Users tab's
-  // detail panel — children, bookings, payments, and session reports, all
-  // touching the given user, instead of an admin piecing that together by
-  // hand across the Users/Payments/Bookings/Session-Reports tabs. Built
-  // first for parents (children + every child's activity); tutorId/
-  // studentId still resolve bookings/payments/reports correctly since
-  // collectBookingsForUser and db.getPaymentsByUserId aren't parent-only —
-  // children just comes back empty for a non-parent.
+  // detail panel — children, bookings, payments, payouts, and session
+  // reports, all touching the given user, instead of an admin piecing that
+  // together by hand across the Users/Payments/Bookings/Payouts/Session-
+  // Reports tabs. Role-agnostic under the hood: children is only ever
+  // populated for a parent (parent_children:<id>) and payouts only for a
+  // tutor (payouts.tutor_id), everything else resolves correctly for
+  // whichever identity is passed. The frontend decides which sections to
+  // show based on the selected user's actual role(s).
   app.get('/make-server-cbd74580/admin/users/:userId/family-overview', async (c) => {
     try {
       const userId = c.req.param('userId');
@@ -2825,11 +2826,19 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       // admin sees the identical data, just for someone else's identity.
       const reports = await getReportsForBookings(bookings);
 
+      // Payouts: only meaningful for a tutor (payouts.tutor_id) — empty for
+      // everyone else, same as children is empty for a non-parent.
+      const payouts = await db.listPayoutsByTutor(userId).catch(() => [] as any[]);
+      const totalPaidOut = payouts
+        .filter((p: any) => p.status === 'completed')
+        .reduce((sum: number, p: any) => sum + (Number(p.amount) || 0), 0);
+
       return c.json({
         children,
         bookings: { ...bookingCounts, recent: enrichedBookings.slice(0, 5) },
         payments: { totalSpent, recent: payments.slice(0, 5) },
         reports: { total: reports.length, recent: reports.slice(0, 5) },
+        payouts: { totalPaidOut, recent: payouts.slice(0, 5) },
       });
     } catch (err: any) {
       console.error('Error fetching family overview for admin:', err);
