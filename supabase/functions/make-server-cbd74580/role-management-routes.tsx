@@ -94,9 +94,20 @@ app.post('/add-role', async (c) => {
       return c.json({ success: false, error: 'Invalid role' }, 400);
     }
 
-    // Get existing roles
-    const existingRoles = await kv.get(`user_roles:${userId}`) as string[] || [];
-    
+    // Get existing roles. Bootstrap with the account's current role the
+    // first time this feature is ever used for it — otherwise user_roles
+    // would only ever contain roles added THROUGH this endpoint, never the
+    // original signup role, and that original role becomes unrecoverable
+    // the moment /switch-role later overwrites user:<id>.role (nothing
+    // else remembers what it used to be). This is also what
+    // GET /admin/users' allRoles reads from, to show a dual-role user as
+    // more than just whichever dashboard they're currently sat in.
+    let existingRoles = await kv.get(`user_roles:${userId}`) as string[] || [];
+    if (existingRoles.length === 0) {
+      const currentProfile = await kv.get(`user:${userId}`) as { role?: string } | null;
+      if (currentProfile?.role) existingRoles = [currentProfile.role];
+    }
+
     // Check if role already exists
     if (existingRoles.includes(newRole)) {
       return c.json({ success: false, error: 'Role already exists' }, 400);
