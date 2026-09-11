@@ -22,6 +22,17 @@ import {
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
 
+/** Booking objects don't reliably carry a `duration` field — derive it from start/end time so the summary never shows "undefined minutes". */
+function deriveDurationMinutes(booking: any): number | null {
+  if (typeof booking?.duration === 'number') return booking.duration;
+  if (!booking?.startTime || !booking?.endTime) return null;
+  const [sh, sm] = String(booking.startTime).split(':').map(Number);
+  const [eh, em] = String(booking.endTime).split(':').map(Number);
+  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return null;
+  const minutes = (eh * 60 + em) - (sh * 60 + sm);
+  return minutes > 0 ? minutes : null;
+}
+
 interface ViewSessionReportProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
@@ -153,7 +164,9 @@ export function ViewSessionReport({
                     <Clock className="w-4 h-4" />
                     <span>Duration</span>
                   </div>
-                  <p className="font-medium">{booking.duration} minutes</p>
+                  <p className="font-medium">
+                    {deriveDurationMinutes(booking) != null ? `${deriveDurationMinutes(booking)} minutes` : '—'}
+                  </p>
                 </div>
                 <div>
                   <div className="flex items-center gap-1 text-gray-600 mb-1">

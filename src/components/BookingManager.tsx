@@ -596,25 +596,25 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
     );
   }
 
-  if (showPostReport) {
-    return (
-      <div>
-        <Button
-          variant="outline"
-          onClick={() => setShowPostReport(null)}
-          className="mb-4"
-        >
-          ← Back to Bookings
-        </Button>
+  return (
+    <div className="space-y-6">
+      {/* Post-session report dialog (tutor) — rendered here rather than as
+          a page swap so it overlays the booking list like the other
+          dialogs on this page, instead of hiding it behind a manual "Back"
+          button. Mounted only while a booking is selected: unlike the
+          Reschedule dialog below, PostSessionReport/ViewSessionReport
+          access `booking.*` directly (no optional chaining), so mounting
+          them with a null booking would throw even while closed — React
+          evaluates a component's JSX body regardless of the `open` prop
+          it's handed. */}
+      {showPostReport && (
         <PostSessionReport
+          open
+          onOpenChange={(isOpen) => { if (!isOpen) setShowPostReport(null); }}
           session={session}
-          bookingId={showPostReport.id}
-          userRole={userRole}
-          studentName={showPostReport.studentName}
-          tutorName={showPostReport.tutorName}
-          startTime={showPostReport.startTime}
-          endTime={showPostReport.endTime}
-          onReportSubmit={(report) => {
+          booking={showPostReport}
+          existingReport={bookingReports[showPostReport.id]}
+          onReportSubmitted={(report) => {
             setBookingReports(prev => ({
               ...prev,
               [showPostReport.id]: report
@@ -622,37 +622,20 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
             setShowPostReport(null);
           }}
         />
-      </div>
-    );
-  }
+      )}
 
-  if (showViewReport) {
-    const report = bookingReports[showViewReport.id];
-    return (
-      <div>
-        <Button
-          variant="outline"
-          onClick={() => setShowViewReport(null)}
-          className="mb-4"
-        >
-          ← Back to Bookings
-        </Button>
+      {/* View submitted report dialog (parent/tutor) */}
+      {showViewReport && (
         <ViewSessionReport
+          open
+          onOpenChange={(isOpen) => { if (!isOpen) setShowViewReport(null); }}
           session={session}
-          bookingId={showViewReport.id}
           userRole={userRole}
-          studentName={showViewReport.studentName}
-          tutorName={showViewReport.tutorName}
-          startTime={showViewReport.startTime}
-          endTime={showViewReport.endTime}
-          report={report}
+          booking={showViewReport}
+          report={bookingReports[showViewReport.id]}
         />
-      </div>
-    );
-  }
+      )}
 
-  return (
-    <div className="space-y-6">
       {/* Reschedule Dialog */}
       <Dialog open={!!rescheduleBooking} onOpenChange={(open) => { if (!open) setRescheduleBooking(null); }}>
         <DialogContent className="max-w-md">

@@ -27,7 +27,20 @@ interface PostSessionReportProps {
   onOpenChange: (open: boolean) => void;
   booking: any;
   session: any;
-  onReportSubmitted?: () => void;
+  /** Pass the booking's existing report (if any) so re-opening this to edit doesn't discard prior answers. */
+  existingReport?: any;
+  onReportSubmitted?: (report: any) => void;
+}
+
+/** Booking objects don't reliably carry a `duration` field — derive it from start/end time so the summary never shows "undefined minutes". */
+function deriveDurationMinutes(booking: any): number | null {
+  if (typeof booking?.duration === 'number') return booking.duration;
+  if (!booking?.startTime || !booking?.endTime) return null;
+  const [sh, sm] = String(booking.startTime).split(':').map(Number);
+  const [eh, em] = String(booking.endTime).split(':').map(Number);
+  if ([sh, sm, eh, em].some((n) => Number.isNaN(n))) return null;
+  const minutes = (eh * 60 + em) - (sh * 60 + sm);
+  return minutes > 0 ? minutes : null;
 }
 
 const SKILLS_CATEGORIES = {
@@ -49,30 +62,35 @@ const SKILLS_CATEGORIES = {
   ]
 };
 
-export function PostSessionReport({ 
-  open, 
-  onOpenChange, 
-  booking, 
+export function PostSessionReport({
+  open,
+  onOpenChange,
+  booking,
   session,
-  onReportSubmitted 
+  existingReport,
+  onReportSubmitted
 }: PostSessionReportProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  
-  // Report fields
-  const [sessionSummary, setSessionSummary] = useState('');
-  const [topicsCovered, setTopicsCovered] = useState<string[]>([]);
+
+  // Report fields — seeded from existingReport (via lazy initializers) so
+  // reopening this to edit an already-submitted report starts from what was
+  // there before, rather than a blank form. This component fully remounts
+  // each time a different booking is selected, so a lazy initializer here
+  // is enough; no effect needed to resync on prop changes.
+  const [sessionSummary, setSessionSummary] = useState(existingReport?.sessionSummary ?? '');
+  const [topicsCovered, setTopicsCovered] = useState<string[]>(existingReport?.topicsCovered ?? []);
   const [newTopic, setNewTopic] = useState('');
-  const [skillsWorked, setSkillsWorked] = useState<string[]>([]);
-  const [homeworkAssigned, setHomeworkAssigned] = useState('');
-  const [homeworkDueDate, setHomeworkDueDate] = useState('');
-  const [progressAssessment, setProgressAssessment] = useState('');
-  const [studentEngagement, setStudentEngagement] = useState('');
-  const [areasOfStrength, setAreasOfStrength] = useState('');
-  const [areasForImprovement, setAreasForImprovement] = useState('');
-  const [nextLessonFocus, setNextLessonFocus] = useState('');
-  const [recommendNextSession, setRecommendNextSession] = useState(true);
-  const [studentAttended, setStudentAttended] = useState(true);
+  const [skillsWorked, setSkillsWorked] = useState<string[]>(existingReport?.skillsWorked ?? []);
+  const [homeworkAssigned, setHomeworkAssigned] = useState(existingReport?.homeworkAssigned ?? '');
+  const [homeworkDueDate, setHomeworkDueDate] = useState(existingReport?.homeworkDueDate ?? '');
+  const [progressAssessment, setProgressAssessment] = useState(existingReport?.progressAssessment ?? '');
+  const [studentEngagement, setStudentEngagement] = useState(existingReport?.studentEngagement ?? '');
+  const [areasOfStrength, setAreasOfStrength] = useState(existingReport?.areasOfStrength ?? '');
+  const [areasForImprovement, setAreasForImprovement] = useState(existingReport?.areasForImprovement ?? '');
+  const [nextLessonFocus, setNextLessonFocus] = useState(existingReport?.nextLessonFocus ?? '');
+  const [recommendNextSession, setRecommendNextSession] = useState(existingReport?.recommendNextSession ?? true);
+  const [studentAttended, setStudentAttended] = useState(existingReport?.studentAttended ?? true);
 
   const addTopic = () => {
     if (newTopic.trim() && !topicsCovered.includes(newTopic.trim())) {
@@ -132,12 +150,12 @@ export function PostSessionReport({
         }
       );
 
+      const data = await response.json();
       if (!response.ok) {
-        const data = await response.json();
         throw new Error(data.error || 'Failed to submit report');
       }
 
-      onReportSubmitted?.();
+      onReportSubmitted?.(data.report);
       onOpenChange(false);
     } catch (err: any) {
       console.error('Error submitting report:', err);
@@ -153,7 +171,7 @@ export function PostSessionReport({
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <FileText className="w-5 h-5" style={{ color: '#625d9c' }} />
-            Post-Session Report
+            {existingReport ? 'Edit Session Report' : 'Post-Session Report'}
           </DialogTitle>
           <DialogDescription>
             Document what was covered and the student's progress
@@ -185,7 +203,9 @@ export function PostSessionReport({
               </div>
               <div>
                 <span className="text-gray-600">Duration:</span>
-                <p className="font-medium">{booking.duration} minutes</p>
+                <p className="font-medium">
+                  {deriveDurationMinutes(booking) != null ? `${deriveDurationMinutes(booking)} minutes` : '—'}
+                </p>
               </div>
             </div>
           </div>
@@ -221,9 +241,10 @@ export function PostSessionReport({
             <Textarea
               id="sessionSummary"
               value={sessionSummary}
-              onChange={(e) => setSessionSummary(e.target.value)}
+              onChange={(e) => setSessionSummary(e.target.value.slice(0, 500))}
               placeholder="Provide a detailed summary of today's lesson, what you covered, and how the student performed..."
               rows={4}
+              maxLength={500}
               className="resize-none"
             />
             <p className="text-xs text-gray-500">{sessionSummary.length}/500 characters</p>
@@ -422,12 +443,12 @@ export function PostSessionReport({
             {loading ? (
               <>
                 <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                Submitting...
+                {existingReport ? 'Saving...' : 'Submitting...'}
               </>
             ) : (
               <>
                 <CheckCircle className="w-4 h-4 mr-2" />
-                Submit Report
+                {existingReport ? 'Save Changes' : 'Submit Report'}
               </>
             )}
           </Button>

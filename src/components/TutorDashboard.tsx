@@ -999,7 +999,7 @@ export function TutorDashboard({
               </p>
             </div>
             <Button size="sm" variant="outline" className="border-amber-300 text-amber-700 text-xs hover:bg-amber-50"
-              onClick={() => typeof onTabChange === 'function' && onTabChange('reports')}>
+              onClick={() => setActiveTab('bookings')}>
               Write Reports
             </Button>
           </div>
@@ -1267,16 +1267,12 @@ export function TutorDashboard({
                             </div>
                             <div className="text-right flex flex-col items-end gap-2">
                               <p className="text-sm">{formatNaira(lesson.price || '0')}</p>
-                              {lesson.status === 'completed' && !lesson.reportSubmitted && (
+                              {lesson.status === 'completed' && !lesson.reportSubmitted && !lesson.report && (
                                 <Button
                                   size="sm"
                                   variant="outline"
                                   className="text-xs border-purple-300 text-purple-700 hover:bg-purple-50"
-                                  onClick={() => {
-                                    if (typeof onTabChange === 'function') {
-                                      onTabChange('reports');
-                                    }
-                                  }}
+                                  onClick={() => setActiveTab('bookings')}
                                 >
                                   Write Report
                                 </Button>

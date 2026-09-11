@@ -241,12 +241,19 @@ export const parentAPI = {
   async getBookingReports(accessToken: string, bookingIds: string[]): Promise<Record<string, SessionReport>> {
     if (bookingIds.length === 0) return {};
 
-    const response = await makeRequest<Record<string, SessionReport>>(
+    // The endpoint returns { reports: SessionReport[], missing: [...] } —
+    // not a map — so callers (BookingManager.tsx's `bookingReports[id]`
+    // lookups) need it re-keyed by bookingId here.
+    const response = await makeRequest<{ reports: (SessionReport & { bookingId: string })[] }>(
       `/bookings/${bookingIds.join(',')}/reports`,
       accessToken,
       { skipCache: true }
     );
-    return response;
+    const byBookingId: Record<string, SessionReport> = {};
+    for (const report of response.reports ?? []) {
+      byBookingId[report.bookingId] = report;
+    }
+    return byBookingId;
   },
 
   async cancelBooking(
