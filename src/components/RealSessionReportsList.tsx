@@ -1,14 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { Button } from '../ui/button';
-import { Input } from '../ui/input';
-import { Badge } from '../ui/badge';
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '../ui/table';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
+import { Button } from './ui/button';
+import { Input } from './ui/input';
+import { Badge } from './ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from './ui/table';
 import { FileText, Search, RefreshCw, AlertCircle, Eye, CheckCircle, XCircle } from 'lucide-react';
-import { projectId } from '../../utils/supabase/info';
-import { ViewSessionReport } from '../ViewSessionReport';
+import { projectId } from '../utils/supabase/info';
+import { ViewSessionReport } from './ViewSessionReport';
+import { studentAPI } from '../utils/student-api-client';
 
-interface AdminSessionReport {
+export interface RealSessionReport {
   id: string;
   bookingId: string;
   tutorId?: string;
@@ -26,24 +27,51 @@ interface AdminSessionReport {
   [key: string]: unknown;
 }
 
-interface SessionReportsAdminProps {
+interface RealSessionReportsListProps {
   session: any;
   accessToken: string;
+  /** 'admin' sees every tutor's reports; everyone else sees only reports touching their own bookings. */
+  endpoint: '/admin/session-reports' | '/my-session-reports';
+  viewerRole: 'student' | 'parent' | 'tutor' | 'admin';
+  title?: string;
+  description?: string;
+  /** Parent dashboards can pass the currently-selected child to pre-filter to just that child's reports. */
+  filterStudentId?: string;
+  /** Admin oversight wants an "Absent" stat card; a personal view doesn't need it. */
+  showAttendanceStat?: boolean;
 }
 
-export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdminProps) {
-  const [reports, setReports] = useState<AdminSessionReport[]>([]);
+export function RealSessionReportsList({
+  session,
+  accessToken,
+  endpoint,
+  viewerRole,
+  title = 'Session Reports',
+  description = 'Reports your tutor has submitted after each session.',
+  filterStudentId,
+  showAttendanceStat = false,
+}: RealSessionReportsListProps) {
+  const [reports, setReports] = useState<RealSessionReport[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
-  const [viewing, setViewing] = useState<AdminSessionReport | null>(null);
+  const [viewing, setViewing] = useState<RealSessionReport | null>(null);
+
+  const handleView = (report: RealSessionReport) => {
+    setViewing(report);
+    // Lets the tutor know their report was actually read — best-effort,
+    // only meaningful for the student who the report is about.
+    if (viewerRole === 'student') {
+      studentAPI.markReportViewed(accessToken, report.id).catch(() => {});
+    }
+  };
 
   const fetchReports = async () => {
     setLoading(true);
     setError('');
     try {
       const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/admin/session-reports`,
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580${endpoint}`,
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
       if (response.ok) {
@@ -64,7 +92,7 @@ export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdmi
   useEffect(() => {
     void fetchReports();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [endpoint, filterStudentId]);
 
   const formatDate = (value?: string): string => {
     if (!value) return '—';
@@ -73,7 +101,8 @@ export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdmi
     return d.toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' });
   };
 
-  const filtered = reports.filter((r) => {
+  const scoped = filterStudentId ? reports.filter((r) => r.studentId === filterStudentId) : reports;
+  const filtered = scoped.filter((r) => {
     const q = searchTerm.trim().toLowerCase();
     if (!q) return true;
     return (
@@ -82,6 +111,11 @@ export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdmi
       r.subject?.toLowerCase().includes(q)
     );
   });
+
+  // Tutors already know who wrote it (them); everyone else benefits from that column.
+  const showTutorColumn = viewerRole !== 'tutor';
+  // Parents/admins see multiple children/students; a lone student only ever sees their own name.
+  const showStudentColumn = viewerRole !== 'student';
 
   return (
     <div className="space-y-6">
@@ -92,13 +126,13 @@ export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdmi
         </div>
       )}
 
-      <div className="grid md:grid-cols-2 gap-4">
+      <div className={`grid gap-4 ${showAttendanceStat ? 'md:grid-cols-2' : ''}`}>
         <Card>
           <CardContent className="pt-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-sm text-gray-600">Total Reports Submitted</p>
-                <h2 className="text-2xl font-bold mt-2">{reports.length}</h2>
+                <p className="text-sm text-gray-600">Total Reports</p>
+                <h2 className="text-2xl font-bold mt-2">{scoped.length}</h2>
               </div>
               <div className="w-12 h-12 rounded-lg flex items-center justify-center" style={{ backgroundColor: '#f0edfb' }}>
                 <FileText className="w-6 h-6" style={{ color: '#625d9c' }} />
@@ -106,19 +140,21 @@ export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdmi
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-gray-600">Reported as Absent</p>
-                <h2 className="text-2xl font-bold mt-2">{reports.filter((r) => r.studentAttended === false).length}</h2>
+        {showAttendanceStat && (
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-gray-600">Reported as Absent</p>
+                  <h2 className="text-2xl font-bold mt-2">{scoped.filter((r) => r.studentAttended === false).length}</h2>
+                </div>
+                <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
+                  <XCircle className="w-6 h-6 text-amber-600" />
+                </div>
               </div>
-              <div className="w-12 h-12 bg-amber-100 rounded-lg flex items-center justify-center">
-                <XCircle className="w-6 h-6 text-amber-600" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+            </CardContent>
+          </Card>
+        )}
       </div>
 
       <Card>
@@ -127,7 +163,7 @@ export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdmi
             <div className="flex-1 min-w-64 relative">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <Input
-                placeholder="Search by tutor, student, or subject..."
+                placeholder={`Search by ${showTutorColumn ? 'tutor, ' : ''}${showStudentColumn ? 'student, ' : ''}or subject...`}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="pl-9"
@@ -143,8 +179,8 @@ export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdmi
 
       <Card>
         <CardHeader>
-          <CardTitle>Session Reports</CardTitle>
-          <CardDescription>Every post-session report a tutor has submitted, across all bookings.</CardDescription>
+          <CardTitle>{title}</CardTitle>
+          <CardDescription>{description}</CardDescription>
         </CardHeader>
         <CardContent>
           {loading ? (
@@ -152,15 +188,18 @@ export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdmi
           ) : filtered.length === 0 ? (
             <div className="text-center py-8 text-gray-500">
               <FileText className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p>{reports.length === 0 ? 'No session reports submitted yet' : 'No reports match your search'}</p>
+              <p>{scoped.length === 0 ? 'No session reports yet' : 'No reports match your search'}</p>
+              {scoped.length === 0 && (
+                <p className="text-sm mt-2">Your tutor will submit a report after each completed session.</p>
+              )}
             </div>
           ) : (
             <div className="overflow-x-auto">
               <Table>
                 <TableHeader>
                   <TableRow>
-                    <TableHead>Tutor</TableHead>
-                    <TableHead>Student</TableHead>
+                    {showTutorColumn && <TableHead>Tutor</TableHead>}
+                    {showStudentColumn && <TableHead>Student</TableHead>}
                     <TableHead>Subject</TableHead>
                     <TableHead>Session</TableHead>
                     <TableHead>Attendance</TableHead>
@@ -171,8 +210,8 @@ export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdmi
                 <TableBody>
                   {filtered.map((r) => (
                     <TableRow key={r.id}>
-                      <TableCell className="text-sm font-medium">{r.tutorName}</TableCell>
-                      <TableCell className="text-sm">{r.studentName}</TableCell>
+                      {showTutorColumn && <TableCell className="text-sm font-medium">{r.tutorName}</TableCell>}
+                      {showStudentColumn && <TableCell className="text-sm">{r.studentName}</TableCell>}
                       <TableCell className="text-sm text-gray-600">{r.subject || '—'}</TableCell>
                       <TableCell className="text-sm text-gray-600 whitespace-nowrap">
                         {r.sessionDate ? formatDate(r.sessionDate) : '—'}
@@ -190,7 +229,7 @@ export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdmi
                       </TableCell>
                       <TableCell className="text-sm text-gray-600 whitespace-nowrap">{formatDate(r.submittedAt)}</TableCell>
                       <TableCell>
-                        <Button size="sm" variant="outline" onClick={() => setViewing(r)}>
+                        <Button size="sm" variant="outline" onClick={() => handleView(r)}>
                           <Eye className="w-4 h-4 mr-1.5" />
                           View
                         </Button>
@@ -209,7 +248,7 @@ export function SessionReportsAdmin({ session, accessToken }: SessionReportsAdmi
           open
           onOpenChange={(isOpen) => { if (!isOpen) setViewing(null); }}
           session={session}
-          userRole="admin"
+          userRole={viewerRole}
           booking={{
             date: viewing.sessionDate,
             startTime: viewing.startTime,

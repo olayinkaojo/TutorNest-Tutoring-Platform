@@ -61,7 +61,7 @@ const ResourcesHub = lazy(() => import('./ResourcesHub').then(m => ({ default: m
 const TutorCurriculumViewer = lazy(() => import('./TutorCurriculumViewer').then(m => ({ default: m.TutorCurriculumViewer })));
 const AdvancedReporting = lazy(() => import('./AdvancedReporting').then(m => ({ default: m.AdvancedReporting })));
 const TutorReviewsTab = lazy(() => import('./TutorReviewsTab').then(m => ({ default: m.TutorReviewsTab })));
-const TutorSessionReports = lazy(() => import('./TutorSessionReports').then(m => ({ default: m.TutorSessionReports })));
+const RealSessionReportsList = lazy(() => import('./RealSessionReportsList').then(m => ({ default: m.RealSessionReportsList })));
 const Chatroom = lazy(() => import('./Chatroom').then(m => ({ default: m.Chatroom })));
 import tutorAPI from '../utils/tutor-api-client';
 import { parseWAT, bookingDateLabel, formatRawTimeWAT, WAT_TIMEZONE } from '../utils/timezone';
@@ -1396,9 +1396,13 @@ export function TutorDashboard({
               <TabsContent value="session-reports">
                 {session && (
                   <Suspense fallback={<TabFallback />}>
-                    <TutorSessionReports
-                      tutorId={profile.id || profile.userId}
+                    <RealSessionReportsList
+                      session={session}
                       accessToken={session.access_token}
+                      endpoint="/my-session-reports"
+                      viewerRole="tutor"
+                      title="Your Submitted Reports"
+                      description="Every post-session report you've submitted, across all your students."
                     />
                   </Suspense>
                 )}

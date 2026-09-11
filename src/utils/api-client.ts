@@ -298,27 +298,6 @@ export const parentAPI = {
     return response;
   },
 
-  // Session Reports
-  async getSessionReports(
-    accessToken: string,
-    parentId: string,
-    studentId?: string,
-    options?: { page?: number; pageSize?: number; filters?: { subject?: string; status?: string } }
-  ): Promise<PaginatedResponse<SessionReport>> {
-    const params = new URLSearchParams({
-      parentId,
-      ...(studentId && { studentId }),
-      page: (options?.page || 1).toString(),
-      pageSize: (options?.pageSize || 10).toString(),
-    });
-
-    const response = await makeRequest<PaginatedResponse<SessionReport>>(
-      `/tutor-session-reports/by-parent/${parentId}?${params.toString()}`,
-      accessToken
-    );
-    return response;
-  },
-
   // Curriculum
   async getCurricula(
     accessToken: string,

@@ -39,7 +39,7 @@ interface ViewSessionReportProps {
   booking: any;
   report: any;
   session: any;
-  userRole: 'parent' | 'tutor' | 'admin';
+  userRole: 'parent' | 'tutor' | 'admin' | 'student';
 }
 
 export function ViewSessionReport({ 

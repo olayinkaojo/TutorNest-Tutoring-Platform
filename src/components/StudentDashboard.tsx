@@ -19,7 +19,7 @@ const Bookshop = lazy(() => import('./Bookshop').then(m => ({ default: m.Booksho
 const Chatroom = lazy(() => import('./Chatroom').then(m => ({ default: m.Chatroom })));
 const ResourcesHub = lazy(() => import('./ResourcesHub').then(m => ({ default: m.ResourcesHub })));
 const CurriculumPDFViewer = lazy(() => import('./CurriculumPDFViewer').then(m => ({ default: m.CurriculumPDFViewer })));
-const SessionReportsViewer = lazy(() => import('./SessionReportsViewer').then(m => ({ default: m.SessionReportsViewer })));
+const RealSessionReportsList = lazy(() => import('./RealSessionReportsList').then(m => ({ default: m.RealSessionReportsList })));
 const TriviaGame = lazy(() => import('./TriviaGame').then(m => ({ default: m.TriviaGame })));
 const TriviaLeaderboard = lazy(() => import('./TriviaLeaderboard').then(m => ({ default: m.TriviaLeaderboard })));
 const GamificationSystem = lazy(() => import('./GamificationSystem').then(m => ({ default: m.GamificationSystem })));
@@ -1203,11 +1203,14 @@ export function StudentDashboard({
             <ErrorBoundary>
               <Suspense fallback={<TabFallback />}>
               {session && (
-                <SessionReportsViewer
-                userId={profile.id || profile.userId}
-                accessToken={session.access_token}
-                viewType="student"
-              />
+                <RealSessionReportsList
+                  session={session}
+                  accessToken={session.access_token}
+                  endpoint="/my-session-reports"
+                  viewerRole="student"
+                  title="Session Reports"
+                  description="Reports your tutor has submitted after each session."
+                />
               )}
               </Suspense>
             </ErrorBoundary>

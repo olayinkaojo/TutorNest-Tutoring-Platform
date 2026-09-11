@@ -209,27 +209,6 @@ export const studentAPI = {
   },
 
   /**
-   * Get student's session reports
-   */
-  async getStudentReports(
-    accessToken: string,
-    studentId: string,
-    limit: number = 10
-  ) {
-    if (!studentId || typeof studentId !== 'string') {
-      throw new StudentAPIError('INVALID_INPUT', 'Student ID is required', 400);
-    }
-
-    const response = await makeRequest<any>(
-      `/tutor-session-reports/by-student/${studentId}?limit=${Math.min(limit, 100)}`,
-      accessToken,
-      { skipCache: true }
-    );
-
-    return response.reports || [];
-  },
-
-  /**
    * Get student's stats summary
    */
   async getStudentStats(

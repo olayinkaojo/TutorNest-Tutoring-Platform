@@ -8,7 +8,6 @@ import { TutorSearch } from './TutorSearch';
 import { NairaIcon } from './icons/NairaIcon';
 import { formatNaira } from '../utils/currency';
 import { MultiSelectFilter, SelectedFilterBadges } from './MultiSelectFilter';
-import { SessionReportsViewer } from './SessionReportsViewer';
 import { NotificationCenter } from './NotificationCenter';
 import { ProgressDashboard } from './ProgressDashboard';
 import { MobileNavigation } from './MobileNavigation';
@@ -48,6 +47,7 @@ const Chatroom = lazy(() => import('./Chatroom').then(m => ({ default: m.Chatroo
 const Bookshop = lazy(() => import('./Bookshop').then(m => ({ default: m.Bookshop })));
 const ResourcesHub = lazy(() => import('./ResourcesHub').then(m => ({ default: m.ResourcesHub })));
 const ParentPaymentsDashboard = lazy(() => import('./ParentPaymentsDashboard').then(m => ({ default: m.ParentPaymentsDashboard })));
+const RealSessionReportsList = lazy(() => import('./RealSessionReportsList').then(m => ({ default: m.RealSessionReportsList })));
 
 interface UserProfile {
   id: string;
@@ -1060,13 +1060,17 @@ export function ParentDashboard({
           <TabsContent value="session-reports">
             <ErrorBoundary tabName="Session Reports">
               {session && children.length > 0 ? (
-                <SessionReportsViewer 
-                  userId={profile.id || profile.userId}
-                  accessToken={session.access_token}
-                  viewType="parent"
-                  studentId={activeChildId || undefined}
-                  children={children}
-                />
+                <Suspense fallback={<TabFallback />}>
+                  <RealSessionReportsList
+                    session={session}
+                    accessToken={session.access_token}
+                    endpoint="/my-session-reports"
+                    viewerRole="parent"
+                    title="Session Reports"
+                    description="Reports your children's tutors have submitted after each session."
+                    filterStudentId={activeChildId || undefined}
+                  />
+                </Suspense>
               ) : session && children.length === 0 ? (
                 <Card>
                   <CardContent className="py-12 text-center text-gray-500">

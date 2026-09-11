@@ -55,7 +55,7 @@ const AuditLogViewer = lazy(() => import('./admin/AuditLogViewer').then(m => ({ 
 const DocumentAuditTrail = lazy(() => import('./admin/DocumentAuditTrail').then(m => ({ default: m.DocumentAuditTrail })));
 const ChatSafeguardingViewer = lazy(() => import('./admin/ChatSafeguardingViewer').then(m => ({ default: m.ChatSafeguardingViewer })));
 const RecordingsViewer = lazy(() => import('./admin/RecordingsViewer').then(m => ({ default: m.RecordingsViewer })));
-const SessionReportsAdmin = lazy(() => import('./admin/SessionReportsAdmin').then(m => ({ default: m.SessionReportsAdmin })));
+const RealSessionReportsList = lazy(() => import('./RealSessionReportsList').then(m => ({ default: m.RealSessionReportsList })));
 
 interface UserProfile {
   id?: string;
@@ -628,7 +628,15 @@ export function AdminDashboard({
           <TabsContent value="sessionreports">
             {session && (
               <Suspense fallback={<TabFallback />}>
-                <SessionReportsAdmin session={session} accessToken={session.access_token} />
+                <RealSessionReportsList
+                  session={session}
+                  accessToken={session.access_token}
+                  endpoint="/admin/session-reports"
+                  viewerRole="admin"
+                  title="Session Reports"
+                  description="Every post-session report a tutor has submitted, across all bookings."
+                  showAttendanceStat
+                />
               </Suspense>
             )}
           </TabsContent>
