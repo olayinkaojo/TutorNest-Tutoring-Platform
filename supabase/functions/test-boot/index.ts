@@ -29,7 +29,6 @@ import roleManagementRoutes from '../make-server-cbd74580/role-management-routes
 import assessmentsRoutes from '../make-server-cbd74580/assessments-routes.tsx';
 import curriculumRoutes from '../make-server-cbd74580/curriculum-routes.tsx';
 import triviaRoutes from '../make-server-cbd74580/trivia-routes.tsx';
-import tutorSessionReportsRoutes from '../make-server-cbd74580/tutor-session-reports-routes.tsx';
 import liveSessionRoutes from '../make-server-cbd74580/live-session-routes.tsx';
 import payoutsComplete from '../make-server-cbd74580/payouts-complete.tsx';
 import { tutorProfileRoutes } from '../make-server-cbd74580/tutor-profile-routes.tsx';

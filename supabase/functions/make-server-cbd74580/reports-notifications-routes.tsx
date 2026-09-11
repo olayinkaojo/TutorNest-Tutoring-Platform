@@ -3,6 +3,7 @@ import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { processSessionAttendance } from './payment-routes.tsx';
 import { createNotification as brokerCreateNotification } from './notification-broker.tsx';
+import { collectBookingsForUser } from './messaging-access.tsx';
 
 // Create a route handler function that can receive getUserId
 export function reportsNotificationsRoutes(app: Hono, getUserId: Function) {
@@ -76,11 +77,24 @@ app.post('/make-server-cbd74580/bookings/:bookingId/report', async (c) => {
       nextSessionPlan: reportData.nextSessionPlan ? sanitizeReportText(reportData.nextSessionPlan as string) : undefined,
     };
 
-    // Create report
+    // Create report. tutorId/studentId/parentId are stored on the record
+    // itself (not just derivable from the booking) because POST
+    // /reports/:reportId/mark-viewed's ownership check
+    // (report.studentId !== callerId && report.parentId !== callerId) reads
+    // straight off the report — without these fields that check failed
+    // unconditionally for every real report, so no caller could ever mark
+    // one viewed, and the tutor "your report was viewed" notification
+    // (which also reads report.tutorId) could never fire.
     const report = {
+      ...sanitizedData,
+      // These come after the spread, not before, so nothing in the
+      // client's own request body can override the server-resolved values
+      // used for later authorization checks.
       id: `report:${bookingId}`,
       bookingId,
-      ...sanitizedData,
+      tutorId: booking.tutorId,
+      studentId: booking.studentId,
+      parentId,
       submittedAt: new Date().toISOString(),
     };
 
@@ -188,6 +202,103 @@ app.get('/make-server-cbd74580/bookings/:bookingId/report', async (c) => {
   } catch (error: any) {
     console.error('Error fetching report:', error);
     return c.json({ error: error.message || 'Failed to fetch report' }, 500);
+  }
+});
+
+// Get every real session report relevant to the caller — as a tutor
+// (reports they wrote), a student (reports about them), or a parent
+// (reports for any of their children's sessions). One implementation
+// serves all three roles because collectBookingsForUser already resolves
+// "every booking touching this identity" however that identity relates to
+// it (booking.tutorId / booking.studentId / booking.userId, plus a
+// dependent student's linked child profile) — the exact same resolution
+// GET /bookings and the messaging system already rely on.
+//
+// This exists because StudentDashboard.tsx and ParentDashboard.tsx's
+// "Session Reports" tab (SessionReportsViewer.tsx) was wired to a
+// completely different, disconnected report system
+// (tutor-session-reports-routes.tsx's freeform notebook) that no tutor
+// actually writes to any more — a student could see "2 new reports" (that
+// badge count IS wired to the real system, via /bookings/:ids/reports) and
+// then open the tab to find nothing there.
+app.get('/make-server-cbd74580/my-session-reports', async (c) => {
+  try {
+    const accessToken = c.req.header('Authorization')?.split(' ')[1];
+    const callerId = await getUserId(accessToken ?? null);
+    if (!callerId) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+
+    const bookings = await collectBookingsForUser(callerId);
+    const bookingIds = bookings.map((b: any) => b.id).filter(Boolean);
+    if (bookingIds.length === 0) {
+      return c.json({ reports: [] });
+    }
+
+    const reportValues = await kv.mget(bookingIds.map((id: string) => `report:${id}`));
+    const bookingById = new Map(bookings.map((b: any) => [b.id, b]));
+
+    // Resolve tutor/student/parent display names once per unique person,
+    // same DB-profile -> KV-user -> KV-child fallback order used elsewhere
+    // (GET /bookings, GET /admin/session-reports) since participants can be
+    // Postgres accounts, KV-only accounts, or a KV-only child profile.
+    const profileIds = [
+      ...new Set(
+        bookings.flatMap((b: any) =>
+          [b.tutorId ?? b.tutor_id, b.studentId ?? b.student_id, b.userId ?? b.user_id ?? b.parentId].filter(Boolean),
+        ),
+      ),
+    ];
+    const profileMap: Record<string, any> = {};
+    await Promise.all(
+      profileIds.map(async (id: string) => {
+        const dbProfile = await db.getProfile(id).catch(() => null);
+        if (dbProfile) { profileMap[id] = dbProfile; return; }
+        const kvUser = await kv.get(`user:${id}`).catch(() => null);
+        if (kvUser) { profileMap[id] = kvUser; return; }
+        const kvChild = await kv.get(`child:${id}`).catch(() => null);
+        if (kvChild) profileMap[id] = kvChild;
+      }),
+    );
+    const resolveName = (id: string | undefined, fallback: string): string => {
+      const p = id ? profileMap[id] : null;
+      return (
+        p?.fullName || p?.full_name || p?.name ||
+        (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
+        fallback
+      );
+    };
+
+    const reports = bookingIds
+      .map((id: string, i: number) => {
+        const report = reportValues[i] as any;
+        if (!report) return null;
+        const booking: any = bookingById.get(id) || {};
+        const tutorId = booking.tutorId ?? booking.tutor_id;
+        const studentId = booking.studentId ?? booking.student_id;
+        const parentId = booking.userId ?? booking.user_id ?? booking.parentId;
+        return {
+          ...report,
+          bookingId: id,
+          tutorId,
+          studentId,
+          parentId,
+          tutorName: resolveName(tutorId, 'Tutor'),
+          studentName: resolveName(studentId, 'Student'),
+          subject: booking.subject,
+          sessionDate: booking.date,
+          startTime: booking.startTime ?? booking.start_time,
+          endTime: booking.endTime ?? booking.end_time,
+        };
+      })
+      .filter(Boolean) as any[];
+
+    reports.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+
+    return c.json({ reports });
+  } catch (error: any) {
+    console.error('Error fetching my-session-reports:', error);
+    return c.json({ error: error.message || 'Failed to fetch session reports' }, 500);
   }
 });
 
