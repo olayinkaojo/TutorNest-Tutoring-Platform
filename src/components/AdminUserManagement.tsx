@@ -454,16 +454,17 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
           <div className="flex items-start justify-between">
             <div className="flex items-start gap-4 flex-1">
               <Avatar className="w-12 h-12">
+                <AvatarFallback style={{ backgroundColor: getRoleColor(user.role), color: 'white' }}>
+                  {getUserInitials(user)}
+                </AvatarFallback>
                 {(user.photo_url || user.photoUrl) && (
                   <img
                     src={user.photo_url || user.photoUrl}
                     alt={getUserDisplayName(user)}
-                    className="w-full h-full object-cover rounded-full"
+                    className="absolute inset-0 w-full h-full object-cover rounded-full"
+                    onError={(e) => { e.currentTarget.style.display = 'none'; }}
                   />
                 )}
-                <AvatarFallback style={{ backgroundColor: getRoleColor(user.role), color: 'white' }}>
-                  {getUserInitials(user)}
-                </AvatarFallback>
               </Avatar>
 
               <div className="flex-1">
@@ -652,16 +653,17 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
                   <div key={`tutor-browser-${user.userId}`} className="rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
                     <div className="flex items-start gap-3">
                       <Avatar className="w-12 h-12">
+                        <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
+                          {getUserInitials(user)}
+                        </AvatarFallback>
                         {(user.photo_url || user.photoUrl) && (
                           <img
                             src={user.photo_url || user.photoUrl}
                             alt={getUserDisplayName(user)}
-                            className="w-full h-full object-cover rounded-full"
+                            className="absolute inset-0 w-full h-full object-cover rounded-full"
+                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
                           />
                         )}
-                        <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
-                          {getUserInitials(user)}
-                        </AvatarFallback>
                       </Avatar>
                       <div className="min-w-0 flex-1">
                         <div className="flex items-start justify-between gap-2">
@@ -801,16 +803,17 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
               <div className="relative px-6 pt-6 pb-5 bg-gradient-to-br from-[#625d9c] to-[#4c469b] text-white">
                 <div className="flex items-start gap-4">
                   <Avatar className="w-20 h-20 ring-4 ring-white/25 flex-shrink-0">
+                    <AvatarFallback className="text-lg font-semibold" style={{ backgroundColor: '#4c469b', color: 'white' }}>
+                      {getUserInitials(selectedUser)}
+                    </AvatarFallback>
                     {(selectedUser.photo_url || selectedUser.photoUrl) && (
                       <img
                         src={selectedUser.photo_url || selectedUser.photoUrl}
                         alt={getUserDisplayName(selectedUser)}
-                        className="w-full h-full object-cover rounded-full"
+                        className="absolute inset-0 w-full h-full object-cover rounded-full"
+                        onError={(e) => { e.currentTarget.style.display = 'none'; }}
                       />
                     )}
-                    <AvatarFallback className="text-lg font-semibold" style={{ backgroundColor: '#4c469b', color: 'white' }}>
-                      {getUserInitials(selectedUser)}
-                    </AvatarFallback>
                   </Avatar>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">
