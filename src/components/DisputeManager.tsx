@@ -114,6 +114,17 @@ export function DisputeManager({ accessToken, userId, userRole }: DisputeManager
   };
 
   const handleSessionSelect = (sessionId: string) => {
+    // The "Not related to a specific session" option's own value
+    // ("none-selected") isn't a real booking id — it used to get stored
+    // verbatim as formData.sessionId and submitted to the backend as if it
+    // were one, which POST /disputes treats as truthy and would have
+    // written a bogus `dispute:session:none-selected:<id>` index entry,
+    // silently grouping every dispute filed this way under one fake
+    // "session".
+    if (sessionId === 'none-selected') {
+      setFormData((p) => ({ ...p, sessionId: '', submittedAgainst: '', submittedAgainstRole: '' }));
+      return;
+    }
     const booking = bookings.find((b) => b.id === sessionId);
     if (booking) {
       setFormData((p) => ({
