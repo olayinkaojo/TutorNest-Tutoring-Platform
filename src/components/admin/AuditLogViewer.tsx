@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '../ui/tabs';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { Badge } from '../ui/badge';
 import { projectId } from '../../utils/supabase/info';
 
@@ -176,24 +176,27 @@ export function AuditLogViewer({ accessToken }: AuditLogViewerProps) {
         <CardDescription>Record of admin and account activity across the platform (most recent first)</CardDescription>
       </CardHeader>
       <CardContent>
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'all' | ActivityCategory)}>
-          <TabsList className="flex flex-wrap h-auto gap-1">
+        <Select value={activeTab} onValueChange={(v) => setActiveTab(v as 'all' | ActivityCategory)}>
+          <SelectTrigger className="w-full sm:w-72">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
             {CATEGORY_TABS.map(({ value, label }) => (
-              <TabsTrigger key={value} value={value} className="gap-1.5">
-                {label}
-                <Badge variant="secondary" className="px-1.5 text-xs">
-                  {countFor(value)}
-                </Badge>
-              </TabsTrigger>
+              <SelectItem key={value} value={value}>
+                <span className="flex items-center justify-between gap-2 w-full">
+                  {label}
+                  <Badge variant="secondary" className="px-1.5 text-xs">
+                    {countFor(value)}
+                  </Badge>
+                </span>
+              </SelectItem>
             ))}
-          </TabsList>
+          </SelectContent>
+        </Select>
 
-          {CATEGORY_TABS.map(({ value }) => (
-            <TabsContent key={value} value={value} className="mt-4">
-              <AuditLogTable logs={value === 'all' ? logs : logs.filter((l) => l.category === value)} />
-            </TabsContent>
-          ))}
-        </Tabs>
+        <div className="mt-4">
+          <AuditLogTable logs={activeTab === 'all' ? logs : logs.filter((l) => l.category === activeTab)} />
+        </div>
       </CardContent>
     </Card>
   );
