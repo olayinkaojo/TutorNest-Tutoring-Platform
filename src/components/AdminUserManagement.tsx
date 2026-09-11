@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback } from './ui/avatar';
 import { Alert, AlertDescription } from './ui/alert';
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from './ui/dialog';
+import { UserFamilyOverview } from './admin/UserFamilyOverview';
 import {
   Search,
   Filter,
@@ -30,6 +31,7 @@ import {
   Calendar,
   FileText,
   Trash2,
+  Baby,
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
 import {
@@ -938,6 +940,12 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
                     )}
                   </div>
                 </SectionCard>
+
+                {hasRole(selectedUser, 'parent') && (
+                  <SectionCard title="Family overview" icon={Baby}>
+                    <UserFamilyOverview session={session} userId={selectedUser.id || selectedUser.userId} />
+                  </SectionCard>
+                )}
 
                 <SectionCard title="Admin notes" icon={FileText}>
                   <p className="text-sm text-gray-600 whitespace-pre-wrap min-h-[3rem] leading-relaxed">
