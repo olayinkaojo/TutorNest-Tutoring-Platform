@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Accordion, AccordionItem, AccordionTrigger, AccordionContent } from '../ui/accordion';
 import { Badge } from '../ui/badge';
 import { Button } from '../ui/button';
-import { AlertCircle, Baby, Calendar, CreditCard, FileText, Loader2, Eye } from 'lucide-react';
+import { AlertCircle, Baby, Calendar, CreditCard, FileText, Loader2, Eye, Wallet } from 'lucide-react';
 import { projectId } from '../../utils/supabase/info';
 import { formatNaira } from '../../utils/currency';
 import { ViewSessionReport } from '../ViewSessionReport';
@@ -18,11 +18,16 @@ interface FamilyOverview {
   };
   payments: { totalSpent: number; recent: any[] };
   reports: { total: number; recent: any[] };
+  payouts: { totalPaidOut: number; recent: any[] };
 }
 
 interface UserFamilyOverviewProps {
   session: any;
   userId: string;
+  /** Only a parent has children on file — hide that section for anyone else rather than show an empty "no children" row. */
+  showChildren: boolean;
+  /** Only a tutor has payouts — same reasoning. */
+  showPayouts: boolean;
 }
 
 const bookingStatusColor: Record<string, string> = {
@@ -32,7 +37,7 @@ const bookingStatusColor: Record<string, string> = {
   rescheduled: 'bg-amber-50 text-amber-700 border-amber-200',
 };
 
-export function UserFamilyOverview({ session, userId }: UserFamilyOverviewProps) {
+export function UserFamilyOverview({ session, userId, showChildren, showPayouts }: UserFamilyOverviewProps) {
   const [data, setData] = useState<FamilyOverview | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -82,39 +87,41 @@ export function UserFamilyOverview({ session, userId }: UserFamilyOverviewProps)
 
   return (
     <div>
-      <Accordion type="multiple" defaultValue={['children', 'bookings']} className="border rounded-lg px-3">
-        <AccordionItem value="children">
-          <AccordionTrigger>
-            <span className="flex items-center gap-2">
-              <Baby className="w-4 h-4" style={{ color: '#625d9c' }} />
-              Children <Badge variant="outline">{data.children.length}</Badge>
-            </span>
-          </AccordionTrigger>
-          <AccordionContent>
-            {data.children.length === 0 ? (
-              <p className="text-sm text-gray-500">No children on file.</p>
-            ) : (
-              <div className="space-y-2">
-                {data.children.map((child) => (
-                  <div key={child.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg text-sm">
-                    <div>
-                      <span className="font-medium">{child.firstName} {child.lastName}</span>
-                      {child.age != null && <span className="text-gray-500"> · Age {child.age}</span>}
-                      {child.gradeLevel && <span className="text-gray-500"> · {child.gradeLevel}</span>}
-                    </div>
-                    {child.subjects && child.subjects.length > 0 && (
-                      <div className="flex gap-1 flex-wrap justify-end">
-                        {child.subjects.slice(0, 3).map((s) => (
-                          <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
-                        ))}
+      <Accordion type="multiple" defaultValue={showChildren ? ['children', 'bookings'] : ['bookings']} className="border rounded-lg px-3">
+        {showChildren && (
+          <AccordionItem value="children">
+            <AccordionTrigger>
+              <span className="flex items-center gap-2">
+                <Baby className="w-4 h-4" style={{ color: '#625d9c' }} />
+                Children <Badge variant="outline">{data.children.length}</Badge>
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              {data.children.length === 0 ? (
+                <p className="text-sm text-gray-500">No children on file.</p>
+              ) : (
+                <div className="space-y-2">
+                  {data.children.map((child) => (
+                    <div key={child.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg text-sm">
+                      <div>
+                        <span className="font-medium">{child.firstName} {child.lastName}</span>
+                        {child.age != null && <span className="text-gray-500"> · Age {child.age}</span>}
+                        {child.gradeLevel && <span className="text-gray-500"> · {child.gradeLevel}</span>}
                       </div>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </AccordionContent>
-        </AccordionItem>
+                      {child.subjects && child.subjects.length > 0 && (
+                        <div className="flex gap-1 flex-wrap justify-end">
+                          {child.subjects.slice(0, 3).map((s) => (
+                            <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+        )}
 
         <AccordionItem value="bookings">
           <AccordionTrigger>
@@ -137,7 +144,7 @@ export function UserFamilyOverview({ session, userId }: UserFamilyOverviewProps)
                   <div key={b.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg text-sm">
                     <div className="min-w-0">
                       <span className="font-medium">{b.studentName}</span>
-                      <span className="text-gray-500"> with {b.tutorName}</span>
+                      {!showPayouts && <span className="text-gray-500"> with {b.tutorName}</span>}
                       {b.subject && <span className="text-gray-500"> · {b.subject}</span>}
                       <p className="text-xs text-gray-400">{formatDate(b.date)}{b.startTime ? ` at ${b.startTime}` : ''}</p>
                     </div>
@@ -155,7 +162,7 @@ export function UserFamilyOverview({ session, userId }: UserFamilyOverviewProps)
           <AccordionTrigger>
             <span className="flex items-center gap-2">
               <CreditCard className="w-4 h-4" style={{ color: '#625d9c' }} />
-              Payments <Badge variant="outline">{formatNaira(data.payments.totalSpent)} total</Badge>
+              {showPayouts ? 'Payments Received' : 'Payments'} <Badge variant="outline">{formatNaira(data.payments.totalSpent)} {showPayouts ? 'received' : 'total'}</Badge>
             </span>
           </AccordionTrigger>
           <AccordionContent>
@@ -194,7 +201,7 @@ export function UserFamilyOverview({ session, userId }: UserFamilyOverviewProps)
                   <div key={r.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg text-sm">
                     <div>
                       <span className="font-medium">{r.studentName}</span>
-                      <span className="text-gray-500"> with {r.tutorName}</span>
+                      {!showPayouts && <span className="text-gray-500"> with {r.tutorName}</span>}
                       {r.subject && <span className="text-gray-500"> · {r.subject}</span>}
                       <p className="text-xs text-gray-400">{formatDate(r.submittedAt)}</p>
                     </div>
@@ -207,6 +214,34 @@ export function UserFamilyOverview({ session, userId }: UserFamilyOverviewProps)
             )}
           </AccordionContent>
         </AccordionItem>
+
+        {showPayouts && (
+          <AccordionItem value="payouts">
+            <AccordionTrigger>
+              <span className="flex items-center gap-2">
+                <Wallet className="w-4 h-4" style={{ color: '#625d9c' }} />
+                Payouts <Badge variant="outline">{formatNaira(data.payouts.totalPaidOut)} paid out</Badge>
+              </span>
+            </AccordionTrigger>
+            <AccordionContent>
+              {data.payouts.recent.length === 0 ? (
+                <p className="text-sm text-gray-500">No payout requests yet.</p>
+              ) : (
+                <div className="space-y-2">
+                  {data.payouts.recent.map((p: any) => (
+                    <div key={p.id} className="flex items-center justify-between p-2.5 bg-gray-50 rounded-lg text-sm">
+                      <div>
+                        <span className="font-medium">{formatNaira(p.amount)}</span>
+                        <p className="text-xs text-gray-400">Requested {formatDate(p.requestedAt)}</p>
+                      </div>
+                      <Badge variant="outline" className="text-xs capitalize">{p.status}</Badge>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </AccordionContent>
+          </AccordionItem>
+        )}
       </Accordion>
 
       {viewingReport && (

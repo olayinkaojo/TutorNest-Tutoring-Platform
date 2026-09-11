@@ -32,6 +32,10 @@ import {
   FileText,
   Trash2,
   Baby,
+  LayoutGrid,
+  List,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
 import {
@@ -194,6 +198,9 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
   const [searchQuery, setSearchQuery] = useState('');
   const [roleFilter, setRoleFilter] = useState('all');
   const [statusFilter, setStatusFilter] = useState('all');
+  const [viewMode, setViewMode] = useState<'list' | 'grid'>('list');
+  const [page, setPage] = useState(1);
+  const USERS_PER_PAGE = 24;
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
   const [selectedUser, setSelectedUser] = useState<any>(null);
@@ -275,6 +282,7 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
 
   useEffect(() => {
     filterUsers();
+    setPage(1);
   }, [searchQuery, roleFilter, statusFilter, users]);
 
   const loadUsers = async () => {
@@ -420,6 +428,53 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
     }
   };
 
+  // Shared between the list row and grid card so both views expose the
+  // same actions — a grid card used to only offer "View Profile", meaning
+  // suspending/reactivating a user was only possible from the list view.
+  const UserActionsMenu = ({ user }: { user: any }) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="sm">
+          <MoreVertical className="w-4 h-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        <DropdownMenuItem onClick={() => setSelectedUser(user)}>
+          <Eye className="w-4 h-4 mr-2" />
+          View Profile
+        </DropdownMenuItem>
+        <DropdownMenuItem>
+          <Mail className="w-4 h-4 mr-2" />
+          Send Email
+        </DropdownMenuItem>
+        <DropdownMenuSeparator />
+        {user.suspended ? (
+          <DropdownMenuItem onClick={() => handleReactivateUser(user.userId)}>
+            <UserCheck className="w-4 h-4 mr-2 text-green-600" />
+            Reactivate User
+          </DropdownMenuItem>
+        ) : (
+          <DropdownMenuItem onClick={() => handleSuspendUser(user.userId)}>
+            <Ban className="w-4 h-4 mr-2 text-red-600" />
+            Suspend User
+          </DropdownMenuItem>
+        )}
+        {user.role !== 'admin' && (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
+              onClick={() => setDeleteTarget(user)}
+              className="text-red-700 focus:text-red-700 focus:bg-red-50"
+            >
+              <Trash2 className="w-4 h-4 mr-2" />
+              Delete Account
+            </DropdownMenuItem>
+          </>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+
   const UserCard = ({ user }: { user: any }) => {
     const getRoleColor = (role: string) => {
       switch (role) {
@@ -529,52 +584,95 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
               </div>
             </div>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <MoreVertical className="w-4 h-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => setSelectedUser(user)}>
-                  <Eye className="w-4 h-4 mr-2" />
-                  View Profile
-                </DropdownMenuItem>
-                <DropdownMenuItem>
-                  <Mail className="w-4 h-4 mr-2" />
-                  Send Email
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                {user.suspended ? (
-                  <DropdownMenuItem onClick={() => handleReactivateUser(user.userId)}>
-                    <UserCheck className="w-4 h-4 mr-2 text-green-600" />
-                    Reactivate User
-                  </DropdownMenuItem>
-                ) : (
-                  <DropdownMenuItem onClick={() => handleSuspendUser(user.userId)}>
-                    <Ban className="w-4 h-4 mr-2 text-red-600" />
-                    Suspend User
-                  </DropdownMenuItem>
-                )}
-                {user.role !== 'admin' && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={() => setDeleteTarget(user)}
-                      className="text-red-700 focus:text-red-700 focus:bg-red-50"
-                    >
-                      <Trash2 className="w-4 h-4 mr-2" />
-                      Delete Account
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <UserActionsMenu user={user} />
           </div>
         </CardContent>
       </Card>
     );
   };
+
+  // Grid view — generalized from what used to be a hardcoded, tutor-only
+  // "Tutor Browser" section that always rendered above the filterable list
+  // (so every tutor appeared twice: once there, unfiltered, and again as a
+  // UserCard row below). Now it's just one more way to render whatever the
+  // filters currently select, for any role.
+  const UserGridCard = ({ user }: { user: any }) => (
+    <div className="rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
+      <div className="flex items-start gap-3">
+        <Avatar className="w-12 h-12 flex-shrink-0">
+          <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
+            {getUserInitials(user)}
+          </AvatarFallback>
+          {(user.photo_url || user.photoUrl) && (
+            <img
+              src={user.photo_url || user.photoUrl}
+              alt={getUserDisplayName(user)}
+              className="absolute inset-0 w-full h-full object-cover rounded-full"
+              onError={(e) => { e.currentTarget.style.display = 'none'; }}
+            />
+          )}
+        </Avatar>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-start justify-between gap-2">
+            <div className="min-w-0">
+              <h4 className="truncate">{getUserDisplayName(user)}</h4>
+              <p className="text-xs text-gray-500 truncate">{user.email}</p>
+            </div>
+            <UserActionsMenu user={user} />
+          </div>
+
+          <div className="mt-2 flex flex-wrap gap-1.5">
+            {(user.allRoles?.length ? user.allRoles : [user.role || 'none']).map((r: string) => (
+              <Badge key={`grid-role-${r}`} variant="outline" className="text-[11px]">
+                {r && r !== 'none' ? r.charAt(0).toUpperCase() + r.slice(1) : 'No Role'}
+              </Badge>
+            ))}
+            {hasRole(user, 'tutor') && (
+              user.verificationStatus === 'verified' ? (
+                <Badge style={{ backgroundColor: '#dcfce7', color: '#166534' }}>Verified</Badge>
+              ) : (
+                <Badge variant="secondary" style={{ backgroundColor: '#fef3c7', color: '#92400e' }}>Pending</Badge>
+              )
+            )}
+            {user.suspended && <Badge variant="destructive">Suspended</Badge>}
+          </div>
+
+          {hasRole(user, 'tutor') && (
+            <>
+              <div className="mt-3 flex flex-wrap gap-1.5">
+                {Array.isArray(user.subjects) && user.subjects.slice(0, 3).map((subject: string) => (
+                  <Badge key={`${user.userId}-${subject}`} variant="secondary" className="text-[11px]">
+                    {subject}
+                  </Badge>
+                ))}
+                {(!Array.isArray(user.subjects) || user.subjects.length === 0) && (
+                  <span className="text-xs text-gray-500">No subjects listed</span>
+                )}
+              </div>
+              <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
+                <span>{user.hourlyRate ? `₦${user.hourlyRate}/hr` : 'Rate not set'}</span>
+                <span>{user.dbsStatus === 'verified' ? 'DBS verified' : 'DBS pending'}</span>
+              </div>
+            </>
+          )}
+
+          <p className="mt-3 text-xs text-gray-400">
+            Joined {new Date(user.createdAt || Date.now()).toLocaleDateString()}
+          </p>
+
+          <Button
+            className="mt-3 w-full"
+            variant="outline"
+            size="sm"
+            onClick={() => setSelectedUser(user)}
+          >
+            <Eye className="w-4 h-4 mr-2" />
+            View Profile
+          </Button>
+        </div>
+      </div>
+    </div>
+  );
 
   if (loading) {
     return (
@@ -605,116 +703,46 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
         </Alert>
       )}
 
-      {/* Stats Summary */}
-      <div className="grid md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-1">Total Users</p>
-            <h3>{users.length}</h3>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-1">Tutors</p>
-            <h3>{users.filter(u => hasRole(u, 'tutor')).length}</h3>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-1">Parents</p>
-            <h3>{users.filter(u => hasRole(u, 'parent')).length}</h3>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <p className="text-sm text-gray-600 mb-1">Students</p>
-            <h3>{users.filter(u => hasRole(u, 'student')).length}</h3>
-          </CardContent>
-        </Card>
+      {/* Role tabs — doubles as the role filter and the stat counts that
+          used to sit above it as four inert cards. Picking "Tutors" also
+          switches to Grid view, matching what used to be a permanent,
+          always-visible "Tutor Browser" section (removed — it duplicated
+          every tutor a second time, unfiltered, above this same list). */}
+      <div className="flex gap-1.5 overflow-x-auto pb-1 -mb-1">
+        {[
+          { value: 'all', label: 'All Users', count: users.length },
+          { value: 'tutor', label: 'Tutors', count: users.filter(u => hasRole(u, 'tutor')).length },
+          { value: 'parent', label: 'Parents', count: users.filter(u => hasRole(u, 'parent')).length },
+          { value: 'student', label: 'Students', count: users.filter(u => hasRole(u, 'student')).length },
+          { value: 'admin', label: 'Admins', count: users.filter(u => hasRole(u, 'admin')).length },
+        ].map((tab) => (
+          <button
+            key={tab.value}
+            type="button"
+            onClick={() => {
+              setRoleFilter(tab.value);
+              setViewMode(tab.value === 'tutor' ? 'grid' : 'list');
+            }}
+            className="flex-shrink-0 flex items-center gap-2 px-4 py-2.5 rounded-lg border text-sm font-medium transition-colors"
+            style={
+              roleFilter === tab.value
+                ? { backgroundColor: '#625d9c', borderColor: '#625d9c', color: 'white' }
+                : { backgroundColor: 'white', borderColor: '#e5e7eb', color: '#374151' }
+            }
+          >
+            {tab.label}
+            <Badge
+              variant="outline"
+              className="border-0"
+              style={roleFilter === tab.value ? { backgroundColor: 'rgba(255,255,255,0.2)', color: 'white' } : { backgroundColor: '#f3f4f6' }}
+            >
+              {tab.count}
+            </Badge>
+          </button>
+        ))}
       </div>
 
-      {/* Tutor Browser */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Tutor Profiles</CardTitle>
-          <CardDescription>
-            Quick browser for all tutors on the platform. Open any profile to review verification, subjects, and details.
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {users.filter(user => hasRole(user, 'tutor')).length === 0 ? (
-            <div className="py-10 text-center text-gray-500">
-              <Users className="w-10 h-10 mx-auto mb-3 text-gray-300" />
-              <p>No tutor profiles found</p>
-            </div>
-          ) : (
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {users
-                .filter(user => hasRole(user, 'tutor'))
-                .map((user) => (
-                  <div key={`tutor-browser-${user.userId}`} className="rounded-xl border bg-white p-4 shadow-sm hover:shadow-md transition-shadow">
-                    <div className="flex items-start gap-3">
-                      <Avatar className="w-12 h-12">
-                        <AvatarFallback style={{ backgroundColor: '#625d9c', color: 'white' }}>
-                          {getUserInitials(user)}
-                        </AvatarFallback>
-                        {(user.photo_url || user.photoUrl) && (
-                          <img
-                            src={user.photo_url || user.photoUrl}
-                            alt={getUserDisplayName(user)}
-                            className="absolute inset-0 w-full h-full object-cover rounded-full"
-                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
-                          />
-                        )}
-                      </Avatar>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <h4 className="truncate">{getUserDisplayName(user)}</h4>
-                            <p className="text-xs text-gray-500 truncate">{user.email}</p>
-                          </div>
-                          {user.verificationStatus === 'verified' ? (
-                            <Badge style={{ backgroundColor: '#dcfce7', color: '#166534' }}>Verified</Badge>
-                          ) : (
-                            <Badge variant="secondary" style={{ backgroundColor: '#fef3c7', color: '#92400e' }}>Pending</Badge>
-                          )}
-                        </div>
-
-                        <div className="mt-3 flex flex-wrap gap-1.5">
-                          {Array.isArray(user.subjects) && user.subjects.slice(0, 3).map((subject: string) => (
-                            <Badge key={`${user.userId}-${subject}`} variant="secondary" className="text-[11px]">
-                              {subject}
-                            </Badge>
-                          ))}
-                          {Array.isArray(user.subjects) && user.subjects.length === 0 && (
-                            <span className="text-xs text-gray-500">No subjects listed</span>
-                          )}
-                        </div>
-
-                        <div className="mt-4 flex items-center justify-between text-xs text-gray-500">
-                          <span>{user.hourlyRate ? `₦${user.hourlyRate}/hr` : 'Rate not set'}</span>
-                          <span>{user.dbsStatus === 'verified' ? 'DBS verified' : 'DBS pending'}</span>
-                        </div>
-
-                        <Button
-                          className="mt-4 w-full"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => setSelectedUser(user)}
-                        >
-                          <Eye className="w-4 h-4 mr-2" />
-                          View Profile
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
-                ))}
-            </div>
-          )}
-        </CardContent>
-      </Card>
-
-      {/* Search and Filters */}
+      {/* Search, status filter, and view toggle */}
       <Card>
         <CardContent className="pt-6">
           <div className="flex flex-col md:flex-row gap-4">
@@ -728,19 +756,6 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
               />
             </div>
 
-            <Select value={roleFilter} onValueChange={setRoleFilter}>
-              <SelectTrigger className="w-full md:w-40">
-                <SelectValue placeholder="All Roles" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Roles</SelectItem>
-                <SelectItem value="tutor">Tutors</SelectItem>
-                <SelectItem value="parent">Parents</SelectItem>
-                <SelectItem value="student">Students</SelectItem>
-                <SelectItem value="admin">Admins</SelectItem>
-              </SelectContent>
-            </Select>
-
             <Select value={statusFilter} onValueChange={setStatusFilter}>
               <SelectTrigger className="w-full md:w-40">
                 <SelectValue placeholder="All Status" />
@@ -753,6 +768,27 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
                 <SelectItem value="suspended">Suspended</SelectItem>
               </SelectContent>
             </Select>
+
+            <div className="flex rounded-lg border border-gray-200 p-0.5">
+              <Button
+                variant="ghost"
+                size="sm"
+                className={viewMode === 'list' ? 'bg-gray-100' : ''}
+                onClick={() => setViewMode('list')}
+                aria-label="List view"
+              >
+                <List className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                className={viewMode === 'grid' ? 'bg-gray-100' : ''}
+                onClick={() => setViewMode('grid')}
+                aria-label="Grid view"
+              >
+                <LayoutGrid className="w-4 h-4" />
+              </Button>
+            </div>
           </div>
 
           <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
@@ -774,21 +810,53 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
         </CardContent>
       </Card>
 
-      {/* User List */}
-      <div className="space-y-4">
-        {filteredUsers.length === 0 ? (
-          <Card>
-            <CardContent className="py-12 text-center">
-              <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-              <p className="text-gray-600">No users found matching your criteria</p>
-            </CardContent>
-          </Card>
-        ) : (
-          filteredUsers.map(user => (
-            <UserCard key={user.userId} user={user} />
-          ))
-        )}
-      </div>
+      {/* Results — paginated so this doesn't unconditionally render every
+          matching user at once as the platform grows. */}
+      {filteredUsers.length === 0 ? (
+        <Card>
+          <CardContent className="py-12 text-center">
+            <Users className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+            <p className="text-gray-600">No users found matching your criteria</p>
+          </CardContent>
+        </Card>
+      ) : (
+        <>
+          {viewMode === 'grid' ? (
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+              {filteredUsers.slice((page - 1) * USERS_PER_PAGE, page * USERS_PER_PAGE).map(user => (
+                <UserGridCard key={user.userId} user={user} />
+              ))}
+            </div>
+          ) : (
+            <div className="space-y-4">
+              {filteredUsers.slice((page - 1) * USERS_PER_PAGE, page * USERS_PER_PAGE).map(user => (
+                <UserCard key={user.userId} user={user} />
+              ))}
+            </div>
+          )}
+
+          {filteredUsers.length > USERS_PER_PAGE && (
+            <div className="flex items-center justify-between pt-2">
+              <p className="text-sm text-gray-500">
+                Page {page} of {Math.ceil(filteredUsers.length / USERS_PER_PAGE)}
+              </p>
+              <div className="flex gap-2">
+                <Button variant="outline" size="sm" disabled={page === 1} onClick={() => setPage(p => p - 1)}>
+                  <ChevronLeft className="w-4 h-4 mr-1" /> Previous
+                </Button>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={page >= Math.ceil(filteredUsers.length / USERS_PER_PAGE)}
+                  onClick={() => setPage(p => p + 1)}
+                >
+                  Next <ChevronRight className="w-4 h-4 ml-1" />
+                </Button>
+              </div>
+            </div>
+          )}
+        </>
+      )}
 
       <Dialog open={!!selectedUser} onOpenChange={(open) => !open && setSelectedUser(null)}>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 gap-0">
@@ -941,9 +1009,17 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
                   </div>
                 </SectionCard>
 
-                {hasRole(selectedUser, 'parent') && (
-                  <SectionCard title="Family overview" icon={Baby}>
-                    <UserFamilyOverview session={session} userId={selectedUser.id || selectedUser.userId} />
+                {(hasRole(selectedUser, 'parent') || hasRole(selectedUser, 'tutor') || hasRole(selectedUser, 'student')) && (
+                  <SectionCard
+                    title={hasRole(selectedUser, 'parent') ? 'Family overview' : hasRole(selectedUser, 'tutor') ? 'Tutor activity' : 'Student activity'}
+                    icon={hasRole(selectedUser, 'parent') ? Baby : hasRole(selectedUser, 'tutor') ? Award : BookOpen}
+                  >
+                    <UserFamilyOverview
+                      session={session}
+                      userId={selectedUser.id || selectedUser.userId}
+                      showChildren={hasRole(selectedUser, 'parent')}
+                      showPayouts={hasRole(selectedUser, 'tutor')}
+                    />
                   </SectionCard>
                 )}
 
