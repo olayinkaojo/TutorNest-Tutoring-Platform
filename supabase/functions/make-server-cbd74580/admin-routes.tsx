@@ -930,7 +930,49 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
         return c.json({ error: 'Unauthorized' }, 401);
       }
 
-      const allUsers = await kv.getByPrefix('user:');
+      const rawUsers = await kv.getByPrefix('user:');
+
+      // Every real account (parent/tutor/student/admin) is created via
+      // supabase.auth.admin.createUser at signup, so a legitimate
+      // user:<id> record always has a matching Auth user. Deleting a user
+      // straight from the Supabase dashboard only ever removes their Auth
+      // account (or a profiles row) — it has no idea kv_store_cbd74580
+      // exists, so the KV record is silently left behind and kept showing
+      // up here forever. Cross-checking against Auth (the true "does this
+      // account still exist" signal) and cleaning up anything orphaned
+      // makes this self-healing instead of needing a manual fixup every
+      // time someone deletes a user outside the app's own delete flow
+      // (admin-user-deletion-routes.tsx, which does clean up KV).
+      const authIds = new Set<string>();
+      try {
+        const authClient = createClient(
+          Deno.env.get('SUPABASE_URL') ?? '',
+          Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+        );
+        for (let page = 1; ; page++) {
+          const { data, error } = await authClient.auth.admin.listUsers({ page, perPage: 1000 });
+          if (error) throw error;
+          for (const u of data.users) authIds.add(u.id);
+          if (data.users.length < 1000) break;
+        }
+      } catch (e: any) {
+        // If Auth can't be reached, fail open (show everything) rather than
+        // wrongly hiding every real user because of a transient error.
+        console.warn('GET /admin/users: could not verify against Auth, skipping orphan check:', e.message);
+      }
+
+      const allUsers = authIds.size
+        ? rawUsers.filter((u: any) => {
+            const id = u.id || u.userId;
+            const stillExists = !id || authIds.has(id);
+            if (!stillExists) {
+              console.warn(`GET /admin/users: user:${id} has no matching Auth account — removing orphaned record`);
+              kv.del(`user:${id}`).catch(() => {});
+              kv.del(`user_roles:${id}`).catch(() => {});
+            }
+            return stillExists;
+          })
+        : rawUsers;
 
       // A user's role field on their own user:<id> record only ever holds
       // whichever role they're CURRENTLY active as — /switch-role
