@@ -215,9 +215,19 @@ export function TutorVerificationGate({ session, profile, onComplete, onSignOut 
           </div>
           <h1 className="text-2xl font-semibold text-gray-900">Complete your registration</h1>
           <p className="text-sm text-gray-600 mt-2 max-w-md mx-auto">
-            Welcome, {displayName}! Before you can access your dashboard, please add your profile
-            photo and at least one document (an ID or a qualification certificate). This is required
-            for verification.
+            {hasPhoto ? (
+              <>
+                Welcome, {displayName}! Your profile photo is already on file — before you can access
+                your dashboard, please add at least one document (an ID or a qualification
+                certificate). This is required for verification.
+              </>
+            ) : (
+              <>
+                Welcome, {displayName}! Before you can access your dashboard, please add your profile
+                photo and at least one document (an ID or a qualification certificate). This is
+                required for verification.
+              </>
+            )}
           </p>
         </div>
 
@@ -233,26 +243,30 @@ export function TutorVerificationGate({ session, profile, onComplete, onSignOut 
           </span>
         </div>
 
-        {/* Photo */}
-        <div className="rounded-xl border border-gray-200 bg-white p-5 mb-4">
-          <div className="flex items-center gap-2 mb-3">
-            {hasPhoto ? <CheckCircle2 className="w-5 h-5 text-green-600" /> : <Circle className="w-5 h-5 text-gray-300" />}
-            <h2 className="font-medium text-gray-900">Profile photo</h2>
-          </div>
-          <div className="flex items-center gap-4">
-            <AvatarUpload
-              session={session}
-              photoUrl={photoUrl}
-              name={displayName}
-              size="lg"
-              onUploaded={(url) => setPhotoUrl(url)}
-            />
-            <div className="text-sm text-gray-600">
-              <p>{hasPhoto ? 'Photo added.' : 'Click the avatar to upload a clear headshot.'}</p>
-              <p className="text-xs text-gray-400 mt-0.5">JPG, PNG or WebP, up to 5MB.</p>
+        {/* Photo — already uploaded during signup for most tutors, so this
+            step is skipped entirely rather than asking again. A tutor who
+            somehow reaches this gate without one yet still gets prompted. */}
+        {!hasPhoto && (
+          <div className="rounded-xl border border-gray-200 bg-white p-5 mb-4">
+            <div className="flex items-center gap-2 mb-3">
+              <Circle className="w-5 h-5 text-gray-300" />
+              <h2 className="font-medium text-gray-900">Profile photo</h2>
+            </div>
+            <div className="flex items-center gap-4">
+              <AvatarUpload
+                session={session}
+                photoUrl={photoUrl}
+                name={displayName}
+                size="lg"
+                onUploaded={(url) => setPhotoUrl(url)}
+              />
+              <div className="text-sm text-gray-600">
+                <p>Click the avatar to upload a clear headshot.</p>
+                <p className="text-xs text-gray-400 mt-0.5">JPG, PNG or WebP, up to 5MB.</p>
+              </div>
             </div>
           </div>
-        </div>
+        )}
 
         {/* Documents */}
         <div className="rounded-xl border border-gray-200 bg-white p-5 mb-6">
@@ -320,7 +334,7 @@ export function TutorVerificationGate({ session, profile, onComplete, onSignOut 
           onClick={onComplete}
           style={{ backgroundColor: complete ? '#625d9c' : undefined }}
         >
-          {complete ? 'Enter dashboard' : 'Add a photo and a document to continue'}
+          {complete ? 'Enter dashboard' : hasPhoto ? 'Add a document to continue' : 'Add a photo and a document to continue'}
         </Button>
 
         {onSignOut && (
