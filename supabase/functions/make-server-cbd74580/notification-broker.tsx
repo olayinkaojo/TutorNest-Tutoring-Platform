@@ -214,7 +214,14 @@ export function createBookshopPurchaseNotification(
     title: 'Book Purchase Confirmed ✓',
     message: `Successfully purchased: ${bookList}`,
     description: `Total: £${totalAmount.toFixed(2)}. Books are now available in your library.`,
-    actionUrl: `/parent/dashboard?tab=bookshop`,
+    // The only one of this file's ~10 notification helpers with a real,
+    // live caller (bookshop-routes.tsx) — actionUrl used the old
+    // ?tab=<x> scheme, which the app's routing (AuthenticatedAppRoutes.tsx)
+    // replaced with path-based /dashboard/:role/:tab. The other 8 or so
+    // helpers' actionUrls have the same defunct scheme, but currently have
+    // zero real callers anywhere in the codebase — left as-is rather than
+    // fixing dead code no notification ever actually uses yet.
+    actionUrl: '/dashboard/parent/bookshop',
     metadata: {
       bookTitles,
       amount: totalAmount,

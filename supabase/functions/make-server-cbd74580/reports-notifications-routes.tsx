@@ -197,23 +197,31 @@ app.post('/make-server-cbd74580/bookings/:bookingId/report', async (c) => {
         studentName = resolveName(studentProfile ?? await kv.get(`child:${booking.studentId}`).catch(() => null), 'the student');
       }
 
-      // Create notification for parent
+      // Create notification for parent. actionUrl used to be a bare hash
+      // fragment (#bookings-report-<id>) with no route or handler behind
+      // it — NotificationCenter.tsx does a real `window.location.href`
+      // navigation on click, so it just changed the current page's hash
+      // and went nowhere. Points at the real path-based dashboard route
+      // (AuthenticatedAppRoutes.tsx) instead, the same tab the report
+      // email's "View Full Report" link already uses.
       await createNotification({
         userId: parentId,
         type: 'report',
         title: 'New Session Report',
         message: `${tutorName} has submitted a report for ${studentName}'s session.`,
-        actionUrl: `#bookings-report-${bookingId}`,
+        actionUrl: '/dashboard/parent/session-reports',
         metadata: { bookingId, reportId: report.id }
       });
 
-      // Create notification for student
+      // Create notification for student — same fix; the student
+      // dashboard's session-reports tab is keyed "reports", not
+      // "session-reports" like the parent's.
       await createNotification({
         userId: booking.studentId,
         type: 'report',
         title: 'Session Report Submitted',
         message: `${tutorName} has submitted a report for your session.`,
-        actionUrl: `#report-${bookingId}`,
+        actionUrl: '/dashboard/student/reports',
         metadata: { bookingId, reportId: report.id }
       });
 
@@ -364,7 +372,7 @@ app.post('/make-server-cbd74580/reports/:reportId/mark-viewed', async (c) => {
       type: 'system',
       title: 'Report Viewed',
       message: `${report.viewedByStudent ? 'Student' : 'Parent'} has viewed your report for ${report.studentName}`,
-      actionUrl: `#report-${reportId}`,
+      actionUrl: '/dashboard/tutor/reporting',
       metadata: {
         reportId,
         viewedBy: currentUserId,
@@ -423,26 +431,33 @@ app.post('/make-server-cbd74580/bookings/:bookingId/rate-session', async (c) => 
         type: 'rating',
         title: 'Session Rated',
         message: `${booking.parentName} rated your session with ${booking.studentName} ${body.rating} stars.`,
-        actionUrl: `#feedback-${bookingId}`,
-        metadata: { 
-          bookingId, 
-          rating: body.rating, 
+        actionUrl: '/dashboard/tutor/reviews',
+        metadata: {
+          bookingId,
+          rating: body.rating,
           feedback: body.feedback,
           studentName: booking.studentName,
           parentName: booking.parentName
         }
       });
 
-      // Create notification for student about parent rating (optional)
+      // Create notification for student about parent rating (optional).
+      // `rating` here used to be an undeclared variable (only body.rating
+      // ever existed) — a ReferenceError thrown building this message,
+      // uncaught by any inner try/catch, meaning the outer catch turned
+      // every rating submission into a 500 response... after the rating
+      // had already been saved successfully a few lines above. The parent
+      // saw "Failed to submit rating" for a rating that had, in fact, gone
+      // through every time.
       await createNotification({
         userId: booking.studentId,
         type: 'session-rated',
         title: 'Your Session Was Rated',
-        message: `Your parent rated your session with ${booking.tutorName} ${rating} stars.`,
-        actionUrl: `#session-feedback-${bookingId}`,
-        metadata: { 
-          bookingId, 
-          rating, 
+        message: `Your parent rated your session with ${booking.tutorName} ${body.rating} stars.`,
+        actionUrl: '/dashboard/student/reports',
+        metadata: {
+          bookingId,
+          rating: body.rating,
           tutorName: booking.tutorName
         }
       });
@@ -1161,7 +1176,11 @@ app.post('/make-server-cbd74580/students/:studentId/notify-progress', async (c) 
       title: 'Student Progress Alert',
       message: `${studentName} improved ${improvementPct.toFixed(1)}% in ${subject}! (${previousScore} → ${currentScore})`,
       priority: improvementPct >= 10 ? 'high' : 'medium',
-      actionUrl: `#student/${studentId}/progress`,
+      // No per-student deep link exists on the tutor dashboard yet —
+      // Bookings is the closest real destination where they'll see this
+      // student's sessions, rather than a bare hash fragment nothing
+      // handles.
+      actionUrl: '/dashboard/tutor/bookings',
       metadata: {
         studentId,
         studentName,
