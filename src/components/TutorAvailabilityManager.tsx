@@ -243,6 +243,7 @@ export function TutorAvailabilityManager({ session, tutorId }: TutorAvailability
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
+                <SelectItem value="Africa/Lagos">Lagos (WAT)</SelectItem>
                 <SelectItem value="Europe/London">London (GMT/BST)</SelectItem>
                 <SelectItem value="Europe/Paris">Paris (CET/CEST)</SelectItem>
                 <SelectItem value="America/New_York">New York (EST/EDT)</SelectItem>
