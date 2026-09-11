@@ -2694,4 +2694,81 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
     }
   });
 
+  // Get every submitted session report, for admin oversight. Reports were
+  // previously only visible to the tutor who wrote them and the parent/
+  // student they were about — admin had no way to see what tutors are
+  // actually reporting, e.g. for quality review or a dispute.
+  app.get('/make-server-cbd74580/admin/session-reports', async (c) => {
+    try {
+      const reports = (await kv.getByPrefix('report:')) as any[];
+
+      // Resolve each report's booking (for date/time/subject — reports
+      // don't carry these themselves) and the tutor/student/parent names,
+      // same profile-resolution order used elsewhere (DB profile -> KV
+      // user -> KV child, since a booking's participants can be Postgres
+      // accounts, KV-only accounts, or a KV-only child profile).
+      const bookingIds = [...new Set(reports.map((r) => r.bookingId).filter(Boolean))];
+      const bookingById = new Map<string, any>();
+      await Promise.all(
+        bookingIds.map(async (id) => {
+          const kvBooking = await kv.get(`booking:${id}`).catch(() => null);
+          if (kvBooking) { bookingById.set(id, kvBooking); return; }
+          const dbBooking = await db.getBooking(id).catch(() => null);
+          if (dbBooking) bookingById.set(id, dbBooking);
+        }),
+      );
+
+      const profileIds = [
+        ...new Set(
+          [...bookingById.values()].flatMap((b: any) =>
+            [b.tutorId, b.studentId, b.userId ?? b.parentId].filter(Boolean),
+          ),
+        ),
+      ];
+      const profileMap: Record<string, any> = {};
+      await Promise.all(
+        profileIds.map(async (id) => {
+          const dbProfile = await db.getProfile(id).catch(() => null);
+          if (dbProfile) { profileMap[id] = dbProfile; return; }
+          const kvUser = await kv.get(`user:${id}`).catch(() => null);
+          if (kvUser) { profileMap[id] = kvUser; return; }
+          const kvChild = await kv.get(`child:${id}`).catch(() => null);
+          if (kvChild) profileMap[id] = kvChild;
+        }),
+      );
+      const resolveName = (id: string | undefined, fallback: string): string => {
+        const p = id ? profileMap[id] : null;
+        return (
+          p?.fullName || p?.full_name || p?.name ||
+          (p?.firstName ? `${p.firstName} ${p.lastName ?? ''}`.trim() : null) ||
+          fallback
+        );
+      };
+
+      const enriched = reports.map((r) => {
+        const booking = bookingById.get(r.bookingId);
+        return {
+          ...r,
+          tutorId: booking?.tutorId,
+          studentId: booking?.studentId,
+          parentId: booking?.userId ?? booking?.parentId,
+          tutorName: resolveName(booking?.tutorId, 'Unknown tutor'),
+          studentName: resolveName(booking?.studentId, 'Unknown student'),
+          parentName: resolveName(booking?.userId ?? booking?.parentId, ''),
+          subject: booking?.subject,
+          sessionDate: booking?.date,
+          startTime: booking?.startTime,
+          endTime: booking?.endTime,
+        };
+      });
+
+      enriched.sort((a, b) => new Date(b.submittedAt).getTime() - new Date(a.submittedAt).getTime());
+
+      return c.json({ reports: enriched });
+    } catch (err: any) {
+      console.error('Error fetching session reports for admin:', err);
+      return c.json({ error: err.message || 'Failed to fetch session reports' }, 500);
+    }
+  });
+
 }
