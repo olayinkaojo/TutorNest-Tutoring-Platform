@@ -51,6 +51,7 @@ const AdminPayoutsManager = lazy(() => import('./AdminPayoutsManager').then(m =>
 const ChildProfileManagement = lazy(() => import('./admin/ChildProfileManagement').then(m => ({ default: m.ChildProfileManagement })));
 const CurriculumUploader = lazy(() => import('./admin/CurriculumUploader').then(m => ({ default: m.CurriculumUploader })));
 const ResourcesUploader = lazy(() => import('./admin/ResourcesUploader').then(m => ({ default: m.ResourcesUploader })));
+const TutorTrainingUploader = lazy(() => import('./admin/TutorTrainingUploader').then(m => ({ default: m.TutorTrainingUploader })));
 const AuditLogViewer = lazy(() => import('./admin/AuditLogViewer').then(m => ({ default: m.AuditLogViewer })));
 const DocumentAuditTrail = lazy(() => import('./admin/DocumentAuditTrail').then(m => ({ default: m.DocumentAuditTrail })));
 const ChatSafeguardingViewer = lazy(() => import('./admin/ChatSafeguardingViewer').then(m => ({ default: m.ChatSafeguardingViewer })));
@@ -127,6 +128,7 @@ export function AdminDashboard({
     'childprofiles',
     'curriculum',
     'resources',
+    'tutortraining',
     'auditlog',
     'sessionreports',
   ]);
@@ -431,6 +433,7 @@ export function AdminDashboard({
             <TabsTrigger value="childprofiles">Child Profiles</TabsTrigger>
             <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
+            <TabsTrigger value="tutortraining">Tutor Training</TabsTrigger>
             <TabsTrigger value="auditlog">Audit Log</TabsTrigger>
             <TabsTrigger value="documenttrail">Document Trail</TabsTrigger>
             <TabsTrigger value="safeguarding">Safeguarding</TabsTrigger>
@@ -587,6 +590,16 @@ export function AdminDashboard({
             {session && (
               <Suspense fallback={<TabFallback />}>
                 <ResourcesUploader
+                  accessToken={session.access_token}
+                />
+              </Suspense>
+            )}
+          </TabsContent>
+
+          <TabsContent value="tutortraining">
+            {session && (
+              <Suspense fallback={<TabFallback />}>
+                <TutorTrainingUploader
                   accessToken={session.access_token}
                 />
               </Suspense>

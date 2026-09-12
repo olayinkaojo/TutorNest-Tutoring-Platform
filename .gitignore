@@ -47,3 +47,5 @@ Icon[]
 .parcel-cache/
 financial-data-backup-*.json
 financial-data-wipe-applied-*.json
+.vercel
+.env*

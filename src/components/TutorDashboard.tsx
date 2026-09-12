@@ -57,7 +57,7 @@ const TutorAvailabilityManager = lazy(() => import('./TutorAvailabilityManager')
 const BookingManager = lazy(() => import('./BookingManager').then(m => ({ default: m.BookingManager })));
 const TutorPerformanceDashboard = lazy(() => import('./TutorPerformanceDashboard').then(m => ({ default: m.TutorPerformanceDashboard })));
 const TutorPayoutDashboard = lazy(() => import('./TutorPayoutDashboard').then(m => ({ default: m.TutorPayoutDashboard })));
-const ResourcesHub = lazy(() => import('./ResourcesHub').then(m => ({ default: m.ResourcesHub })));
+const TutorTrainingResources = lazy(() => import('./TutorTrainingResources').then(m => ({ default: m.TutorTrainingResources })));
 const TutorCurriculumViewer = lazy(() => import('./TutorCurriculumViewer').then(m => ({ default: m.TutorCurriculumViewer })));
 const AdvancedReporting = lazy(() => import('./AdvancedReporting').then(m => ({ default: m.AdvancedReporting })));
 const TutorReviewsTab = lazy(() => import('./TutorReviewsTab').then(m => ({ default: m.TutorReviewsTab })));
@@ -1376,7 +1376,7 @@ export function TutorDashboard({
 
           <TabsContent value="resources">
             <Suspense fallback={<TabFallback />}>
-              <ResourcesHub session={session} userId={profile.id || profile.userId || ''} userRole="tutor" />
+              <TutorTrainingResources session={session} />
             </Suspense>
           </TabsContent>
 

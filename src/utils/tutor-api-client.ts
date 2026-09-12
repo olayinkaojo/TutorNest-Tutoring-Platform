@@ -429,6 +429,20 @@ const tutorAPI = {
 
     return response;
   },
+
+  /**
+   * Training videos and reference material for tutors (platform demos,
+   * onboarding, teaching tips) — admin-managed, shown in the tutor
+   * dashboard's Resources tab.
+   */
+  async getTrainingResources(accessToken: string) {
+    const response = await makeRequest<any>(
+      '/tutor-training',
+      accessToken
+    );
+
+    return response.resources || [];
+  },
 };
 
 export default tutorAPI;
