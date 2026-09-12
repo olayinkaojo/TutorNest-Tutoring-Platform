@@ -352,6 +352,42 @@ export default function dailyVideoRoutes(mainApp: Hono, getUserId: (token: strin
 
   // Fresh, time-limited playback/download link — fetched on demand, never
   // stored, since Daily's own access links expire. Every fetch is logged
+  // TEMPORARY — diagnosing why createDailyRoom has a 0% success rate in
+  // production (72/72 bookings fell back to Jitsi). Calls Daily's API
+  // directly and returns the raw status + body so we can see the actual
+  // rejection reason instead of guessing. Remove once diagnosed.
+  app.get('/make-server-cbd74580/admin/daily-debug', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) return c.json({ error: 'Unauthorized' }, 401);
+      const admin = await requireAdmin(userId);
+      if (!admin) return c.json({ error: 'Admin access required' }, 403);
+
+      const apiKey = Deno.env.get('DAILY_API_KEY') ?? '';
+      const res = await fetch(`${DAILY_API_BASE}/rooms`, {
+        method: 'POST',
+        headers: dailyHeaders(),
+        body: JSON.stringify({
+          name: `debug-${Date.now()}`,
+          privacy: 'private',
+          properties: { enable_recording: 'cloud', exp: Math.floor(Date.now() / 1000) + 3600 },
+        }),
+      });
+      const bodyText = await res.text();
+      return c.json({
+        keyPresent: !!apiKey,
+        keyLength: apiKey.length,
+        keyPrefix: apiKey.slice(0, 6),
+        status: res.status,
+        ok: res.ok,
+        body: bodyText,
+      });
+    } catch (e: any) {
+      return c.json({ error: e.message }, 500);
+    }
+  });
+
   // against the tutor/student on the recording (same pattern as the chat
   // safeguarding viewer): proof of when the platform looked, not just that
   // it could.
