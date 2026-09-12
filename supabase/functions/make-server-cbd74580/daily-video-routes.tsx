@@ -18,6 +18,16 @@ const app = new Hono();
 
 const DAILY_API_BASE = 'https://api.daily.co/v1';
 
+// Cloud recording requires Daily's paid "Scale" plan. The account is
+// currently on a lower tier, so every request that included
+// enable_recording/start_cloud_recording was being rejected outright
+// (400 invalid-request-error) — and because createDailyRoom treated that
+// as room-creation failing, every single session silently fell back to an
+// unrecorded Jitsi link instead of real Daily.co video. Flip this back to
+// `true` once the Daily plan is upgraded — that's the entire restore step,
+// nothing else in this file needs to change.
+const CLOUD_RECORDING_ENABLED = false;
+
 // How long a finished recording stays available before an admin has to act.
 // Not indefinite by design — NDPA/GDPR both treat indefinite retention of a
 // minor's data as a red flag. Enforced lazily (no cron here) whenever the
@@ -54,7 +64,7 @@ export async function createDailyRoom(paymentId: string, expiresAt: Date): Promi
       name,
       privacy: 'private',
       properties: {
-        enable_recording: 'cloud',
+        ...(CLOUD_RECORDING_ENABLED ? { enable_recording: 'cloud' } : {}),
         exp: Math.floor(expiresAt.getTime() / 1000),
         eject_at_room_exp: true,
       },
@@ -89,6 +99,7 @@ async function createMeetingToken(
   roomName: string,
   opts: { userName: string; isOwner: boolean; startRecording: boolean },
 ): Promise<string | null> {
+  const shouldRecord = opts.startRecording && CLOUD_RECORDING_ENABLED;
   const res = await fetch(`${DAILY_API_BASE}/meeting-tokens`, {
     method: 'POST',
     headers: dailyHeaders(),
@@ -97,8 +108,7 @@ async function createMeetingToken(
         room_name: roomName,
         user_name: opts.userName,
         is_owner: opts.isOwner,
-        enable_recording: opts.startRecording ? 'cloud' : undefined,
-        start_cloud_recording: opts.startRecording,
+        ...(shouldRecord ? { enable_recording: 'cloud', start_cloud_recording: true } : {}),
         exp: Math.floor(Date.now() / 1000) + 2 * 60 * 60, // 2 hours — one session's worth
       },
     }),
@@ -149,7 +159,10 @@ export default function dailyVideoRoutes(mainApp: Hono, getUserId: (token: strin
       });
       if (!token) return c.json({ error: 'Could not create a join link. Please try again.' }, 502);
 
-      return c.json({ roomUrl: `${booking.meetLink}?t=${token}`, recorded: true });
+      // Tell the truth here — SessionCallModal shows a different message to
+      // users depending on this flag, and it was previously hardcoded `true`
+      // even while recording was silently disabled account-wide.
+      return c.json({ roomUrl: `${booking.meetLink}?t=${token}`, recorded: CLOUD_RECORDING_ENABLED });
     } catch (error: any) {
       console.error('Error creating session join token:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);
