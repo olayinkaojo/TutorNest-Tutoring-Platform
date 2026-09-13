@@ -1375,9 +1375,11 @@ export function TutorDashboard({
           </TabsContent>
 
           <TabsContent value="resources">
-            <Suspense fallback={<TabFallback />}>
-              <TutorTrainingResources session={session} />
-            </Suspense>
+            {session && (
+              <Suspense fallback={<TabFallback />}>
+                <TutorTrainingResources session={session} />
+              </Suspense>
+            )}
           </TabsContent>
 
           <TabsContent value="curriculum">

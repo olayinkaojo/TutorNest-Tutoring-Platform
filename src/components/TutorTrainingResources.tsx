@@ -37,13 +37,16 @@ export function TutorTrainingResources({ session }: TutorTrainingResourcesProps)
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const accessToken = session?.access_token;
+
   useEffect(() => {
+    if (!accessToken) return;
     let cancelled = false;
     (async () => {
       setLoading(true);
       setError(null);
       try {
-        const data = await tutorAPI.getTrainingResources(session.access_token);
+        const data = await tutorAPI.getTrainingResources(accessToken);
         if (!cancelled) setResources(data);
       } catch (err: any) {
         console.error('Error loading tutor training resources:', err);
@@ -53,9 +56,9 @@ export function TutorTrainingResources({ session }: TutorTrainingResourcesProps)
       }
     })();
     return () => { cancelled = true; };
-  }, [session.access_token]);
+  }, [accessToken]);
 
-  if (loading) {
+  if (!accessToken || loading) {
     return (
       <Card>
         <CardContent className="flex items-center justify-center py-16">
@@ -92,7 +95,7 @@ export function TutorTrainingResources({ session }: TutorTrainingResourcesProps)
         ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             {resources.map((resource) => (
-              <ResourceCard key={resource.id} resource={resource} accessToken={session.access_token} />
+              <ResourceCard key={resource.id} resource={resource} accessToken={accessToken} />
             ))}
           </div>
         )}
