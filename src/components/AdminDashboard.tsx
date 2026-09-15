@@ -52,6 +52,7 @@ const ChildProfileManagement = lazy(() => import('./admin/ChildProfileManagement
 const CurriculumUploader = lazy(() => import('./admin/CurriculumUploader').then(m => ({ default: m.CurriculumUploader })));
 const ResourcesUploader = lazy(() => import('./admin/ResourcesUploader').then(m => ({ default: m.ResourcesUploader })));
 const TutorTrainingUploader = lazy(() => import('./admin/TutorTrainingUploader').then(m => ({ default: m.TutorTrainingUploader })));
+const AdminBroadcast = lazy(() => import('./admin/AdminBroadcast').then(m => ({ default: m.AdminBroadcast })));
 const AuditLogViewer = lazy(() => import('./admin/AuditLogViewer').then(m => ({ default: m.AuditLogViewer })));
 const DocumentAuditTrail = lazy(() => import('./admin/DocumentAuditTrail').then(m => ({ default: m.DocumentAuditTrail })));
 const ChatSafeguardingViewer = lazy(() => import('./admin/ChatSafeguardingViewer').then(m => ({ default: m.ChatSafeguardingViewer })));
@@ -116,6 +117,7 @@ export function AdminDashboard({
     'overview',
     'alerts',
     'notifications',
+    'announcements',
     'users',
     'verification',
     'analytics',
@@ -421,6 +423,7 @@ export function AdminDashboard({
             <TabsTrigger value="overview">Overview</TabsTrigger>
             <TabsTrigger value="alerts">System Alerts</TabsTrigger>
             <TabsTrigger value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger value="announcements">Announcements</TabsTrigger>
             <TabsTrigger value="users">Users</TabsTrigger>
             <TabsTrigger value="verification">Verification</TabsTrigger>
             <TabsTrigger value="analytics">Analytics</TabsTrigger>
@@ -491,6 +494,14 @@ export function AdminDashboard({
           <TabsContent value="notifications">
             {session && (
               <NotificationCenter session={session} userId={profile.id || profile.userId} />
+            )}
+          </TabsContent>
+
+          <TabsContent value="announcements">
+            {session && (
+              <Suspense fallback={<TabFallback />}>
+                <AdminBroadcast accessToken={session.access_token} />
+              </Suspense>
             )}
           </TabsContent>
 

@@ -1821,3 +1821,42 @@ export const emailTemplates = {
     `,
   }),
 };
+
+/**
+ * Wraps an admin-authored broadcast message (Admin Dashboard → Announcements)
+ * in the same branded template as every other system email. Unlike
+ * `emailTemplates`, this isn't a fixed-subject template — the subject and
+ * body are written fresh by an admin each time, so it's a plain rendering
+ * helper instead. `bodyText` is admin-authored, not end-user input, but is
+ * still HTML-escaped before paragraph-wrapping — cheap defense in depth
+ * against a stray "<" or "&" breaking the layout.
+ */
+export function renderBroadcastEmailHtml(name: string, bodyText: string): string {
+  const escapeHtml = (s: string) =>
+    s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+
+  const paragraphs = bodyText
+    .split(/\n{2,}/)
+    .map((block) => `<p style="margin:0 0 16px;font-size:15px;color:#374151;line-height:1.6;">${escapeHtml(block).replace(/\n/g, '<br>')}</p>`)
+    .join('');
+
+  return `
+    <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+    <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:32px 0;"><tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+        <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:36px 40px;text-align:center;">
+          <img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="160" style="display:block;margin:0 auto;max-width:180px;height:auto;" />
+          <p style="margin:8px 0 0;color:rgba(255,255,255,0.85);font-size:14px;">Professional Tutoring Platform</p>
+        </td></tr>
+        <tr><td style="padding:36px 40px;">
+          <p style="margin:0 0 8px;font-size:16px;color:#1e1b4b;">Hi ${escapeHtml(name)},</p>
+          ${paragraphs}
+          <p style="margin:24px 0 0;font-size:14px;color:#374151;">The Knowledge Fons Academy Team</p>
+        </td></tr>
+        <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;">
+          <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.knowledgefonsacademy.com" style="color:#625d9c;text-decoration:none;">knowledgefonsacademy.com</a></p>
+        </td></tr>
+      </table>
+    </td></tr></table></body></html>
+  `;
+}
