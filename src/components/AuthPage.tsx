@@ -79,7 +79,13 @@ export function AuthPage({ onBecomeTutor, onBecomeStudent, onTutorSignupWithData
       setLoading(true);
       try {
         const { error } = await supabase.auth.resetPasswordForEmail(email, {
-          redirectTo: `${window.location.origin}/auth`,
+          // Bare origin, not "/auth" — matches the exact redirect URL the
+          // signup-confirmation flow already sends (see appUrl in
+          // signup-routes.tsx) and that's confirmed working, rather than
+          // depending on "/auth" separately being in Supabase's redirect
+          // allow-list. App.tsx's recovery detection reads the URL hash
+          // directly, so it works regardless of which path this lands on.
+          redirectTo: window.location.origin,
         });
 
         if (error) throw error;

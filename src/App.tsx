@@ -3,6 +3,7 @@ import type { Session } from '@supabase/supabase-js';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { AuthBackground } from './components/AuthBackground';
+import { ResetPasswordConfirm } from './components/ResetPasswordConfirm';
 import { getSupabaseClient } from './utils/supabase/client';
 import { edgeFunctionHeaders, edgeFunctionUrl } from './utils/supabase-edge-fetch';
 import { logger } from './utils/logger';
@@ -37,6 +38,22 @@ export default function App() {
     if (typeof window === 'undefined') return null;
     const match = /[#&]type=(signup|invite|email_change)\b/.exec(window.location.hash);
     return match ? match[1] : null;
+  });
+
+  // Clicking a "reset your password" email link redirects back here the same
+  // way (type=recovery in the hash) and supabase-js establishes a real,
+  // signed-in session from it — but that's just proof the person owns the
+  // inbox, not a new password. Without this, the auth-state/redirect effects
+  // below treat that session exactly like a normal sign-in and silently drop
+  // the user straight onto their dashboard, having never actually been asked
+  // to set a new password — leaving them right back where they started
+  // (still not knowing a working password) the next time they need to sign
+  // in fresh. This has to be read synchronously here, same as
+  // emailConfirmationType above, before supabase-js's own detectSessionInUrl
+  // consumes and strips the hash.
+  const [isPasswordRecovery, setIsPasswordRecovery] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
+    return /[#&]type=recovery\b/.test(window.location.hash);
   });
 
   const navigateTo = (path: string, options?: { replace?: boolean }) => {
@@ -141,6 +158,12 @@ export default function App() {
     // nulls in the first place.
     if (loading) return;
 
+    // Hold off on any redirect while the password-recovery screen is up —
+    // otherwise this fires the moment the recovery session lands (before
+    // the user has actually set a new password) and quietly changes the
+    // URL underneath them mid-flow.
+    if (isPasswordRecovery) return;
+
     if (!session) {
       if (location.pathname.startsWith('/dashboard') || location.pathname === '/select-role') {
         navigateTo('/auth', { replace: true });
@@ -163,7 +186,7 @@ export default function App() {
     ) {
       navigateTo(rolePath, { replace: true });
     }
-  }, [session, profile, location.pathname, loading]);
+  }, [session, profile, location.pathname, loading, isPasswordRecovery]);
 
   const fetchProfile = async (accessToken: string) => {
     try {
@@ -348,6 +371,17 @@ export default function App() {
           <p className="text-gray-600">Loading...</p>
         </div>
       </AuthBackground>
+    );
+  }
+
+  if (isPasswordRecovery) {
+    return (
+      <ResetPasswordConfirm
+        onComplete={() => {
+          toast.success('Password updated — you\'re signed in.', { duration: 6000 });
+          setIsPasswordRecovery(false);
+        }}
+      />
     );
   }
 
