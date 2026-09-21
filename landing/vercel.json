@@ -2,5 +2,19 @@
   "buildCommand": null,
   "outputDirectory": ".",
   "framework": null,
-  "cleanUrls": true
+  "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "tutornest.org" }],
+      "destination": "https://www.knowledgefonsacademy.com/:path*",
+      "permanent": true
+    },
+    {
+      "source": "/:path*",
+      "has": [{ "type": "host", "value": "www.tutornest.org" }],
+      "destination": "https://www.knowledgefonsacademy.com/:path*",
+      "permanent": true
+    }
+  ]
 }
