@@ -271,7 +271,17 @@ function validatePaymentInit(body: Record<string, unknown>): string | null {
 }
 
 // Initialize payment for a session booking
+//
+// RETIRED before going live. This older flow takes the charge `amount`
+// straight from the request body — so any signed-in user could ask for a ₦1
+// hosted-payment link and have it accepted as full payment. Nothing in the
+// app calls it any more (only the unmounted PaymentProcessor.tsx did); every
+// real booking goes through /payments/initiate-plan, where the price comes
+// from PAYMENT_PLANS on the server and is re-checked against what Flutterwave
+// actually charged in confirmPlanPayment.
 app.post('/payments/initialize', async (c) => {
+  return c.json({ error: 'This payment route has been retired. Please book through the app.' }, 410);
+  // eslint-disable-next-line no-unreachable
   try {
     const accessToken = c.req.header('Authorization')?.split(' ')[1];
     const userId = await getUserIdFromToken(accessToken);
@@ -1165,6 +1175,34 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
 
   const plan = PAYMENT_PLANS[payment.planType];
   if (!plan) throw new Error('Invalid plan type on payment record: ' + payment.planType);
+
+  // "successful" alone only proves SOME payment went through under this
+  // reference — not that it was for the right amount. The inline checkout
+  // popup takes its `amount` from the browser (BookSessionWithPayment.tsx),
+  // so anyone comfortable with devtools could open it for ₦100 against a
+  // ₦15,000 plan's reference, pay ₦100, and get every session marked paid.
+  // Harmless with test cards; a real revenue hole with live keys. Compare
+  // what Flutterwave says was actually charged against what OUR server
+  // recorded as owed (payment.amount was set from PAYMENT_PLANS, never from
+  // the client) before creating anything.
+  const paidAmount = Number(verifyData.data?.amount);
+  const paidCurrency = verifyData.data?.currency;
+  const paidRef = verifyData.data?.tx_ref;
+  if (paidRef !== reference || paidCurrency !== 'NGN' || !(paidAmount >= Number(payment.amount))) {
+    console.error(
+      `confirmPlanPayment: payment mismatch for ${reference} — expected ₦${payment.amount} NGN, ` +
+      `Flutterwave reports ${paidAmount} ${paidCurrency} (tx_ref ${paidRef})`,
+    );
+    await logAuditEvent({
+      userId: payment.userId,
+      action: 'payment_amount_mismatch',
+      category: 'payments',
+      description: `Payment ${reference} succeeded on Flutterwave but for ${paidAmount} ${paidCurrency}, expected ₦${payment.amount} — no sessions were created.`,
+      severity: 'critical',
+      metadata: { paymentId: payment.id, reference, expectedAmount: payment.amount, paidAmount, paidCurrency },
+    }).catch(() => {});
+    throw new Error('Payment amount did not match the expected price — no sessions were created. Please contact support.');
+  }
 
   // Generate all session dates and create booking rows
   // Parse startDate as noon WAT (+01:00) to avoid UTC date shifting
