@@ -1,7 +1,11 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 
 // This endpoint is called by Vercel Cron every day at 07:00 UTC and 12:00 UTC.
-// It triggers the Supabase edge function that schedules 24h and 1h session reminder emails.
+// It triggers the Supabase edge function that schedules 24h and 1h session
+// reminder emails, and (piggybacking on the same daily trigger rather than
+// adding a third cron entry) the Worksheets subscription renewal check —
+// sends a reminder a few days before a subscription lapses, and flips any
+// subscription past its period end to lapsed.
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   // Vercel Cron calls with Authorization header containing CRON_SECRET
   const authHeader = req.headers.authorization;
@@ -37,7 +41,28 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     console.log('Reminders triggered successfully:', data);
-    return res.status(200).json({ success: true, result: data, triggeredAt: new Date().toISOString() });
+
+    // Best-effort, non-blocking — a failure here shouldn't mark the whole
+    // cron run as failed when session reminders above already succeeded.
+    let worksheetResult: unknown = null;
+    try {
+      const wRes = await fetch(
+        `${supabaseUrl}/functions/v1/make-server-cbd74580/worksheets/check-renewals`,
+        { method: 'POST', headers: { Authorization: `Bearer ${serviceKey}` } },
+      );
+      worksheetResult = await wRes.json().catch(() => ({}));
+      if (!wRes.ok) console.error('Worksheet renewal check failed:', worksheetResult);
+    } catch (wErr: any) {
+      console.error('Worksheet renewal check error:', wErr);
+      worksheetResult = { error: wErr.message };
+    }
+
+    return res.status(200).json({
+      success: true,
+      result: data,
+      worksheetRenewals: worksheetResult,
+      triggeredAt: new Date().toISOString(),
+    });
   } catch (err: any) {
     console.error('Cron error:', err);
     return res.status(500).json({ error: err.message });

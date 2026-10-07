@@ -46,6 +46,7 @@ const BookingManager = lazy(() => import('./BookingManager').then(m => ({ defaul
 const Chatroom = lazy(() => import('./Chatroom').then(m => ({ default: m.Chatroom })));
 const Bookshop = lazy(() => import('./Bookshop').then(m => ({ default: m.Bookshop })));
 const ResourcesHub = lazy(() => import('./ResourcesHub').then(m => ({ default: m.ResourcesHub })));
+const WorksheetsHub = lazy(() => import('./WorksheetsHub').then(m => ({ default: m.WorksheetsHub })));
 const ParentPaymentsDashboard = lazy(() => import('./ParentPaymentsDashboard').then(m => ({ default: m.ParentPaymentsDashboard })));
 const RealSessionReportsList = lazy(() => import('./RealSessionReportsList').then(m => ({ default: m.RealSessionReportsList })));
 
@@ -824,6 +825,7 @@ export function ParentDashboard({
             <TabsTrigger value="progress">Progress</TabsTrigger>
             <TabsTrigger value="session-reports">Session Reports</TabsTrigger>
             <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
+            <TabsTrigger value="worksheets">Worksheets</TabsTrigger>
             <TabsTrigger value="messages">Messages</TabsTrigger>
             <TabsTrigger value="documents">Documents</TabsTrigger>
             <TabsTrigger value="payments">Payments</TabsTrigger>
@@ -1136,6 +1138,19 @@ export function ParentDashboard({
                     </Card>
                   )}
             </ErrorBoundary>
+          </TabsContent>
+
+          {/* Worksheets Tab */}
+          <TabsContent value="worksheets">
+            {session && (
+              <Suspense fallback={<TabFallback />}>
+                <WorksheetsHub
+                  accessToken={session.access_token}
+                  userEmail={session.user?.email}
+                  userName={profile.full_name || profile.name || 'Parent'}
+                />
+              </Suspense>
+            )}
           </TabsContent>
 
           {/* Messages Tab */}

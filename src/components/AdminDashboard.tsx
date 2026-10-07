@@ -52,6 +52,7 @@ const ChildProfileManagement = lazy(() => import('./admin/ChildProfileManagement
 const CurriculumUploader = lazy(() => import('./admin/CurriculumUploader').then(m => ({ default: m.CurriculumUploader })));
 const ResourcesUploader = lazy(() => import('./admin/ResourcesUploader').then(m => ({ default: m.ResourcesUploader })));
 const TutorTrainingUploader = lazy(() => import('./admin/TutorTrainingUploader').then(m => ({ default: m.TutorTrainingUploader })));
+const WorksheetsUploader = lazy(() => import('./admin/WorksheetsUploader').then(m => ({ default: m.WorksheetsUploader })));
 const AdminBroadcast = lazy(() => import('./admin/AdminBroadcast').then(m => ({ default: m.AdminBroadcast })));
 const AuditLogViewer = lazy(() => import('./admin/AuditLogViewer').then(m => ({ default: m.AuditLogViewer })));
 const DocumentAuditTrail = lazy(() => import('./admin/DocumentAuditTrail').then(m => ({ default: m.DocumentAuditTrail })));
@@ -131,6 +132,7 @@ export function AdminDashboard({
     'curriculum',
     'resources',
     'tutortraining',
+    'worksheets',
     'auditlog',
     'sessionreports',
   ]);
@@ -437,6 +439,7 @@ export function AdminDashboard({
             <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
             <TabsTrigger value="resources">Resources</TabsTrigger>
             <TabsTrigger value="tutortraining">Tutor Training</TabsTrigger>
+            <TabsTrigger value="worksheets">Worksheets</TabsTrigger>
             <TabsTrigger value="auditlog">Audit Log</TabsTrigger>
             <TabsTrigger value="documenttrail">Document Trail</TabsTrigger>
             <TabsTrigger value="safeguarding">Safeguarding</TabsTrigger>
@@ -611,6 +614,16 @@ export function AdminDashboard({
             {session && (
               <Suspense fallback={<TabFallback />}>
                 <TutorTrainingUploader
+                  accessToken={session.access_token}
+                />
+              </Suspense>
+            )}
+          </TabsContent>
+
+          <TabsContent value="worksheets">
+            {session && (
+              <Suspense fallback={<TabFallback />}>
+                <WorksheetsUploader
                   accessToken={session.access_token}
                 />
               </Suspense>

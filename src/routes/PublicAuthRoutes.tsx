@@ -3,6 +3,7 @@ import { Navigate, Route, Routes } from 'react-router-dom';
 import ErrorBoundary from '../components/ErrorBoundary';
 import { AuthPage } from '../components/AuthPage';
 import { LandingPage } from '../components/LandingPage';
+import { PublicWorksheetsPage } from '../components/PublicWorksheetsPage';
 import { SignupRoleChooser } from '../components/SignupRoleChooser';
 import { TutorSignup } from '../components/TutorSignup';
 import { StudentSignup } from '../components/StudentSignup';
@@ -40,6 +41,7 @@ export function PublicAuthRoutes({
               onSignIn={() => navigateTo('/auth')}
               onSignUp={() => navigateTo('/signup')}
               onBecomeTutor={() => navigateTo('/signup/tutor')}
+              onWorksheets={() => navigateTo('/worksheets')}
             />
           </ErrorBoundary>
         }
@@ -132,6 +134,18 @@ export function PublicAuthRoutes({
       <Route path="/privacy" element={<ErrorBoundary><PrivacyPolicy /></ErrorBoundary>} />
       <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
       <Route path="/feedback" element={<ErrorBoundary><FeedbackPage /></ErrorBoundary>} />
+      <Route
+        path="/worksheets"
+        element={
+          <ErrorBoundary>
+            <PublicWorksheetsPage
+              onSignIn={() => navigateTo('/auth')}
+              onSignUp={() => navigateTo('/signup')}
+              onBackHome={() => navigateTo('/')}
+            />
+          </ErrorBoundary>
+        }
+      />
       <Route path="*" element={<Navigate to="/auth" replace />} />
     </Routes>
   );

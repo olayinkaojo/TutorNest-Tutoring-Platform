@@ -33,6 +33,7 @@ import bookshopRoutes from './bookshop-routes.tsx';
 import roleManagementRoutes from './role-management-routes.tsx';
 import assessmentsRoutes from './assessments-routes.tsx';
 import curriculumRoutes from './curriculum-routes.tsx';
+import worksheetsRoutes from './worksheets-routes.tsx';
 import tutorTrainingRoutes from './tutor-training-routes.tsx';
 import adminBroadcastRoutes from './admin-broadcast-routes.tsx';
 import triviaRoutes from './trivia-routes.tsx';
@@ -438,6 +439,7 @@ app.route('/make-server-cbd74580/assessments', assessmentsRoutes);
 
 // Register curriculum routes
 app.route('/make-server-cbd74580/curriculum', curriculumRoutes);
+app.route('/make-server-cbd74580/worksheets', worksheetsRoutes);
 app.route('/make-server-cbd74580/tutor-training', tutorTrainingRoutes);
 app.route('/make-server-cbd74580/admin/broadcast', adminBroadcastRoutes);
 
