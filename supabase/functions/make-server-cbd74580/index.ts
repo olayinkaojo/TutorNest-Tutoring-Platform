@@ -78,7 +78,7 @@ app.use('*', async (c, next) => {
   if (c.req.method === 'OPTIONS') {
     c.header('Access-Control-Allow-Origin', resolveAllowOrigin(c.req.raw));
     c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-client-info, apikey');
+    c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-client-info, apikey, X-Visitor-Id');
     c.header('Access-Control-Max-Age', '86400');
     return c.body(null, 204);
   }
@@ -107,7 +107,7 @@ app.use('*', async (c, next) => {
   await next();
   c.header('Access-Control-Allow-Origin', resolveAllowOrigin(c.req.raw));
   c.header('Access-Control-Allow-Methods', 'GET, POST, PUT, PATCH, DELETE, OPTIONS');
-  c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-client-info, apikey');
+  c.header('Access-Control-Allow-Headers', 'Content-Type, Authorization, x-client-info, apikey, X-Visitor-Id');
 });
 app.use('*', logger());
 
