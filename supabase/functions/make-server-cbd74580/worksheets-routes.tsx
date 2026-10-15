@@ -28,6 +28,15 @@ import { createClient } from 'npm:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import { requireAdmin, verifyUser } from './route-auth.tsx';
 import { logAuditEvent } from './activity-log.tsx';
+
+// The catalog is fetched from the Edge Function, but the browser renders it
+// on the app's own domain (app.knowledgefonsacademy.com) — a path-only URL
+// like `/make-server-cbd74580/...` would resolve against THAT origin, not
+// this function, and silently 200 with the SPA's index.html instead of an
+// image. Thumbnail links must be absolute.
+function functionBaseUrl(): string {
+  return `${(Deno.env.get('SUPABASE_URL') ?? '').replace(/\/$/, '')}/functions/v1/make-server-cbd74580`;
+}
 import { sendEmail, renderBroadcastEmailHtml } from './email-service.tsx';
 
 const app = new Hono();
@@ -162,7 +171,7 @@ app.get('/catalog', async (c) => {
           description: w.description,
           isPremium: !!w.isPremium,
           premiumPrice: w.isPremium ? w.premiumPrice : undefined,
-          thumbnailUrl: w.thumbnailPath ? `/make-server-cbd74580/worksheets/${w.id}/thumbnail` : null,
+          thumbnailUrl: w.thumbnailPath ? `${functionBaseUrl()}/worksheets/${w.id}/thumbnail` : null,
           locked,
           lockReason,
         };

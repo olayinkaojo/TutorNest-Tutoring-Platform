@@ -170,7 +170,13 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      if (generatedThumbnail) formData.append('thumbnail', generatedThumbnail, 'cover.jpg');
+      if (generatedThumbnail) {
+        // A manually-picked cover keeps its real name/extension (it might be
+        // a .png); only the auto-rendered PDF-page Blob has no name of its
+        // own and falls back to .jpg, which is what it actually is.
+        const name = generatedThumbnail instanceof File ? generatedThumbnail.name : 'cover.jpg';
+        formData.append('thumbnail', generatedThumbnail, name);
+      }
       formData.append('subject', subject);
       formData.append('yearGroup', yearGroup);
       formData.append('title', title);
