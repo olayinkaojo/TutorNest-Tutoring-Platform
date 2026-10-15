@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '../ui/card';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -28,6 +28,7 @@ import {
   Trash2,
   Pencil,
   ImagePlus,
+  Image as ImageIcon,
   Loader2,
   CheckCircle,
   AlertCircle,
@@ -80,7 +81,10 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
   const [loading, setLoading] = useState(true);
   const [filterYearGroup, setFilterYearGroup] = useState('all');
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [uploadingCoverId, setUploadingCoverId] = useState<string | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
+  const manualCoverTargetId = useRef<string | null>(null);
+  const manualCoverInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchAll();
@@ -103,6 +107,15 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
   };
 
   const [generatedThumbnail, setGeneratedThumbnail] = useState<Blob | null>(null);
+  const manualThumbInputRef = useRef<HTMLInputElement>(null);
+
+  const handleManualThumbnail = (selected: File | null) => {
+    if (!selected) return;
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    setGeneratedThumbnail(selected);
+    setThumbnailPreview(URL.createObjectURL(selected));
+    setUploadError(null);
+  };
 
   const handleFileChange = async (selected: File | null) => {
     setFile(selected);
@@ -137,6 +150,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
     setGeneratedThumbnail(null);
     const fileInput = document.getElementById('worksheet-file') as HTMLInputElement | null;
     if (fileInput) fileInput.value = '';
+    if (manualThumbInputRef.current) manualThumbInputRef.current.value = '';
   };
 
   const handleUpload = async () => {
@@ -220,6 +234,26 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
     }
   };
 
+  const handleManualCoverUpload = async (worksheetId: string, file: File | null) => {
+    if (!file) return;
+    setUploadingCoverId(worksheetId);
+    try {
+      const formData = new FormData();
+      formData.append('thumbnail', file);
+      const saveRes = await fetch(`${BASE_URL}/admin/${worksheetId}/thumbnail`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
+      });
+      if (!saveRes.ok) throw new Error((await saveRes.json()).error || 'Could not save the thumbnail');
+      fetchAll();
+    } catch (error: any) {
+      alert(error.message || 'Could not upload a cover image for this worksheet');
+    } finally {
+      setUploadingCoverId(null);
+    }
+  };
+
   const filtered = filterYearGroup === 'all' ? worksheets : worksheets.filter((w) => w.yearGroup === filterYearGroup);
   const yearLabel = (value: string) => YEAR_GROUPS.find((g) => g.value === value)?.label ?? value;
   const thumbUrl = (w: any) => (w.thumbnailPath ? `${BASE_URL}/${w.id}/thumbnail` : null);
@@ -293,14 +327,33 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
               />
               <p className="text-xs text-gray-500">The first page is used as the thumbnail automatically.</p>
             </div>
-            <div className="w-24 h-32 rounded-lg border bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
-              {generatingThumbnail ? (
-                <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-              ) : thumbnailPreview ? (
-                <img src={thumbnailPreview} alt="Cover preview" className="w-full h-full object-cover" />
-              ) : (
-                <FileText className="w-6 h-6 text-gray-300" />
-              )}
+            <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+              <div className="w-24 h-32 rounded-lg border bg-gray-50 flex items-center justify-center overflow-hidden">
+                {generatingThumbnail ? (
+                  <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+                ) : thumbnailPreview ? (
+                  <img src={thumbnailPreview} alt="Cover preview" className="w-full h-full object-cover" />
+                ) : (
+                  <FileText className="w-6 h-6 text-gray-300" />
+                )}
+              </div>
+              <input
+                ref={manualThumbInputRef}
+                type="file"
+                accept="image/*"
+                className="hidden"
+                onChange={(e) => handleManualThumbnail(e.target.files?.[0] || null)}
+              />
+              <button
+                type="button"
+                className="text-xs underline whitespace-nowrap"
+                style={{ color: '#625d9c' }}
+                onClick={() => manualThumbInputRef.current?.click()}
+                disabled={uploading}
+              >
+                <ImageIcon className="w-3 h-3 inline mr-0.5 -mt-0.5" />
+                {thumbnailPreview ? 'Replace cover' : 'Upload cover image'}
+              </button>
             </div>
           </div>
 
@@ -390,6 +443,18 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
                         {regeneratingId === w.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" style={{ color: '#625d9c' }} />}
                       </Button>
                     )}
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title="Upload a cover image manually"
+                      disabled={uploadingCoverId === w.id}
+                      onClick={() => {
+                        manualCoverTargetId.current = w.id;
+                        manualCoverInputRef.current?.click();
+                      }}
+                    >
+                      {uploadingCoverId === w.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" style={{ color: '#625d9c' }} />}
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => setEditing(w)}>
                       <Pencil className="w-4 h-4" style={{ color: '#625d9c' }} />
                     </Button>
@@ -403,6 +468,19 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
           )}
         </CardContent>
       </Card>
+
+      <input
+        ref={manualCoverInputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={(e) => {
+          const file = e.target.files?.[0] || null;
+          const targetId = manualCoverTargetId.current;
+          e.target.value = '';
+          if (targetId && file) handleManualCoverUpload(targetId, file);
+        }}
+      />
 
       {editing && (
         <EditWorksheetDialog
