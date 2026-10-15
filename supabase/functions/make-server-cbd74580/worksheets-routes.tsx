@@ -39,7 +39,12 @@ const supabase = createClient(
 
 const FLUTTERWAVE_SECRET_KEY = Deno.env.get('FLUTTERWAVE_SECRET_KEY') ?? '';
 const BUCKET = 'make-cbd74580-worksheets';
-const FREE_DOWNLOAD_LIMIT = 5;
+// Dropped from 5 to 1 (decision: the worksheet quality on offer doesn't
+// justify 5 free downloads) — everything that reads this number (the
+// catalog lock logic, /my-access, the frontend copy that mirrors it) stays
+// correct automatically; only the UI strings that hardcode the English
+// phrasing ("Try N free worksheets") needed a matching text edit.
+const FREE_DOWNLOAD_LIMIT = 1;
 const FREE_YEAR_GROUP_LIMIT = 3;
 const SUBSCRIPTION_PRICE = 15_000; // ₦, NGN
 const SUBSCRIPTION_PERIOD_DAYS = 30;

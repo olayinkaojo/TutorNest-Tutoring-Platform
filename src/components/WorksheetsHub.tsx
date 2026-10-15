@@ -266,7 +266,7 @@ function HeroBanner() {
       </div>
       <h1 className="text-2xl sm:text-3xl text-white font-semibold">Worksheets</h1>
       <p className="mt-2 text-white/85 text-sm sm:text-base max-w-xl mx-auto">
-        Maths &amp; English practice sheets by year group. Try 5 free from any 3 year groups — no account needed to start.
+        Maths &amp; English practice sheets by year group. Try 1 free from any 3 year groups — no account needed to start.
       </p>
     </div>
   );
@@ -300,7 +300,7 @@ function AccessStrip({
   return (
     <div className="flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm flex-wrap" style={{ borderColor: '#e5e3ef', backgroundColor: '#f9f8fc' }}>
       <span style={{ color: '#44415b' }}>
-        <strong>{freeDownloadsRemaining}</strong> of {access.freeLimit} free downloads left ·{' '}
+        <strong>{freeDownloadsRemaining}</strong> of {access.freeLimit} free download{access.freeLimit === 1 ? '' : 's'} left ·{' '}
         <strong>{access.chosenYearGroups.length}</strong> of {access.yearGroupLimit} year groups chosen
         {access.chosenYearGroups.length > 0 && (
           <span className="opacity-70"> ({access.chosenYearGroups.map((g) => g.replace('year_', 'Yr ')).join(', ')})</span>
@@ -417,7 +417,7 @@ function FreePicksDialog({
         <DialogHeader>
           <DialogTitle>Choose your {access.yearGroupLimit} free year groups</DialogTitle>
           <DialogDescription>
-            Pick up to {access.yearGroupLimit} — these are where your 5 free downloads apply. You can change this until your first download.
+            Pick up to {access.yearGroupLimit} — these are where your {access.freeLimit} free download{access.freeLimit === 1 ? '' : 's'} appl{access.freeLimit === 1 ? 'ies' : 'y'}. You can change this until your first download.
           </DialogDescription>
         </DialogHeader>
         {err && (

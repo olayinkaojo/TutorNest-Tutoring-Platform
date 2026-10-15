@@ -52,7 +52,7 @@ export function LandingPage({ onSignIn, onSignUp, onBecomeTutor, onWorksheets }:
               style={{ backgroundColor: '#625d9c' }}
               onClick={onWorksheets}
             >
-              Try 5 Free Worksheets — No Sign Up Needed
+              Try 1 Free Worksheet — No Sign Up Needed
             </Button>
           )}
 
