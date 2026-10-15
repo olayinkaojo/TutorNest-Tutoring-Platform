@@ -542,6 +542,118 @@ app.get('/admin/all', async (c) => {
   });
 });
 
+// ── Admin: edit a worksheet's metadata ──────────────────────────────────────
+app.patch('/admin/:id', async (c) => {
+  const auth = await requireAdmin(c);
+  if (auth instanceof Response) return auth;
+  const adminId = auth;
+
+  const id = c.req.param('id');
+  const w = (await kv.get(`worksheet:${id}`)) as any;
+  if (!w) return c.json({ error: 'Worksheet not found' }, 404);
+
+  try {
+    const body = (await c.req.json()) as Partial<{
+      subject: string; yearGroup: string; title: string; description: string;
+      isPremium: boolean; premiumPrice: number;
+    }>;
+
+    if (body.subject !== undefined) w.subject = body.subject;
+    if (body.yearGroup !== undefined) w.yearGroup = body.yearGroup;
+    if (body.title !== undefined) {
+      if (!body.title.trim()) return c.json({ error: 'Title cannot be empty' }, 400);
+      w.title = body.title;
+    }
+    if (body.description !== undefined) w.description = body.description;
+    if (body.isPremium !== undefined) {
+      w.isPremium = body.isPremium;
+      if (w.isPremium) {
+        const price = body.premiumPrice ?? w.premiumPrice;
+        if (!price || price <= 0) return c.json({ error: 'Premium worksheets need a price greater than 0' }, 400);
+        w.premiumPrice = price;
+      } else {
+        w.premiumPrice = undefined;
+      }
+    } else if (body.premiumPrice !== undefined && w.isPremium) {
+      if (body.premiumPrice <= 0) return c.json({ error: 'Price must be greater than 0' }, 400);
+      w.premiumPrice = body.premiumPrice;
+    }
+
+    await kv.set(`worksheet:${id}`, w);
+    await logAuditEvent({
+      userId: adminId,
+      action: 'worksheet_edited',
+      category: 'content',
+      description: `Worksheet edited: "${w.title}"`,
+      metadata: { id },
+    });
+
+    return c.json({ success: true, worksheet: w });
+  } catch (error: any) {
+    console.error('Error editing worksheet:', error);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
+// ── Admin: the raw file, to regenerate a thumbnail client-side for a
+// worksheet that doesn't have one (e.g. uploaded before auto-thumbnails) ───
+app.get('/admin/:id/raw-file', async (c) => {
+  const auth = await requireAdmin(c);
+  if (auth instanceof Response) return auth;
+
+  const id = c.req.param('id');
+  const w = (await kv.get(`worksheet:${id}`)) as any;
+  if (!w) return c.json({ error: 'Worksheet not found' }, 404);
+
+  const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(w.filePath, 120);
+  if (error || !data) return c.json({ error: 'Could not access the file' }, 500);
+  return c.json({ url: data.signedUrl });
+});
+
+// ── Admin: replace/add a thumbnail (auto-generated client-side, or manual) ─
+app.post('/admin/:id/thumbnail', async (c) => {
+  const auth = await requireAdmin(c);
+  if (auth instanceof Response) return auth;
+  const adminId = auth;
+
+  const id = c.req.param('id');
+  const w = (await kv.get(`worksheet:${id}`)) as any;
+  if (!w) return c.json({ error: 'Worksheet not found' }, 404);
+
+  try {
+    const formData = await c.req.formData();
+    const thumbnail = formData.get('thumbnail') as File;
+    if (!thumbnail) return c.json({ error: 'A thumbnail file is required' }, 400);
+
+    const thumbExt = thumbnail.name.split('.').pop() || 'jpg';
+    const thumbnailPath = `thumbnails/${id}.${thumbExt}`;
+    const { error: uploadError } = await supabase.storage
+      .from(BUCKET)
+      .upload(thumbnailPath, await thumbnail.arrayBuffer(), { contentType: thumbnail.type || 'image/jpeg', upsert: true });
+    if (uploadError) return c.json({ error: `Thumbnail upload failed: ${uploadError.message}` }, 500);
+
+    // Clean up an old thumbnail at a different path (e.g. different extension).
+    if (w.thumbnailPath && w.thumbnailPath !== thumbnailPath) {
+      await supabase.storage.from(BUCKET).remove([w.thumbnailPath]).catch(() => {});
+    }
+
+    w.thumbnailPath = thumbnailPath;
+    await kv.set(`worksheet:${id}`, w);
+    await logAuditEvent({
+      userId: adminId,
+      action: 'worksheet_thumbnail_updated',
+      category: 'content',
+      description: `Worksheet thumbnail updated: "${w.title}"`,
+      metadata: { id },
+    });
+
+    return c.json({ success: true });
+  } catch (error: any) {
+    console.error('Error updating worksheet thumbnail:', error);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
 app.delete('/admin/:id', async (c) => {
   const auth = await requireAdmin(c);
   if (auth instanceof Response) return auth;

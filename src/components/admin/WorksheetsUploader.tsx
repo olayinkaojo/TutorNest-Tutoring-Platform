@@ -8,6 +8,14 @@ import { Badge } from '../ui/badge';
 import { Switch } from '../ui/switch';
 import { Alert, AlertDescription } from '../ui/alert';
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '../ui/dialog';
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -18,14 +26,16 @@ import {
   Upload,
   FileText,
   Trash2,
+  Pencil,
+  ImagePlus,
   Loader2,
   CheckCircle,
   AlertCircle,
   BookOpen,
   Crown,
-  Image as ImageIcon,
 } from 'lucide-react';
 import { projectId } from '../../utils/supabase/info';
+import { renderPdfFirstPageThumbnail } from '../../utils/pdf-thumbnail';
 
 interface WorksheetsUploaderProps {
   accessToken: string;
@@ -49,6 +59,8 @@ const YEAR_GROUPS = [
   { value: 'year_13', label: 'Year 13 / Post-Secondary' },
 ];
 
+const BASE_URL = `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/worksheets`;
+
 export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
   const [subject, setSubject] = useState('Maths');
   const [yearGroup, setYearGroup] = useState('');
@@ -57,7 +69,8 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
   const [isPremium, setIsPremium] = useState(false);
   const [premiumPrice, setPremiumPrice] = useState('');
   const [file, setFile] = useState<File | null>(null);
-  const [thumbnail, setThumbnail] = useState<File | null>(null);
+  const [thumbnailPreview, setThumbnailPreview] = useState<string | null>(null);
+  const [generatingThumbnail, setGeneratingThumbnail] = useState(false);
 
   const [uploading, setUploading] = useState(false);
   const [uploadSuccess, setUploadSuccess] = useState(false);
@@ -66,26 +79,49 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
   const [worksheets, setWorksheets] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [filterYearGroup, setFilterYearGroup] = useState('all');
+  const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
+  const [editing, setEditing] = useState<any | null>(null);
 
   useEffect(() => {
     fetchAll();
+    return () => {
+      if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const fetchAll = async () => {
     setLoading(true);
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/worksheets/admin/all`,
-        { headers: { Authorization: `Bearer ${accessToken}` } },
-      );
-      if (response.ok) {
-        const data = await response.json();
-        setWorksheets(data.worksheets || []);
-      }
+      const response = await fetch(`${BASE_URL}/admin/all`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (response.ok) setWorksheets((await response.json()).worksheets || []);
     } catch (error) {
       console.error('Error fetching worksheets:', error);
     } finally {
       setLoading(false);
+    }
+  };
+
+  const [generatedThumbnail, setGeneratedThumbnail] = useState<Blob | null>(null);
+
+  const handleFileChange = async (selected: File | null) => {
+    setFile(selected);
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    setThumbnailPreview(null);
+    setGeneratedThumbnail(null);
+    if (!selected) return;
+
+    setGeneratingThumbnail(true);
+    setUploadError(null);
+    try {
+      const blob = await renderPdfFirstPageThumbnail(selected);
+      setGeneratedThumbnail(blob);
+      setThumbnailPreview(URL.createObjectURL(blob));
+    } catch (err: any) {
+      console.error('Thumbnail generation failed:', err);
+      setUploadError('Could not read a preview from this PDF — it will upload without a thumbnail. You can add one afterward.');
+    } finally {
+      setGeneratingThumbnail(false);
     }
   };
 
@@ -96,9 +132,11 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
     setIsPremium(false);
     setPremiumPrice('');
     setFile(null);
-    setThumbnail(null);
-    (document.getElementById('worksheet-file') as HTMLInputElement | null)?.value && ((document.getElementById('worksheet-file') as HTMLInputElement).value = '');
-    (document.getElementById('worksheet-thumbnail') as HTMLInputElement | null)?.value && ((document.getElementById('worksheet-thumbnail') as HTMLInputElement).value = '');
+    if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
+    setThumbnailPreview(null);
+    setGeneratedThumbnail(null);
+    const fileInput = document.getElementById('worksheet-file') as HTMLInputElement | null;
+    if (fileInput) fileInput.value = '';
   };
 
   const handleUpload = async () => {
@@ -117,7 +155,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
     try {
       const formData = new FormData();
       formData.append('file', file);
-      if (thumbnail) formData.append('thumbnail', thumbnail);
+      if (generatedThumbnail) formData.append('thumbnail', generatedThumbnail, 'cover.jpg');
       formData.append('subject', subject);
       formData.append('yearGroup', yearGroup);
       formData.append('title', title);
@@ -125,14 +163,12 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
       formData.append('isPremium', String(isPremium));
       if (isPremium) formData.append('premiumPrice', premiumPrice);
 
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/worksheets/admin/upload`,
-        { method: 'POST', headers: { Authorization: `Bearer ${accessToken}` }, body: formData },
-      );
-      if (!response.ok) {
-        const errorData = await response.json();
-        throw new Error(errorData.error || 'Upload failed');
-      }
+      const response = await fetch(`${BASE_URL}/admin/upload`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
+      });
+      if (!response.ok) throw new Error((await response.json()).error || 'Upload failed');
 
       setUploadSuccess(true);
       resetForm();
@@ -148,10 +184,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
   const handleDelete = async (id: string) => {
     if (!confirm('Delete this worksheet? This cannot be undone.')) return;
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/worksheets/admin/${id}`,
-        { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } },
-      );
+      const response = await fetch(`${BASE_URL}/admin/${id}`, { method: 'DELETE', headers: { Authorization: `Bearer ${accessToken}` } });
       if (response.ok) fetchAll();
       else alert((await response.json()).error || 'Failed to delete');
     } catch (error) {
@@ -159,8 +192,37 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
     }
   };
 
+  const handleRegenerateThumbnail = async (w: any) => {
+    setRegeneratingId(w.id);
+    try {
+      const linkRes = await fetch(`${BASE_URL}/admin/${w.id}/raw-file`, { headers: { Authorization: `Bearer ${accessToken}` } });
+      if (!linkRes.ok) throw new Error((await linkRes.json()).error || 'Could not access the file');
+      const { url } = await linkRes.json();
+
+      const fileRes = await fetch(url);
+      const pdfBlob = await fileRes.blob();
+      const thumbBlob = await renderPdfFirstPageThumbnail(pdfBlob);
+
+      const formData = new FormData();
+      formData.append('thumbnail', thumbBlob, 'cover.jpg');
+      const saveRes = await fetch(`${BASE_URL}/admin/${w.id}/thumbnail`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
+      });
+      if (!saveRes.ok) throw new Error((await saveRes.json()).error || 'Could not save the thumbnail');
+
+      fetchAll();
+    } catch (error: any) {
+      alert(error.message || 'Could not generate a thumbnail for this worksheet');
+    } finally {
+      setRegeneratingId(null);
+    }
+  };
+
   const filtered = filterYearGroup === 'all' ? worksheets : worksheets.filter((w) => w.yearGroup === filterYearGroup);
   const yearLabel = (value: string) => YEAR_GROUPS.find((g) => g.value === value)?.label ?? value;
+  const thumbUrl = (w: any) => (w.thumbnailPath ? `${BASE_URL}/${w.id}/thumbnail` : null);
 
   return (
     <div className="space-y-6">
@@ -171,7 +233,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
             Upload a Worksheet
           </CardTitle>
           <CardDescription>
-            Add it to the Worksheets library — same place parents and visitors browse from, free or paid.
+            Its cover page becomes the thumbnail automatically — just upload the PDF.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -219,15 +281,26 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
             <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} disabled={uploading} />
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-4 items-start">
             <div className="space-y-2">
               <Label htmlFor="worksheet-file">Worksheet file (PDF) <span className="text-red-500">*</span></Label>
-              <Input id="worksheet-file" type="file" accept=".pdf,application/pdf" onChange={(e) => setFile(e.target.files?.[0] || null)} disabled={uploading} />
+              <Input
+                id="worksheet-file"
+                type="file"
+                accept=".pdf,application/pdf"
+                onChange={(e) => handleFileChange(e.target.files?.[0] || null)}
+                disabled={uploading}
+              />
+              <p className="text-xs text-gray-500">The first page is used as the thumbnail automatically.</p>
             </div>
-            <div className="space-y-2">
-              <Label htmlFor="worksheet-thumbnail">Thumbnail image (optional)</Label>
-              <Input id="worksheet-thumbnail" type="file" accept="image/*" onChange={(e) => setThumbnail(e.target.files?.[0] || null)} disabled={uploading} />
-              <p className="text-xs text-gray-500 flex items-center gap-1"><ImageIcon className="w-3 h-3" /> Shown in the thumbnail grid — falls back to a plain icon if omitted.</p>
+            <div className="w-24 h-32 rounded-lg border bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+              {generatingThumbnail ? (
+                <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+              ) : thumbnailPreview ? (
+                <img src={thumbnailPreview} alt="Cover preview" className="w-full h-full object-cover" />
+              ) : (
+                <FileText className="w-6 h-6 text-gray-300" />
+              )}
             </div>
           </div>
 
@@ -246,7 +319,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
             </div>
           )}
 
-          <Button onClick={handleUpload} disabled={uploading} className="w-full text-white" style={{ backgroundColor: '#625d9c' }}>
+          <Button onClick={handleUpload} disabled={uploading || generatingThumbnail} className="w-full text-white" style={{ backgroundColor: '#625d9c' }}>
             {uploading ? (<><Loader2 className="w-4 h-4 mr-2 animate-spin" /> Uploading…</>) : (<><Upload className="w-4 h-4 mr-2" /> Upload Worksheet</>)}
           </Button>
         </CardContent>
@@ -281,9 +354,15 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
           ) : (
             <div className="space-y-3">
               {filtered.map((w) => (
-                <div key={w.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50">
+                <div key={w.id} className="flex items-center justify-between p-4 border rounded-lg hover:bg-gray-50 gap-3">
                   <div className="flex items-center gap-4 flex-1 min-w-0">
-                    <FileText className="w-8 h-8 flex-shrink-0" style={{ color: '#625d9c' }} />
+                    <div className="w-12 h-16 rounded border bg-gray-50 flex items-center justify-center overflow-hidden flex-shrink-0">
+                      {thumbUrl(w) ? (
+                        <img src={thumbUrl(w)!} alt="" className="w-full h-full object-cover" />
+                      ) : (
+                        <FileText className="w-5 h-5 text-gray-300" />
+                      )}
+                    </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h4 className="text-sm truncate">{w.title}</h4>
@@ -299,15 +378,168 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
                       <p className="text-xs text-gray-400 mt-1">Uploaded {new Date(w.uploadedAt).toLocaleDateString()}</p>
                     </div>
                   </div>
-                  <Button variant="ghost" size="sm" onClick={() => handleDelete(w.id)}>
-                    <Trash2 className="w-4 h-4 text-red-500" />
-                  </Button>
+                  <div className="flex items-center gap-1 flex-shrink-0">
+                    {!w.thumbnailPath && (
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        title="Generate thumbnail from the PDF's first page"
+                        disabled={regeneratingId === w.id}
+                        onClick={() => handleRegenerateThumbnail(w)}
+                      >
+                        {regeneratingId === w.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagePlus className="w-4 h-4" style={{ color: '#625d9c' }} />}
+                      </Button>
+                    )}
+                    <Button variant="ghost" size="sm" onClick={() => setEditing(w)}>
+                      <Pencil className="w-4 h-4" style={{ color: '#625d9c' }} />
+                    </Button>
+                    <Button variant="ghost" size="sm" onClick={() => handleDelete(w.id)}>
+                      <Trash2 className="w-4 h-4 text-red-500" />
+                    </Button>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </CardContent>
       </Card>
+
+      {editing && (
+        <EditWorksheetDialog
+          worksheet={editing}
+          accessToken={accessToken}
+          onClose={() => setEditing(null)}
+          onSaved={() => {
+            setEditing(null);
+            fetchAll();
+          }}
+        />
+      )}
     </div>
+  );
+}
+
+function EditWorksheetDialog({
+  worksheet,
+  accessToken,
+  onClose,
+  onSaved,
+}: {
+  worksheet: any;
+  accessToken: string;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const [subject, setSubject] = useState(worksheet.subject);
+  const [yearGroup, setYearGroup] = useState(worksheet.yearGroup);
+  const [title, setTitle] = useState(worksheet.title);
+  const [description, setDescription] = useState(worksheet.description || '');
+  const [isPremium, setIsPremium] = useState(!!worksheet.isPremium);
+  const [premiumPrice, setPremiumPrice] = useState(String(worksheet.premiumPrice || ''));
+  const [saving, setSaving] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+
+  const save = async () => {
+    setErr(null);
+    if (!title.trim()) {
+      setErr('Title cannot be empty');
+      return;
+    }
+    if (isPremium && (!premiumPrice || Number(premiumPrice) <= 0)) {
+      setErr('Enter a price greater than ₦0 for a premium worksheet');
+      return;
+    }
+    setSaving(true);
+    try {
+      const response = await fetch(`${BASE_URL}/admin/${worksheet.id}`, {
+        method: 'PATCH',
+        headers: { Authorization: `Bearer ${accessToken}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          subject,
+          yearGroup,
+          title,
+          description,
+          isPremium,
+          premiumPrice: isPremium ? Number(premiumPrice) : undefined,
+        }),
+      });
+      if (!response.ok) throw new Error((await response.json()).error || 'Could not save changes');
+      onSaved();
+    } catch (e: any) {
+      setErr(e.message || 'Could not save changes');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-h-[85vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Edit Worksheet</DialogTitle>
+          <DialogDescription>Change its details — the file itself isn't replaced here, only the listing.</DialogDescription>
+        </DialogHeader>
+
+        {err && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>{err}</AlertDescription>
+          </Alert>
+        )}
+
+        <div className="space-y-4 py-2">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Subject</Label>
+              <Select value={subject} onValueChange={setSubject} disabled={saving}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {SUBJECTS.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="space-y-2">
+              <Label>Year Group</Label>
+              <Select value={yearGroup} onValueChange={setYearGroup} disabled={saving}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {YEAR_GROUPS.map((g) => <SelectItem key={g.value} value={g.value}>{g.label}</SelectItem>)}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <Label>Title</Label>
+            <Input value={title} onChange={(e) => setTitle(e.target.value)} disabled={saving} />
+          </div>
+
+          <div className="space-y-2">
+            <Label>Description</Label>
+            <Textarea value={description} onChange={(e) => setDescription(e.target.value)} rows={2} disabled={saving} />
+          </div>
+
+          <div className="flex items-center justify-between border rounded-lg p-4 bg-amber-50 border-amber-200">
+            <Label className="flex items-center gap-1.5"><Crown className="w-4 h-4 text-amber-600" /> Premium — pay to own</Label>
+            <Switch checked={isPremium} onCheckedChange={setIsPremium} disabled={saving} />
+          </div>
+
+          {isPremium && (
+            <div className="space-y-2">
+              <Label>Price (₦)</Label>
+              <Input type="number" min="1" value={premiumPrice} onChange={(e) => setPremiumPrice(e.target.value)} disabled={saving} />
+            </div>
+          )}
+        </div>
+
+        <DialogFooter>
+          <Button variant="outline" onClick={onClose} disabled={saving}>Cancel</Button>
+          <Button onClick={save} disabled={saving} className="text-white" style={{ backgroundColor: '#625d9c' }}>
+            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+            Save changes
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
   );
 }
