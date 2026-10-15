@@ -40,6 +40,9 @@ export async function renderPdfFirstPageThumbnail(source: File | Blob, maxWidth 
       );
     });
   } finally {
-    await pdf.destroy();
+    // If rendering already failed (e.g. the worker crashed), destroy() can
+    // itself throw — and a throw in `finally` silently replaces whatever
+    // real error we were about to propagate. Never let cleanup mask that.
+    await pdf.destroy().catch(() => {});
   }
 }

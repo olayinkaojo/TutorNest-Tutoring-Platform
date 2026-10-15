@@ -82,6 +82,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
   const [filterYearGroup, setFilterYearGroup] = useState('all');
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [uploadingCoverId, setUploadingCoverId] = useState<string | null>(null);
+  const [listError, setListError] = useState<string | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
   const manualCoverTargetId = useRef<string | null>(null);
   const manualCoverInputRef = useRef<HTMLInputElement>(null);
@@ -208,6 +209,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
 
   const handleRegenerateThumbnail = async (w: any) => {
     setRegeneratingId(w.id);
+    setListError(null);
     try {
       const linkRes = await fetch(`${BASE_URL}/admin/${w.id}/raw-file`, { headers: { Authorization: `Bearer ${accessToken}` } });
       if (!linkRes.ok) throw new Error((await linkRes.json()).error || 'Could not access the file');
@@ -228,7 +230,10 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
 
       fetchAll();
     } catch (error: any) {
-      alert(error.message || 'Could not generate a thumbnail for this worksheet');
+      console.error('Thumbnail generation failed:', error);
+      setListError(
+        `This browser couldn't generate a thumbnail for "${w.title}" — use the image icon next to it to upload a cover photo instead.`,
+      );
     } finally {
       setRegeneratingId(null);
     }
@@ -237,6 +242,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
   const handleManualCoverUpload = async (worksheetId: string, file: File | null) => {
     if (!file) return;
     setUploadingCoverId(worksheetId);
+    setListError(null);
     try {
       const formData = new FormData();
       formData.append('thumbnail', file);
@@ -248,7 +254,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
       if (!saveRes.ok) throw new Error((await saveRes.json()).error || 'Could not save the thumbnail');
       fetchAll();
     } catch (error: any) {
-      alert(error.message || 'Could not upload a cover image for this worksheet');
+      setListError(error.message || 'Could not upload a cover image for this worksheet');
     } finally {
       setUploadingCoverId(null);
     }
@@ -397,6 +403,12 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
           </div>
         </CardHeader>
         <CardContent>
+          {listError && (
+            <Alert variant="destructive" className="mb-4">
+              <AlertCircle className="h-4 w-4" />
+              <AlertDescription>{listError}</AlertDescription>
+            </Alert>
+          )}
           {loading ? (
             <div className="flex items-center justify-center py-12"><Loader2 className="w-8 h-8 animate-spin text-gray-400" /></div>
           ) : filtered.length === 0 ? (
