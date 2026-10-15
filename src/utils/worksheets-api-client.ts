@@ -74,11 +74,8 @@ export interface WorksheetItem {
 
 export interface WorksheetAccess {
   isLoggedIn: boolean;
-  chosenYearGroups: string[];
-  lockedIn: boolean;
   downloadCount: number;
   freeLimit: number;
-  yearGroupLimit: number;
   subscription: { active: boolean; status: string; currentPeriodEnd: string } | null;
   ownedPremiumIds: string[];
 }
@@ -95,13 +92,6 @@ export const worksheetsAPI = {
 
   async getMyAccess(accessToken: string | null | undefined) {
     return request<WorksheetAccess>('/my-access', accessToken);
-  },
-
-  async setFreePicks(accessToken: string | null | undefined, yearGroups: string[]) {
-    return request<{ success: true; chosenYearGroups: string[] }>('/my-free-picks', accessToken, {
-      method: 'POST',
-      body: JSON.stringify({ yearGroups }),
-    });
   },
 
   async getFileUrl(accessToken: string | null | undefined, worksheetId: string) {

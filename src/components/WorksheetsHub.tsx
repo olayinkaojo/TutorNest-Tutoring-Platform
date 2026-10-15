@@ -7,7 +7,6 @@ import {
   Dialog,
   DialogContent,
   DialogDescription,
-  DialogFooter,
   DialogHeader,
   DialogTitle,
 } from './ui/dialog';
@@ -18,7 +17,6 @@ import {
   CheckCircle2,
   Loader2,
   Download,
-  Pencil,
   Sparkles,
   AlertCircle,
 } from 'lucide-react';
@@ -65,7 +63,6 @@ export function WorksheetsHub({ accessToken, userEmail, userName, onSignUp, onSi
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [paywall, setPaywall] = useState<Paywall>(null);
-  const [editingPicks, setEditingPicks] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -89,7 +86,6 @@ export function WorksheetsHub({ accessToken, userEmail, userName, onSignUp, onSi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [subject, yearGroup]);
 
-  const freeGroupsRemaining = access ? Math.max(0, access.yearGroupLimit - access.chosenYearGroups.length) : 0;
   const freeDownloadsRemaining = access ? Math.max(0, access.freeLimit - access.downloadCount) : 0;
 
   const handleOpenWorksheet = async (item: WorksheetItem) => {
@@ -121,12 +117,7 @@ export function WorksheetsHub({ accessToken, userEmail, userName, onSignUp, onSi
     <div className="space-y-6">
       <HeroBanner />
 
-      <AccessStrip
-        access={access}
-        freeGroupsRemaining={freeGroupsRemaining}
-        freeDownloadsRemaining={freeDownloadsRemaining}
-        onEditPicks={() => setEditingPicks(true)}
-      />
+      <AccessStrip access={access} freeDownloadsRemaining={freeDownloadsRemaining} />
 
       {error && (
         <Alert variant="destructive">
@@ -155,7 +146,6 @@ export function WorksheetsHub({ accessToken, userEmail, userName, onSignUp, onSi
       <div className="overflow-x-auto -mx-1 px-1">
         <div className="flex gap-2 pb-1 min-w-max">
           {YEAR_GROUPS.map((g) => {
-            const isChosenFree = access?.chosenYearGroups.includes(g.value);
             const selected = yearGroup === g.value;
             return (
               <button
@@ -170,13 +160,6 @@ export function WorksheetsHub({ accessToken, userEmail, userName, onSignUp, onSi
               >
                 <span className="font-medium">{g.label}</span>
                 <span className="text-xs opacity-60">{g.sub}</span>
-                {isChosenFree && !access?.subscription?.active && (
-                  <span
-                    className="absolute -top-1.5 -right-1.5 rounded-full w-3.5 h-3.5 border-2 border-white"
-                    style={{ backgroundColor: GREEN }}
-                    title="One of your free year groups"
-                  />
-                )}
               </button>
             );
           })}
@@ -205,18 +188,6 @@ export function WorksheetsHub({ accessToken, userEmail, userName, onSignUp, onSi
             />
           ))}
         </div>
-      )}
-
-      {editingPicks && access && (
-        <FreePicksDialog
-          access={access}
-          accessToken={accessToken}
-          onClose={() => setEditingPicks(false)}
-          onSaved={() => {
-            setEditingPicks(false);
-            refresh();
-          }}
-        />
       )}
 
       {paywall?.type === 'subscribe' && (
@@ -266,7 +237,7 @@ function HeroBanner() {
       </div>
       <h1 className="text-2xl sm:text-3xl text-white font-semibold">Worksheets</h1>
       <p className="mt-2 text-white/85 text-sm sm:text-base max-w-xl mx-auto">
-        Maths &amp; English practice sheets by year group. Try 1 free from any 3 year groups — no account needed to start.
+        Maths &amp; English practice sheets by year group. Try 1 free — no account needed to start.
       </p>
     </div>
   );
@@ -274,14 +245,10 @@ function HeroBanner() {
 
 function AccessStrip({
   access,
-  freeGroupsRemaining,
   freeDownloadsRemaining,
-  onEditPicks,
 }: {
   access: WorksheetAccess | null;
-  freeGroupsRemaining: number;
   freeDownloadsRemaining: number;
-  onEditPicks: () => void;
 }) {
   if (!access) return null;
 
@@ -298,23 +265,8 @@ function AccessStrip({
   }
 
   return (
-    <div className="flex items-center justify-between gap-3 rounded-xl border px-4 py-3 text-sm flex-wrap" style={{ borderColor: '#e5e3ef', backgroundColor: '#f9f8fc' }}>
-      <span style={{ color: '#44415b' }}>
-        <strong>{freeDownloadsRemaining}</strong> of {access.freeLimit} free download{access.freeLimit === 1 ? '' : 's'} left ·{' '}
-        <strong>{access.chosenYearGroups.length}</strong> of {access.yearGroupLimit} year groups chosen
-        {access.chosenYearGroups.length > 0 && (
-          <span className="opacity-70"> ({access.chosenYearGroups.map((g) => g.replace('year_', 'Yr ')).join(', ')})</span>
-        )}
-      </span>
-      {!access.lockedIn && (
-        <button
-          onClick={onEditPicks}
-          className="inline-flex items-center gap-1 text-xs font-medium hover:underline flex-shrink-0"
-          style={{ color: PURPLE }}
-        >
-          <Pencil className="w-3 h-3" /> Choose my 3
-        </button>
-      )}
+    <div className="rounded-xl border px-4 py-3 text-sm" style={{ borderColor: '#e5e3ef', backgroundColor: '#f9f8fc', color: '#44415b' }}>
+      <strong>{freeDownloadsRemaining}</strong> of {access.freeLimit} free download{access.freeLimit === 1 ? '' : 's'} left
     </div>
   );
 }
@@ -368,90 +320,6 @@ function WorksheetCard({ item, busy, onOpen }: { item: WorksheetItem; busy: bool
         </Button>
       </CardContent>
     </Card>
-  );
-}
-
-function FreePicksDialog({
-  access,
-  accessToken,
-  onClose,
-  onSaved,
-}: {
-  access: WorksheetAccess;
-  accessToken: string | null;
-  onClose: () => void;
-  onSaved: () => void;
-}) {
-  const [selected, setSelected] = useState<string[]>(access.chosenYearGroups);
-  const [saving, setSaving] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
-
-  const toggle = (value: string) => {
-    setSelected((prev) => {
-      if (prev.includes(value)) return prev.filter((v) => v !== value);
-      if (prev.length >= access.yearGroupLimit) return prev;
-      return [...prev, value];
-    });
-  };
-
-  const save = async () => {
-    if (selected.length === 0) {
-      setErr('Choose at least 1 year group');
-      return;
-    }
-    setSaving(true);
-    setErr(null);
-    try {
-      await worksheetsAPI.setFreePicks(accessToken, selected);
-      onSaved();
-    } catch (e: any) {
-      setErr(e.message || 'Could not save your picks');
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <Dialog open onOpenChange={(open) => !open && onClose()}>
-      <DialogContent>
-        <DialogHeader>
-          <DialogTitle>Choose your {access.yearGroupLimit} free year groups</DialogTitle>
-          <DialogDescription>
-            Pick up to {access.yearGroupLimit} — these are where your {access.freeLimit} free download{access.freeLimit === 1 ? '' : 's'} appl{access.freeLimit === 1 ? 'ies' : 'y'}. You can change this until your first download.
-          </DialogDescription>
-        </DialogHeader>
-        {err && (
-          <Alert variant="destructive">
-            <AlertCircle className="h-4 w-4" />
-            <AlertDescription>{err}</AlertDescription>
-          </Alert>
-        )}
-        <div className="grid grid-cols-3 sm:grid-cols-4 gap-2 py-2">
-          {YEAR_GROUPS.map((g) => {
-            const checked = selected.includes(g.value);
-            const disabled = !checked && selected.length >= access.yearGroupLimit;
-            return (
-              <button
-                key={g.value}
-                disabled={disabled}
-                onClick={() => toggle(g.value)}
-                className="rounded-lg border px-2 py-2 text-xs transition-colors disabled:opacity-40"
-                style={checked ? { borderColor: PURPLE, backgroundColor: '#625d9c12', color: PURPLE } : { borderColor: '#e5e3ef', color: '#44415b' }}
-              >
-                {g.label}
-              </button>
-            );
-          })}
-        </div>
-        <DialogFooter>
-          <Button variant="outline" onClick={onClose}>Cancel</Button>
-          <Button onClick={save} disabled={saving} className="text-white" style={{ backgroundColor: PURPLE }}>
-            {saving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
-            Save picks
-          </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
   );
 }
 

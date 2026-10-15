@@ -5,8 +5,8 @@
  * per-item purchase). This one is deliberately usable by someone who has
  * never signed up at all:
  *
- *   anonymous visitor → picks 3 year groups → 5 free downloads total →
- *   hits the limit → sign up → subscribe (₦15,000) → everything (except
+ *   anonymous visitor → 1 free download, any year group → hits the limit
+ *   → sign up → subscribe (₦15,000) → everything (except
  *   per-item "premium" worksheets, which always need their own one-time
  *   purchase, subscribed or not — owning something needs an account, so
  *   that's the one point where even an anonymous visitor must sign up).
@@ -44,8 +44,12 @@ const BUCKET = 'make-cbd74580-worksheets';
 // catalog lock logic, /my-access, the frontend copy that mirrors it) stays
 // correct automatically; only the UI strings that hardcode the English
 // phrasing ("Try N free worksheets") needed a matching text edit.
+//
+// The "pick 3 year groups" restriction was removed in the same change —
+// with only 1 free download, restricting WHICH year groups it could come
+// from had no real effect, just an extra screen before someone saw any
+// content. A free download can now be any year group.
 const FREE_DOWNLOAD_LIMIT = 1;
-const FREE_YEAR_GROUP_LIMIT = 3;
 const SUBSCRIPTION_PRICE = 15_000; // ₦, NGN
 const SUBSCRIPTION_PERIOD_DAYS = 30;
 
@@ -90,14 +94,12 @@ function accessKey(identity: Identity): string | null {
 }
 
 type AccessState = {
-  chosenYearGroups: string[];
   downloadCount: number;
   downloadedIds: string[];
-  lockedIn: boolean;
 };
 
 function defaultAccessState(): AccessState {
-  return { chosenYearGroups: [], downloadCount: 0, downloadedIds: [], lockedIn: false };
+  return { downloadCount: 0, downloadedIds: [] };
 }
 
 async function getSubscription(userId: string | null) {
@@ -145,9 +147,8 @@ app.get('/catalog', async (c) => {
             lockReason = 'premium';
           }
         } else if (!subscription?.active) {
-          const inChosenGroups = access.chosenYearGroups.length === 0 || access.chosenYearGroups.includes(w.yearGroup);
           const alreadyDownloaded = access.downloadedIds.includes(w.id);
-          if (!alreadyDownloaded && (!inChosenGroups || access.downloadCount >= FREE_DOWNLOAD_LIMIT)) {
+          if (!alreadyDownloaded && access.downloadCount >= FREE_DOWNLOAD_LIMIT) {
             locked = true;
             lockReason = 'subscribe';
           }
@@ -186,46 +187,13 @@ app.get('/my-access', async (c) => {
 
     return c.json({
       isLoggedIn: !!identity.userId,
-      chosenYearGroups: access.chosenYearGroups,
-      lockedIn: access.lockedIn,
       downloadCount: access.downloadCount,
       freeLimit: FREE_DOWNLOAD_LIMIT,
-      yearGroupLimit: FREE_YEAR_GROUP_LIMIT,
       subscription: subscription ? { active: subscription.active, status: subscription.status, currentPeriodEnd: subscription.currentPeriodEnd } : null,
       ownedPremiumIds,
     });
   } catch (error: any) {
     console.error('Error fetching worksheet access state:', error);
-    return c.json({ error: error.message || 'Internal server error' }, 500);
-  }
-});
-
-// ── Choose (or change, before the first download) free year groups ─────────
-app.post('/my-free-picks', async (c) => {
-  try {
-    const identity = await resolveIdentity(c);
-    const key = accessKey(identity);
-    if (!key) return c.json({ error: 'A visitor id or login is required' }, 400);
-
-    const { yearGroups } = (await c.req.json()) as { yearGroups: string[] };
-    if (!Array.isArray(yearGroups) || yearGroups.length === 0 || yearGroups.length > FREE_YEAR_GROUP_LIMIT) {
-      return c.json({ error: `Choose up to ${FREE_YEAR_GROUP_LIMIT} year groups` }, 400);
-    }
-    const validValues = new Set(YEAR_GROUPS.map((g) => g.value));
-    if (!yearGroups.every((g) => validValues.has(g))) {
-      return c.json({ error: 'Invalid year group' }, 400);
-    }
-
-    const access = ((await kv.get(key)) as AccessState | null) ?? defaultAccessState();
-    if (access.lockedIn) {
-      return c.json({ error: 'Your free year groups are already locked in after your first download' }, 409);
-    }
-
-    access.chosenYearGroups = yearGroups;
-    await kv.set(key, access);
-    return c.json({ success: true, chosenYearGroups: yearGroups });
-  } catch (error: any) {
-    console.error('Error setting free year-group picks:', error);
     return c.json({ error: error.message || 'Internal server error' }, 500);
   }
 });
@@ -271,18 +239,12 @@ app.get('/:id/file', async (c) => {
         const alreadyDownloaded = access.downloadedIds.includes(id);
 
         if (!alreadyDownloaded) {
-          const willUseNewGroup = !access.chosenYearGroups.includes(w.yearGroup);
-          if (willUseNewGroup && access.chosenYearGroups.length >= FREE_YEAR_GROUP_LIMIT) {
-            return c.json({ error: 'Sign up and subscribe to access more year groups', code: 'subscribe_required' }, 402);
-          }
           if (access.downloadCount >= FREE_DOWNLOAD_LIMIT) {
             return c.json({ error: 'Sign up and subscribe to download more worksheets', code: 'subscribe_required' }, 402);
           }
 
-          if (willUseNewGroup) access.chosenYearGroups.push(w.yearGroup);
           access.downloadCount += 1;
           access.downloadedIds.push(id);
-          access.lockedIn = true; // first real download locks in the 3 picks
           await kv.set(key, access);
         }
       }
