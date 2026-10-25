@@ -242,13 +242,25 @@ signupRoutes.post('/signup', async (c) => {
           console.log('✅ Application received email sent to tutor:', email);
 
           // Notify admin of new tutor application
-          const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'admin@knowledgefonsacademy.com';
+          const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'contact@knowledgefonsacademy.com';
           const adminDash = `${appUrl}/admin/verifications`;
           const adminTpl = emailTemplates.adminTutorApplicationAlert(name, email, adminDash);
           await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch(() => {});
         } catch (emailErr: any) {
           console.warn('⚠️ Could not send application received email:', emailErr.message);
         }
+      } else if (initialProfile.role === 'parent') {
+        // Notify admin of new parent signup
+        const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'contact@knowledgefonsacademy.com';
+        const adminDash = `${appUrl}/admin?tab=users`;
+        const adminTpl = emailTemplates.adminParentSignupAlert(
+          name,
+          email,
+          initialProfile.phone,
+          initialProfile.number_of_children,
+          adminDash,
+        );
+        await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch(() => {});
       }
 
       // Also write to proper profiles table (dual-write during migration)

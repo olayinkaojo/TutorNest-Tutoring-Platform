@@ -1214,7 +1214,7 @@ app.post('/make-server-cbd74580/profile/complete', async (c) => {
           const submittedTpl = emailTemplates.tutorProfileSubmitted(profileName, `${appBase}/dashboard`);
           await sendEmail({ to: profileEmail, subject: submittedTpl.subject, html: submittedTpl.html }).catch(() => {});
         }
-        const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'admin@knowledgefonsacademy.com';
+        const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'contact@knowledgefonsacademy.com';
         const adminTpl = emailTemplates.adminTutorApplicationAlert(profileName, profileEmail || 'unknown', `${appBase}/admin/verifications`);
         await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch(() => {});
       } catch (_e) {}
@@ -2032,6 +2032,22 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
           ...stuTpl,
         }).catch((err) => console.error('Error sending student confirmation email:', err));
       }
+
+      // Notify admin of the new booking
+      const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'contact@knowledgefonsacademy.com';
+      const adminTpl = emailTemplates.adminNewBookingAlert(
+        parentName,
+        studentName,
+        tutorName,
+        subjectLine,
+        formattedDate,
+        timeOnly,
+        price,
+        `${dashboardBase}/admin?tab=users`,
+      );
+      await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch((err) =>
+        console.error('Error sending admin booking alert email:', err),
+      );
     } catch (emailError) {
       console.error('Error sending confirmation emails:', emailError);
     }
