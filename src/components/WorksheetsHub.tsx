@@ -19,6 +19,7 @@ import {
   Download,
   Sparkles,
   AlertCircle,
+  ZoomIn,
 } from 'lucide-react';
 import { worksheetsAPI, type WorksheetItem, type WorksheetAccess } from '../utils/worksheets-api-client';
 
@@ -63,6 +64,7 @@ export function WorksheetsHub({ accessToken, userEmail, userName, onSignUp, onSi
   const [error, setError] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [paywall, setPaywall] = useState<Paywall>(null);
+  const [previewItem, setPreviewItem] = useState<WorksheetItem | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -185,9 +187,22 @@ export function WorksheetsHub({ accessToken, userEmail, userName, onSignUp, onSi
               item={item}
               busy={downloadingId === item.id}
               onOpen={() => handleOpenWorksheet(item)}
+              onPreview={() => setPreviewItem(item)}
             />
           ))}
         </div>
+      )}
+
+      {previewItem && (
+        <PreviewDialog
+          item={previewItem}
+          busy={downloadingId === previewItem.id}
+          onClose={() => setPreviewItem(null)}
+          onOpen={() => {
+            setPreviewItem(null);
+            handleOpenWorksheet(previewItem);
+          }}
+        />
       )}
 
       {paywall?.type === 'subscribe' && (
@@ -271,10 +286,20 @@ function AccessStrip({
   );
 }
 
-function WorksheetCard({ item, busy, onOpen }: { item: WorksheetItem; busy: boolean; onOpen: () => void }) {
+function WorksheetCard({
+  item,
+  busy,
+  onOpen,
+  onPreview,
+}: {
+  item: WorksheetItem;
+  busy: boolean;
+  onOpen: () => void;
+  onPreview: () => void;
+}) {
   return (
     <Card className="overflow-hidden flex flex-col">
-      <button onClick={onOpen} className="block text-left focus:outline-none group">
+      <button onClick={onPreview} className="block text-left focus:outline-none group relative">
         <div className="aspect-[4/3] relative bg-gray-50 flex items-center justify-center overflow-hidden">
           {item.thumbnailUrl ? (
             <img src={item.thumbnailUrl} alt="" className="w-full h-full object-cover" />
@@ -288,6 +313,9 @@ function WorksheetCard({ item, busy, onOpen }: { item: WorksheetItem; busy: bool
               </div>
             </div>
           )}
+        </div>
+        <div className="absolute bottom-2 right-2 flex items-center gap-1 rounded-full bg-black/55 px-2.5 py-1 text-xs text-white opacity-90 group-hover:opacity-100">
+          <ZoomIn className="w-3 h-3" /> Preview
         </div>
       </button>
       <CardContent className="p-4 flex-1 flex flex-col gap-2">
@@ -320,6 +348,68 @@ function WorksheetCard({ item, busy, onOpen }: { item: WorksheetItem; busy: bool
         </Button>
       </CardContent>
     </Card>
+  );
+}
+
+function PreviewDialog({
+  item,
+  busy,
+  onClose,
+  onOpen,
+}: {
+  item: WorksheetItem;
+  busy: boolean;
+  onClose: () => void;
+  onOpen: () => void;
+}) {
+  const actionLabel = item.locked
+    ? item.lockReason === 'premium'
+      ? `Unlock — ₦${item.premiumPrice?.toLocaleString()}`
+      : 'Unlock'
+    : 'Download';
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-lg">
+        <DialogHeader>
+          <DialogTitle>{item.title}</DialogTitle>
+          <DialogDescription className="sr-only">Preview of this worksheet's cover page.</DialogDescription>
+        </DialogHeader>
+
+        <div className="flex items-center gap-2 flex-wrap text-xs">
+          <Badge variant="outline">{item.subject}</Badge>
+          {item.isPremium ? (
+            <Badge className="bg-amber-100 text-amber-800 border-amber-300">
+              <Crown className="w-3 h-3 mr-1" /> ₦{item.premiumPrice?.toLocaleString()}
+            </Badge>
+          ) : (
+            <Badge variant="outline">Free</Badge>
+          )}
+        </div>
+
+        <div className="rounded-lg overflow-hidden border bg-gray-50 max-h-[60vh] flex items-center justify-center">
+          {item.thumbnailUrl ? (
+            <img src={item.thumbnailUrl} alt={`${item.title} — cover page preview`} className="w-full h-auto object-contain" />
+          ) : (
+            <div className="py-20 text-gray-400 text-sm">No preview image available yet.</div>
+          )}
+        </div>
+        <p className="text-xs text-gray-500 -mt-1">This is the worksheet's actual cover page — the rest is inside.</p>
+
+        {item.description && <p className="text-sm text-gray-600">{item.description}</p>}
+
+        <Button onClick={onOpen} disabled={busy} className="w-full h-11 text-white" style={{ backgroundColor: item.locked ? '#6b7280' : PURPLE }}>
+          {busy ? (
+            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+          ) : item.locked ? (
+            <Lock className="w-4 h-4 mr-2" />
+          ) : (
+            <Download className="w-4 h-4 mr-2" />
+          )}
+          {busy ? 'Opening…' : actionLabel}
+        </Button>
+      </DialogContent>
+    </Dialog>
   );
 }
 
