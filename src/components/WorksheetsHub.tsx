@@ -46,6 +46,31 @@ const YEAR_GROUPS = [
 const PURPLE = '#625d9c';
 const GREEN = '#5d9827';
 
+function sanitizeFilename(name: string): string {
+  return name.replace(/[\\/:*?"<>|]+/g, ' ').trim() || 'Worksheet';
+}
+
+async function downloadBlob(url: string, filename: string): Promise<void> {
+  try {
+    const response = await fetch(url);
+    if (!response.ok) throw new Error('Download failed');
+    const blob = await response.blob();
+    const blobUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = blobUrl;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(blobUrl);
+  } catch (err) {
+    // Fall back to just opening the signed link directly — worse (shows the
+    // raw storage URL, generic filename) but still gets the file to them.
+    console.warn('Blob download failed, falling back to opening the link:', err);
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
+}
+
 interface WorksheetsHubProps {
   /** null for an anonymous visitor (public landing page); a real token once signed in. */
   accessToken: string | null;
@@ -99,8 +124,12 @@ export function WorksheetsHub({ accessToken, userEmail, userName, onSignUp, onSi
     }
     setDownloadingId(item.id);
     try {
-      const { url } = await worksheetsAPI.getFileUrl(accessToken, item.id);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      const { url, title } = await worksheetsAPI.getFileUrl(accessToken, item.id);
+      // Fetched as a Blob and saved via a blob: URL rather than navigating
+      // to the signed Storage link directly — otherwise the browser shows
+      // our raw Supabase storage domain + access token in the address bar,
+      // and the saved file is named after the internal id, not the title.
+      await downloadBlob(url, `${sanitizeFilename(title)}.pdf`);
       await refresh(); // counts/locks may have just changed
     } catch (err: any) {
       if (err.status === 401 || err.code === 'signup_required') {

@@ -31,13 +31,23 @@ async function renderPage(pdf: any, pageNumber: number, maxWidth: number): Promi
 
   await page.render({ canvasContext: context, viewport, canvas }).promise;
 
-  return await new Promise<Blob>((resolve, reject) => {
+  const blob = await new Promise<Blob>((resolve, reject) => {
     canvas.toBlob(
-      (blob) => (blob ? resolve(blob) : reject(new Error('Could not generate a preview image'))),
+      (b) => (b ? resolve(b) : reject(new Error('Could not generate a preview image'))),
       'image/jpeg',
       0.85,
     );
   });
+
+  // Mobile Safari in particular caps total canvas backing-store memory per
+  // tab; rendering several full-size pages back-to-back without releasing
+  // each canvas's backing store is a known way to hit that ceiling and crash
+  // the renderer mid-set. Zeroing the dimensions frees it immediately rather
+  // than waiting on GC.
+  canvas.width = 0;
+  canvas.height = 0;
+
+  return blob;
 }
 
 export async function renderPdfFirstPageThumbnail(source: File | Blob, maxWidth = 640): Promise<Blob> {
@@ -59,7 +69,7 @@ export async function renderPdfFirstPageThumbnail(source: File | Blob, maxWidth 
  * still returned rather than failing the whole set — a partial preview
  * beats none.
  */
-export async function renderPdfPagesPreview(source: File | Blob, pageCount: number, maxWidth = 640): Promise<Blob[]> {
+export async function renderPdfPagesPreview(source: File | Blob, pageCount: number, maxWidth = 480): Promise<Blob[]> {
   const arrayBuffer = await source.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   const blobs: Blob[] = [];
@@ -68,6 +78,10 @@ export async function renderPdfPagesPreview(source: File | Blob, pageCount: numb
     for (let i = 1; i <= count; i++) {
       try {
         blobs.push(await renderPage(pdf, i, maxWidth));
+        // Yield a frame between pages so the browser gets a chance to
+        // actually reclaim the canvas memory just freed above, instead of
+        // immediately piling the next page's allocation on top of it.
+        await new Promise((resolve) => requestAnimationFrame(resolve));
       } catch (err) {
         console.warn(`Could not render preview page ${i}:`, err);
         break;

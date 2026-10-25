@@ -29,6 +29,7 @@ import {
   Pencil,
   ImagePlus,
   Image as ImageIcon,
+  Images as ImagesIcon,
   Loader2,
   CheckCircle,
   AlertCircle,
@@ -88,10 +89,13 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
   const [filterYearGroup, setFilterYearGroup] = useState('all');
   const [regeneratingId, setRegeneratingId] = useState<string | null>(null);
   const [uploadingCoverId, setUploadingCoverId] = useState<string | null>(null);
+  const [uploadingPreviewId, setUploadingPreviewId] = useState<string | null>(null);
   const [listError, setListError] = useState<string | null>(null);
   const [editing, setEditing] = useState<any | null>(null);
   const manualCoverTargetId = useRef<string | null>(null);
   const manualCoverInputRef = useRef<HTMLInputElement>(null);
+  const manualPreviewTargetId = useRef<string | null>(null);
+  const manualPreviewInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     fetchAll();
@@ -268,7 +272,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
     } catch (error: any) {
       console.error('Preview generation failed:', error);
       setListError(
-        `This browser couldn't generate a preview for "${w.title}" — use the image icon next to it to upload a cover photo instead.`,
+        `Couldn't auto-generate a preview for "${w.title}" (${error.message || 'unknown error'}) — use the image icons next to it to upload a cover photo and/or preview pages manually instead.`,
       );
     } finally {
       setRegeneratingId(null);
@@ -293,6 +297,27 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
       setListError(error.message || 'Could not upload a cover image for this worksheet');
     } finally {
       setUploadingCoverId(null);
+    }
+  };
+
+  const handleManualPreviewPagesUpload = async (worksheetId: string, files: FileList | null) => {
+    if (!files || !files.length) return;
+    setUploadingPreviewId(worksheetId);
+    setListError(null);
+    try {
+      const formData = new FormData();
+      Array.from(files).forEach((file, i) => formData.append('previewPages', file, file.name || `page-${i + 1}.jpg`));
+      const saveRes = await fetch(`${BASE_URL}/admin/${worksheetId}/preview-pages`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${accessToken}` },
+        body: formData,
+      });
+      if (!saveRes.ok) throw new Error((await saveRes.json()).error || 'Could not save the preview pages');
+      fetchAll();
+    } catch (error: any) {
+      setListError(error.message || 'Could not upload preview pages for this worksheet');
+    } finally {
+      setUploadingPreviewId(null);
     }
   };
 
@@ -503,6 +528,18 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
                     >
                       {uploadingCoverId === w.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImageIcon className="w-4 h-4" style={{ color: '#625d9c' }} />}
                     </Button>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      title={`Upload preview pages manually (select up to ${w.isPremium ? PREVIEW_PAGES_PREMIUM : PREVIEW_PAGES_FREE} images, in order)`}
+                      disabled={uploadingPreviewId === w.id}
+                      onClick={() => {
+                        manualPreviewTargetId.current = w.id;
+                        manualPreviewInputRef.current?.click();
+                      }}
+                    >
+                      {uploadingPreviewId === w.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <ImagesIcon className="w-4 h-4" style={{ color: '#625d9c' }} />}
+                    </Button>
                     <Button variant="ghost" size="sm" onClick={() => setEditing(w)}>
                       <Pencil className="w-4 h-4" style={{ color: '#625d9c' }} />
                     </Button>
@@ -527,6 +564,21 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
           const targetId = manualCoverTargetId.current;
           e.target.value = '';
           if (targetId && file) handleManualCoverUpload(targetId, file);
+        }}
+      />
+
+      <input
+        ref={manualPreviewInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = e.target.files;
+          const targetId = manualPreviewTargetId.current;
+          const list = files && files.length ? files : null;
+          e.target.value = '';
+          if (targetId && list) handleManualPreviewPagesUpload(targetId, list);
         }}
       />
 
