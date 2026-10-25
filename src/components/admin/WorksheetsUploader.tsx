@@ -36,7 +36,13 @@ import {
   Crown,
 } from 'lucide-react';
 import { projectId } from '../../utils/supabase/info';
-import { renderPdfFirstPageThumbnail } from '../../utils/pdf-thumbnail';
+import { renderPdfFirstPageThumbnail, renderPdfPagesPreview } from '../../utils/pdf-thumbnail';
+
+// Mirrors PREVIEW_PAGES_FREE / PREVIEW_PAGES_PREMIUM in worksheets-routes.tsx
+// — the server re-caps on every read regardless, this just avoids rendering
+// and uploading pages that would be thrown away anyway.
+const PREVIEW_PAGES_FREE = 5;
+const PREVIEW_PAGES_PREMIUM = 2;
 
 interface WorksheetsUploaderProps {
   accessToken: string;
@@ -108,6 +114,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
   };
 
   const [generatedThumbnail, setGeneratedThumbnail] = useState<Blob | null>(null);
+  const [generatedPreviewPages, setGeneratedPreviewPages] = useState<Blob[]>([]);
   const manualThumbInputRef = useRef<HTMLInputElement>(null);
 
   const handleManualThumbnail = (selected: File | null) => {
@@ -123,17 +130,22 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
     if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
     setThumbnailPreview(null);
     setGeneratedThumbnail(null);
+    setGeneratedPreviewPages([]);
     if (!selected) return;
 
     setGeneratingThumbnail(true);
     setUploadError(null);
     try {
-      const blob = await renderPdfFirstPageThumbnail(selected);
-      setGeneratedThumbnail(blob);
-      setThumbnailPreview(URL.createObjectURL(blob));
+      // Render the max either tier could need once; handleUpload slices to
+      // whatever the current Premium toggle actually entitles at submit time.
+      const pages = await renderPdfPagesPreview(selected, PREVIEW_PAGES_FREE);
+      if (!pages.length) throw new Error('Could not read any pages from this PDF');
+      setGeneratedThumbnail(pages[0]);
+      setThumbnailPreview(URL.createObjectURL(pages[0]));
+      setGeneratedPreviewPages(pages);
     } catch (err: any) {
-      console.error('Thumbnail generation failed:', err);
-      setUploadError('Could not read a preview from this PDF — it will upload without a thumbnail. You can add one afterward.');
+      console.error('Preview generation failed:', err);
+      setUploadError('Could not read a preview from this PDF — it will upload without one. You can add a cover image afterward.');
     } finally {
       setGeneratingThumbnail(false);
     }
@@ -149,6 +161,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
     if (thumbnailPreview) URL.revokeObjectURL(thumbnailPreview);
     setThumbnailPreview(null);
     setGeneratedThumbnail(null);
+    setGeneratedPreviewPages([]);
     const fileInput = document.getElementById('worksheet-file') as HTMLInputElement | null;
     if (fileInput) fileInput.value = '';
     if (manualThumbInputRef.current) manualThumbInputRef.current.value = '';
@@ -177,6 +190,10 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
         const name = generatedThumbnail instanceof File ? generatedThumbnail.name : 'cover.jpg';
         formData.append('thumbnail', generatedThumbnail, name);
       }
+      const previewLimit = isPremium ? PREVIEW_PAGES_PREMIUM : PREVIEW_PAGES_FREE;
+      generatedPreviewPages.slice(0, previewLimit).forEach((blob, i) => {
+        formData.append('previewPages', blob, `page-${i + 1}.jpg`);
+      });
       formData.append('subject', subject);
       formData.append('yearGroup', yearGroup);
       formData.append('title', title);
@@ -223,22 +240,35 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
 
       const fileRes = await fetch(url);
       const pdfBlob = await fileRes.blob();
-      const thumbBlob = await renderPdfFirstPageThumbnail(pdfBlob);
+      const previewLimit = w.isPremium ? PREVIEW_PAGES_PREMIUM : PREVIEW_PAGES_FREE;
+      const pages = await renderPdfPagesPreview(pdfBlob, previewLimit);
+      if (!pages.length) throw new Error('Could not read any pages from this PDF');
 
-      const formData = new FormData();
-      formData.append('thumbnail', thumbBlob, 'cover.jpg');
-      const saveRes = await fetch(`${BASE_URL}/admin/${w.id}/thumbnail`, {
+      if (!w.thumbnailPath) {
+        const thumbForm = new FormData();
+        thumbForm.append('thumbnail', pages[0], 'cover.jpg');
+        const thumbRes = await fetch(`${BASE_URL}/admin/${w.id}/thumbnail`, {
+          method: 'POST',
+          headers: { Authorization: `Bearer ${accessToken}` },
+          body: thumbForm,
+        });
+        if (!thumbRes.ok) throw new Error((await thumbRes.json()).error || 'Could not save the thumbnail');
+      }
+
+      const previewForm = new FormData();
+      pages.forEach((blob, i) => previewForm.append('previewPages', blob, `page-${i + 1}.jpg`));
+      const previewRes = await fetch(`${BASE_URL}/admin/${w.id}/preview-pages`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${accessToken}` },
-        body: formData,
+        body: previewForm,
       });
-      if (!saveRes.ok) throw new Error((await saveRes.json()).error || 'Could not save the thumbnail');
+      if (!previewRes.ok) throw new Error((await previewRes.json()).error || 'Could not save the preview pages');
 
       fetchAll();
     } catch (error: any) {
-      console.error('Thumbnail generation failed:', error);
+      console.error('Preview generation failed:', error);
       setListError(
-        `This browser couldn't generate a thumbnail for "${w.title}" — use the image icon next to it to upload a cover photo instead.`,
+        `This browser couldn't generate a preview for "${w.title}" — use the image icon next to it to upload a cover photo instead.`,
       );
     } finally {
       setRegeneratingId(null);
@@ -279,7 +309,7 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
             Upload a Worksheet
           </CardTitle>
           <CardDescription>
-            Its cover page becomes the thumbnail automatically — just upload the PDF.
+            Its first {PREVIEW_PAGES_FREE} pages (first {PREVIEW_PAGES_PREMIUM} if marked Premium below) become the cover and preview automatically — just upload the PDF.
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -450,11 +480,11 @@ export function WorksheetsUploader({ accessToken }: WorksheetsUploaderProps) {
                     </div>
                   </div>
                   <div className="flex items-center gap-1 flex-shrink-0">
-                    {!w.thumbnailPath && (
+                    {(!w.thumbnailPath || !w.previewPaths?.length) && (
                       <Button
                         variant="ghost"
                         size="sm"
-                        title="Generate thumbnail from the PDF's first page"
+                        title="Generate cover + preview pages from the PDF"
                         disabled={regeneratingId === w.id}
                         onClick={() => handleRegenerateThumbnail(w)}
                       >

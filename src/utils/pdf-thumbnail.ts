@@ -1,9 +1,11 @@
 /**
- * Renders a PDF's first page to an image client-side (pdf.js), used so
- * admin never has to separately design/export a thumbnail image — the
- * worksheet's own cover page IS the thumbnail, generated automatically
- * whenever a PDF is uploaded or retroactively regenerated for one that
- * doesn't have one yet.
+ * Renders a PDF's pages to images client-side (pdf.js), used so admin never
+ * has to separately design/export preview art — the worksheet's own pages
+ * ARE the preview, generated automatically whenever a PDF is uploaded or
+ * retroactively regenerated for one that doesn't have one yet. The single
+ * cover thumbnail (used in the catalog grid) and the multi-page preview
+ * (used in the "look before you download" dialog) are both just this
+ * render, called with a page count of 1 or more.
  */
 import * as pdfjsLib from 'pdfjs-dist';
 
@@ -15,34 +17,64 @@ pdfjsLib.GlobalWorkerOptions.workerSrc = new URL(
   import.meta.url,
 ).toString();
 
+async function renderPage(pdf: any, pageNumber: number, maxWidth: number): Promise<Blob> {
+  const page = await pdf.getPage(pageNumber);
+  const unscaled = page.getViewport({ scale: 1 });
+  const scale = maxWidth / unscaled.width;
+  const viewport = page.getViewport({ scale });
+
+  const canvas = document.createElement('canvas');
+  canvas.width = Math.round(viewport.width);
+  canvas.height = Math.round(viewport.height);
+  const context = canvas.getContext('2d');
+  if (!context) throw new Error('Could not create a canvas context');
+
+  await page.render({ canvasContext: context, viewport, canvas }).promise;
+
+  return await new Promise<Blob>((resolve, reject) => {
+    canvas.toBlob(
+      (blob) => (blob ? resolve(blob) : reject(new Error('Could not generate a preview image'))),
+      'image/jpeg',
+      0.85,
+    );
+  });
+}
+
 export async function renderPdfFirstPageThumbnail(source: File | Blob, maxWidth = 640): Promise<Blob> {
   const arrayBuffer = await source.arrayBuffer();
   const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
   try {
-    const page = await pdf.getPage(1);
-    const unscaled = page.getViewport({ scale: 1 });
-    const scale = maxWidth / unscaled.width;
-    const viewport = page.getViewport({ scale });
-
-    const canvas = document.createElement('canvas');
-    canvas.width = Math.round(viewport.width);
-    canvas.height = Math.round(viewport.height);
-    const context = canvas.getContext('2d');
-    if (!context) throw new Error('Could not create a canvas context');
-
-    await page.render({ canvasContext: context, viewport, canvas }).promise;
-
-    return await new Promise<Blob>((resolve, reject) => {
-      canvas.toBlob(
-        (blob) => (blob ? resolve(blob) : reject(new Error('Could not generate a thumbnail image'))),
-        'image/jpeg',
-        0.85,
-      );
-    });
+    return await renderPage(pdf, 1, maxWidth);
   } finally {
     // If rendering already failed (e.g. the worker crashed), destroy() can
     // itself throw — and a throw in `finally` silently replaces whatever
     // real error we were about to propagate. Never let cleanup mask that.
     await pdf.destroy().catch(() => {});
   }
+}
+
+/**
+ * Renders up to `pageCount` pages (fewer if the PDF is shorter) in order.
+ * Best-effort per page: if one page fails to render, earlier successes are
+ * still returned rather than failing the whole set — a partial preview
+ * beats none.
+ */
+export async function renderPdfPagesPreview(source: File | Blob, pageCount: number, maxWidth = 640): Promise<Blob[]> {
+  const arrayBuffer = await source.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+  const blobs: Blob[] = [];
+  try {
+    const count = Math.min(pageCount, pdf.numPages);
+    for (let i = 1; i <= count; i++) {
+      try {
+        blobs.push(await renderPage(pdf, i, maxWidth));
+      } catch (err) {
+        console.warn(`Could not render preview page ${i}:`, err);
+        break;
+      }
+    }
+  } finally {
+    await pdf.destroy().catch(() => {});
+  }
+  return blobs;
 }

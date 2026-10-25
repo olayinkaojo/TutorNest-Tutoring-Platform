@@ -98,6 +98,11 @@ export const worksheetsAPI = {
     return request<{ url: string; title: string }>(`/${worksheetId}/file`, accessToken);
   },
 
+  async getPreviewPages(accessToken: string | null | undefined, worksheetId: string) {
+    const data = await request<{ pages: string[] }>(`/${worksheetId}/preview-pages`, accessToken);
+    return data.pages;
+  },
+
   async initiateSubscription(accessToken: string) {
     return request<{ success: true; reference: string; amount: number }>('/subscribe/initiate', accessToken, {
       method: 'POST',

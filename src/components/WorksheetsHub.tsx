@@ -20,6 +20,8 @@ import {
   Sparkles,
   AlertCircle,
   ZoomIn,
+  ChevronLeft,
+  ChevronRight,
 } from 'lucide-react';
 import { worksheetsAPI, type WorksheetItem, type WorksheetAccess } from '../utils/worksheets-api-client';
 
@@ -196,6 +198,7 @@ export function WorksheetsHub({ accessToken, userEmail, userName, onSignUp, onSi
       {previewItem && (
         <PreviewDialog
           item={previewItem}
+          accessToken={accessToken}
           busy={downloadingId === previewItem.id}
           onClose={() => setPreviewItem(null)}
           onOpen={() => {
@@ -353,27 +356,52 @@ function WorksheetCard({
 
 function PreviewDialog({
   item,
+  accessToken,
   busy,
   onClose,
   onOpen,
 }: {
   item: WorksheetItem;
+  accessToken: string | null;
   busy: boolean;
   onClose: () => void;
   onOpen: () => void;
 }) {
+  const [pages, setPages] = useState<string[] | null>(null); // null = still loading
+  const [pageIndex, setPageIndex] = useState(0);
+
+  useEffect(() => {
+    let cancelled = false;
+    setPages(null);
+    setPageIndex(0);
+    worksheetsAPI
+      .getPreviewPages(accessToken, item.id)
+      .then((p) => {
+        if (!cancelled) setPages(p);
+      })
+      .catch(() => {
+        if (!cancelled) setPages([]); // falls back to the single cover thumbnail below
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [item.id, accessToken]);
+
   const actionLabel = item.locked
     ? item.lockReason === 'premium'
       ? `Unlock — ₦${item.premiumPrice?.toLocaleString()}`
       : 'Unlock'
     : 'Download';
 
+  const multiPage = !!pages && pages.length > 1;
+  const currentImage = pages && pages.length ? pages[pageIndex] : item.thumbnailUrl;
+
   return (
     <Dialog open onOpenChange={(open) => !open && onClose()}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
           <DialogTitle>{item.title}</DialogTitle>
-          <DialogDescription className="sr-only">Preview of this worksheet's cover page.</DialogDescription>
+          <DialogDescription className="sr-only">Preview of this worksheet's early pages.</DialogDescription>
         </DialogHeader>
 
         <div className="flex items-center gap-2 flex-wrap text-xs">
@@ -387,14 +415,44 @@ function PreviewDialog({
           )}
         </div>
 
-        <div className="rounded-lg overflow-hidden border bg-gray-50 max-h-[60vh] flex items-center justify-center">
-          {item.thumbnailUrl ? (
-            <img src={item.thumbnailUrl} alt={`${item.title} — cover page preview`} className="w-full h-auto object-contain" />
+        <div className="relative rounded-lg overflow-hidden border bg-gray-50 max-h-[60vh] min-h-[200px] flex items-center justify-center">
+          {pages === null ? (
+            <Loader2 className="w-6 h-6 animate-spin text-gray-400" />
+          ) : currentImage ? (
+            <img src={currentImage} alt={`${item.title} — page ${pageIndex + 1} preview`} className="w-full h-auto object-contain" />
           ) : (
             <div className="py-20 text-gray-400 text-sm">No preview image available yet.</div>
           )}
+
+          {multiPage && (
+            <>
+              <button
+                type="button"
+                onClick={() => setPageIndex((i) => Math.max(0, i - 1))}
+                disabled={pageIndex === 0}
+                className="absolute left-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow flex items-center justify-center disabled:opacity-30"
+              >
+                <ChevronLeft className="w-4 h-4" style={{ color: PURPLE }} />
+              </button>
+              <button
+                type="button"
+                onClick={() => setPageIndex((i) => Math.min(pages!.length - 1, i + 1))}
+                disabled={pageIndex === pages!.length - 1}
+                className="absolute right-1.5 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-white/90 shadow flex items-center justify-center disabled:opacity-30"
+              >
+                <ChevronRight className="w-4 h-4" style={{ color: PURPLE }} />
+              </button>
+              <div className="absolute bottom-1.5 left-1/2 -translate-x-1/2 rounded-full bg-black/60 px-2.5 py-0.5 text-xs text-white">
+                Page {pageIndex + 1} of {pages!.length}
+              </div>
+            </>
+          )}
         </div>
-        <p className="text-xs text-gray-500 -mt-1">This is the worksheet's actual cover page — the rest is inside.</p>
+        <p className="text-xs text-gray-500 -mt-1">
+          {multiPage
+            ? `These are the worksheet's actual first ${pages!.length} pages — the rest is inside.`
+            : 'This is the worksheet\'s actual cover page — the rest is inside.'}
+        </p>
 
         {item.description && <p className="text-sm text-gray-600">{item.description}</p>}
 

@@ -62,6 +62,17 @@ const FREE_DOWNLOAD_LIMIT = 1;
 const SUBSCRIPTION_PRICE = 15_000; // ₦, NGN
 const SUBSCRIPTION_PERIOD_DAYS = 30;
 
+// How many rendered pages someone can preview before paying. A free/
+// subscription-gated worksheet can show a generous sample since the thing
+// being sold is the subscription, not the page content itself. A premium
+// pay-to-own item (an answer book, say) is sold BECAUSE of what's on its
+// early pages — a 5-page preview would just give the purchase away, so it
+// gets capped much lower. This is re-applied server-side on every read
+// (not just at upload time) so toggling a worksheet premium later can't
+// leave over-generous preview pages signed and servable.
+const PREVIEW_PAGES_FREE = 5;
+const PREVIEW_PAGES_PREMIUM = 2;
+
 export const SUBJECTS = ['Maths', 'English'];
 export const YEAR_GROUPS = [
   { value: 'year_1', label: 'Year 1 / Primary 1 (P1)' },
@@ -84,6 +95,27 @@ async function ensureBucket() {
   if (!buckets?.some((b) => b.name === BUCKET)) {
     await supabase.storage.createBucket(BUCKET, { public: false, fileSizeLimit: 26_214_400 }); // 25MB
   }
+}
+
+// Uploads a set of page-preview images (admin-rendered client-side from the
+// PDF, same as the cover thumbnail) and returns their storage paths in page
+// order. Best-effort per file — one failed page doesn't block the others.
+async function uploadPreviewPages(id: string, files: File[]): Promise<string[]> {
+  const paths: string[] = [];
+  for (let i = 0; i < files.length; i++) {
+    const file = files[i];
+    const ext = file.name.split('.').pop() || 'jpg';
+    const path = `previews/${id}/${i + 1}.${ext}`;
+    const { error } = await supabase.storage
+      .from(BUCKET)
+      .upload(path, await file.arrayBuffer(), { contentType: file.type || 'image/jpeg', upsert: true });
+    if (error) {
+      console.warn(`Preview page ${i + 1} upload failed (non-fatal):`, error.message);
+      continue;
+    }
+    paths.push(path);
+  }
+  return paths;
 }
 
 type Identity = { userId: string | null; visitorId: string | null };
@@ -216,6 +248,32 @@ app.get('/:id/thumbnail', async (c) => {
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(w.thumbnailPath, 3600);
     if (error || !data) return c.json({ error: 'Not found' }, 404);
     return c.redirect(data.signedUrl, 302);
+  } catch (error: any) {
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
+// ── Multi-page preview (public, intentionally un-gated — see the page-count
+// comment above: the cap, not a login/paywall check, is what limits it) ────
+app.get('/:id/preview-pages', async (c) => {
+  try {
+    const id = c.req.param('id');
+    const w = (await kv.get(`worksheet:${id}`)) as any;
+    if (!w) return c.json({ error: 'Not found' }, 404);
+
+    const paths: string[] = Array.isArray(w.previewPaths) ? w.previewPaths : [];
+    const maxPages = w.isPremium ? PREVIEW_PAGES_PREMIUM : PREVIEW_PAGES_FREE;
+    const capped = paths.slice(0, maxPages);
+
+    const pages = (
+      await Promise.all(
+        capped.map((p) => supabase.storage.from(BUCKET).createSignedUrl(p, 3600)),
+      )
+    )
+      .map((r) => r.data?.signedUrl)
+      .filter((u): u is string => !!u);
+
+    return c.json({ pages });
   } catch (error: any) {
     return c.json({ error: error.message || 'Internal server error' }, 500);
   }
@@ -441,6 +499,7 @@ app.post('/admin/upload', async (c) => {
     const formData = await c.req.formData();
     const file = formData.get('file') as File;
     const thumbnail = formData.get('thumbnail') as File | null;
+    const previewFiles = formData.getAll('previewPages') as File[];
     const subject = formData.get('subject') as string;
     const yearGroup = formData.get('yearGroup') as string;
     const title = formData.get('title') as string;
@@ -477,6 +536,8 @@ app.post('/admin/upload', async (c) => {
       }
     }
 
+    const previewPaths = previewFiles.length ? await uploadPreviewPages(id, previewFiles) : [];
+
     const worksheet = {
       id,
       subject,
@@ -485,6 +546,7 @@ app.post('/admin/upload', async (c) => {
       description,
       filePath,
       thumbnailPath,
+      previewPaths,
       fileSize: file.size,
       isPremium,
       premiumPrice: isPremium ? premiumPrice : undefined,
@@ -630,6 +692,42 @@ app.post('/admin/:id/thumbnail', async (c) => {
   }
 });
 
+// ── Admin: replace the multi-page preview set (same client-rendered-from-PDF
+// pattern as the cover thumbnail, just several pages instead of one) ───────
+app.post('/admin/:id/preview-pages', async (c) => {
+  const auth = await requireAdmin(c);
+  if (auth instanceof Response) return auth;
+  const adminId = auth;
+
+  const id = c.req.param('id');
+  const w = (await kv.get(`worksheet:${id}`)) as any;
+  if (!w) return c.json({ error: 'Worksheet not found' }, 404);
+
+  try {
+    const formData = await c.req.formData();
+    const files = formData.getAll('previewPages') as File[];
+    if (!files.length) return c.json({ error: 'At least one preview page image is required' }, 400);
+
+    const oldPaths: string[] = Array.isArray(w.previewPaths) ? w.previewPaths : [];
+    if (oldPaths.length) await supabase.storage.from(BUCKET).remove(oldPaths).catch(() => {});
+
+    w.previewPaths = await uploadPreviewPages(id, files);
+    await kv.set(`worksheet:${id}`, w);
+    await logAuditEvent({
+      userId: adminId,
+      action: 'worksheet_preview_pages_updated',
+      category: 'content',
+      description: `Worksheet preview pages updated: "${w.title}" (${w.previewPaths.length} page${w.previewPaths.length === 1 ? '' : 's'})`,
+      metadata: { id, pageCount: w.previewPaths.length },
+    });
+
+    return c.json({ success: true, pageCount: w.previewPaths.length });
+  } catch (error: any) {
+    console.error('Error updating worksheet preview pages:', error);
+    return c.json({ error: error.message || 'Internal server error' }, 500);
+  }
+});
+
 app.delete('/admin/:id', async (c) => {
   const auth = await requireAdmin(c);
   if (auth instanceof Response) return auth;
@@ -638,7 +736,11 @@ app.delete('/admin/:id', async (c) => {
   const id = c.req.param('id');
   const w = (await kv.get(`worksheet:${id}`)) as any;
   if (w) {
-    await supabase.storage.from(BUCKET).remove([w.filePath, ...(w.thumbnailPath ? [w.thumbnailPath] : [])]).catch(() => {});
+    const previewPaths: string[] = Array.isArray(w.previewPaths) ? w.previewPaths : [];
+    await supabase.storage
+      .from(BUCKET)
+      .remove([w.filePath, ...(w.thumbnailPath ? [w.thumbnailPath] : []), ...previewPaths])
+      .catch(() => {});
     await kv.del(`worksheet:${id}`);
     await logAuditEvent({
       userId: adminId,
