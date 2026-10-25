@@ -49,7 +49,7 @@ interface WorksheetsUploaderProps {
   accessToken: string;
 }
 
-const SUBJECTS = ['Maths', 'English'];
+const SUBJECTS = ['Maths', 'English', 'Science', '11+ / Common Entrance', 'Jr WAEC/Neco', 'GCSE'];
 
 const YEAR_GROUPS = [
   { value: 'year_1', label: 'Year 1 / Primary 1 (P1)' },

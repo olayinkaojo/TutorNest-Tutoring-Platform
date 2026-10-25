@@ -420,32 +420,38 @@ export function AdminDashboard({
         </Card>
 
         {/* Tabs */}
-        <Tabs value={activeTab} onValueChange={setActiveTab} className="min-w-0">
-          <TabsList className="mb-4 shadow-sm">
-            <TabsTrigger value="overview">Overview</TabsTrigger>
-            <TabsTrigger value="alerts">System Alerts</TabsTrigger>
-            <TabsTrigger value="notifications">Notifications</TabsTrigger>
-            <TabsTrigger value="announcements">Announcements</TabsTrigger>
-            <TabsTrigger value="users">Users</TabsTrigger>
-            <TabsTrigger value="verification">Verification</TabsTrigger>
-            <TabsTrigger value="analytics">Analytics</TabsTrigger>
-            <TabsTrigger value="activity">Activity</TabsTrigger>
-            <TabsTrigger value="disputes">Disputes</TabsTrigger>
-            <TabsTrigger value="coupons">Coupons</TabsTrigger>
-            <TabsTrigger value="taxreports">Tax Reports</TabsTrigger>
-            <TabsTrigger value="payments">Payments</TabsTrigger>
-            <TabsTrigger value="payouts">Payouts</TabsTrigger>
-            <TabsTrigger value="childprofiles">Child Profiles</TabsTrigger>
-            <TabsTrigger value="curriculum">Curriculum</TabsTrigger>
-            <TabsTrigger value="resources">Resources</TabsTrigger>
-            <TabsTrigger value="tutortraining">Tutor Training</TabsTrigger>
-            <TabsTrigger value="worksheets">Worksheets</TabsTrigger>
-            <TabsTrigger value="auditlog">Audit Log</TabsTrigger>
-            <TabsTrigger value="documenttrail">Document Trail</TabsTrigger>
-            <TabsTrigger value="safeguarding">Safeguarding</TabsTrigger>
-            <TabsTrigger value="recordings">Recordings</TabsTrigger>
-            <TabsTrigger value="sessionreports">Session Reports</TabsTrigger>
+        <Tabs
+          value={activeTab}
+          onValueChange={setActiveTab}
+          className="min-w-0 flex-col gap-4 lg:flex-row lg:gap-6"
+        >
+          <TabsList className="h-auto shrink-0 flex-row flex-wrap justify-start gap-0.5 shadow-sm lg:w-56 lg:flex-col lg:items-stretch lg:justify-start lg:gap-1 lg:overflow-y-auto lg:max-h-[calc(100vh-10rem)] lg:sticky lg:top-4">
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="overview">Overview</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="alerts">System Alerts</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="notifications">Notifications</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="announcements">Announcements</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="users">Users</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="verification">Verification</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="analytics">Analytics</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="activity">Activity</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="disputes">Disputes</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="coupons">Coupons</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="taxreports">Tax Reports</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="payments">Payments</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="payouts">Payouts</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="childprofiles">Child Profiles</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="curriculum">Curriculum</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="resources">Resources</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="tutortraining">Tutor Training</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="worksheets">Worksheets</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="auditlog">Audit Log</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="documenttrail">Document Trail</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="safeguarding">Safeguarding</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="recordings">Recordings</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="sessionreports">Session Reports</TabsTrigger>
           </TabsList>
+
+          <div className="flex-1 min-w-0">
 
           <TabsContent value="overview">
             <div className="space-y-6">
@@ -677,7 +683,7 @@ export function AdminDashboard({
               </Suspense>
             )}
           </TabsContent>
-
+          </div>
         </Tabs>
       </main>
     </div>

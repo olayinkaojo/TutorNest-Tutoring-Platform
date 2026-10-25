@@ -25,7 +25,7 @@ import {
 } from 'lucide-react';
 import { worksheetsAPI, type WorksheetItem, type WorksheetAccess } from '../utils/worksheets-api-client';
 
-const SUBJECTS = ['Maths', 'English'];
+const SUBJECTS = ['Maths', 'English', 'Science', '11+ / Common Entrance', 'Jr WAEC/Neco', 'GCSE'];
 
 const YEAR_GROUPS = [
   { value: 'year_1', label: 'Year 1', sub: 'P1' },

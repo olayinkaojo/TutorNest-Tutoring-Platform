@@ -73,7 +73,7 @@ const SUBSCRIPTION_PERIOD_DAYS = 30;
 const PREVIEW_PAGES_FREE = 5;
 const PREVIEW_PAGES_PREMIUM = 2;
 
-export const SUBJECTS = ['Maths', 'English'];
+export const SUBJECTS = ['Maths', 'English', 'Science', '11+ / Common Entrance', 'Jr WAEC/Neco', 'GCSE'];
 export const YEAR_GROUPS = [
   { value: 'year_1', label: 'Year 1 / Primary 1 (P1)' },
   { value: 'year_2', label: 'Year 2 / Primary 2 (P2)' },
