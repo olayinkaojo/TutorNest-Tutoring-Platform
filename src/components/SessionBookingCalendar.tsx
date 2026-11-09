@@ -748,6 +748,43 @@ export function SessionBookingCalendar({
         </Card>
       )}
 
+      {/* Selected tutor banner — the only confirmation of who's picked used
+          to be a highlighted card in the (often scrolled-past) list below;
+          this stays visible regardless of scroll position or subject filter. */}
+      {selectedTutorData && (
+        <Card className="border-2" style={{ borderColor: '#625d9c' }}>
+          <CardContent className="pt-4 pb-4">
+            <div className="flex items-center gap-3">
+              {selectedTutorData.photoUrl ? (
+                <img
+                  src={selectedTutorData.photoUrl}
+                  alt={selectedTutorData.name}
+                  className="w-10 h-10 rounded-full object-cover flex-shrink-0 border border-purple-200"
+                />
+              ) : (
+                <div
+                  className="w-10 h-10 rounded-full flex items-center justify-center text-white text-sm font-semibold flex-shrink-0"
+                  style={{ backgroundColor: '#625d9c' }}
+                >
+                  {selectedTutorData.name.split(' ').map(n => n[0]).join('').slice(0, 2).toUpperCase()}
+                </div>
+              )}
+              <div className="flex-1 min-w-0">
+                <p className="text-xs text-gray-500">Booking with</p>
+                <p className="font-semibold text-gray-900 truncate">{selectedTutorData.name}</p>
+              </div>
+              <button
+                onClick={() => { setSelectedTutor(''); setSelectedSlot(''); }}
+                className="text-xs font-medium flex-shrink-0 underline"
+                style={{ color: '#625d9c' }}
+              >
+                Change tutor
+              </button>
+            </div>
+          </CardContent>
+        </Card>
+      )}
+
       {/* ── Subject filter row ─────────────────────────────────────────────── */}
       <div className="space-y-2">
         <div className="flex items-center justify-between">
