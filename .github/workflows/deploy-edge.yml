@@ -41,6 +41,7 @@ jobs:
           supabase secrets set
           "DEPLOY_SHA=${{ github.sha }}"
           --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+          --yes
 
       - name: Sync ALLOWED_ORIGINS (optional)
         if: vars.ALLOWED_ORIGINS != ''
@@ -50,6 +51,7 @@ jobs:
           supabase secrets set
           "ALLOWED_ORIGINS=${ALLOWED_ORIGINS}"
           --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+          --yes
 
       - name: Deploy make-server-cbd74580
         run: >
