@@ -68,7 +68,8 @@ function draftHasProgress(d: Partial<TutorOnboardingDraft>): boolean {
 const AVAILABLE_SUBJECTS = [
   'Mathematics', 'English', 'Science', 'Physics', 'Chemistry', 'Biology',
   'Computer Science', 'Information Technology', 'Spanish', 'French', 'German',
-  'Italian', 'Mandarin Chinese', 'Arabic', 'Latin', 'History', 'Geography',
+  'Italian', 'Mandarin Chinese', 'Arabic', 'Latin', 'Hausa', 'Yoruba', 'Igbo',
+  'History', 'Geography',
   'Religious Studies', 'Philosophy', 'Psychology', 'Sociology', 'Politics',
   'Economics', 'Art & Design', 'Music', 'Drama', 'Dance', 'Media Studies',
   'Photography', 'Business Studies', 'Accounting', 'Law', 'Physical Education',

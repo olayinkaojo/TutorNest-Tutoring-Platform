@@ -85,7 +85,10 @@ const AVAILABLE_SUBJECTS = [
   'Mandarin Chinese',
   'Arabic',
   'Latin',
-  
+  'Hausa',
+  'Yoruba',
+  'Igbo',
+
   // Humanities
   'History',
   'Geography',

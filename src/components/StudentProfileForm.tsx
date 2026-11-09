@@ -56,6 +56,9 @@ export function StudentProfileForm({ session, onComplete }: StudentProfileFormPr
     'Geography',
     'Computer Science',
     'Languages',
+    'Hausa',
+    'Yoruba',
+    'Igbo',
   ];
 
   const senTypes = [

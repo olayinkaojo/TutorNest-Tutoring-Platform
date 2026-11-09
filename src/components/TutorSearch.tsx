@@ -39,6 +39,7 @@ interface TutorSearchProps {
 const SUBJECTS = [
   'Mathematics', 'English', 'Science', 'Physics', 'Chemistry',
   'Biology', 'History', 'Geography', 'Computer Science', 'Languages',
+  'Hausa', 'Yoruba', 'Igbo',
 ];
 
 const LEVELS = [
