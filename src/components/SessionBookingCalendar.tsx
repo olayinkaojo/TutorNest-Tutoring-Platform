@@ -119,6 +119,26 @@ export function SessionBookingCalendar({
     fetchTutors();
   }, []);
 
+  // `preSelectedTutorId` was previously only read once, via the useState
+  // initializer above and inside fetchTutors' mount-only effect — so it
+  // only ever "took" the very first time this screen was opened in a
+  // session. Radix keeps TabsContent mounted (hidden, not destroyed) once
+  // visited, so every later "Book" click elsewhere — which just updates
+  // this same prop on the already-mounted component — silently did
+  // nothing: selectedTutor stayed whatever (or whatever-wasn't) it was the
+  // first time around. This is what "I picked a tutor but it forgot" was.
+  useEffect(() => {
+    if (preSelectedTutorId) {
+      setSelectedTutor(preSelectedTutorId);
+      setSelectedSlot('');
+      // Also clear any leftover subject filter from a previous visit to
+      // this screen — otherwise the tutor is correctly selected but can
+      // still be invisible (unhighlighted) in the list on the left if they
+      // don't teach whatever subject happened to still be active.
+      setActiveSubject('');
+    }
+  }, [preSelectedTutorId]);
+
   useEffect(() => {
     // Pre-select the first child subject if available — but never when a
     // specific tutor was already chosen (e.g. via "Book" on a tutor card
