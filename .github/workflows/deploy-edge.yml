@@ -57,3 +57,4 @@ jobs:
         run: >
           supabase functions deploy make-server-cbd74580
           --project-ref "${{ secrets.SUPABASE_PROJECT_REF }}"
+          --yes
