@@ -24,42 +24,81 @@ import { requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
 // review-weighted rating, and actual session-attendance history — the one
 // dimension that's always backed by real data no matter what either side
 // filled in on a form).
-async function calculateMatchScore(student: any, tutor: any): Promise<{score: number, breakdown: any}> {
-  let totalScore = 0;
-  const breakdown: any = {};
+//
+// Even with that cleanup, Budget and Schedule still fall back to a flat
+// "neutral" value (half marks) for most pairs today, because almost no
+// profile has budgetRange/availability filled in yet. Previously that
+// neutral half-mark was folded straight into a /100 total alongside
+// everything else — so two tutors who were a perfect subject match but
+// differed wildly in trust/level could still land within a couple of points
+// of each other, because 20 of the 100 points (budget + schedule) were
+// silently identical for both. A percentage score should mean "how well do
+// we actually know these two fit," not "how many points did we have to
+// invent." So each dimension below is marked `applicable` when there is
+// real signal to score, and the final percentage is only ever an average
+// over the applicable dimensions — a pair with no budget/schedule data
+// is scored out of 80, not out of 100 padded with two freebies.
+interface DimensionResult {
+  score: number;
+  max: number;
+  applicable: boolean;
+}
 
-  // 1. Subject Match (25 points max)
-  const subjectScore = calculateSubjectMatch(student, tutor);
-  totalScore += subjectScore;
-  breakdown.subject = subjectScore;
+async function calculateMatchScore(
+  student: any,
+  tutor: any,
+): Promise<{ score: number; breakdown: any }> {
+  const subject = calculateSubjectMatch(student, tutor); // 25 pts, always applicable
+  const level = calculateLevelMatch(student, tutor); // 15 pts, applicable iff both sides specify a level
+  const sen = calculateSENMatch(student, tutor); // 15 pts, always applicable (absence of need is itself real signal)
+  const trust = await calculateTrustScore(tutor); // 25 pts, always applicable
+  const budget = calculateBudgetMatch(student, tutor); // 10 pts, applicable iff both sides specify budget/rate
+  const schedule = calculateScheduleMatch(student, tutor); // 10 pts, applicable iff both sides specify availability
 
-  // 2. Level/Grade Match (15 points max)
-  const levelScore = calculateLevelMatch(student, tutor);
-  totalScore += levelScore;
-  breakdown.level = levelScore;
+  const dimensions: Record<string, DimensionResult> = {
+    subject: { score: subject, max: 25, applicable: true },
+    level,
+    sen: { score: sen, max: 15, applicable: true },
+    trust: { score: trust.score, max: 25, applicable: true },
+    budget,
+    schedule,
+  };
 
-  // 3. SEN/Accessibility Match (15 points max)
-  const senScore = calculateSENMatch(student, tutor);
-  totalScore += senScore;
-  breakdown.sen = senScore;
-
-  // 4. Trust & Safety (25 points max)
-  const trust = await calculateTrustScore(tutor);
-  totalScore += trust.score;
-  breakdown.trust = trust.score;
+  let applicableScore = 0;
+  let applicableMax = 0;
+  const breakdown: any = { applicable: {} };
+  for (const [name, d] of Object.entries(dimensions)) {
+    breakdown[name] = d.score;
+    breakdown.applicable[name] = d.applicable;
+    if (d.applicable) {
+      applicableScore += d.score;
+      applicableMax += d.max;
+    }
+  }
   breakdown.trustBreakdown = trust.breakdown;
 
-  // 5. Budget Fit (10 points max)
-  const budgetScore = calculateBudgetMatch(student, tutor);
-  totalScore += budgetScore;
-  breakdown.budget = budgetScore;
+  // applicableMax can never be 0 — subject, sen and trust are always
+  // applicable — but guard anyway rather than risk a NaN percentage.
+  const percentage = applicableMax > 0 ? (applicableScore / applicableMax) * 100 : 0;
 
-  // 6. Schedule Compatibility (10 points max)
-  const scheduleScore = calculateScheduleMatch(student, tutor);
-  totalScore += scheduleScore;
-  breakdown.schedule = scheduleScore;
+  return { score: percentage, breakdown };
+}
 
-  return { score: totalScore, breakdown };
+// A tutor who doesn't teach any subject the student is enrolled in isn't a
+// "low-scoring match" — they're not a match at all, and shouldn't appear in
+// results no matter how well they score on trust/level/budget. Scoring
+// alone can't express that: a 0/25 subject score diluted into the other
+// four dimensions could still land a completely unrelated tutor in the
+// "Fair" bucket. This is a hard pre-filter, applied before scoring even
+// runs, in both match directions (parent matching tutors, tutor matching
+// students). When a student genuinely has no subjects on file, nothing is
+// excluded — filtering against an empty list would hide every tutor.
+function hasSubjectOverlap(student: any, tutor: any): boolean {
+  const studentSubjects: string[] = student.subjects || [];
+  const tutorSubjects: string[] = tutor.subjects || [];
+  if (studentSubjects.length === 0) return true;
+  if (tutorSubjects.length === 0) return false;
+  return studentSubjects.some((s) => tutorSubjects.includes(s));
 }
 
 function calculateSubjectMatch(student: any, tutor: any): number {
@@ -138,16 +177,21 @@ function mapGradeLevelToBucket(gradeLevel: string): string {
   return '';
 }
 
-function calculateLevelMatch(student: any, tutor: any): number {
+function calculateLevelMatch(student: any, tutor: any): DimensionResult {
   const studentLevel = mapGradeLevelToBucket(student.gradeLevel || student.yearGroup || '');
   const tutorLevels: string[] = tutor.yearGroups || [];
 
-  if (!studentLevel || tutorLevels.length === 0) return 8; // neutral — one side hasn't filled this in
+  // One side hasn't specified a level — nothing to actually compare, so
+  // this dimension sits out of the percentage entirely rather than
+  // contributing a guessed half-mark that's identical for every pair.
+  if (!studentLevel || tutorLevels.length === 0) {
+    return { score: 0, max: 15, applicable: false };
+  }
 
-  return tutorLevels.includes(studentLevel) ? 15 : 0;
+  return { score: tutorLevels.includes(studentLevel) ? 15 : 0, max: 15, applicable: true };
 }
 
-function calculateScheduleMatch(student: any, tutor: any): number {
+function calculateScheduleMatch(student: any, tutor: any): DimensionResult {
   const studentDays = student.availabilityDays || [];
   const tutorDays = tutor.availableDays || [];
   const studentTimes = student.availabilityTimes || [];
@@ -155,12 +199,15 @@ function calculateScheduleMatch(student: any, tutor: any): number {
 
   // Neither the live "Add Child" form nor the live tutor signup form
   // collects availability today (only an abandoned enhanced profile form
-  // does — see EnhancedTutorProfileForm.tsx, which nothing renders), so this
-  // is neutral for virtually every match right now. Kept at a modest weight
-  // rather than removed outright, since either side filling it in later
-  // (via a profile edit) should start counting immediately with no further
-  // changes needed here.
-  if (studentDays.length === 0 || tutorDays.length === 0) return 5; // neutral (half of 10)
+  // does — see EnhancedTutorProfileForm.tsx, which nothing renders), so
+  // this dimension is inapplicable for virtually every match right now and
+  // sits out of the percentage rather than padding it with a flat neutral
+  // that's identical for every pair. Either side filling it in later (via a
+  // profile edit) starts counting immediately with no further changes
+  // needed here.
+  if (studentDays.length === 0 || tutorDays.length === 0) {
+    return { score: 0, max: 10, applicable: false };
+  }
 
   const matchedDays = studentDays.filter((d: string) => tutorDays.includes(d));
   const dayScore = (matchedDays.length / studentDays.length) * 6;
@@ -168,14 +215,16 @@ function calculateScheduleMatch(student: any, tutor: any): number {
   const matchedTimes = studentTimes.filter((t: string) => tutorTimes.includes(t));
   const timeScore = (matchedTimes.length / Math.max(studentTimes.length, 1)) * 4;
 
-  return Math.round(dayScore + timeScore);
+  return { score: Math.round(dayScore + timeScore), max: 10, applicable: true };
 }
 
-function calculateBudgetMatch(student: any, tutor: any): number {
+function calculateBudgetMatch(student: any, tutor: any): DimensionResult {
   const studentBudget = student.budgetRange || '';
   const tutorRate = parseFloat(tutor.hourlyRate || '0');
 
-  if (!studentBudget || tutorRate === 0) return 5; // neutral
+  if (!studentBudget || tutorRate === 0) {
+    return { score: 0, max: 10, applicable: false };
+  }
 
   const budgetRanges: Record<string, [number, number]> = {
     '15-25': [15, 25],
@@ -186,19 +235,17 @@ function calculateBudgetMatch(student: any, tutor: any): number {
 
   const [min, max] = budgetRanges[studentBudget] || [0, 1000];
 
+  let score: number;
   if (tutorRate >= min && tutorRate <= max) {
-    // Perfect fit
-    return 10;
+    score = 10; // Perfect fit
   } else if (tutorRate < min) {
-    // Under budget - still good
-    return 8;
+    score = 8; // Under budget - still good
   } else if (tutorRate <= max * 1.2) {
-    // Slightly over budget
-    return 5;
+    score = 5; // Slightly over budget
   } else {
-    // Too expensive
-    return 0;
+    score = 0; // Too expensive
   }
+  return { score, max: 10, applicable: true };
 }
 
 function calculateSENMatch(student: any, tutor: any): number {
@@ -323,7 +370,11 @@ app.get('/match/student/:studentId', async (c) => {
     // Merge: DB tutors not already in KV set
     const kvIds = new Set(kvTutors.map((u: any) => u.userId || u.id));
     const extraDbTutors = dbVerifiedTutors.filter((u: any) => !kvIds.has(u.id));
-    const tutors = [...kvTutors, ...extraDbTutors];
+    const allVerifiedTutors = [...kvTutors, ...extraDbTutors];
+
+    // Hard filter — see hasSubjectOverlap. A tutor who doesn't teach
+    // anything this student is enrolled in is not a match, full stop.
+    const tutors = allVerifiedTutors.filter((tutor: any) => hasSubjectOverlap(student, tutor));
 
     // Calculate match scores for each tutor
     const matches = await Promise.all(tutors.map(async (tutor: any) => {
@@ -410,9 +461,12 @@ app.get('/match/tutor/:tutorId', async (c) => {
       return c.json({ error: 'Tutor not found' }, 404);
     }
 
-    // Get all students
+    // Get all students who've opted into matching and take at least one
+    // subject this tutor actually teaches (see hasSubjectOverlap).
     const allChildren = await kv.getByPrefix('child:');
-    const students = allChildren.filter((s: any) => s.matchingEnabled);
+    const students = allChildren.filter(
+      (s: any) => s.matchingEnabled && hasSubjectOverlap(s, tutor),
+    );
 
     // Calculate match scores for each student
     const matches = await Promise.all(students.map(async (student: any) => {

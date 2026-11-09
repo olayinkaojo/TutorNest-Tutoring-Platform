@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, type ReactNode } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/card';
 import { Button } from './ui/button';
 import { Badge } from './ui/badge';
@@ -46,7 +46,44 @@ interface TutorMatch {
   compatibility: string;
 }
 
-export function SmartTutorMatches({ 
+// One row of the match breakdown. The backend now marks a dimension
+// inapplicable when neither side has the relevant data (e.g. budget,
+// schedule) rather than silently padding it with a flat neutral score — so
+// this shows an honest "Not enough data yet" instead of a percentage that
+// would otherwise look identical across every tutor.
+function MatchDimensionRow({
+  icon,
+  label,
+  score,
+  max,
+  applicable,
+}: {
+  icon: ReactNode;
+  label: string;
+  score: number;
+  max: number;
+  applicable: boolean;
+}) {
+  const pct = Math.round((score / max) * 100);
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="flex items-center gap-1 text-gray-600">
+        {icon}
+        {label}
+      </span>
+      {applicable ? (
+        <div className="flex items-center gap-2">
+          <Progress value={pct} className="w-20 h-2" />
+          <span className="font-medium">{pct}%</span>
+        </div>
+      ) : (
+        <span className="text-xs text-gray-400 italic">Not enough data yet</span>
+      )}
+    </div>
+  );
+}
+
+export function SmartTutorMatches({
   session, 
   studentId, 
   studentName,
@@ -155,60 +192,41 @@ export function SmartTutorMatches({
 
           {/* Match Breakdown */}
           <div className="space-y-2 mb-4">
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1 text-gray-600">
-                <BookOpen className="w-4 h-4" />
-                Subject Match
-              </span>
-              <div className="flex items-center gap-2">
-                <Progress value={(match.matchBreakdown.subject / 25) * 100} className="w-20 h-2" />
-                <span className="font-medium">{Math.round((match.matchBreakdown.subject / 25) * 100)}%</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1 text-gray-600">
-                <GraduationCap className="w-4 h-4" />
-                Level Match
-              </span>
-              <div className="flex items-center gap-2">
-                <Progress value={(match.matchBreakdown.level / 15) * 100} className="w-20 h-2" />
-                <span className="font-medium">{Math.round((match.matchBreakdown.level / 15) * 100)}%</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1 text-gray-600">
-                <Shield className="w-4 h-4" />
-                Trust &amp; Safety
-              </span>
-              <div className="flex items-center gap-2">
-                <Progress value={(match.matchBreakdown.trust / 25) * 100} className="w-20 h-2" />
-                <span className="font-medium">{Math.round((match.matchBreakdown.trust / 25) * 100)}%</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1 text-gray-600">
-                <Calendar className="w-4 h-4" />
-                Schedule
-              </span>
-              <div className="flex items-center gap-2">
-                <Progress value={(match.matchBreakdown.schedule / 10) * 100} className="w-20 h-2" />
-                <span className="font-medium">{Math.round((match.matchBreakdown.schedule / 10) * 100)}%</span>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between text-sm">
-              <span className="flex items-center gap-1 text-gray-600">
-                <DollarSign className="w-4 h-4" />
-                Budget Fit
-              </span>
-              <div className="flex items-center gap-2">
-                <Progress value={(match.matchBreakdown.budget / 10) * 100} className="w-20 h-2" />
-                <span className="font-medium">{Math.round((match.matchBreakdown.budget / 10) * 100)}%</span>
-              </div>
-            </div>
+            <MatchDimensionRow
+              icon={<BookOpen className="w-4 h-4" />}
+              label="Subject Match"
+              score={match.matchBreakdown.subject}
+              max={25}
+              applicable={match.matchBreakdown.applicable?.subject ?? true}
+            />
+            <MatchDimensionRow
+              icon={<GraduationCap className="w-4 h-4" />}
+              label="Level Match"
+              score={match.matchBreakdown.level}
+              max={15}
+              applicable={match.matchBreakdown.applicable?.level ?? true}
+            />
+            <MatchDimensionRow
+              icon={<Shield className="w-4 h-4" />}
+              label="Trust & Safety"
+              score={match.matchBreakdown.trust}
+              max={25}
+              applicable={match.matchBreakdown.applicable?.trust ?? true}
+            />
+            <MatchDimensionRow
+              icon={<Calendar className="w-4 h-4" />}
+              label="Schedule"
+              score={match.matchBreakdown.schedule}
+              max={10}
+              applicable={match.matchBreakdown.applicable?.schedule ?? true}
+            />
+            <MatchDimensionRow
+              icon={<DollarSign className="w-4 h-4" />}
+              label="Budget Fit"
+              score={match.matchBreakdown.budget}
+              max={10}
+              applicable={match.matchBreakdown.applicable?.budget ?? true}
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-3 pt-3 border-t">
@@ -487,26 +505,41 @@ export function SmartTutorMatches({
                 <div>
                   <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Why this match</p>
                   <div className="space-y-1.5 text-sm">
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1 text-gray-600"><BookOpen className="w-3.5 h-3.5" />Subject Match</span>
-                      <span className="font-medium">{Math.round((selectedMatch.matchBreakdown.subject / 25) * 100)}%</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1 text-gray-600"><GraduationCap className="w-3.5 h-3.5" />Level Match</span>
-                      <span className="font-medium">{Math.round((selectedMatch.matchBreakdown.level / 15) * 100)}%</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1 text-gray-600"><Shield className="w-3.5 h-3.5" />Trust &amp; Safety</span>
-                      <span className="font-medium">{Math.round((selectedMatch.matchBreakdown.trust / 25) * 100)}%</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1 text-gray-600"><Calendar className="w-3.5 h-3.5" />Schedule</span>
-                      <span className="font-medium">{Math.round((selectedMatch.matchBreakdown.schedule / 10) * 100)}%</span>
-                    </div>
-                    <div className="flex items-center justify-between">
-                      <span className="flex items-center gap-1 text-gray-600"><DollarSign className="w-3.5 h-3.5" />Budget Fit</span>
-                      <span className="font-medium">{Math.round((selectedMatch.matchBreakdown.budget / 10) * 100)}%</span>
-                    </div>
+                    <MatchDimensionRow
+                      icon={<BookOpen className="w-3.5 h-3.5" />}
+                      label="Subject Match"
+                      score={selectedMatch.matchBreakdown.subject}
+                      max={25}
+                      applicable={selectedMatch.matchBreakdown.applicable?.subject ?? true}
+                    />
+                    <MatchDimensionRow
+                      icon={<GraduationCap className="w-3.5 h-3.5" />}
+                      label="Level Match"
+                      score={selectedMatch.matchBreakdown.level}
+                      max={15}
+                      applicable={selectedMatch.matchBreakdown.applicable?.level ?? true}
+                    />
+                    <MatchDimensionRow
+                      icon={<Shield className="w-3.5 h-3.5" />}
+                      label="Trust & Safety"
+                      score={selectedMatch.matchBreakdown.trust}
+                      max={25}
+                      applicable={selectedMatch.matchBreakdown.applicable?.trust ?? true}
+                    />
+                    <MatchDimensionRow
+                      icon={<Calendar className="w-3.5 h-3.5" />}
+                      label="Schedule"
+                      score={selectedMatch.matchBreakdown.schedule}
+                      max={10}
+                      applicable={selectedMatch.matchBreakdown.applicable?.schedule ?? true}
+                    />
+                    <MatchDimensionRow
+                      icon={<DollarSign className="w-3.5 h-3.5" />}
+                      label="Budget Fit"
+                      score={selectedMatch.matchBreakdown.budget}
+                      max={10}
+                      applicable={selectedMatch.matchBreakdown.applicable?.budget ?? true}
+                    />
                   </div>
                 </div>
               </div>
