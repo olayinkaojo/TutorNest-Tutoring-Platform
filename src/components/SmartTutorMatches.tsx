@@ -5,6 +5,7 @@ import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Progress } from './ui/progress';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from './ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from './ui/dialog';
 import {
   Sparkles,
   User,
@@ -18,7 +19,6 @@ import {
   GraduationCap,
   Shield,
   Calendar,
-  MessageSquare,
   AlertCircle,
   Loader2,
   Award
@@ -29,6 +29,11 @@ interface SmartTutorMatchesProps {
   session: any;
   studentId: string;
   studentName?: string;
+  // Takes the parent to the booking flow with this tutor pre-selected. This
+  // is deliberately *not* a "message this tutor" action — a parent reaching
+  // a tutor from Smart Match has no booking with them yet, so the backend's
+  // messaging gate (messaging-access.tsx) would reject a chat attempt
+  // anyway. Booking is the correct next step, not a dead end.
   onSelectTutor?: (tutorId: string) => void;
 }
 
@@ -105,9 +110,17 @@ export function SmartTutorMatches({
         <CardContent className="pt-6">
           <div className="flex items-start justify-between mb-4">
             <div className="flex items-start gap-4 flex-1">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center text-purple-600">
-                {match.tutor.name?.split(' ').map((n: string) => n[0]).join('') || '?'}
-              </div>
+              {match.tutor.photo ? (
+                <img
+                  src={match.tutor.photo}
+                  alt={match.tutor.name}
+                  className="w-16 h-16 rounded-full object-cover flex-shrink-0 border border-purple-100"
+                />
+              ) : (
+                <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 flex-shrink-0">
+                  {match.tutor.name?.split(' ').map((n: string) => n[0]).join('') || '?'}
+                </div>
+              )}
               <div className="flex-1">
                 <h3 className="mb-1">{match.tutor.name}</h3>
                 <p className="text-sm text-gray-600 mb-2 line-clamp-2">{match.tutor.bio}</p>
@@ -229,8 +242,8 @@ export function SmartTutorMatches({
                 }
               }}
             >
-              <MessageSquare className="w-4 h-4 mr-2" />
-              Contact
+              <Calendar className="w-4 h-4 mr-2" />
+              Book This Tutor
             </Button>
           </div>
         </CardContent>
@@ -389,7 +402,132 @@ export function SmartTutorMatches({
         </Tabs>
       )}
 
-      {/* Detailed Match View Dialog would go here */}
+      {/* Detailed Match View */}
+      <Dialog open={!!selectedMatch} onOpenChange={(open) => { if (!open) setSelectedMatch(null); }}>
+        <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
+          {selectedMatch && (
+            <>
+              <DialogHeader>
+                <div className="flex items-start gap-4">
+                  {selectedMatch.tutor.photo ? (
+                    <img
+                      src={selectedMatch.tutor.photo}
+                      alt={selectedMatch.tutor.name}
+                      className="w-14 h-14 rounded-full object-cover flex-shrink-0 border border-purple-100"
+                    />
+                  ) : (
+                    <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center text-purple-600 flex-shrink-0">
+                      {selectedMatch.tutor.name?.split(' ').map((n: string) => n[0]).join('') || '?'}
+                    </div>
+                  )}
+                  <div>
+                    <DialogTitle>{selectedMatch.tutor.name}</DialogTitle>
+                    <Badge
+                      className="mt-1"
+                      style={{
+                        backgroundColor: getCompatibilityColor(selectedMatch.compatibility).bg,
+                        color: getCompatibilityColor(selectedMatch.compatibility).text,
+                      }}
+                    >
+                      {selectedMatch.matchPercentage}% · {selectedMatch.compatibility} match
+                    </Badge>
+                  </div>
+                </div>
+              </DialogHeader>
+
+              <div className="space-y-4 mt-2">
+                {selectedMatch.tutor.bio && (
+                  <p className="text-sm text-gray-700 leading-relaxed">{selectedMatch.tutor.bio}</p>
+                )}
+
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                  <div>
+                    <p className="text-xs text-gray-500">Hourly Rate</p>
+                    <p className="font-medium">₦{selectedMatch.tutor.hourlyRate}</p>
+                  </div>
+                  <div>
+                    <p className="text-xs text-gray-500">Experience</p>
+                    <p className="font-medium">{selectedMatch.tutor.yearsExperience || 'N/A'}</p>
+                  </div>
+                </div>
+
+                {selectedMatch.tutor.subjects?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Subjects</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedMatch.tutor.subjects.map((s: string) => (
+                        <Badge key={s} variant="secondary" className="text-xs">{s}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedMatch.tutor.teachingStyle?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Teaching Style</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedMatch.tutor.teachingStyle.map((s: string) => (
+                        <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {selectedMatch.tutor.languagesSpoken?.length > 0 && (
+                  <div>
+                    <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">Languages</p>
+                    <div className="flex flex-wrap gap-1.5">
+                      {selectedMatch.tutor.languagesSpoken.map((s: string) => (
+                        <Badge key={s} variant="outline" className="text-xs">{s}</Badge>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div>
+                  <p className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Why this match</p>
+                  <div className="space-y-1.5 text-sm">
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-gray-600"><BookOpen className="w-3.5 h-3.5" />Subject Match</span>
+                      <span className="font-medium">{Math.round((selectedMatch.matchBreakdown.subject / 25) * 100)}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-gray-600"><GraduationCap className="w-3.5 h-3.5" />Level Match</span>
+                      <span className="font-medium">{Math.round((selectedMatch.matchBreakdown.level / 15) * 100)}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-gray-600"><Shield className="w-3.5 h-3.5" />Trust &amp; Safety</span>
+                      <span className="font-medium">{Math.round((selectedMatch.matchBreakdown.trust / 25) * 100)}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-gray-600"><Calendar className="w-3.5 h-3.5" />Schedule</span>
+                      <span className="font-medium">{Math.round((selectedMatch.matchBreakdown.schedule / 10) * 100)}%</span>
+                    </div>
+                    <div className="flex items-center justify-between">
+                      <span className="flex items-center gap-1 text-gray-600"><DollarSign className="w-3.5 h-3.5" />Budget Fit</span>
+                      <span className="font-medium">{Math.round((selectedMatch.matchBreakdown.budget / 10) * 100)}%</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <DialogFooter>
+                <Button
+                  className="w-full text-white"
+                  style={{ backgroundColor: '#625d9c' }}
+                  onClick={() => {
+                    onSelectTutor?.(selectedMatch.tutorId);
+                    setSelectedMatch(null);
+                  }}
+                >
+                  <Calendar className="w-4 h-4 mr-2" />
+                  Book This Tutor
+                </Button>
+              </DialogFooter>
+            </>
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

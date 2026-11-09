@@ -120,15 +120,19 @@ export function SessionBookingCalendar({
   }, []);
 
   useEffect(() => {
-    // Pre-select the first child subject if available
-    if (childSubjects.length > 0 && !activeSubject) {
+    // Pre-select the first child subject if available — but never when a
+    // specific tutor was already chosen (e.g. via "Book" on a tutor card
+    // elsewhere): auto-picking a subject that tutor doesn't teach would
+    // silently filter their card out of the list below, making it look
+    // like the selection was never made.
+    if (childSubjects.length > 0 && !activeSubject && !preSelectedTutorId) {
       setActiveSubject(childSubjects[0]);
     }
-  }, [childSubjects]);
+  }, [childSubjects, preSelectedTutorId]);
 
   const isTutorVerified = (tutor: any) => {
     const verificationStatus = String(tutor.verificationStatus || '').toLowerCase();
-    if (verificationStatus === 'verified') return true;
+    if (verificationStatus === 'verified' || verificationStatus === 'approved') return true;
     return tutor.isVerified === true || tutor.verified === true;
   };
 
@@ -842,7 +846,7 @@ export function SessionBookingCalendar({
                   <User className="w-10 h-10 mx-auto mb-3 text-gray-300" />
                   <p className="text-sm mb-1">No tutors match your filters</p>
                   <button
-                    onClick={() => { setActiveSubject(''); setMaxRate('all'); setDbsOnly(false); }}
+                    onClick={() => { setActiveSubject(''); setDbsOnly(false); }}
                     className="text-xs underline"
                     style={{ color: '#625d9c' }}
                   >

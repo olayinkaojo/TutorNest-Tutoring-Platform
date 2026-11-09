@@ -332,7 +332,14 @@ app.get('/match/student/:studentId', async (c) => {
         tutorId: tutor.userId || tutor.id,
         tutor: {
           id: tutor.userId || tutor.id,
-          name: tutor.fullName || tutor.name || 'Unknown Tutor',
+          // A DB-sourced profile stores a split firstName/lastName rather
+          // than a single fullName/name field — without this, those tutors
+          // showed as "Unknown Tutor" with no name at all, just their
+          // headline/bio text underneath.
+          name:
+            tutor.fullName || tutor.name ||
+            `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim() ||
+            'Unknown Tutor',
           bio: tutor.bio,
           subjects: tutor.subjects || [],
           hourlyRate: tutor.hourlyRate,
@@ -341,7 +348,11 @@ app.get('/match/student/:studentId', async (c) => {
           teachingStyle: tutor.teachingStyle || [],
           senExperience: tutor.senExperience || [],
           languagesSpoken: tutor.languagesSpoken || [],
-          photo: tutor.documents?.photo || null,
+          // Real uploads are written to photoUrl/photo_url (see
+          // profile-avatar-routes.tsx) — documents.photo is an unrelated,
+          // never-populated field, so this previously sent `photo: null`
+          // for every tutor regardless of whether they'd uploaded one.
+          photo: tutor.photoUrl || tutor.photo_url || null,
         },
         matchScore: score,
         matchBreakdown: breakdown,

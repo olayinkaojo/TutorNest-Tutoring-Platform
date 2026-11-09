@@ -1,6 +1,7 @@
 import { Hono } from 'npm:hono@4';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
+import { getProfilesByRole } from './db.tsx';
 
 const tutorSearchRoutes = new Hono();
 
@@ -47,11 +48,28 @@ tutorSearchRoutes.get('/search/tutors', async (c) => {
     const minRating = parseFloat(c.req.query('minRating') || '0');
     const dbsRequired = c.req.query('dbsRequired') === 'true';
 
-    // Get all tutors (removed verification status filter to make all tutors live and visible)
+    // Only show tutors a parent has actually been cleared to see. An
+    // unverified tutor (no background check reviewed, or still pending) must
+    // never appear in a parent-facing list — a prior version of this route
+    // intentionally dropped that filter "to make all tutors live and
+    // visible," which meant rejected and pending applicants were booking-
+    // visible to every parent on the platform.
+    const isVerified = (u: any) =>
+      u.verificationStatus === 'verified' || u.verificationStatus === 'approved';
+
     const allUsers = await kv.getByPrefix('user:');
-    let tutors = allUsers.filter((user: any) =>
-      user.role === 'tutor'
-    );
+    const kvTutors = allUsers.filter((user: any) => user.role === 'tutor' && isVerified(user));
+
+    // Mirrors the KV+DB merge in smart-matching-routes.tsx — without this, a
+    // tutor who exists in the profiles table but was never (or no longer)
+    // mirrored into KV silently never appeared in search results, even
+    // though the same tutor shows up correctly in Smart Match.
+    const dbTutors = await getProfilesByRole('tutor').catch(() => [] as any[]);
+    const dbVerifiedTutors = dbTutors.filter((u: any) => isVerified(u));
+    const kvIds = new Set(kvTutors.map((u: any) => u.userId || u.id));
+    const extraDbTutors = dbVerifiedTutors.filter((u: any) => !kvIds.has(u.id));
+
+    let tutors: any[] = [...kvTutors, ...extraDbTutors];
 
     // tutor.rating on the raw KV profile is never written by anything — real
     // reviews update a separate cache (tutor:rating:<id>, see

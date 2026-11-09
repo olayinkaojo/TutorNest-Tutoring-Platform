@@ -147,12 +147,6 @@ export function ParentDashboard({
     totalSpent: 0
   });
 
-  // Track tutor to message with
-  const [initialMessageTutor, setInitialMessageTutor] = useState<{
-    id: string;
-    name: string;
-  } | null>(null);
-
   // Check if user can become a tutor (doesn't already have tutor role)
   const canBecomeTutor = !availableRoles.includes('tutor');
 
@@ -925,17 +919,23 @@ export function ParentDashboard({
                       studentId={activeChildId}
                       studentName={activeChild ? `${activeChild.firstName} ${activeChild.lastName}` : undefined}
                       onSelectTutor={(tutorId) => {
-                        setInitialMessageTutor({ id: tutorId, name: '' });
-                        setActiveTab('messages');
+                        // Smart Match's "Book This Tutor" takes the parent
+                        // straight to booking rather than messaging — a
+                        // parent reaching a tutor from here has no booking
+                        // with them yet, so the backend's messaging gate
+                        // (messaging-access.tsx, isEligibleMessagingPair)
+                        // would reject a chat attempt anyway.
+                        setPreSelectedTutorId(tutorId);
+                        setBookingsSubTab('book-session');
+                        setActiveTab('bookings');
                       }}
                     />
                   ) : (
                     <TutorSearch
                       session={session}
                       activeChildId={activeChildId}
-                      onStartConversation={(tutorId, tutorName) => {
-                        setInitialMessageTutor({ id: tutorId, name: tutorName });
-                        setActiveTab('messages');
+                      onStartConversation={() => {
+                        toast.info('You can message a tutor once you’ve booked a session with them.');
                       }}
                       onBookSession={(tutor) => {
                         setPreSelectedTutorId(tutor.userId || tutor.id);
@@ -1162,8 +1162,6 @@ export function ParentDashboard({
                   userId={profile.id || profile.userId}
                   userName={profile.full_name || profile.name || 'Parent'}
                   userRole="parent"
-                  initialContactId={initialMessageTutor?.id}
-                  initialContactName={initialMessageTutor?.name}
                   initialContactRole="tutor"
                 />
               </Suspense>

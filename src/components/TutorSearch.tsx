@@ -107,7 +107,13 @@ export function TutorSearch({
       );
       if (!res.ok) throw new Error('Failed to load tutors');
       const data = await res.json();
-      setAllTutors(data.tutors || []);
+      // Defense in depth: the backend already filters to verified tutors,
+      // but an unverified tutor appearing here is a safeguarding issue, not
+      // just a cosmetic one, so this list re-checks rather than trusting it.
+      const verifiedOnly = (data.tutors || []).filter((t: any) =>
+        t.verificationStatus === 'verified' || t.verificationStatus === 'approved' || t.isVerified === true
+      );
+      setAllTutors(verifiedOnly);
     } catch (err: any) {
       setError('Could not load tutors. Please try again.');
     } finally {
@@ -195,7 +201,15 @@ export function TutorSearch({
   const TutorCard = ({ tutor }: { tutor: any }) => {
     const tutorId = tutor.userId || tutor.id;
     const isInvited = invitedTutors.has(tutorId);
-    const initials = `${tutor.firstName?.[0] || ''}${tutor.lastName?.[0] || ''}`;
+    // DB-sourced profiles store a single `fullName`/`name` field rather than
+    // split firstName/lastName — without this fallback, those tutors'
+    // name and initials rendered completely blank.
+    const displayName =
+      `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim() ||
+      tutor.fullName || tutor.name || 'Tutor';
+    const initials =
+      `${tutor.firstName?.[0] || ''}${tutor.lastName?.[0] || ''}` ||
+      displayName.split(' ').map((n: string) => n[0]).join('').slice(0, 2);
     // tutor.rating is null (not 0) when a tutor genuinely has no reviews yet
     // — showing a fabricated "5.0★" for an unrated tutor misrepresents them
     // as verified-excellent when they're simply new.
@@ -223,7 +237,7 @@ export function TutorSearch({
               <div className="flex items-start justify-between gap-2">
                 <div>
                   <h3 className="font-semibold text-gray-900 truncate">
-                    {tutor.firstName} {tutor.lastName}
+                    {displayName}
                   </h3>
                   {tutor.headline && (
                     <p className="text-xs text-gray-500 truncate">{tutor.headline}</p>
