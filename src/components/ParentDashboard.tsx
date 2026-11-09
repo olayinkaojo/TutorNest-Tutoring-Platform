@@ -108,6 +108,13 @@ export function ParentDashboard({
   const [selectedMonths, setSelectedMonths] = useState<number[]>([new Date().getMonth() + 1]);
   const [showRoleCongrats, setShowRoleCongrats] = useState(false);
   const [preSelectedTutorId, setPreSelectedTutorId] = useState<string | undefined>(undefined);
+  // Bumped on every "Book" click, independent of which tutor was picked —
+  // used to force SessionBookingCalendar to remount from scratch each time.
+  // Radix keeps that tab's content mounted once visited, so a second "Book"
+  // click on the SAME tutor left preSelectedTutorId unchanged, and an
+  // effect keyed on that value alone would never re-fire. A fresh mount
+  // sidesteps the whole class of staleness bug rather than chasing it.
+  const [bookingRequestSeq, setBookingRequestSeq] = useState(0);
   const [soonSession, setSoonSession] = useState<any>(null);
   const [callBookingId, setCallBookingId] = useState<string | null>(null);
 
@@ -926,6 +933,7 @@ export function ParentDashboard({
                         // (messaging-access.tsx, isEligibleMessagingPair)
                         // would reject a chat attempt anyway.
                         setPreSelectedTutorId(tutorId);
+                        setBookingRequestSeq((n) => n + 1);
                         setBookingsSubTab('book-session');
                         setActiveTab('bookings');
                       }}
@@ -939,6 +947,7 @@ export function ParentDashboard({
                       }}
                       onBookSession={(tutor) => {
                         setPreSelectedTutorId(tutor.userId || tutor.id);
+                        setBookingRequestSeq((n) => n + 1);
                         setBookingsSubTab('book-session');
                         setActiveTab('bookings');
                       }}
@@ -986,6 +995,7 @@ export function ParentDashboard({
 
                 <TabsContent value="book-session">
                   <SessionBookingCalendar
+                    key={bookingRequestSeq}
                     session={session}
                     activeChildId={activeChildId}
                     childName={activeChild ? `${activeChild.firstName} ${activeChild.lastName}` : undefined}
