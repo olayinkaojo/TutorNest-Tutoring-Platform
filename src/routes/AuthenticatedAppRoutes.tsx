@@ -27,6 +27,112 @@ interface AuthenticatedAppRoutesProps {
 
 const KNOWN_ROLES = ['admin', 'parent', 'student', 'tutor'];
 
+function buildDashboardPath(role: string, tab?: string) {
+  if (!tab) return `/dashboard/${role}`;
+  return `/dashboard/${role}/${encodeURIComponent(tab)}`;
+}
+
+// Hoisted to module scope deliberately — this used to be defined inside
+// AuthenticatedAppRoutes' render body, which meant it was a brand-new
+// component *type* on every render of that component (e.g. on every
+// navigation, since AuthenticatedAppRoutes' own parent re-renders it on
+// every location change via useLocation()). React remounts a component
+// whenever its type identity changes, so every single tab/URL change
+// inside the app silently destroyed and recreated AdminDashboard /
+// ParentDashboard / etc. from scratch — wiping any state that wasn't
+// itself derived from the URL or localStorage (e.g. a pre-selected tutor
+// set just before navigating to the booking screen).
+function DashboardRouteRenderer({
+  profile,
+  navigateTo,
+  availableRoles,
+  onSignOut,
+  onRoleSwitch,
+  onRoleAdded,
+}: {
+  profile: UserProfile;
+  navigateTo: NavigateTo;
+  availableRoles: string[];
+  onSignOut: () => Promise<void>;
+  onRoleSwitch: (newRole: string) => Promise<void>;
+  onRoleAdded: () => void;
+}) {
+  const { role, tab } = useParams();
+
+  if (!role || role !== profile.role) {
+    return <Navigate to={buildDashboardPath(profile.role, tab)} replace />;
+  }
+
+  const decodedTab = tab ? decodeURIComponent(tab) : undefined;
+
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+        <div className="text-center">
+          <div className="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: '#625d9c', borderTopColor: 'transparent' }} />
+          <p className="text-gray-500 text-sm">Loading dashboard…</p>
+        </div>
+      </div>
+    }>
+      <ErrorBoundary>
+        {profile.role === 'admin' && (
+          <AdminDashboard
+            profile={profile}
+            onSignOut={onSignOut}
+            availableRoles={availableRoles}
+            onRoleSwitch={onRoleSwitch}
+            initialTab={decodedTab}
+            onTabChange={(nextTab) => navigateTo(buildDashboardPath('admin', nextTab))}
+          />
+        )}
+        {profile.role === 'parent' && (
+          <ParentDashboard
+            profile={profile}
+            onSignOut={onSignOut}
+            availableRoles={availableRoles}
+            onRoleSwitch={onRoleSwitch}
+            onBecomeTutor={() => navigateTo('/become-tutor')}
+            initialTab={decodedTab}
+            onTabChange={(nextTab) => navigateTo(buildDashboardPath('parent', nextTab))}
+          />
+        )}
+        {profile.role === 'student' && (
+          <StudentDashboard
+            initialProfile={profile}
+            onSignOut={onSignOut}
+            initialTab={decodedTab}
+            onTabChange={(nextTab) => navigateTo(buildDashboardPath('student', nextTab))}
+          />
+        )}
+        {profile.role === 'tutor' && (
+          <TutorDashboard
+            profile={profile}
+            onSignOut={onSignOut}
+            availableRoles={availableRoles}
+            onRoleSwitch={onRoleSwitch}
+            onRoleAdded={onRoleAdded}
+            initialTab={decodedTab}
+            onTabChange={(nextTab) => navigateTo(buildDashboardPath('tutor', nextTab))}
+          />
+        )}
+        {!KNOWN_ROLES.includes(profile.role) && (
+          <div className="min-h-screen flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <h2 className="mb-4">Unknown Role: {profile.role}</h2>
+              <p className="text-gray-600 mb-4">Please contact support.</p>
+              <Button onClick={onSignOut}>Sign Out</Button>
+            </div>
+          </div>
+        )}
+      </ErrorBoundary>
+    </Suspense>
+  );
+}
+
+function WildcardRedirect({ role }: { role: string }) {
+  return <Navigate to={buildDashboardPath(role)} replace />;
+}
+
 export function AuthenticatedAppRoutes({
   session,
   profile,
@@ -38,89 +144,6 @@ export function AuthenticatedAppRoutes({
   onRoleAdded,
   onSignupSuccess,
 }: AuthenticatedAppRoutesProps) {
-  const buildDashboardPath = (role: string, tab?: string) => {
-    if (!tab) return `/dashboard/${role}`;
-    return `/dashboard/${role}/${encodeURIComponent(tab)}`;
-  };
-
-  const DashboardRouteRenderer = () => {
-    const { role, tab } = useParams();
-
-    if (!role || role !== profile.role) {
-      return <Navigate to={buildDashboardPath(profile.role, tab)} replace />;
-    }
-
-    const decodedTab = tab ? decodeURIComponent(tab) : undefined;
-
-    return (
-      <Suspense fallback={
-        <div className="min-h-screen flex items-center justify-center bg-gray-50">
-          <div className="text-center">
-            <div className="w-12 h-12 border-4 border-t-transparent rounded-full animate-spin mx-auto mb-3" style={{ borderColor: '#625d9c', borderTopColor: 'transparent' }} />
-            <p className="text-gray-500 text-sm">Loading dashboard…</p>
-          </div>
-        </div>
-      }>
-        <ErrorBoundary>
-          {profile.role === 'admin' && (
-            <AdminDashboard
-              profile={profile}
-              onSignOut={onSignOut}
-              availableRoles={availableRoles}
-              onRoleSwitch={onRoleSwitch}
-              initialTab={decodedTab}
-              onTabChange={(nextTab) => navigateTo(buildDashboardPath('admin', nextTab))}
-            />
-          )}
-          {profile.role === 'parent' && (
-            <ParentDashboard
-              profile={profile}
-              onSignOut={onSignOut}
-              availableRoles={availableRoles}
-              onRoleSwitch={onRoleSwitch}
-              onBecomeTutor={() => navigateTo('/become-tutor')}
-              initialTab={decodedTab}
-              onTabChange={(nextTab) => navigateTo(buildDashboardPath('parent', nextTab))}
-            />
-          )}
-          {profile.role === 'student' && (
-            <StudentDashboard
-              initialProfile={profile}
-              onSignOut={onSignOut}
-              initialTab={decodedTab}
-              onTabChange={(nextTab) => navigateTo(buildDashboardPath('student', nextTab))}
-            />
-          )}
-          {profile.role === 'tutor' && (
-            <TutorDashboard
-              profile={profile}
-              onSignOut={onSignOut}
-              availableRoles={availableRoles}
-              onRoleSwitch={onRoleSwitch}
-              onRoleAdded={onRoleAdded}
-              initialTab={decodedTab}
-              onTabChange={(nextTab) => navigateTo(buildDashboardPath('tutor', nextTab))}
-            />
-          )}
-          {!KNOWN_ROLES.includes(profile.role) && (
-            <div className="min-h-screen flex items-center justify-center bg-gray-50">
-              <div className="text-center">
-                <h2 className="mb-4">Unknown Role: {profile.role}</h2>
-                <p className="text-gray-600 mb-4">Please contact support.</p>
-                <Button onClick={onSignOut}>Sign Out</Button>
-              </div>
-            </div>
-          )}
-        </ErrorBoundary>
-      </Suspense>
-    );
-  };
-
-
-  function WildcardRedirect({ role, buildDashboardPath }: { role: string; buildDashboardPath: (r: string, t?: string) => string }) {
-    return <Navigate to={buildDashboardPath(role)} replace />;
-  }
-
   return (
     <Routes>
       <Route
@@ -143,9 +166,33 @@ export function AuthenticatedAppRoutes({
       <Route path="/privacy" element={<ErrorBoundary><PrivacyPolicy /></ErrorBoundary>} />
       <Route path="/privacy-policy" element={<Navigate to="/privacy" replace />} />
       <Route path="/feedback" element={<ErrorBoundary><FeedbackPage /></ErrorBoundary>} />
-      <Route path="/dashboard/:role" element={<DashboardRouteRenderer />} />
-      <Route path="/dashboard/:role/:tab" element={<DashboardRouteRenderer />} />
-      <Route path="*" element={<WildcardRedirect role={profile.role} buildDashboardPath={buildDashboardPath} />} />
+      <Route
+        path="/dashboard/:role"
+        element={
+          <DashboardRouteRenderer
+            profile={profile}
+            navigateTo={navigateTo}
+            availableRoles={availableRoles}
+            onSignOut={onSignOut}
+            onRoleSwitch={onRoleSwitch}
+            onRoleAdded={onRoleAdded}
+          />
+        }
+      />
+      <Route
+        path="/dashboard/:role/:tab"
+        element={
+          <DashboardRouteRenderer
+            profile={profile}
+            navigateTo={navigateTo}
+            availableRoles={availableRoles}
+            onSignOut={onSignOut}
+            onRoleSwitch={onRoleSwitch}
+            onRoleAdded={onRoleAdded}
+          />
+        }
+      />
+      <Route path="*" element={<WildcardRedirect role={profile.role} />} />
     </Routes>
   );
 }
