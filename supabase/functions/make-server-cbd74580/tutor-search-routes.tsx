@@ -43,8 +43,6 @@ tutorSearchRoutes.get('/search/tutors', async (c) => {
     const subject = c.req.query('subject') || '';
     const level = c.req.query('level') || '';
     const availability = c.req.query('availability') || '';
-    const minPrice = parseFloat(c.req.query('minPrice') || '0');
-    const maxPrice = parseFloat(c.req.query('maxPrice') || '10000');
     const minRating = parseFloat(c.req.query('minRating') || '0');
     const dbsRequired = c.req.query('dbsRequired') === 'true';
 
@@ -85,6 +83,11 @@ tutorSearchRoutes.get('/search/tutors', async (c) => {
         ...tutor,
         rating: stats ? stats.averageRating : null,
         reviewCount: stats ? stats.totalReviews : 0,
+        // Platform flat rate (see PAYMENT_PLANS in payment-routes.tsx) —
+        // overridden here rather than trusted from whatever's on the raw
+        // profile, since tutors no longer set this themselves and older
+        // records may still carry a pre-flat-rate value.
+        hourlyRate: 15000,
       };
     }));
 
@@ -117,10 +120,10 @@ tutorSearchRoutes.get('/search/tutors', async (c) => {
       );
     }
 
-    tutors = tutors.filter((tutor: any) => {
-      const rate = parseFloat(tutor.hourlyRate || '0');
-      return rate >= minPrice && rate <= maxPrice;
-    });
+    // A min/max price filter used to live here — removed along with the
+    // tutor-settable rate itself; every tutor now charges the same
+    // platform flat rate (overridden above), so a price range has nothing
+    // left to filter on.
 
     if (minRating > 0) {
       // tutor.rating was overwritten above with the real cached average (or

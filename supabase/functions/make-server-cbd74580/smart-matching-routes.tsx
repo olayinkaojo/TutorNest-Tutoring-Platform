@@ -52,15 +52,21 @@ async function calculateMatchScore(
   const level = calculateLevelMatch(student, tutor); // 15 pts, applicable iff both sides specify a level
   const sen = calculateSENMatch(student, tutor); // 15 pts, always applicable (absence of need is itself real signal)
   const trust = await calculateTrustScore(tutor); // 25 pts, always applicable
-  const budget = calculateBudgetMatch(student, tutor); // 10 pts, applicable iff both sides specify budget/rate
   const schedule = calculateScheduleMatch(student, tutor); // 10 pts, applicable iff both sides specify availability
 
+  // Budget Fit (calculateBudgetMatch) used to live here, comparing a
+  // parent's budgetRange against tutor.hourlyRate. Every tutor now charges
+  // the same platform flat rate (see constants/pricing.ts), so that
+  // comparison would score 100% of tutors identically for any given
+  // parent — reintroducing the exact "same score for everyone" failure
+  // this file's applicable/DimensionResult system exists to prevent.
+  // Removed rather than left always-inapplicable, since there's no
+  // realistic future signal (hourlyRate is gone) to revive it against.
   const dimensions: Record<string, DimensionResult> = {
     subject: { score: subject, max: 25, applicable: true },
     level,
     sen: { score: sen, max: 15, applicable: true },
     trust: { score: trust.score, max: 25, applicable: true },
-    budget,
     schedule,
   };
 
@@ -216,36 +222,6 @@ function calculateScheduleMatch(student: any, tutor: any): DimensionResult {
   const timeScore = (matchedTimes.length / Math.max(studentTimes.length, 1)) * 4;
 
   return { score: Math.round(dayScore + timeScore), max: 10, applicable: true };
-}
-
-function calculateBudgetMatch(student: any, tutor: any): DimensionResult {
-  const studentBudget = student.budgetRange || '';
-  const tutorRate = parseFloat(tutor.hourlyRate || '0');
-
-  if (!studentBudget || tutorRate === 0) {
-    return { score: 0, max: 10, applicable: false };
-  }
-
-  const budgetRanges: Record<string, [number, number]> = {
-    '15-25': [15, 25],
-    '25-40': [25, 40],
-    '40-60': [40, 60],
-    '60+': [60, 1000]
-  };
-
-  const [min, max] = budgetRanges[studentBudget] || [0, 1000];
-
-  let score: number;
-  if (tutorRate >= min && tutorRate <= max) {
-    score = 10; // Perfect fit
-  } else if (tutorRate < min) {
-    score = 8; // Under budget - still good
-  } else if (tutorRate <= max * 1.2) {
-    score = 5; // Slightly over budget
-  } else {
-    score = 0; // Too expensive
-  }
-  return { score, max: 10, applicable: true };
 }
 
 function calculateSENMatch(student: any, tutor: any): number {

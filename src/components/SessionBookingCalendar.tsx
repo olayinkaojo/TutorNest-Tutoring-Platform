@@ -8,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '.
 import { projectId } from '../utils/supabase/info';
 import { todayStringWAT, WAT_TIMEZONE } from '../utils/timezone';
 import { formatNaira } from '../utils/currency';
+import { PLATFORM_HOURLY_RATE_NGN } from '../constants/pricing';
 import { BookSessionWithPayment } from './BookSessionWithPayment';
 import {
   Calendar as CalendarIcon,
@@ -201,7 +202,7 @@ export function SessionBookingCalendar({
           // Photo
           photoUrl: tutor.photoUrl || tutor.photo_url || null,
           // Engagement
-          hourlyRate: 15000,
+          hourlyRate: PLATFORM_HOURLY_RATE_NGN,
           availability: tutor.availability,
           rating: tutor.rating != null ? Number(tutor.rating)
                 : tutor.averageRating != null ? Number(tutor.averageRating)
@@ -294,9 +295,14 @@ export function SessionBookingCalendar({
   };
 
   const calculatePrice = () => {
-    const tutor = tutors.find(t => t.id === selectedTutor);
-    if (!tutor) return '0.00';
-    return (tutor.hourlyRate * (parseInt(sessionDuration) / 60)).toFixed(2);
+    // Flat per-session rate, independent of duration or which tutor —
+    // matches what's actually charged (PAYMENT_PLANS in
+    // payment-routes.tsx prices every plan at exactly this per session).
+    // This used to scale by sessionDuration/60, showing e.g. ₦7,500 for a
+    // 30-minute preview right before charging the full flat amount
+    // regardless — a real mismatch between what was previewed and what
+    // was billed.
+    return PLATFORM_HOURLY_RATE_NGN.toFixed(2);
   };
 
   // ── Filtered tutors ──────────────────────────────────────────────────────────

@@ -12,7 +12,6 @@ import {
   Star,
   BookOpen,
   Clock,
-  DollarSign,
   CheckCircle,
   TrendingUp,
   Heart,
@@ -24,6 +23,7 @@ import {
   Award
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
+import { PLATFORM_HOURLY_RATE_NGN } from '../constants/pricing';
 
 interface SmartTutorMatchesProps {
   session: any;
@@ -220,19 +220,14 @@ export function SmartTutorMatches({
               max={10}
               applicable={match.matchBreakdown.applicable?.schedule ?? true}
             />
-            <MatchDimensionRow
-              icon={<DollarSign className="w-4 h-4" />}
-              label="Budget Fit"
-              score={match.matchBreakdown.budget}
-              max={10}
-              applicable={match.matchBreakdown.applicable?.budget ?? true}
-            />
+            {/* Budget Fit removed — every tutor now charges the same
+                platform flat rate, so there's nothing left to compare. */}
           </div>
 
           <div className="grid grid-cols-2 gap-3 pt-3 border-t">
             <div className="text-center">
-              <p className="text-xs text-gray-500">Hourly Rate</p>
-              <p className="font-medium">£{match.tutor.hourlyRate}</p>
+              <p className="text-xs text-gray-500">Session Rate</p>
+              <p className="font-medium">₦{PLATFORM_HOURLY_RATE_NGN.toLocaleString()}</p>
             </div>
             <div className="text-center">
               <p className="text-xs text-gray-500">Experience</p>
@@ -460,8 +455,8 @@ export function SmartTutorMatches({
 
                 <div className="grid grid-cols-2 gap-3 text-sm">
                   <div>
-                    <p className="text-xs text-gray-500">Hourly Rate</p>
-                    <p className="font-medium">₦{selectedMatch.tutor.hourlyRate}</p>
+                    <p className="text-xs text-gray-500">Session Rate</p>
+                    <p className="font-medium">₦{PLATFORM_HOURLY_RATE_NGN.toLocaleString()}</p>
                   </div>
                   <div>
                     <p className="text-xs text-gray-500">Experience</p>
@@ -532,13 +527,6 @@ export function SmartTutorMatches({
                       score={selectedMatch.matchBreakdown.schedule}
                       max={10}
                       applicable={selectedMatch.matchBreakdown.applicable?.schedule ?? true}
-                    />
-                    <MatchDimensionRow
-                      icon={<DollarSign className="w-3.5 h-3.5" />}
-                      label="Budget Fit"
-                      score={selectedMatch.matchBreakdown.budget}
-                      max={10}
-                      applicable={selectedMatch.matchBreakdown.applicable?.budget ?? true}
                     />
                   </div>
                 </div>

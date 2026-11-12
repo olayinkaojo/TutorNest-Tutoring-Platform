@@ -38,6 +38,7 @@ import {
   ChevronRight,
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
+import { PLATFORM_HOURLY_RATE_NGN } from '../constants/pricing';
 import {
   Select,
   SelectContent,
@@ -218,7 +219,6 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
       ? v.filter(Boolean)
       : (typeof v === 'string' && v.trim() ? v.split(',').map((s) => s.trim()).filter(Boolean) : []);
 
-  const hourlyRate = pick(ps.hourlyRate, su.hourlyRate, su.hourly_rate);
   const experienceYears = pick(ps.experienceYears, su.experienceYears, su.experience_years);
   const travelRadius = pick(ps.travelRadius, su.travelRadius, su.travel_radius);
 
@@ -235,7 +235,7 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
         { label: 'Education level', value: pick(ps.educationLevel, su.educationLevel, su.education_level) },
         { label: 'Institution', value: pick(ps.institution, su.institution) },
         { label: 'Experience', value: experienceYears !== undefined ? `${experienceYears} year${Number(experienceYears) === 1 ? '' : 's'}` : undefined },
-        { label: 'Hourly rate', value: hourlyRate ? `₦${Number(hourlyRate).toLocaleString()} / session` : undefined },
+        { label: 'Session rate', value: `₦${PLATFORM_HOURLY_RATE_NGN.toLocaleString()} / session (platform flat rate)` },
         { label: 'Teaching style', value: pick(ps.teachingStyle, su.teachingStyle, su.teaching_style) },
       ],
     },
@@ -558,7 +558,7 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
                   {hasRole(user, 'tutor') && (
                     <span key="rate-badge" className="flex items-center gap-1">
                       <DollarSign className="w-3 h-3" />
-                      £{user.hourlyRate || 'N/A'}/hr
+                      ₦{PLATFORM_HOURLY_RATE_NGN.toLocaleString()}/session
                     </span>
                   )}
 
@@ -650,7 +650,7 @@ export function AdminUserManagement({ session, filterRequest }: AdminUserManagem
                 )}
               </div>
               <div className="mt-3 flex items-center justify-between text-xs text-gray-500">
-                <span>{user.hourlyRate ? `₦${user.hourlyRate}/hr` : 'Rate not set'}</span>
+                <span>₦{PLATFORM_HOURLY_RATE_NGN.toLocaleString()}/session</span>
                 <span>{user.dbsStatus === 'verified' ? 'DBS verified' : 'DBS pending'}</span>
               </div>
             </>

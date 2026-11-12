@@ -11,6 +11,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from './ui/
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { Progress } from './ui/progress';
 import { COUNTRIES } from '../constants/countries';
+import { PLATFORM_HOURLY_RATE_NGN } from '../constants/pricing';
 import { CheckCircle, AlertCircle, User, BookOpen, Award, Shield, RotateCcw } from 'lucide-react';
 import KFALogo from './KFALogo';
 import {
@@ -225,7 +226,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
 
   // Step 2: Professional Info
   const [bio, setBio] = useState('');
-  const hourlyRate = '15000'; // Platform-fixed rate — tutors cannot change this
+  const hourlyRate = String(PLATFORM_HOURLY_RATE_NGN); // Platform-fixed rate — tutors cannot change this
   const [experienceYears, setExperienceYears] = useState('');
   const [qualifications, setQualifications] = useState('');
   const [teachingStyle, setTeachingStyle] = useState('');
@@ -1354,7 +1355,7 @@ export function TutorSignup({ onBackToSignIn, initialData, onSignupComplete, ses
                 <div className="p-4 bg-green-50 border-2 border-green-200 rounded-lg">
                   <h3 className="font-semibold text-green-900 mb-2">💰 Session Payment Structure</h3>
                   <div className="space-y-2 text-sm text-green-800">
-                    <p><strong>Flat Rate per Session:</strong> ₦15,000</p>
+                    <p><strong>Flat Rate per Session:</strong> ₦{PLATFORM_HOURLY_RATE_NGN.toLocaleString()}</p>
                     <div className="pl-4 space-y-1">
                       <p>• You receive: <strong>80%</strong> of session fee</p>
                       <p>• Knowledge Fons Academy Platform Fee: <strong>20%</strong></p>

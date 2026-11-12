@@ -9,6 +9,7 @@ import { Alert, AlertDescription } from './ui/alert';
 import { Progress } from './ui/progress';
 import { User, Mail, Phone, MapPin, DollarSign, BookOpen, Award, CheckCircle, AlertCircle, CreditCard, Upload, FileText, X, Download, RefreshCw, Loader2, Clock } from 'lucide-react';
 import { projectId, publicAnonKey } from '../utils/supabase/info';
+import { PLATFORM_HOURLY_RATE_NGN } from '../constants/pricing';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { COUNTRIES } from '../constants/countries';
 import { getSupabaseClient } from '../utils/supabase/client';
@@ -339,7 +340,6 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
     phone: '',
     location: '',
     bio: '',
-    hourly_rate: '',
     qualifications: '',
     experience_years: '',
     teaching_style: '',
@@ -595,7 +595,6 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
         phone: currentProfile.phone || '',
         location: currentProfile.location || '',
         bio: currentProfile.bio || '',
-        hourly_rate: currentProfile.hourly_rate || '',
         qualifications: currentProfile.qualifications || '',
         experience_years: currentProfile.experience_years || '',
         teaching_style: currentProfile.teaching_style || '',
@@ -794,7 +793,10 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
         other_languages: otherLanguages,
         professional_certifications: selectedProfessionalCertifications,
         other_professional_certifications: otherProfessionalCertifications,
-        hourly_rate: formData.hourly_rate ? parseFloat(formData.hourly_rate) : null,
+        // Platform flat rate — not user-editable (see the Session Rate
+        // notice above); sent explicitly so saving a profile also
+        // self-corrects any older, pre-flat-rate value already on file.
+        hourly_rate: PLATFORM_HOURLY_RATE_NGN,
         experience_years: formData.experience_years ? parseInt(formData.experience_years) : null,
       };
 
@@ -937,17 +939,13 @@ export function TutorProfileEditor({ session, tutorId, currentProfile, onProfile
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <Label htmlFor="hourly_rate">Hourly Rate (₦) *</Label>
-                <Input
-                  id="hourly_rate"
-                  type="number"
-                  step="0.01"
-                  min="0"
-                  value={formData.hourly_rate}
-                  onChange={(e) => handleChange('hourly_rate', e.target.value)}
-                  placeholder="25.00"
-                  required
-                />
+                <Label>Session Rate</Label>
+                <div className="flex items-center h-9 px-3 rounded-md border border-gray-200 bg-gray-50 text-sm text-gray-700">
+                  ₦{PLATFORM_HOURLY_RATE_NGN.toLocaleString()} / session
+                </div>
+                <p className="text-xs text-gray-500 mt-1">
+                  A flat rate across every tutor on the platform — not something you can change here.
+                </p>
               </div>
               <div>
                 <Label htmlFor="experience_years">Years of Experience</Label>

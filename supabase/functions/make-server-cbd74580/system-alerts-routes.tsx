@@ -266,10 +266,13 @@ export const systemAlertsRoutes = (app: Hono, getUserId: Function) => {
         // firstName/lastName — many real profiles only have the former.
         if (tutor.verificationStatus === 'verified') {
           const hasName = !!(tutor.fullName || tutor.full_name || tutor.name || (tutor.firstName && tutor.lastName));
+          // hourlyRate dropped from this list too (2026-11-12): every
+          // tutor now charges the same platform flat rate and can no
+          // longer set their own, so a missing one is expected, not an
+          // incompleteness signal.
           const missingFields = [
             !hasName && 'name',
             !tutor.subjects && 'subjects',
-            !tutor.hourlyRate && 'hourlyRate',
           ].filter((f): f is string => !!f);
 
           const alertId = `system-alert:incomplete-profile-${tutorId}`;

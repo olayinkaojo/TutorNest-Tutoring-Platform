@@ -877,6 +877,17 @@ app.put('/make-server-cbd74580/profiles/:userId', async (c) => {
     
     console.log('✅ Role assigned:', role);
 
+    // Platform flat rate (₦15,000/session — see PAYMENT_PLANS in
+    // payment-routes.tsx, the actual source of truth for what gets
+    // charged) — not tutor-editable. The UI no longer offers a rate input
+    // (TutorProfileEditor.tsx), but this merge is a generic allowlist-free
+    // spread of whatever the client sends, so a crafted direct API call
+    // could otherwise still set a custom rate.
+    if (role === 'tutor') {
+      profileData.hourly_rate = 15000;
+      profileData.hourlyRate = 15000;
+    }
+
     // Split full_name into firstName and lastName if provided
     let firstName = profileData.firstName || existingProfile?.firstName;
     let lastName = profileData.lastName || existingProfile?.lastName;

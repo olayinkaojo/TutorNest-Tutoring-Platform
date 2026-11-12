@@ -54,16 +54,15 @@ const LEVELS = [
 const SORT_OPTIONS = [
   { value: 'rating', label: 'Highest Rated' },
   { value: 'lessons', label: 'Most Experienced' },
-  { value: 'price-low', label: 'Price: Low → High' },
-  { value: 'price-high', label: 'Price: High → Low' },
 ];
 
+// Price-based sorting removed along with the tutor-settable rate — every
+// tutor now charges the platform flat rate, so "Price: Low → High/High →
+// Low" would have nothing to actually sort by.
 function sortTutors(tutors: any[], sortBy: string) {
   return [...tutors].sort((a, b) => {
     if (sortBy === 'rating') return (b.rating || 0) - (a.rating || 0);
     if (sortBy === 'lessons') return (b.totalLessons || 0) - (a.totalLessons || 0);
-    if (sortBy === 'price-low') return (a.hourlyRate || 0) - (b.hourlyRate || 0);
-    if (sortBy === 'price-high') return (b.hourlyRate || 0) - (a.hourlyRate || 0);
     return 0;
   });
 }
