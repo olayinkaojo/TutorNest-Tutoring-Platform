@@ -7,6 +7,39 @@ import { createNotification } from './notification-broker.tsx';
 
 const STUDENT_EMAIL_DOMAIN = '@student.knowledgefonsacademy.com';
 
+/**
+ * Generates a temporary password that's guaranteed to satisfy Supabase
+ * Auth's password policy (at least one lowercase, one uppercase, one digit,
+ * one symbol). The three call sites below used to each roll their own:
+ * enable-login and regenerate-login built `${firstName}${random base36}!`,
+ * which only has an uppercase letter if the child's first name happens to
+ * be capitalized, and reset-password drew all 12 characters independently
+ * from a combined pool with no guarantee any given class was included —
+ * confirmed live, via a real E2E run against production, to fail roughly
+ * 40%+ of the time (symbols are only 4 of 60 possible characters, so the
+ * odds of 12 independent draws containing zero of them are ~43%). Picking
+ * one character from each required class up front and shuffling the result
+ * makes the policy impossible to fail by chance, rather than merely
+ * unlikely to.
+ */
+function generateSecurePassword(length = 12): string {
+  const lower = 'abcdefghjkmnpqrstuvwxyz';
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const digits = '23456789';
+  const symbols = '!@#$';
+  const all = lower + upper + digits + symbols;
+  const pick = (set: string) => set[Math.floor(Math.random() * set.length)];
+
+  const chars = [pick(lower), pick(upper), pick(digits), pick(symbols)];
+  while (chars.length < length) chars.push(pick(all));
+
+  for (let i = chars.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [chars[i], chars[j]] = [chars[j], chars[i]];
+  }
+  return chars.join('');
+}
+
 type ProvisionResult =
   | { ok: true; authUserId: string; studentEmail: string; existingAccount?: boolean }
   | { ok: false; status: number; error: string; details?: any };
@@ -151,7 +184,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
 
       // Generate secure password if requested
       const password = generatePassword
-        ? `${child.firstName}${Math.random().toString(36).slice(-8)}!`
+        ? generateSecurePassword()
         : body.password;
 
       if (!password) {
@@ -245,7 +278,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
       }
       await kv.del(`user:${oldAuthUserId}`);
 
-      const newPassword = `${child.firstName}${Math.random().toString(36).slice(-8)}!`;
+      const newPassword = generateSecurePassword();
       const result = await provisionStudentLogin(supabase, {
         child: { ...child, studentLoginEnabled: false },
         childId,
@@ -812,11 +845,7 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
         return c.json({ error: 'Student login not enabled' }, 400);
       }
 
-      // Generate a secure temporary password
-      const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789!@#$';
-      const temporaryPassword = Array.from({ length: 12 }, () =>
-        chars[Math.floor(Math.random() * chars.length)]
-      ).join('');
+      const temporaryPassword = generateSecurePassword();
 
       const supabase = createClient(
         Deno.env.get('SUPABASE_URL') ?? '',
