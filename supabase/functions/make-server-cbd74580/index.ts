@@ -4,6 +4,7 @@ import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import { tutorMaterialFieldsChanged } from './verification-helpers.tsx';
 import { sendEmail, emailTemplates } from './email-service.tsx';
+import { notifyAdmins } from './notification-broker.tsx';
 import { contentLibraryRoutes } from './content-library-routes.tsx';
 import { progressAnalyticsRoutes } from './progress-analytics-routes.tsx';
 import { notificationsRoutes } from './notifications-routes.tsx';
@@ -2034,6 +2035,15 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
       }
 
       // Notify admin of the new booking
+      await notifyAdmins({
+        type: 'booking_created',
+        title: 'New session booked',
+        message: `${parentName} booked ${studentName} with ${tutorName} for ${subjectLine}.`,
+        description: `${formattedDate} at ${timeOnly} — ₦${price}.`,
+        actionUrl: '/dashboard/admin/sessions',
+        metadata: { bookingId, tutorId, studentId, price },
+      }).catch((e) => console.error('notifyAdmins (booking) failed:', e));
+
       const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'contact@knowledgefonsacademy.com';
       const adminTpl = emailTemplates.adminNewBookingAlert(
         parentName,

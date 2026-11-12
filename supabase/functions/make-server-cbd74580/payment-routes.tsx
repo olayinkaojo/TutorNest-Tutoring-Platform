@@ -7,7 +7,7 @@ import { logAuditEvent } from './activity-log.tsx';
 import { buildIcsContent, createCalendarDownloadLink, buildWeeklyRRule } from './calendar-ics.tsx';
 import { createDailyRoom } from './daily-video-routes.tsx';
 import { createGoogleCalendarEvent } from './google-calendar-routes.tsx';
-import { createNotification } from './notification-broker.tsx';
+import { createNotification, notifyAdmins } from './notification-broker.tsx';
 
 const app = new Hono();
 
@@ -1474,6 +1474,15 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
         tutorEmailSent,
       },
     });
+
+    await notifyAdmins({
+      type: 'payment_received',
+      title: 'New paid booking',
+      message: `${parentName} paid ${formattedAmount} for ${plan.sessions} session(s) with ${tutorName}.`,
+      description: `${plan.name} — ${subjectLabel}, starting ${formattedStartDate} at ${formattedTime}. Ref ${payment.reference}.`,
+      actionUrl: '/dashboard/admin/sessions',
+      metadata: { paymentId: payment.id, reference: payment.reference, tutorId: payment.tutorId, studentId: payment.studentId },
+    }).catch((e) => console.error('notifyAdmins (plan payment) failed:', e));
 
     const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'contact@knowledgefonsacademy.com';
     const adminTpl = emailTemplates.adminPlanBookingAlert(

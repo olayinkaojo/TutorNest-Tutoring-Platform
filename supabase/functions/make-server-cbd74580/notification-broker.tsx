@@ -9,6 +9,7 @@
 // - System Alerts
 
 import * as db from './db.tsx';
+import * as kv from './kv_store.tsx';
 
 type NotificationType =
   | 'payment_initiated'
@@ -120,6 +121,51 @@ export async function createNotification(
       error: error instanceof Error ? error.message : 'Unknown error',
     };
   }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
+// ADMIN BROADCAST
+// ═══════════════════════════════════════════════════════════════════════════════
+
+/**
+ * Notifies every admin account in-app. This exact "scan user: for
+ * role === 'admin', loop, create one notification each" pattern already
+ * existed — proven live for tutor payout requests (payouts-complete.tsx) —
+ * but was never extracted, so every other admin-relevant event (a paid
+ * booking confirming, a free booking being created) had no in-app trace at
+ * all even though an admin email already went out for the same event. This
+ * is that same logic, reusable. Email is handled separately by each call
+ * site's own admin-alert email — sentViaEmail is false here deliberately,
+ * so this never double-sends.
+ */
+export async function notifyAdmins(payload: {
+  type: NotificationType;
+  title: string;
+  message: string;
+  description?: string;
+  actionUrl?: string;
+  metadata?: Record<string, unknown>;
+}): Promise<void> {
+  const allUsers = ((await kv.getByPrefix('user:').catch(() => [])) as any[]) || [];
+  const admins = allUsers.filter((u: any) => u?.role === 'admin');
+  await Promise.all(
+    admins.map((admin) =>
+      db
+        .createNotification({
+          userId: admin.id ?? admin.userId,
+          type: payload.type,
+          title: payload.title,
+          message: payload.message,
+          description: payload.description,
+          actionUrl: payload.actionUrl,
+          priority: 'normal',
+          metadata: payload.metadata,
+          sentViaEmail: false,
+          sentViaInApp: true,
+        })
+        .catch((e) => console.error('[notifyAdmins] failed for', admin.id ?? admin.userId, e)),
+    ),
+  );
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════

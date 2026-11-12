@@ -505,7 +505,7 @@ export function AdminDashboard({
 
           <TabsContent value="notifications">
             {session && (
-              <NotificationCenter session={session} userId={profile.id || profile.userId} />
+              <NotificationCenter session={session} userId={profile.id || profile.userId} variant="inline" />
             )}
           </TabsContent>
 

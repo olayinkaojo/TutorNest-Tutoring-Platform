@@ -1,0 +1,41 @@
+# Runs the admin system-alert checks on a schedule, since nothing else ever
+# did — the three POST /admin/check-* endpoints existed in
+# system-alerts-routes.tsx but had no caller anywhere (no cron, no scheduled
+# job), so the System Alerts tab was permanently empty regardless of what
+# conditions it was designed to catch.
+#
+# Requires a repository secret SUPABASE_PROJECT_REF (already used by
+# deploy-edge.yml) and a new one, CRON_SECRET, whose value must also be set
+# as the Supabase Edge Function secret of the same name
+# (`supabase secrets set CRON_SECRET=<value>`) — the two must match exactly,
+# since the endpoints check this header against that env var.
+
+name: System alert checks
+
+on:
+  workflow_dispatch:
+  schedule:
+    # Every 6 hours.
+    - cron: '0 */6 * * *'
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check compliance (DBS expiry, incomplete tutor profiles)
+        run: >
+          curl -sf -X POST
+          "https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/make-server-cbd74580/admin/check-compliance"
+          -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+
+      - name: Check for abandoned payments
+        run: >
+          curl -sf -X POST
+          "https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/make-server-cbd74580/admin/check-payment-failures"
+          -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+
+      - name: Check for overdue session reports
+        run: >
+          curl -sf -X POST
+          "https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/make-server-cbd74580/admin/check-overdue-reports"
+          -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"

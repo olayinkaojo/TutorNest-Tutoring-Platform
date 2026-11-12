@@ -28,9 +28,14 @@ import { notificationAPI, Notification } from '../utils/notification-api-client'
 interface NotificationCenterProps {
   session: any;
   userId: string;
+  // 'popover' (default) is the bell icon used in a header/toolbar. 'inline'
+  // renders the same list directly in the page — for a dedicated
+  // "Notifications" tab, where a popover trigger with nothing around it
+  // just looks like a stray bell icon sitting in an otherwise empty page.
+  variant?: 'popover' | 'inline';
 }
 
-export function NotificationCenter({ session, userId }: NotificationCenterProps) {
+export function NotificationCenter({ session, userId, variant = 'popover' }: NotificationCenterProps) {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(true);
   const [open, setOpen] = useState(false);
@@ -190,6 +195,96 @@ export function NotificationCenter({ session, userId }: NotificationCenterProps)
   const unreadNotifications = notifications.filter(n => !n.read);
   const readNotifications = notifications.filter(n => n.read);
 
+  const body = (
+    <>
+      <div className="p-4 border-b">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold">Notifications</h3>
+          {unreadCount > 0 && (
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={markAllAsRead}
+              className="h-8 text-xs"
+            >
+              <CheckCircle className="w-4 h-4 mr-1" />
+              Mark all read
+            </Button>
+          )}
+        </div>
+      </div>
+
+      {loading ? (
+        <div className="p-8 text-center text-gray-500">
+          <Bell className="w-8 h-8 animate-pulse mx-auto mb-2 text-gray-300" />
+          <p className="text-sm">Loading notifications...</p>
+        </div>
+      ) : notifications.length === 0 ? (
+        <div className="p-8 text-center text-gray-500">
+          <Bell className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+          <p className="font-medium mb-1">No notifications yet</p>
+          <p className="text-sm">We'll notify you when something happens</p>
+        </div>
+      ) : (
+        <Tabs defaultValue="all" className="w-full">
+          <TabsList className="w-full grid grid-cols-3 gap-0 rounded-none border-b min-w-0">
+            <TabsTrigger value="all" className="rounded-none px-1.5 text-xs sm:px-3 sm:text-sm">
+              All ({notifications.length})
+            </TabsTrigger>
+            <TabsTrigger value="unread" className="rounded-none px-1.5 text-xs sm:px-3 sm:text-sm">
+              Unread ({unreadCount})
+            </TabsTrigger>
+            <TabsTrigger value="read" className="rounded-none px-1.5 text-xs sm:px-3 sm:text-sm">
+              Read ({readNotifications.length})
+            </TabsTrigger>
+          </TabsList>
+
+          <ScrollArea className={variant === 'inline' ? 'h-[32rem]' : 'h-96'}>
+            <TabsContent value="all" className="m-0">
+              {notifications.map((notification) => (
+                <NotificationItem key={notification.id} notification={notification} />
+              ))}
+            </TabsContent>
+
+            <TabsContent value="unread" className="m-0">
+              {unreadNotifications.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <CheckCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-sm">No unread notifications</p>
+                </div>
+              ) : (
+                unreadNotifications.map((notification) => (
+                  <NotificationItem key={notification.id} notification={notification} />
+                ))
+              )}
+            </TabsContent>
+
+            <TabsContent value="read" className="m-0">
+              {readNotifications.length === 0 ? (
+                <div className="p-8 text-center text-gray-500">
+                  <Bell className="w-12 h-12 mx-auto mb-4 text-gray-300" />
+                  <p className="text-sm">No read notifications</p>
+                </div>
+              ) : (
+                readNotifications.map((notification) => (
+                  <NotificationItem key={notification.id} notification={notification} />
+                ))
+              )}
+            </TabsContent>
+          </ScrollArea>
+        </Tabs>
+      )}
+    </>
+  );
+
+  if (variant === 'inline') {
+    return (
+      <Card className="overflow-hidden p-0">
+        <CardContent className="p-0">{body}</CardContent>
+      </Card>
+    );
+  }
+
   return (
     <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
@@ -210,83 +305,7 @@ export function NotificationCenter({ session, userId }: NotificationCenterProps)
         </Button>
       </PopoverTrigger>
       <PopoverContent className="w-96 p-0" align="end">
-        <div className="p-4 border-b">
-          <div className="flex items-center justify-between">
-            <h3 className="font-semibold">Notifications</h3>
-            {unreadCount > 0 && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={markAllAsRead}
-                className="h-8 text-xs"
-              >
-                <CheckCircle className="w-4 h-4 mr-1" />
-                Mark all read
-              </Button>
-            )}
-          </div>
-        </div>
-
-        {loading ? (
-          <div className="p-8 text-center text-gray-500">
-            <Bell className="w-8 h-8 animate-pulse mx-auto mb-2 text-gray-300" />
-            <p className="text-sm">Loading notifications...</p>
-          </div>
-        ) : notifications.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">
-            <Bell className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-            <p className="font-medium mb-1">No notifications yet</p>
-            <p className="text-sm">We'll notify you when something happens</p>
-          </div>
-        ) : (
-          <Tabs defaultValue="all" className="w-full">
-            <TabsList className="w-full grid grid-cols-3 gap-0 rounded-none border-b min-w-0">
-              <TabsTrigger value="all" className="rounded-none px-1.5 text-xs sm:px-3 sm:text-sm">
-                All ({notifications.length})
-              </TabsTrigger>
-              <TabsTrigger value="unread" className="rounded-none px-1.5 text-xs sm:px-3 sm:text-sm">
-                Unread ({unreadCount})
-              </TabsTrigger>
-              <TabsTrigger value="read" className="rounded-none px-1.5 text-xs sm:px-3 sm:text-sm">
-                Read ({readNotifications.length})
-              </TabsTrigger>
-            </TabsList>
-
-            <ScrollArea className="h-96">
-              <TabsContent value="all" className="m-0">
-                {notifications.map((notification) => (
-                  <NotificationItem key={notification.id} notification={notification} />
-                ))}
-              </TabsContent>
-
-              <TabsContent value="unread" className="m-0">
-                {unreadNotifications.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
-                    <CheckCircle className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-sm">No unread notifications</p>
-                  </div>
-                ) : (
-                  unreadNotifications.map((notification) => (
-                    <NotificationItem key={notification.id} notification={notification} />
-                  ))
-                )}
-              </TabsContent>
-
-              <TabsContent value="read" className="m-0">
-                {readNotifications.length === 0 ? (
-                  <div className="p-8 text-center text-gray-500">
-                    <Bell className="w-12 h-12 mx-auto mb-4 text-gray-300" />
-                    <p className="text-sm">No read notifications</p>
-                  </div>
-                ) : (
-                  readNotifications.map((notification) => (
-                    <NotificationItem key={notification.id} notification={notification} />
-                  ))
-                )}
-              </TabsContent>
-            </ScrollArea>
-          </Tabs>
-        )}
+        {body}
       </PopoverContent>
     </Popover>
   );
