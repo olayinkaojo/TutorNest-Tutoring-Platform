@@ -51,6 +51,29 @@ function generateBookingDates(startDate: Date, sessionsCount: number, sessionsPe
   return dates;
 }
 
+// Returns the first date (YYYY-MM-DD) on which `tutorId` already has a
+// confirmed/scheduled booking overlapping [startTime, endTime), or null if
+// every date in `dates` is free. Used to stop a parent from paying for a
+// slot the tutor can't actually deliver.
+async function findBookingConflict(
+  tutorId: string,
+  dates: Date[],
+  startTime: string,
+  endTime: string,
+): Promise<string | null> {
+  for (const d of dates) {
+    const dateStr = d.toISOString().split('T')[0];
+    const existing = await db.getBookingsByTutorAndDate(tutorId, dateStr);
+    const conflict = existing.find((b) =>
+      (startTime >= b.startTime && startTime < b.endTime) ||
+      (endTime > b.startTime && endTime <= b.endTime) ||
+      (startTime <= b.startTime && endTime >= b.endTime)
+    );
+    if (conflict) return dateStr;
+  }
+  return null;
+}
+
 // Verify JWT and return the authenticated user ID via Supabase auth
 async function getUserIdFromToken(accessToken: string | undefined): Promise<string | null> {
   if (!accessToken) return null;
@@ -1111,6 +1134,21 @@ app.post('/payments/initiate-plan', async (c) => {
 
     if (!FLUTTERWAVE_SECRET_KEY) return c.json({ error: 'Payment not configured yet' }, 503);
 
+    // Reject before any money moves if the tutor is already booked for any
+    // session this plan would create — e.g. a once-weekly plan checks every
+    // weekly date up front, not just the first one.
+    const requestedStart = new Date(startDate + 'T12:00:00+01:00');
+    const requestedEnd = addMinutesToTime(startTime, 60);
+    const conflictDate = await findBookingConflict(
+      tutorId,
+      generateBookingDates(requestedStart, plan.sessions, plan.sessionsPerWeek),
+      startTime,
+      requestedEnd,
+    );
+    if (conflictDate) {
+      return c.json({ error: `This tutor already has a session booked on ${conflictDate} at that time. Please pick a different time or date.` }, 409);
+    }
+
     // Generate a unique reference — this is passed directly to the Flutterwave
     // inline checkout JS popup on the frontend. No API call to Flutterwave is
     // needed at this stage; the popup handles payment collection itself.
@@ -1209,6 +1247,31 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
   const startDate = new Date(payment.startDate + 'T12:00:00+01:00');
   const bookingDates = generateBookingDates(startDate, plan.sessions, plan.sessionsPerWeek);
   const endTime = addMinutesToTime(payment.startTime, 60);
+
+  // initiate-plan already rejected this slot once if it was taken, but two
+  // parents can race between then and here (both pay for the same open
+  // slot within the same few minutes). Payment has already been captured
+  // by Flutterwave at this point, so we still create the sessions — pulling
+  // them back would mean a refund, not just a 409 — but we flag it loudly
+  // so admin can manually resolve the double-booking with the tutor.
+  const raceConflictDate = await findBookingConflict(payment.tutorId, bookingDates, payment.startTime, endTime);
+  if (raceConflictDate) {
+    console.error(`confirmPlanPayment: tutor ${payment.tutorId} already booked on ${raceConflictDate} — creating sessions anyway (paid), flagging for manual resolution.`);
+    await logAuditEvent({
+      userId: payment.userId,
+      action: 'booking_conflict_after_payment',
+      category: 'bookings',
+      description: `Payment ${reference} was confirmed but tutor ${payment.tutorId} already has another booking on ${raceConflictDate} at ${payment.startTime}. Sessions were created anyway since payment succeeded — needs manual rescheduling with the tutor/family.`,
+      severity: 'critical',
+      metadata: { paymentId: payment.id, reference, tutorId: payment.tutorId, conflictDate: raceConflictDate, startTime: payment.startTime },
+    }).catch(() => {});
+    await notifyAdmins({
+      type: 'system_alert',
+      title: 'Double-booking after payment — needs manual resolution',
+      message: `A paid plan (ref ${reference}) collided with an existing booking for tutor ${payment.tutorId} on ${raceConflictDate} at ${payment.startTime}. Sessions were still created since the parent already paid — please contact the tutor and family to reschedule one of them.`,
+      actionUrl: '/dashboard/admin/sessions',
+    }).catch(() => {});
+  }
 
   const bookingIds: string[] = [];
   for (let i = 0; i < bookingDates.length; i++) {

@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/
 import { Badge } from './ui/badge';
 import { Alert, AlertDescription } from './ui/alert';
 import { Calendar } from './ui/calendar';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from './ui/select';
 import { projectId } from '../utils/supabase/info';
 import { todayStringWAT, WAT_TIMEZONE } from '../utils/timezone';
 import { formatNaira } from '../utils/currency';
@@ -102,7 +101,6 @@ export function SessionBookingCalendar({
   const [availableSlots, setAvailableSlots] = useState<TimeSlot[]>([]);
   const [loadingSlots, setLoadingSlots] = useState(false);
   const [selectedSlot, setSelectedSlot] = useState<string>('');
-  const [sessionDuration, setSessionDuration] = useState<string>('60');
   const [showPaymentPlans, setShowPaymentPlans] = useState(false);
   const [success, setSuccess] = useState('');
   const [error, setError] = useState('');
@@ -262,23 +260,21 @@ export function SessionBookingCalendar({
 
       if (!response.ok) throw new Error('Failed to fetch availability');
       const data = await response.json();
-      setAvailableSlots(data.slots || generateDefaultSlots());
-    } catch {
-      setAvailableSlots(generateDefaultSlots());
+      // An empty/missing `slots` array legitimately means "nothing open
+      // that day" — it must not be papered over with made-up availability.
+      setAvailableSlots(Array.isArray(data.slots) ? data.slots : []);
+    } catch (err: any) {
+      console.error('Error fetching available slots:', err);
+      // This used to fall back to a list of time slots with RANDOMLY
+      // assigned availability (Math.random() > 0.3), so a real fetch
+      // failure could show a parent slots that don't correspond to
+      // anything real and let them "book" one. Show the real failure
+      // instead and let them retry rather than booking against fiction.
+      setAvailableSlots([]);
+      setError('Failed to load this tutor’s availability. Please try again.');
     } finally {
       setLoadingSlots(false);
     }
-  };
-
-  const generateDefaultSlots = (): TimeSlot[] => {
-    const slots: TimeSlot[] = [];
-    for (let hour = 9; hour <= 20; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const time = `${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`;
-        slots.push({ time, available: Math.random() > 0.3 });
-      }
-    }
-    return slots;
   };
 
   const formatTime = (time: string) => {
@@ -949,30 +945,10 @@ export function SessionBookingCalendar({
             </CardContent>
           </Card>
 
-          {/* Session Duration */}
-          <Card>
-            <CardHeader className="pb-3">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <Clock className="w-4 h-4" style={{ color: '#625d9c' }} />
-                Session Duration
-              </CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Select value={sessionDuration} onValueChange={setSessionDuration}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Select duration" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="30">30 minutes</SelectItem>
-                  <SelectItem value="60">1 hour</SelectItem>
-                  <SelectItem value="90">1.5 hours</SelectItem>
-                  <SelectItem value="120">2 hours</SelectItem>
-                </SelectContent>
-              </Select>
-            </CardContent>
-          </Card>
-
-          {/* Available Time Slots */}
+          {/* Available Time Slots — every session is a fixed 1-hour slot
+              (what's actually created server-side); there's no duration
+              picker since picking anything else would misrepresent what
+              gets booked and charged. */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="flex items-center gap-2 text-base">
@@ -1055,12 +1031,12 @@ export function SessionBookingCalendar({
                   <div className="flex justify-between">
                     <span className="text-gray-500">Time</span>
                     <span className="font-medium">
-                      {formatTime(selectedSlot)} – {formatTime(calculateEndTime(selectedSlot, parseInt(sessionDuration)))}
+                      {formatTime(selectedSlot)} – {formatTime(calculateEndTime(selectedSlot, 60))}
                     </span>
                   </div>
                   <div className="flex justify-between">
                     <span className="text-gray-500">Duration</span>
-                    <span className="font-medium">{parseInt(sessionDuration)} min</span>
+                    <span className="font-medium">1 hour</span>
                   </div>
                   <div className="flex justify-between pt-2 border-t">
                     <span className="text-gray-500 font-medium">Total</span>
