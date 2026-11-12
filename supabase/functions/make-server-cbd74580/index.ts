@@ -195,7 +195,24 @@ app.get(`${ROUTE_PREFIX}/health`, (c) =>
  *
  * Registered before the route modules so it runs ahead of their handlers.
  */
+// Called by an unattended scheduled job (system-alert-checks.yml), never by
+// a logged-in admin — they enforce their own shared-secret check
+// (requireCronSecret in system-alerts-routes.tsx) instead of a user
+// session, so they're explicitly exempted from the session check below
+// rather than silently unreachable by any caller that isn't a browser with
+// an admin's session.
+const CRON_ONLY_ADMIN_PATHS = new Set([
+  `${ROUTE_PREFIX}/admin/check-compliance`,
+  `${ROUTE_PREFIX}/admin/check-payment-failures`,
+  `${ROUTE_PREFIX}/admin/check-overdue-reports`,
+]);
+
 app.use(`${ROUTE_PREFIX}/admin/*`, async (c, next) => {
+  if (CRON_ONLY_ADMIN_PATHS.has(c.req.path)) {
+    await next();
+    return;
+  }
+
   const accessToken = c.req.header('Authorization')?.split(' ')[1];
   const userId = await getUserId(accessToken ?? null);
 
