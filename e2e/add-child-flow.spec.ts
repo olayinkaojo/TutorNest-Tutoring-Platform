@@ -64,11 +64,15 @@ test.describe('Parent adds a child profile', () => {
     await page.getByRole('button', { name: /^Add Child$/ }).click();
 
     // 4) The new child appears immediately (dialog closes, list refreshes).
-    await expect(page.getByText(childFirstName)).toBeVisible({ timeout: 10000 });
+    // .first() — a real run against an account with existing children
+    // showed the name legitimately rendered twice (the card heading plus
+    // another on-page mention), which made the exact-text locator
+    // ambiguous under strict mode even though the feature worked correctly.
+    await expect(page.getByText(childFirstName).first()).toBeVisible({ timeout: 10000 });
 
     // 5) Reload to confirm it was actually persisted server-side, not just
     // held in local component state.
     await page.reload({ waitUntil: 'networkidle' });
-    await expect(page.getByText(childFirstName)).toBeVisible({ timeout: 15000 });
+    await expect(page.getByText(childFirstName).first()).toBeVisible({ timeout: 15000 });
   });
 });
