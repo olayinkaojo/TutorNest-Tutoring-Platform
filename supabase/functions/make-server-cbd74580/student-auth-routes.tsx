@@ -831,7 +831,11 @@ export function studentAuthRoutes(app: Hono, getUserId: (token: string | null) =
 
       if (updateError) {
         console.error('Error resetting student password:', updateError);
-        return c.json({ error: 'Failed to reset password' }, 500);
+        // The real Supabase error (e.g. "User not found", a password-policy
+        // rejection) was previously swallowed behind a generic message with
+        // no way for the parent — or anyone debugging this later — to tell
+        // what actually went wrong versus every other possible cause.
+        return c.json({ error: `Failed to reset password: ${updateError.message}` }, 500);
       }
 
       // Create audit log
