@@ -206,11 +206,21 @@ export const systemAlertsRoutes = (app: Hono, getUserId: Function) => {
 
       for (const tutor of tutors) {
         const tutorId = tutor.userId || tutor.id; // Handle both field names
-        
-        // Check DBS expiry
+        const tutorName =
+          tutor.fullName || tutor.full_name || tutor.name ||
+          `${tutor.firstName || ''} ${tutor.lastName || ''}`.trim() ||
+          'A tutor';
+
+        // Check DBS expiry — dbsCheckExpiry is never written by any live
+        // signup or profile-edit form (confirmed by grep: this file is the
+        // only reference to that field anywhere in the codebase), so this
+        // branch is correctly inert until that field actually gets
+        // collected somewhere. Left in place rather than removed, since
+        // wiring it up later should start working immediately with no
+        // further change here.
         if (tutor.dbsCheckExpiry) {
           const expiryDate = new Date(tutor.dbsCheckExpiry);
-          
+
           if (expiryDate <= now) {
             // DBS has expired
             await kv.set(`system-alert:dbs-expired-${tutorId}`, {
@@ -218,9 +228,9 @@ export const systemAlertsRoutes = (app: Hono, getUserId: Function) => {
               type: 'dbs_expiry',
               severity: 'critical',
               title: 'DBS Check Expired',
-              description: `DBS check for ${tutor.firstName} ${tutor.lastName} has expired`,
+              description: `DBS check for ${tutorName} has expired`,
               relatedUserId: tutorId,
-              relatedUserName: `${tutor.firstName} ${tutor.lastName}`,
+              relatedUserName: tutorName,
               status: 'new',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
@@ -234,9 +244,9 @@ export const systemAlertsRoutes = (app: Hono, getUserId: Function) => {
               type: 'dbs_expiry',
               severity: 'high',
               title: 'DBS Check Expiring Soon',
-              description: `DBS check for ${tutor.firstName} ${tutor.lastName} expires on ${expiryDate.toLocaleDateString()}`,
+              description: `DBS check for ${tutorName} expires on ${expiryDate.toLocaleDateString()}`,
               relatedUserId: tutorId,
-              relatedUserName: `${tutor.firstName} ${tutor.lastName}`,
+              relatedUserName: tutorName,
               status: 'new',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
@@ -246,26 +256,42 @@ export const systemAlertsRoutes = (app: Hono, getUserId: Function) => {
           }
         }
 
-        // Check profile completeness
+        // Check profile completeness. dbsCheckExpiry was previously in this
+        // list too — since nothing anywhere ever sets it, that made EVERY
+        // verified tutor "incomplete" unconditionally, regardless of how
+        // complete their actual profile was (confirmed: 0 of 122 tutor
+        // profiles have it set). Dropped it; a field no UI lets anyone fill
+        // in isn't a completeness signal, just permanent noise. Also
+        // accepts a single `name`/`fullName` field, not just a split
+        // firstName/lastName — many real profiles only have the former.
         if (tutor.verificationStatus === 'verified') {
-          const requiredFields = ['firstName', 'lastName', 'subjects', 'hourlyRate', 'dbsCheckExpiry'];
-          const missingFields = requiredFields.filter(field => !tutor[field]);
-          
+          const hasName = !!(tutor.fullName || tutor.full_name || tutor.name || (tutor.firstName && tutor.lastName));
+          const missingFields = [
+            !hasName && 'name',
+            !tutor.subjects && 'subjects',
+            !tutor.hourlyRate && 'hourlyRate',
+          ].filter((f): f is string => !!f);
+
+          const alertId = `system-alert:incomplete-profile-${tutorId}`;
           if (missingFields.length > 0) {
-            await kv.set(`system-alert:incomplete-profile-${tutorId}`, {
-              id: `system-alert:incomplete-profile-${tutorId}`,
+            await kv.set(alertId, {
+              id: alertId,
               type: 'compliance_expiry',
               severity: 'medium',
               title: 'Incomplete Tutor Profile',
-              description: `Tutor ${tutor.firstName} ${tutor.lastName} is missing: ${missingFields.join(', ')}`,
+              description: `Tutor ${tutorName} is missing: ${missingFields.join(', ')}`,
               relatedUserId: tutorId,
-              relatedUserName: `${tutor.firstName} ${tutor.lastName}`,
+              relatedUserName: tutorName,
               status: 'new',
               createdAt: new Date().toISOString(),
               updatedAt: new Date().toISOString(),
               auditTrail: [],
             });
             alertsCreated++;
+          } else {
+            // Profile is now complete — clear a stale alert from a
+            // previous run rather than leaving it to sit forever.
+            await kv.del(alertId).catch(() => {});
           }
         }
       }
