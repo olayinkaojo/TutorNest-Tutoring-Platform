@@ -1938,6 +1938,123 @@ export const emailTemplates = {
       </td></tr></table></body></html>
     `,
   }),
+
+  // Confirmed paid bookings (BookSessionWithPayment → confirmPlanPayment) are
+  // a separate code path from the free/direct booking flow above, and
+  // previously had no admin-visible trace at all on success — not an email,
+  // not an audit-log entry, nothing. This is the one admin signal for every
+  // real paid booking, and deliberately reports whether the parent/tutor
+  // emails actually sent (sendEmail never throws on a provider-side
+  // failure — it returns {success:false}, so a caller that doesn't check
+  // that return value gets no error, no log, and no email, with nothing
+  // anywhere to show it happened) rather than just assuming they did.
+  adminPlanBookingAlert: (
+    parentName: string,
+    studentName: string,
+    tutorName: string,
+    planName: string,
+    sessionCount: number,
+    subjectLine: string,
+    formattedDate: string,
+    timeOnly: string,
+    totalAmount: string,
+    reference: string,
+    parentEmailSent: boolean | null,
+    tutorEmailSent: boolean | null,
+    adminDashboardLink: string,
+  ) => {
+    const emailStatusRow = (label: string, sent: boolean | null) => {
+      if (sent === null) return `<span style="color:#9ca3af;">— no email on file</span>`;
+      return sent
+        ? `<span style="color:#16a34a;font-weight:600;">✅ Sent</span>`
+        : `<span style="color:#dc2626;font-weight:600;">⚠️ Failed to send</span>`;
+    };
+    const anyFailed = parentEmailSent === false || tutorEmailSent === false;
+    return {
+      subject: `${anyFailed ? '⚠️ ' : ''}New paid booking — ${studentName} with ${tutorName} (${planName})`,
+      html: `
+      <!DOCTYPE html><html lang="en"><body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
+      <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:24px 0;"><tr><td align="center">
+        <table width="600" cellpadding="0" cellspacing="0" style="background:#fff;border-radius:12px;overflow:hidden;box-shadow:0 2px 12px rgba(0,0,0,0.08);">
+          <tr><td style="background:#ffffff;padding:20px 36px 8px;text-align:center;"><img src="https://app.knowledgefonsacademy.com/Knowledge_Fons_Academy_Logo.png" alt="Knowledge Fons Academy" width="140" style="display:block;margin:0 auto;max-width:160px;height:auto;" /></td></tr>
+          <tr><td style="background:linear-gradient(135deg,#625d9c 0%,#8b5cf6 100%);padding:28px 40px;text-align:center;">
+            <h1 style="margin:0;color:#fff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">Admin Notification</h1>
+            <p style="margin:6px 0 0;color:rgba(255,255,255,0.85);font-size:13px;">Internal — not sent to parents or tutors</p>
+          </td></tr>
+          <tr><td style="background:${anyFailed ? '#dc2626' : '#16a34a'};padding:12px 40px;text-align:center;">
+            <p style="margin:0;color:#fff;font-size:15px;font-weight:600;">${anyFailed ? '⚠️ Paid Booking — Email Delivery Issue' : '💳 New Paid Booking Confirmed'}</p>
+          </td></tr>
+          <tr><td style="padding:32px 40px;">
+            <p style="margin:0 0 20px;font-size:15px;color:#374151;line-height:1.6;">
+              A parent has just paid for and booked ${sessionCount} session${sessionCount === 1 ? '' : 's'}.
+            </p>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:#f5f3ff;border:1px solid #ddd6fe;border-radius:8px;margin-bottom:16px;">
+              <tr><td style="padding:20px 24px;">
+                <p style="margin:0 0 14px;font-size:13px;font-weight:700;color:#7c3aed;text-transform:uppercase;letter-spacing:0.8px;">Booking Details</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;width:130px;">👨‍👩‍👧 Parent</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${parentName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">🎓 Student</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${studentName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">👤 Tutor</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${tutorName}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">📦 Plan</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${planName} (${sessionCount} session${sessionCount === 1 ? '' : 's'})</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">📚 Subject</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${subjectLine}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">📅 First session</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${formattedDate}, ${timeOnly}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">💰 Amount paid</td>
+                    <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:600;">${totalAmount}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:8px 0;font-size:14px;color:#6b7280;">🔖 Reference</td>
+                    <td style="padding:8px 0;font-size:13px;color:#6b7280;font-family:monospace;">${reference}</td>
+                  </tr>
+                </table>
+              </td></tr>
+            </table>
+            <table width="100%" cellpadding="0" cellspacing="0" style="background:${anyFailed ? '#fef2f2' : '#f0fdf4'};border:1px solid ${anyFailed ? '#fecaca' : '#bbf7d0'};border-radius:8px;margin-bottom:24px;">
+              <tr><td style="padding:16px 24px;">
+                <p style="margin:0 0 10px;font-size:13px;font-weight:700;color:${anyFailed ? '#991b1b' : '#166534'};text-transform:uppercase;letter-spacing:0.8px;">Notification Status</p>
+                <table width="100%" cellpadding="0" cellspacing="0">
+                  <tr>
+                    <td style="padding:4px 0;font-size:14px;color:#6b7280;width:130px;">Parent email</td>
+                    <td style="padding:4px 0;font-size:14px;">${emailStatusRow('parent', parentEmailSent)}</td>
+                  </tr>
+                  <tr>
+                    <td style="padding:4px 0;font-size:14px;color:#6b7280;">Tutor email</td>
+                    <td style="padding:4px 0;font-size:14px;">${emailStatusRow('tutor', tutorEmailSent)}</td>
+                  </tr>
+                </table>
+                ${anyFailed ? `<p style="margin:10px 0 0;font-size:13px;color:#991b1b;">Consider following up with them directly — their booking is confirmed either way, they just may not have been told yet.</p>` : ''}
+              </td></tr>
+            </table>
+            <div style="text-align:center;margin-bottom:20px;">
+              <a href="${adminDashboardLink}" style="display:inline-block;background:#22c55e;color:#fff;font-size:15px;font-weight:600;padding:14px 32px;border-radius:8px;text-decoration:none;">View in Admin Dashboard</a>
+            </div>
+          </td></tr>
+          <tr><td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:16px 40px;text-align:center;">
+            <p style="margin:0;font-size:12px;color:#9ca3af;">&copy; Knowledge Fons Academy ${new Date().getFullYear()}. All rights reserved. &middot; <a href="https://www.knowledgefonsacademy.com" style="color:#625d9c;text-decoration:none;">knowledgefonsacademy.com</a></p>
+          </td></tr>
+        </table>
+      </td></tr></table></body></html>
+    `,
+    };
+  },
 };
 
 /**

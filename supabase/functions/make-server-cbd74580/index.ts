@@ -1215,7 +1215,7 @@ app.post('/make-server-cbd74580/profile/complete', async (c) => {
           await sendEmail({ to: profileEmail, subject: submittedTpl.subject, html: submittedTpl.html }).catch(() => {});
         }
         const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'contact@knowledgefonsacademy.com';
-        const adminTpl = emailTemplates.adminTutorApplicationAlert(profileName, profileEmail || 'unknown', `${appBase}/admin/verifications`);
+        const adminTpl = emailTemplates.adminTutorApplicationAlert(profileName, profileEmail || 'unknown', `${appBase}/dashboard/admin/verification`);
         await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch(() => {});
       } catch (_e) {}
 
@@ -2043,7 +2043,7 @@ app.post('/make-server-cbd74580/bookings/create', async (c) => {
         formattedDate,
         timeOnly,
         price,
-        `${dashboardBase}/admin?tab=users`,
+        `${dashboardBase}/dashboard/admin/sessions`,
       );
       await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch((err) =>
         console.error('Error sending admin booking alert email:', err),

@@ -55,6 +55,7 @@ const TutorTrainingUploader = lazy(() => import('./admin/TutorTrainingUploader')
 const WorksheetsUploader = lazy(() => import('./admin/WorksheetsUploader').then(m => ({ default: m.WorksheetsUploader })));
 const AdminBroadcast = lazy(() => import('./admin/AdminBroadcast').then(m => ({ default: m.AdminBroadcast })));
 const AuditLogViewer = lazy(() => import('./admin/AuditLogViewer').then(m => ({ default: m.AuditLogViewer })));
+const AdminSessionsViewer = lazy(() => import('./admin/AdminSessionsViewer').then(m => ({ default: m.AdminSessionsViewer })));
 const DocumentAuditTrail = lazy(() => import('./admin/DocumentAuditTrail').then(m => ({ default: m.DocumentAuditTrail })));
 const ChatSafeguardingViewer = lazy(() => import('./admin/ChatSafeguardingViewer').then(m => ({ default: m.ChatSafeguardingViewer })));
 const RecordingsViewer = lazy(() => import('./admin/RecordingsViewer').then(m => ({ default: m.RecordingsViewer })));
@@ -135,6 +136,7 @@ export function AdminDashboard({
     'worksheets',
     'auditlog',
     'sessionreports',
+    'sessions',
   ]);
 
   useEffect(() => {
@@ -448,6 +450,7 @@ export function AdminDashboard({
             <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="documenttrail">Document Trail</TabsTrigger>
             <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="safeguarding">Safeguarding</TabsTrigger>
             <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="recordings">Recordings</TabsTrigger>
+            <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="sessions">Sessions</TabsTrigger>
             <TabsTrigger className="lg:h-auto lg:w-full lg:justify-start" value="sessionreports">Session Reports</TabsTrigger>
           </TabsList>
 
@@ -664,6 +667,14 @@ export function AdminDashboard({
             {session && (
               <Suspense fallback={<TabFallback />}>
                 <RecordingsViewer accessToken={session.access_token} />
+              </Suspense>
+            )}
+          </TabsContent>
+
+          <TabsContent value="sessions">
+            {session && (
+              <Suspense fallback={<TabFallback />}>
+                <AdminSessionsViewer accessToken={session.access_token} />
               </Suspense>
             )}
           </TabsContent>

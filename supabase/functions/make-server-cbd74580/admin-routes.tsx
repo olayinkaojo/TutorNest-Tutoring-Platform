@@ -2794,6 +2794,93 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
     }
   });
 
+  // Every booked session an admin would need to see — who booked it, who
+  // it's for, who's teaching it, when, and its payment state. Nothing like
+  // this existed: the closest things were /admin/sessions/monitor (just
+  // aggregate counts, and from the wrong data source for paid bookings) and
+  // /admin/session-reports (only sessions a tutor already filed a report
+  // for — excludes everything upcoming and anything never reported on).
+  //
+  // Reads Postgres bookings as the primary source (both the free booking
+  // path and the paid-plan path write here — see /bookings/create and
+  // confirmPlanPayment) and folds in any KV-only booking not already
+  // present there, since the free path's Postgres write is a best-effort
+  // "dual-write during migration" that can silently fail.
+  app.get('/make-server-cbd74580/admin/sessions', async (c) => {
+    try {
+      const dbBookings = await db.getAllBookingsForAdmin().catch(() => [] as any[]);
+      const dbIds = new Set(dbBookings.map((b: any) => b.id));
+
+      const kvBookingsRaw = ((await kv.getByPrefix('booking:').catch(() => [])) as any[]) || [];
+      const kvOnly = kvBookingsRaw
+        .filter((b: any) => b?.id && !dbIds.has(b.id))
+        .map((b: any) => ({
+          id: b.id,
+          paymentId: b.paymentId ?? null,
+          tutorId: b.tutorId,
+          studentId: b.studentId,
+          userId: b.parentId ?? b.userId,
+          date: b.date,
+          startTime: b.startTime,
+          endTime: b.endTime,
+          subject: b.subject ?? null,
+          status: b.status ?? 'confirmed',
+          paymentStatus: b.paymentStatus ?? null,
+          planType: null,
+          sessionNumber: null,
+          totalSessions: null,
+          createdAt: b.createdAt,
+        }));
+
+      const allBookings = [...dbBookings, ...kvOnly];
+
+      const profileIds = allBookings.flatMap((b: any) => [b.tutorId, b.studentId, b.userId]);
+      const profileMap = await resolveProfiles(profileIds);
+
+      const enriched = allBookings.map((b: any) => ({
+        id: b.id,
+        tutorId: b.tutorId,
+        studentId: b.studentId,
+        parentId: b.userId,
+        tutorName: resolveName(profileMap, b.tutorId, 'Unknown tutor'),
+        studentName: resolveName(profileMap, b.studentId, 'Unknown student'),
+        parentName: resolveName(profileMap, b.userId, 'Unknown parent'),
+        subject: b.subject || 'General Tutoring',
+        date: b.date,
+        startTime: b.startTime,
+        endTime: b.endTime,
+        status: b.status,
+        paymentStatus: b.paymentStatus,
+        planType: b.planType,
+        sessionNumber: b.sessionNumber,
+        totalSessions: b.totalSessions,
+        createdAt: b.createdAt,
+      }));
+
+      // Split into upcoming (soonest first) and past (most recent first) —
+      // an admin checking in wants "what's coming up" before "what already
+      // happened", not one long reverse-chronological list with today's
+      // bookings buried under a backlog of old ones.
+      const todayStr = new Date().toISOString().slice(0, 10);
+      const sortKey = (s: any) => `${s.date}T${s.startTime || '00:00'}`;
+      const upcoming = enriched
+        .filter((s) => s.date >= todayStr)
+        .sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+      const past = enriched
+        .filter((s) => s.date < todayStr)
+        .sort((a, b) => sortKey(b).localeCompare(sortKey(a)));
+
+      return c.json({
+        sessions: [...upcoming, ...past],
+        upcomingCount: upcoming.length,
+        pastCount: past.length,
+      });
+    } catch (err: any) {
+      console.error('Error fetching admin sessions:', err);
+      return c.json({ error: err.message || 'Failed to fetch sessions' }, 500);
+    }
+  });
+
   // One-call "everything about this person" view for the Users tab's
   // detail panel — children, bookings, payments, payouts, and session
   // reports, all touching the given user, instead of an admin piecing that

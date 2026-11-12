@@ -1387,7 +1387,10 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
     const hour12 = h % 12 || 12;
     const formattedTime = `${hour12}:${String(m).padStart(2, '0')} ${ampm}`;
 
-    // Email parent
+    // Email parent — sendEmail never throws on a provider-side failure (it
+    // returns {success:false, error}), so the result is checked explicitly
+    // rather than assumed from "no exception was thrown".
+    let parentEmailSent: boolean | null = null;
     if (parentEmail) {
       const parentTemplate = emailTemplates.planBookingConfirmationParent(
         parentName,
@@ -1404,10 +1407,22 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
         formattedAmount,
         calendarLink,
       );
-      await sendEmail({ to: parentEmail, ...parentTemplate });
+      const result = await sendEmail({ to: parentEmail, ...parentTemplate });
+      parentEmailSent = result.success;
+      if (!result.success) {
+        await logAuditEvent({
+          userId: payment.userId,
+          action: 'booking_confirmation_email_failed',
+          category: 'bookings',
+          description: `Paid booking confirmed (${payment.reference}), but the confirmation email to the parent (${parentEmail}) failed to send: ${result.error || 'unknown error'}`,
+          severity: 'warning',
+          metadata: { paymentId: payment.id, reference: payment.reference, recipient: parentEmail, error: result.error },
+        });
+      }
     }
 
     // Email tutor
+    let tutorEmailSent: boolean | null = null;
     if (tutorEmail) {
       const tutorTemplate = emailTemplates.planBookingNotificationTutor(
         tutorName,
@@ -1423,11 +1438,73 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
         tutorEarnings,
         calendarLink,
       );
-      await sendEmail({ to: tutorEmail, ...tutorTemplate });
+      const result = await sendEmail({ to: tutorEmail, ...tutorTemplate });
+      tutorEmailSent = result.success;
+      if (!result.success) {
+        await logAuditEvent({
+          userId: payment.tutorId,
+          action: 'booking_confirmation_email_failed',
+          category: 'bookings',
+          description: `Paid booking confirmed (${payment.reference}), but the notification email to the tutor (${tutorEmail}) failed to send: ${result.error || 'unknown error'}`,
+          severity: 'warning',
+          metadata: { paymentId: payment.id, reference: payment.reference, recipient: tutorEmail, error: result.error },
+        });
+      }
     }
+
+    // A successful paid booking previously left no trace an admin could
+    // ever see — not in the Audit Log, not as a notification, nothing. This
+    // is the one record of every real paid booking, and reports whether the
+    // parent/tutor actually got told, since that's exactly what silently
+    // fails otherwise.
+    await logAuditEvent({
+      userId: payment.userId,
+      action: 'plan_payment_confirmed',
+      category: 'bookings',
+      description: `${parentName} paid ${formattedAmount} for ${plan.sessions} session(s) with ${tutorName} (${plan.name}, ref ${payment.reference}).`,
+      severity: 'info',
+      metadata: {
+        paymentId: payment.id,
+        reference: payment.reference,
+        tutorId: payment.tutorId,
+        studentId: payment.studentId,
+        amount: payment.amount,
+        sessionsCreated: bookingIds.length,
+        parentEmailSent,
+        tutorEmailSent,
+      },
+    });
+
+    const adminEmail = Deno.env.get('ADMIN_EMAIL') || 'contact@knowledgefonsacademy.com';
+    const adminTpl = emailTemplates.adminPlanBookingAlert(
+      parentName,
+      studentName,
+      tutorName,
+      plan.name,
+      plan.sessions,
+      subjectLabel,
+      formattedStartDate,
+      formattedTime,
+      formattedAmount,
+      payment.reference,
+      parentEmailSent,
+      tutorEmailSent,
+      `${dashboardLink.replace(/\/dashboard$/, '')}/dashboard/admin/sessions`,
+    );
+    await sendEmail({ to: adminEmail, subject: adminTpl.subject, html: adminTpl.html }).catch((err) =>
+      console.error('Error sending admin plan-booking alert email:', err),
+    );
   } catch (emailErr: any) {
     // Non-fatal — bookings are confirmed; email failure must not roll anything back
     console.error('Post-booking email error (non-fatal):', emailErr.message);
+    await logAuditEvent({
+      userId: payment.userId,
+      action: 'booking_notification_error',
+      category: 'bookings',
+      description: `Paid booking confirmed (${payment.reference}), but something went wrong while sending confirmation emails: ${emailErr.message}`,
+      severity: 'warning',
+      metadata: { paymentId: payment.id, reference: payment.reference, error: emailErr.message },
+    }).catch(() => {});
   }
 
   // ── Auto-generate invoice (non-fatal) ─────────────────────────────────────
