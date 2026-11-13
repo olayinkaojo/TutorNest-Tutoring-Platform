@@ -411,115 +411,60 @@ export async function getTutorBalance(tutorId: string): Promise<{
 }
 
 /**
- * Atomically adds tutorAmount to pending_balance and total_earnings.
- * Creates the row if it doesn't exist yet.
+ * Atomically adds tutorAmount to pending_balance and total_earnings, via the
+ * adjust_tutor_balance() Postgres function (see migration
+ * 20261113000000_atomic_tutor_balance_and_trivia.sql) — a single UPDATE/
+ * UPSERT statement under Postgres's row lock, not a read-then-write in this
+ * process. Two concurrent credits for the same tutor can no longer race:
+ * the old version read the current row, computed the new value in JS, then
+ * wrote it back, so a second call reading before the first call's write
+ * landed would silently overwrite it instead of adding to it.
  */
 export async function incrementTutorBalance(tutorId: string, tutorAmount: number): Promise<void> {
-  const current = await getTutorBalance(tutorId);
-  const { error } = await db()
-    .from('tutor_balance')
-    .upsert(
-      {
-        tutor_id: tutorId,
-        pending_balance: (current.pending_balance ?? 0) + tutorAmount,
-        available_balance: current.available_balance ?? 0,
-        total_earnings: (current.total_earnings ?? 0) + tutorAmount,
-        total_payouts: current.total_payouts ?? 0,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'tutor_id' },
-    );
+  const { error } = await db().rpc('adjust_tutor_balance', {
+    p_tutor_id: tutorId,
+    p_pending_delta: tutorAmount,
+    p_earnings_delta: tutorAmount,
+  });
   if (error) throw new Error(error.message);
 }
 
 /**
  * Moves `amount` from pending_balance to available_balance — call this once a
  * paid session has actually happened, so a tutor can eventually withdraw it.
- * Clamped so pending never goes negative if called twice for the same amount.
+ * Clamped (atomically, inside release_tutor_balance()) so pending never goes
+ * negative if called twice for the same amount.
  */
 export async function releaseTutorBalance(tutorId: string, amount: number): Promise<void> {
   if (amount <= 0) return;
-  const current = await getTutorBalance(tutorId);
-  const moved = Math.min(amount, current.pending_balance ?? 0);
-  if (moved <= 0) return;
-  const { error } = await db()
-    .from('tutor_balance')
-    .upsert(
-      {
-        tutor_id: tutorId,
-        pending_balance: (current.pending_balance ?? 0) - moved,
-        available_balance: (current.available_balance ?? 0) + moved,
-        total_earnings: current.total_earnings ?? 0,
-        total_payouts: current.total_payouts ?? 0,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'tutor_id' },
-    );
+  const { error } = await db().rpc('release_tutor_balance', { p_tutor_id: tutorId, p_amount: amount });
   if (error) throw new Error(error.message);
 }
 
 /**
  * Reserves `amount` out of available_balance when a payout is requested, so a
  * second request submitted before the first is approved can't double-spend
- * the same funds. Throws if the tutor doesn't have enough available.
+ * the same funds. reserve_tutor_balance_for_payout() does the sufficiency
+ * check and the deduction as one atomic UPDATE ... WHERE available_balance
+ * >= amount — the old version checked, then wrote separately, so two
+ * concurrent requests could both pass the check against the same starting
+ * balance and both succeed against money that only existed once.
  */
 export async function reserveTutorBalanceForPayout(tutorId: string, amount: number): Promise<void> {
-  const current = await getTutorBalance(tutorId);
-  if ((current.available_balance ?? 0) < amount) {
-    throw new Error('Insufficient available balance');
-  }
-  const { error } = await db()
-    .from('tutor_balance')
-    .upsert(
-      {
-        tutor_id: tutorId,
-        pending_balance: current.pending_balance ?? 0,
-        available_balance: (current.available_balance ?? 0) - amount,
-        total_earnings: current.total_earnings ?? 0,
-        total_payouts: current.total_payouts ?? 0,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'tutor_id' },
-    );
-  if (error) throw new Error(error.message);
+  const { error } = await db().rpc('reserve_tutor_balance_for_payout', { p_tutor_id: tutorId, p_amount: amount });
+  if (error) throw new Error(error.message.includes('Insufficient') ? 'Insufficient available balance' : error.message);
 }
 
 /** Returns a reserved amount to available_balance — payout was rejected or failed. */
 export async function refundTutorReservedBalance(tutorId: string, amount: number): Promise<void> {
   if (amount <= 0) return;
-  const current = await getTutorBalance(tutorId);
-  const { error } = await db()
-    .from('tutor_balance')
-    .upsert(
-      {
-        tutor_id: tutorId,
-        pending_balance: current.pending_balance ?? 0,
-        available_balance: (current.available_balance ?? 0) + amount,
-        total_earnings: current.total_earnings ?? 0,
-        total_payouts: current.total_payouts ?? 0,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'tutor_id' },
-    );
+  const { error } = await db().rpc('adjust_tutor_balance', { p_tutor_id: tutorId, p_available_delta: amount });
   if (error) throw new Error(error.message);
 }
 
 /** Records a completed payout — the reserved amount is now actually out the door. */
 export async function finalizeTutorPayout(tutorId: string, amount: number): Promise<void> {
-  const current = await getTutorBalance(tutorId);
-  const { error } = await db()
-    .from('tutor_balance')
-    .upsert(
-      {
-        tutor_id: tutorId,
-        pending_balance: current.pending_balance ?? 0,
-        available_balance: current.available_balance ?? 0,
-        total_earnings: current.total_earnings ?? 0,
-        total_payouts: (current.total_payouts ?? 0) + amount,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'tutor_id' },
-    );
+  const { error } = await db().rpc('adjust_tutor_balance', { p_tutor_id: tutorId, p_payouts_delta: amount });
   if (error) throw new Error(error.message);
 }
 
@@ -532,20 +477,11 @@ export async function finalizeTutorPayout(tutorId: string, amount: number): Prom
  */
 export async function reverseFailedPayout(tutorId: string, amount: number): Promise<void> {
   if (amount <= 0) return;
-  const current = await getTutorBalance(tutorId);
-  const { error } = await db()
-    .from('tutor_balance')
-    .upsert(
-      {
-        tutor_id: tutorId,
-        pending_balance: current.pending_balance ?? 0,
-        available_balance: (current.available_balance ?? 0) + amount,
-        total_earnings: current.total_earnings ?? 0,
-        total_payouts: Math.max(0, (current.total_payouts ?? 0) - amount),
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'tutor_id' },
-    );
+  const { error } = await db().rpc('adjust_tutor_balance', {
+    p_tutor_id: tutorId,
+    p_available_delta: amount,
+    p_payouts_delta: -amount,
+  });
   if (error) throw new Error(error.message);
 }
 
@@ -556,31 +492,22 @@ export async function reverseFailedPayout(tutorId: string, amount: number): Prom
  * already sitting as available/reserved-or-paid-out that this function
  * cannot safely touch automatically. Callers should flag that remainder for
  * manual admin review rather than silently writing it off.
+ * deduct_tutor_balance_for_refund() reads the row with FOR UPDATE and
+ * applies the clamp-and-split under that same lock, so a concurrent balance
+ * change can't be computed against a value this call is about to replace.
  */
 export async function deductTutorBalanceForRefund(
   tutorId: string,
   amount: number,
 ): Promise<{ deductedFromPending: number; deductedFromAvailable: number; shortfall: number }> {
-  const current = await getTutorBalance(tutorId);
-  const fromPending = Math.min(amount, current.pending_balance ?? 0);
-  const remaining = amount - fromPending;
-  const fromAvailable = Math.min(remaining, current.available_balance ?? 0);
-  const shortfall = remaining - fromAvailable;
-  const { error } = await db()
-    .from('tutor_balance')
-    .upsert(
-      {
-        tutor_id: tutorId,
-        pending_balance: (current.pending_balance ?? 0) - fromPending,
-        available_balance: (current.available_balance ?? 0) - fromAvailable,
-        total_earnings: current.total_earnings ?? 0,
-        total_payouts: current.total_payouts ?? 0,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'tutor_id' },
-    );
+  const { data, error } = await db().rpc('deduct_tutor_balance_for_refund', { p_tutor_id: tutorId, p_amount: amount });
   if (error) throw new Error(error.message);
-  return { deductedFromPending: fromPending, deductedFromAvailable: fromAvailable, shortfall };
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    deductedFromPending: Number(row?.deducted_from_pending ?? 0),
+    deductedFromAvailable: Number(row?.deducted_from_available ?? 0),
+    shortfall: Number(row?.shortfall ?? 0),
+  };
 }
 
 // ─── Payouts ──────────────────────────────────────────────────────────────────
@@ -1138,6 +1065,108 @@ export async function updateTriviaSubscription(
     .eq('subject_id', subjectId);
 
   if (error) throw new Error(error.message);
+}
+
+// ─── Trivia stats & leaderboard ────────────────────────────────────────────
+// Real tables with an atomic recording function (see migration
+// 20261113000000_atomic_tutor_balance_and_trivia.sql), replacing KV blobs
+// that trivia-routes.tsx used to read-modify-write per submission — a race
+// two concurrent submissions from the same user could lose one update to.
+
+export interface TriviaResultRow {
+  totalGames: number;
+  totalXP: number;
+  totalCorrect: number;
+  totalQuestions: number;
+  bestScore: number;
+  rank: number;
+  totalPlayers: number;
+}
+
+/** Atomically records one quiz result and returns the player's updated stats + new rank for that grade. */
+export async function recordTriviaResult(params: {
+  userId: string;
+  userName: string;
+  grade: string;
+  correct: number;
+  totalQuestions: number;
+  xp: number;
+  score: number;
+}): Promise<TriviaResultRow> {
+  const { data, error } = await db().rpc('record_trivia_result', {
+    p_user_id: params.userId,
+    p_user_name: params.userName,
+    p_grade: params.grade,
+    p_correct: params.correct,
+    p_total_questions: params.totalQuestions,
+    p_xp: params.xp,
+    p_score: params.score,
+  });
+  if (error) throw new Error(error.message);
+  const row = Array.isArray(data) ? data[0] : data;
+  return {
+    totalGames: row.total_games,
+    totalXP: row.total_xp,
+    totalCorrect: row.total_correct,
+    totalQuestions: row.total_questions,
+    bestScore: Number(row.best_score),
+    rank: Number(row.rank),
+    totalPlayers: Number(row.total_players),
+  };
+}
+
+/** Total number of players on a grade's leaderboard. */
+export async function getTriviaLeaderboardCount(grade: string): Promise<number> {
+  const { count, error } = await db()
+    .from('trivia_leaderboard')
+    .select('*', { count: 'exact', head: true })
+    .eq('grade', grade);
+  if (error) throw new Error(error.message);
+  return count ?? 0;
+}
+
+/** A grade's leaderboard, highest XP first. */
+export async function getTriviaLeaderboard(grade: string, limit = 100): Promise<Array<{
+  userId: string; userName: string; totalXP: number; gamesPlayed: number; averageScore: number; bestScore: number; lastPlayed: string | null;
+}>> {
+  const { data, error } = await db()
+    .from('trivia_leaderboard')
+    .select('*')
+    .eq('grade', grade)
+    .order('total_xp', { ascending: false })
+    .limit(limit);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => ({
+    userId: row.user_id,
+    userName: row.user_name,
+    totalXP: row.total_xp,
+    gamesPlayed: row.games_played,
+    averageScore: Number(row.average_score),
+    bestScore: Number(row.best_score),
+    lastPlayed: row.last_played,
+  }));
+}
+
+/** One user's lifetime trivia stats, across every grade/subject. */
+export async function getTriviaStats(userId: string): Promise<{
+  totalGames: number; totalXP: number; totalCorrect: number; totalQuestions: number; averageScore: number; bestScore: number; lastPlayed: string | null;
+} | null> {
+  const { data, error } = await db()
+    .from('trivia_stats')
+    .select('*')
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (error) throw new Error(error.message);
+  if (!data) return null;
+  return {
+    totalGames: data.total_games,
+    totalXP: data.total_xp,
+    totalCorrect: data.total_correct,
+    totalQuestions: data.total_questions,
+    averageScore: data.total_questions > 0 ? (data.total_correct / data.total_questions) * 100 : 0,
+    bestScore: Number(data.best_score),
+    lastPlayed: data.last_played,
+  };
 }
 
 // ─── Admin Audit Log ──────────────────────────────────────────────────────────

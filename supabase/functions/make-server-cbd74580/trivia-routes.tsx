@@ -253,63 +253,38 @@ app.post('/submit', async (c) => {
 
     await kv.set(`trivia_result:${user.id}:${Date.now()}`, triviaResult);
 
-    // Update user's total trivia stats
-    const statsKey = `trivia_stats:${user.id}`;
-    const existingStats = await kv.get(statsKey);
-    
+    // Updates trivia_stats and trivia_leaderboard atomically in one
+    // Postgres function call (see migration
+    // 20261113000000_atomic_tutor_balance_and_trivia.sql) instead of the
+    // old read-KV -> mutate-in-JS -> write-KV sequence for each — two
+    // concurrent submissions from the same user (double-click, two tabs, a
+    // retried request) used to be able to both read the same starting
+    // totals and have the second write clobber the first's update,
+    // silently losing XP/games/correct-answer counts.
+    const displayName =
+      (await resolveStudentProfile(user.id).catch(() => null))?.firstName ||
+      'Student';
+    const resultRow = await db.recordTriviaResult({
+      userId: user.id,
+      userName: displayName,
+      grade,
+      correct: correctAnswers,
+      totalQuestions: answers.length,
+      xp: totalXP,
+      score,
+    });
+
     const updatedStats = {
-      totalGames: (existingStats?.totalGames || 0) + 1,
-      totalXP: (existingStats?.totalXP || 0) + totalXP,
-      totalCorrect: (existingStats?.totalCorrect || 0) + correctAnswers,
-      totalQuestions: (existingStats?.totalQuestions || 0) + answers.length,
-      averageScore: 0,
-      bestScore: Math.max(existingStats?.bestScore || 0, score),
-      lastPlayed: new Date().toISOString()
+      totalGames: resultRow.totalGames,
+      totalXP: resultRow.totalXP,
+      totalCorrect: resultRow.totalCorrect,
+      totalQuestions: resultRow.totalQuestions,
+      averageScore: resultRow.totalQuestions > 0 ? (resultRow.totalCorrect / resultRow.totalQuestions) * 100 : 0,
+      bestScore: resultRow.bestScore,
+      lastPlayed: new Date().toISOString(),
     };
-
-    updatedStats.averageScore = (updatedStats.totalCorrect / updatedStats.totalQuestions) * 100;
-
-    await kv.set(statsKey, updatedStats);
-
-    // Update grade-specific leaderboard
-    const leaderboardKey = `trivia_leaderboard:${grade}`;
-    const leaderboard = await kv.get(leaderboardKey) || { entries: [] };
-    
-    // Find or create user entry
-    let userEntry = leaderboard.entries.find((e: any) => e.userId === user.id);
-    
-    if (userEntry) {
-      userEntry.totalXP = (userEntry.totalXP || 0) + totalXP;
-      userEntry.gamesPlayed = (userEntry.gamesPlayed || 0) + 1;
-      userEntry.averageScore = ((userEntry.averageScore * (userEntry.gamesPlayed - 1)) + score) / userEntry.gamesPlayed;
-      userEntry.bestScore = Math.max(userEntry.bestScore || 0, score);
-      userEntry.lastPlayed = new Date().toISOString();
-    } else {
-      // Get user profile for display
-      const profile = await resolveStudentProfile(user.id);
-
-      userEntry = {
-        userId: user.id,
-        userName: profile?.firstName || profile?.fullName || profile?.full_name || profile?.name || 'Student',
-        totalXP,
-        gamesPlayed: 1,
-        averageScore: score,
-        bestScore: score,
-        lastPlayed: new Date().toISOString()
-      };
-      leaderboard.entries.push(userEntry);
-    }
-
-    // Sort leaderboard by totalXP
-    leaderboard.entries.sort((a: any, b: any) => b.totalXP - a.totalXP);
-    
-    // Keep top 100
-    leaderboard.entries = leaderboard.entries.slice(0, 100);
-    
-    await kv.set(leaderboardKey, leaderboard);
-
-    // Find user's rank
-    const userRank = leaderboard.entries.findIndex((e: any) => e.userId === user.id) + 1;
+    const userRank = resultRow.rank;
+    const totalPlayers = resultRow.totalPlayers;
 
     console.log('Trivia submit successful: Score:', score, '| XP:', totalXP, '| Rank:', userRank);
 
@@ -331,7 +306,7 @@ app.post('/submit', async (c) => {
       result: triviaResult,
       stats: updatedStats,
       rank: userRank,
-      totalPlayers: leaderboard.entries.length,
+      totalPlayers,
       newBadges,
     });
   } catch (error) {
@@ -345,13 +320,15 @@ app.post('/submit', async (c) => {
 app.get('/leaderboard/:grade', async (c) => {
   try {
     const grade = c.req.param('grade');
-    const leaderboardKey = `trivia_leaderboard:${grade}`;
-    const leaderboard = await kv.get(leaderboardKey) || { entries: [] };
+    const [entries, totalPlayers] = await Promise.all([
+      db.getTriviaLeaderboard(grade, 50),
+      db.getTriviaLeaderboardCount(grade),
+    ]);
 
     return c.json({
       grade,
-      leaderboard: leaderboard.entries.slice(0, 50), // Top 50
-      totalPlayers: leaderboard.entries.length
+      leaderboard: entries,
+      totalPlayers,
     });
   } catch (error) {
     console.error('Error fetching leaderboard:', error);
@@ -377,14 +354,14 @@ app.get('/stats', async (c) => {
       return c.json({ error: 'Unauthorized' }, 401);
     }
 
-    const statsKey = `trivia_stats:${user.id}`;
-    const stats = await kv.get(statsKey) || {
+    const stats = await db.getTriviaStats(user.id) || {
       totalGames: 0,
       totalXP: 0,
       totalCorrect: 0,
       totalQuestions: 0,
       averageScore: 0,
-      bestScore: 0
+      bestScore: 0,
+      lastPlayed: null,
     };
 
     return c.json({ stats });
