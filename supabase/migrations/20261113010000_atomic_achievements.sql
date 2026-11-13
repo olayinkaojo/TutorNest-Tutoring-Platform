@@ -80,12 +80,12 @@ ON CONFLICT (user_id) DO NOTHING;
 
 INSERT INTO user_badges (user_id, badge_id, unlocked_at)
 SELECT
-  (split_part(key, ':', 2))::uuid,
-  badge_id,
-  COALESCE((value->'unlockDates'->>badge_id)::timestamptz, NOW())
-FROM kv_store_cbd74580
-CROSS JOIN LATERAL jsonb_array_elements_text(value->'achieved') AS badge_id
-WHERE key LIKE 'user:%:achievements'
+  (split_part(k.key, ':', 2))::uuid,
+  elem.badge_id,
+  COALESCE((k.value->'unlockDates'->>elem.badge_id)::timestamptz, NOW())
+FROM kv_store_cbd74580 k
+CROSS JOIN LATERAL jsonb_array_elements_text(k.value->'achieved') AS elem(badge_id)
+WHERE k.key LIKE 'user:%:achievements'
 ON CONFLICT (user_id, badge_id) DO NOTHING;
 
 INSERT INTO badge_unlock_stats (badge_id, total_unlocks)
