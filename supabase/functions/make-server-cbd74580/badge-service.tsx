@@ -1,4 +1,4 @@
-import * as kv from "./kv_store.tsx";
+import * as db from "./db.tsx";
 
 export type BadgeRarity = "common" | "rare" | "epic" | "legendary";
 
@@ -227,32 +227,22 @@ export const BADGE_DEFINITIONS: Record<string, Badge> = {
 
 export async function getUserBadges(userId: string): Promise<string[]> {
   try {
-    const data = await kv.get(`user:${userId}:achievements`);
-    return data?.achieved || [];
+    return await db.getUserBadgeIds(userId);
   } catch {
     return [];
   }
 }
 
+// Atomic via unlock_badge_for_user (migration 20261113010000_atomic_achievements.sql)
+// — the user_badges (user_id, badge_id) primary key means two concurrent
+// attempts to unlock the same badge for the same user can't both succeed,
+// unlike the old version's read-array -> push -> write-array, where a
+// second concurrent call could either silently overwrite the first's
+// addition of a *different* badge, or add the *same* badge twice (both
+// calls would read "not yet achieved" before either had written).
 export async function addBadgeToUser(userId: string, badgeId: string): Promise<boolean> {
   try {
-    const achievementKey = `user:${userId}:achievements`;
-    const current = await kv.get(achievementKey);
-    const achieved = current?.achieved || [];
-
-    if (achieved.includes(badgeId)) return false;
-
-    const updated = {
-      achieved: [...achieved, badgeId],
-      progress: current?.progress || {},
-      unlockDates: {
-        ...(current?.unlockDates || {}),
-        [badgeId]: new Date().toISOString(),
-      },
-    };
-
-    await kv.set(achievementKey, updated);
-    return true;
+    return await db.unlockBadgeForUser(userId, badgeId);
   } catch {
     return false;
   }
@@ -260,18 +250,10 @@ export async function addBadgeToUser(userId: string, badgeId: string): Promise<b
 
 export async function getBadgeStats(badgeId: string): Promise<any> {
   try {
-    const data = await kv.get(`badge:${badgeId}:stats`);
-    return data || { totalUnlocks: 0, userCount: 0, rarity: "unknown" };
+    const { totalUnlocks } = await db.getBadgeUnlockStats(badgeId);
+    return { totalUnlocks, userCount: totalUnlocks, rarity: await getBadgeRarity(badgeId) };
   } catch {
     return { totalUnlocks: 0, userCount: 0, rarity: "unknown" };
-  }
-}
-
-export async function updateBadgeStats(badgeId: string, stats: any): Promise<void> {
-  try {
-    await kv.set(`badge:${badgeId}:stats`, stats);
-  } catch {
-    // Silent fail
   }
 }
 

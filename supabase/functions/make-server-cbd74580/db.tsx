@@ -1169,6 +1169,143 @@ export async function getTriviaStats(userId: string): Promise<{
   };
 }
 
+// ─── Game stats, badges & achievement leaderboard ──────────────────────────
+// Real tables with atomic record-result functions (see migration
+// 20261113010000_atomic_achievements.sql), replacing KV blobs that
+// achievement-service.tsx/badge-service.tsx used to read-modify-write per
+// call — a race between, e.g., two battle answers or a daily-challenge
+// completion landing close together for the same user could lose an update.
+
+export interface GameStatsRow {
+  userId: string;
+  userName: string;
+  dailyChallengesCompleted: number;
+  fastestAnswerTime: number;
+  battlesPlayed: number;
+  battleWins: number;
+  friendBattleWins: number;
+  currentStreak: number;
+  battleWinStreak: number;
+  averageAnswerTime: number;
+  globalRank: number;
+  perfectTimeAttackGames: number;
+  friendsInvited: number;
+  battlesOrganized: number;
+  isInAchievementsLeaderboard: boolean;
+  totalXP: number;
+}
+
+function mapGameStatsRow(row: any): GameStatsRow {
+  return {
+    userId: row.user_id,
+    userName: row.user_name,
+    dailyChallengesCompleted: row.daily_challenges_completed,
+    fastestAnswerTime: row.fastest_answer_time,
+    battlesPlayed: row.battles_played,
+    battleWins: row.battle_wins,
+    friendBattleWins: row.friend_battle_wins,
+    currentStreak: row.current_streak,
+    battleWinStreak: row.battle_win_streak,
+    averageAnswerTime: row.average_answer_time,
+    globalRank: row.global_rank,
+    perfectTimeAttackGames: row.perfect_time_attack_games,
+    friendsInvited: row.friends_invited,
+    battlesOrganized: row.battles_organized,
+    isInAchievementsLeaderboard: row.is_in_achievements_leaderboard,
+    totalXP: row.total_xp,
+  };
+}
+
+/** Read-only — does not create a row. Callers should fall back to defaults themselves. */
+export async function getUserGameStats(userId: string): Promise<GameStatsRow | null> {
+  const { data, error } = await db().from('user_game_stats').select('*').eq('user_id', userId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return data ? mapGameStatsRow(data) : null;
+}
+
+export async function recordDailyChallengeCompletion(params: {
+  userId: string; userName: string; xpEarned: number; streak: number;
+}): Promise<GameStatsRow> {
+  const { data, error } = await db().rpc('record_daily_challenge_completion', {
+    p_user_id: params.userId, p_user_name: params.userName, p_xp_earned: params.xpEarned, p_streak: params.streak,
+  });
+  if (error) throw new Error(error.message);
+  return mapGameStatsRow(Array.isArray(data) ? data[0] : data);
+}
+
+export async function recordTimeAttackCompletion(params: {
+  userId: string; userName: string; xpEarned: number; accuracy: number; avgAnswerTime: number;
+}): Promise<GameStatsRow> {
+  const { data, error } = await db().rpc('record_time_attack_completion', {
+    p_user_id: params.userId, p_user_name: params.userName, p_xp_earned: params.xpEarned,
+    p_accuracy: params.accuracy, p_avg_answer_time: params.avgAnswerTime,
+  });
+  if (error) throw new Error(error.message);
+  return mapGameStatsRow(Array.isArray(data) ? data[0] : data);
+}
+
+export async function recordBattleAnswerTime(params: {
+  userId: string; userName: string; timeMs: number;
+}): Promise<GameStatsRow> {
+  const { data, error } = await db().rpc('record_battle_answer_time', {
+    p_user_id: params.userId, p_user_name: params.userName, p_time_ms: params.timeMs,
+  });
+  if (error) throw new Error(error.message);
+  return mapGameStatsRow(Array.isArray(data) ? data[0] : data);
+}
+
+export async function recordBattleResult(params: {
+  userId: string; userName: string; won: boolean;
+}): Promise<GameStatsRow> {
+  const { data, error } = await db().rpc('record_battle_result', {
+    p_user_id: params.userId, p_user_name: params.userName, p_won: params.won,
+  });
+  if (error) throw new Error(error.message);
+  return mapGameStatsRow(Array.isArray(data) ? data[0] : data);
+}
+
+export async function incrementUserXP(params: {
+  userId: string; userName: string; xpDelta: number;
+}): Promise<GameStatsRow> {
+  const { data, error } = await db().rpc('increment_user_xp', {
+    p_user_id: params.userId, p_user_name: params.userName, p_xp_delta: params.xpDelta,
+  });
+  if (error) throw new Error(error.message);
+  return mapGameStatsRow(Array.isArray(data) ? data[0] : data);
+}
+
+/** Atomically unlocks a badge — returns false if the user already had it (no-op, not an error). */
+export async function unlockBadgeForUser(userId: string, badgeId: string): Promise<boolean> {
+  const { data, error } = await db().rpc('unlock_badge_for_user', { p_user_id: userId, p_badge_id: badgeId });
+  if (error) throw new Error(error.message);
+  return Boolean(data);
+}
+
+export async function getUserBadgeIds(userId: string): Promise<string[]> {
+  const { data, error } = await db().from('user_badges').select('badge_id').eq('user_id', userId);
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row) => row.badge_id);
+}
+
+export async function getBadgeUnlockStats(badgeId: string): Promise<{ totalUnlocks: number }> {
+  const { data, error } = await db().from('badge_unlock_stats').select('total_unlocks').eq('badge_id', badgeId).maybeSingle();
+  if (error) throw new Error(error.message);
+  return { totalUnlocks: data?.total_unlocks ?? 0 };
+}
+
+export async function getAchievementLeaderboard(limit = 200): Promise<Array<{
+  userId: string; userName: string; badgesUnlocked: number; totalXP: number;
+}>> {
+  const { data, error } = await db().rpc('get_achievement_leaderboard', { p_limit: limit });
+  if (error) throw new Error(error.message);
+  return (data ?? []).map((row: any) => ({
+    userId: row.user_id,
+    userName: row.user_name,
+    badgesUnlocked: Number(row.badges_unlocked),
+    totalXP: row.total_xp,
+  }));
+}
+
 // ─── Admin Audit Log ──────────────────────────────────────────────────────────
 
 export async function createAdminAuditLog(entry: {

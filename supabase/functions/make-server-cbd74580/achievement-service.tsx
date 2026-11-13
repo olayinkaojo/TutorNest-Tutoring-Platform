@@ -1,10 +1,6 @@
 import * as kv from "./kv_store.tsx";
-import {
-  getUserBadges,
-  addBadgeToUser,
-  BADGE_DEFINITIONS,
-  getBadgeRarity,
-} from "./badge-service.tsx";
+import * as db from "./db.tsx";
+import { getUserBadges, addBadgeToUser, BADGE_DEFINITIONS } from "./badge-service.tsx";
 
 export interface UserStats {
   userId: string;
@@ -25,30 +21,11 @@ export interface UserStats {
   totalXP: number;
 }
 
-export async function getUserStats(userId: string): Promise<UserStats> {
-  try {
-    const statsKey = `user:${userId}:stats`;
-    const data = await kv.get(statsKey);
-
-    if (data) {
-      return data as UserStats;
-    }
-
-    return createDefaultStats(userId);
-  } catch {
-    return createDefaultStats(userId);
-  }
-}
-
 // A "no data yet" sentinel for answer-time fields — large and finite
-// rather than Infinity. updateUserStats spreads {...current, ...updates}
-// through kv.set on every call, and this object goes through JSON
-// serialization to get there: JSON.stringify(Infinity) silently becomes
-// `null`, and null coerces to 0 in a numeric comparison — so any update
-// that didn't happen to also set these two fields would have quietly
-// turned "no data" into 0 on its very first save, permanently satisfying
-// "answered in under 5/3 seconds" for an account that had never answered
-// anything.
+// rather than Infinity. JSON.stringify(Infinity) silently becomes `null`,
+// and null coerces to 0 in a numeric comparison — so an account that had
+// never answered anything could quietly satisfy "answered in under 5/3
+// seconds" the moment that round-trip happened.
 const NO_ANSWER_TIME_YET = 999_999_999;
 
 function createDefaultStats(userId: string): UserStats {
@@ -61,10 +38,6 @@ function createDefaultStats(userId: string): UserStats {
     friendBattleWins: 0,
     currentStreak: 0,
     battleWinStreak: 0,
-    // Confirmed live: with the old `0` default, a test student unlocked
-    // this badge from their very first (incorrectly-answered!) daily
-    // challenge submission — before this fix, updateUserStats had never
-    // even run for them yet.
     averageAnswerTime: NO_ANSWER_TIME_YET,
     globalRank: 999999,
     badgesUnlocked: 0,
@@ -76,54 +49,52 @@ function createDefaultStats(userId: string): UserStats {
   };
 }
 
-export async function updateUserStats(userId: string, updates: Partial<UserStats>): Promise<void> {
-  try {
-    const current = await getUserStats(userId);
-    const updated = { ...current, ...updates, userId };
-    await kv.set(`user:${userId}:stats`, updated);
-    await updateAchievementLeaderboard(userId, updated);
-  } catch {
-    // Silent fail
-  }
+// Every other profile write in this codebase uses `user:${userId}` for a
+// direct account, `child:${userId}` for a managed child profile, or
+// `profile_${role}_${userId}` for a specific role's data — never
+// `user_profile:${userId}` or `profile:${userId}` (both of which this file
+// used to look up, and neither of which anything ever writes to).
+async function resolveDisplayName(userId: string): Promise<string> {
+  const direct = (await kv.get(`user:${userId}`).catch(() => null)) as any;
+  if (direct) return direct.firstName || direct.fullName || direct.full_name || direct.name || 'Student';
+  const asChild = (await kv.get(`child:${userId}`).catch(() => null)) as any;
+  if (asChild) return asChild.firstName || asChild.name || 'Student';
+  const profile = await db.getProfile(userId).catch(() => null);
+  return profile?.firstName || profile?.fullName || profile?.full_name || profile?.name || 'Student';
 }
 
 /**
- * Keeps achievement-leaderboard:global in sync — GET /achievements/leaderboard
- * (leaderboard-achievements.tsx) reads this key, but nothing ever wrote to
- * it, so that leaderboard was always empty regardless of how many badges
- * anyone actually earned. Called from the one place every game mode already
- * routes through (updateUserStats) rather than duplicating this in each of
- * trivia/daily-challenge/time-attack/battle's own completion handlers.
+ * Real stats row from Postgres (see migration 20261113010000_atomic_achievements.sql)
+ * plus a live badge count — badgesUnlocked is derived, not stored, so there's
+ * nowhere for it to drift out of sync with the user's actual unlocked badges.
  */
-async function updateAchievementLeaderboard(userId: string, stats: UserStats): Promise<void> {
+export async function getUserStats(userId: string): Promise<UserStats> {
   try {
-    const leaderboardKey = `achievement-leaderboard:global`;
-    const data = await kv.get(leaderboardKey);
-    const entries: any[] = data?.entries || [];
-
-    const badges = await getUserBadges(userId);
-    const profile = (await kv.get(`user:${userId}`)) as any;
-    const username = profile?.firstName || profile?.full_name || profile?.name || 'Student';
-
-    const existingIndex = entries.findIndex((e) => e.userId === userId);
-    const entry = {
-      userId,
-      username,
+    const [row, badges] = await Promise.all([
+      db.getUserGameStats(userId),
+      getUserBadges(userId),
+    ]);
+    if (!row) return { ...createDefaultStats(userId), badgesUnlocked: badges.length };
+    return {
+      userId: row.userId,
+      dailyChallengesCompleted: row.dailyChallengesCompleted,
+      fastestAnswerTime: row.fastestAnswerTime,
+      battlesPlayed: row.battlesPlayed,
+      battleWins: row.battleWins,
+      friendBattleWins: row.friendBattleWins,
+      currentStreak: row.currentStreak,
+      battleWinStreak: row.battleWinStreak,
+      averageAnswerTime: row.averageAnswerTime,
+      globalRank: row.globalRank,
       badgesUnlocked: badges.length,
-      totalXP: stats.totalXP || 0,
+      perfectTimeAttackGames: row.perfectTimeAttackGames,
+      friendsInvited: row.friendsInvited,
+      battlesOrganized: row.battlesOrganized,
+      isInAchievementsLeaderboard: row.isInAchievementsLeaderboard,
+      totalXP: row.totalXP,
     };
-
-    if (existingIndex >= 0) {
-      entries[existingIndex] = entry;
-    } else {
-      entries.push(entry);
-    }
-
-    entries.sort((a, b) => (b.badgesUnlocked - a.badgesUnlocked) || (b.totalXP - a.totalXP));
-
-    await kv.set(leaderboardKey, { entries: entries.slice(0, 200) });
   } catch {
-    // Non-fatal — the leaderboard just won't reflect this update.
+    return createDefaultStats(userId);
   }
 }
 
@@ -134,27 +105,13 @@ export async function checkAndAwardAchievements(userId: string): Promise<string[
     const newBadges: string[] = [];
 
     for (const [badgeId, badge] of Object.entries(BADGE_DEFINITIONS)) {
-      if (!currentBadges.includes(badgeId)) {
-        if (badge.unlockCondition(stats)) {
-          const added = await addBadgeToUser(userId, badgeId);
-          if (added) {
-            newBadges.push(badgeId);
-
-            // Update badge unlock count
-            const statsKey = `badge:${badgeId}:stats`;
-            const badgeStats = await kv.get(statsKey);
-            const current = badgeStats || { totalUnlocks: 0 };
-            await kv.set(statsKey, {
-              ...current,
-              totalUnlocks: (current.totalUnlocks || 0) + 1,
-            });
-
-            // Update user's badge count
-            await updateUserStats(userId, {
-              badgesUnlocked: currentBadges.length + newBadges.length,
-            });
-          }
-        }
+      if (!currentBadges.includes(badgeId) && badge.unlockCondition(stats)) {
+        // addBadgeToUser (badge-service.tsx) is now an atomic unlock —
+        // returns false if another concurrent call already won the
+        // unlock for this exact badge, so it's never added twice and the
+        // unlock-count stat is never double-bumped.
+        const added = await addBadgeToUser(userId, badgeId);
+        if (added) newBadges.push(badgeId);
       }
     }
 
@@ -302,12 +259,8 @@ export async function recordDailyChallengeCompletion(
   streak: number
 ): Promise<string[]> {
   try {
-    const stats = await getUserStats(userId);
-    await updateUserStats(userId, {
-      dailyChallengesCompleted: stats.dailyChallengesCompleted + 1,
-      currentStreak: streak,
-      totalXP: stats.totalXP + xpEarned,
-    });
+    const userName = await resolveDisplayName(userId);
+    await db.recordDailyChallengeCompletion({ userId, userName, xpEarned, streak });
     return await checkAndAwardAchievements(userId);
   } catch {
     return [];
@@ -321,40 +274,42 @@ export async function recordTimeAttackCompletion(
   avgAnswerTime: number
 ): Promise<string[]> {
   try {
-    const stats = await getUserStats(userId);
-    await updateUserStats(userId, {
-      totalXP: stats.totalXP + xpEarned,
-      averageAnswerTime: (stats.averageAnswerTime + avgAnswerTime) / 2,
-      perfectTimeAttackGames:
-        accuracy === 100 ? stats.perfectTimeAttackGames + 1 : stats.perfectTimeAttackGames,
-    });
+    const userName = await resolveDisplayName(userId);
+    await db.recordTimeAttackCompletion({ userId, userName, xpEarned, accuracy, avgAnswerTime });
     return await checkAndAwardAchievements(userId);
   } catch {
     return [];
   }
 }
 
-export async function recordBattleCompletion(
-  userId: string,
-  won: boolean,
-  isFriendBattle: boolean,
-  xpEarned: number,
-  answerTime: number
-): Promise<string[]> {
+/** Called on every battle answer — just the fastest-answer-time update. */
+export async function recordBattleAnswerTime(userId: string, timeMs: number): Promise<string[]> {
   try {
-    const stats = await getUserStats(userId);
-    const newWinStreak = won ? stats.battleWinStreak + 1 : 0;
-
-    await updateUserStats(userId, {
-      battlesPlayed: stats.battlesPlayed + 1,
-      battleWins: won ? stats.battleWins + 1 : stats.battleWins,
-      battleWinStreak: newWinStreak,
-      friendBattleWins: won && isFriendBattle ? stats.friendBattleWins + 1 : stats.friendBattleWins,
-      totalXP: stats.totalXP + xpEarned,
-      fastestAnswerTime: Math.min(stats.fastestAnswerTime, answerTime),
-    });
+    const userName = await resolveDisplayName(userId);
+    await db.recordBattleAnswerTime({ userId, userName, timeMs });
     return await checkAndAwardAchievements(userId);
   } catch {
     return [];
+  }
+}
+
+/** Called once per player when a battle actually concludes. */
+export async function recordBattleResult(userId: string, won: boolean): Promise<string[]> {
+  try {
+    const userName = await resolveDisplayName(userId);
+    await db.recordBattleResult({ userId, userName, won });
+    return await checkAndAwardAchievements(userId);
+  } catch {
+    return [];
+  }
+}
+
+/** Adds XP without touching any other stat — used by trivia's shared-achievement feed. */
+export async function incrementUserXP(userId: string, xpDelta: number): Promise<void> {
+  try {
+    const userName = await resolveDisplayName(userId);
+    await db.incrementUserXP({ userId, userName, xpDelta });
+  } catch {
+    // Silent fail — matches the rest of this file's non-fatal-by-design error handling.
   }
 }

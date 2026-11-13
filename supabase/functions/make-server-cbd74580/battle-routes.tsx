@@ -5,7 +5,7 @@ import { Hono } from "npm:hono@4";
 import { createClient } from "jsr:@supabase/supabase-js@2";
 import * as db from "./db.tsx";
 import * as multiplayerBattleService from "./multiplayer-battle-service.tsx";
-import { getUserStats, updateUserStats, checkAndAwardAchievements } from "./achievement-service.tsx";
+import { recordBattleAnswerTime, recordBattleResult } from "./achievement-service.tsx";
 
 const app = new Hono();
 
@@ -163,22 +163,19 @@ app.post("/battle/:battleId/answer", async (c) => {
       Number(timeMs)
     );
 
-    // Feed the shared achievement system (see achievement-service.tsx).
-    // recordBattleCompletion (already written there, never called from
-    // anywhere) needs an xpEarned figure this battle system has no real
-    // concept of — there's no per-battle XP anywhere else in the app —
-    // so rather than invent one, update the fields that are genuinely
-    // observable here: fastestAnswerTime from this real answer's timeMs
-    // for whoever just answered, every time; battlesPlayed/battleWins/
-    // battleWinStreak for both players once the battle actually concludes.
-    // Without any of this, finishing battles never reached
-    // user:<id>:stats and could never unlock a badge.
+    // Feed the shared achievement system (see achievement-service.tsx) with
+    // the fields genuinely observable here: fastestAnswerTime from this
+    // real answer's timeMs for whoever just answered, every time;
+    // battlesPlayed/battleWins/battleWinStreak for both players once the
+    // battle actually concludes. There's no per-battle XP concept anywhere
+    // else in the app, so none is invented here either. Both calls are
+    // atomic (db.tsx's record_battle_answer_time / record_battle_result —
+    // see migration 20261113010000_atomic_achievements.sql): this used to
+    // read the current stat, compute the new value in JS, then write it
+    // back, so a fast flurry of answers/battles for the same player could
+    // lose an update to a race on that read.
     try {
-      const answererStats = await getUserStats(userData.user.id);
-      await updateUserStats(userData.user.id, {
-        fastestAnswerTime: Math.min(answererStats.fastestAnswerTime, Number(timeMs)),
-      });
-      await checkAndAwardAchievements(userData.user.id);
+      await recordBattleAnswerTime(userData.user.id, Number(timeMs));
 
       if (result.battleComplete) {
         const battle = await multiplayerBattleService.getBattleStatus(battleId);
@@ -186,13 +183,7 @@ app.post("/battle/:battleId/answer", async (c) => {
         const player2Id = battle?.player2?.userId;
         const winnerId = battle?.winner;
         for (const playerId of [player1Id, player2Id].filter(Boolean) as string[]) {
-          const stats = await getUserStats(playerId);
-          await updateUserStats(playerId, {
-            battlesPlayed: (stats.battlesPlayed || 0) + 1,
-            battleWins: (stats.battleWins || 0) + (playerId === winnerId ? 1 : 0),
-            battleWinStreak: playerId === winnerId ? (stats.battleWinStreak || 0) + 1 : 0,
-          });
-          await checkAndAwardAchievements(playerId);
+          await recordBattleResult(playerId, playerId === winnerId);
         }
       }
     } catch (err) {

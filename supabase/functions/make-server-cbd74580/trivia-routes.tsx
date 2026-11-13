@@ -2,7 +2,7 @@ import { Hono } from 'npm:hono@4';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
-import { getUserStats, updateUserStats, checkAndAwardAchievements } from './achievement-service.tsx';
+import { incrementUserXP, checkAndAwardAchievements } from './achievement-service.tsx';
 
 const app = new Hono();
 
@@ -289,13 +289,14 @@ app.post('/submit', async (c) => {
     console.log('Trivia submit successful: Score:', score, '| XP:', totalXP, '| Rank:', userRank);
 
     // Feed the shared achievement system (see achievement-service.tsx) —
-    // without this, XP earned here never reached user:<id>:stats, so
-    // checkAndAwardAchievements had nothing real to check against and the
-    // Achievements tab could never show a badge earned from playing trivia.
+    // without this, XP earned here never reached the player's game stats,
+    // so checkAndAwardAchievements had nothing real to check against and
+    // the Achievements tab could never show a badge earned from playing
+    // trivia. incrementUserXP is atomic (adjust_tutor_balance-style single
+    // UPDATE, not a read-then-write) — see achievement-service.tsx.
     let newBadges: string[] = [];
     try {
-      const achievementStats = await getUserStats(user.id);
-      await updateUserStats(user.id, { totalXP: (achievementStats.totalXP || 0) + totalXP });
+      await incrementUserXP(user.id, totalXP);
       newBadges = await checkAndAwardAchievements(user.id);
     } catch (err) {
       console.warn('Trivia submit: achievement update failed (non-fatal):', err);

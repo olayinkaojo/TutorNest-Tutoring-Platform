@@ -1,4 +1,4 @@
-import * as kv from "./kv_store.tsx";
+import * as db from "./db.tsx";
 import { getUserBadges } from "./badge-service.tsx";
 import { getUserStats } from "./achievement-service.tsx";
 
@@ -10,30 +10,24 @@ export interface AchievementLeaderboardEntry {
   rank: number;
 }
 
-export async function updateAchievementLeaderboard(): Promise<void> {
+// This used to read/write an `achievement-leaderboard:global` KV blob that
+// a *different*, unused export in this same file (also named
+// updateAchievementLeaderboard, since removed) would silently wipe to an
+// empty array if anything had ever called it. The data itself — badge
+// count + XP per user — is entirely derived from user_game_stats/
+// user_badges, so get_achievement_leaderboard (migration
+// 20261113010000_atomic_achievements.sql) just queries it live instead of
+// maintaining a second, separately-mutated copy that could drift or race.
+export async function getAchievementLeaderboard(limit: number = 100): Promise<AchievementLeaderboardEntry[]> {
   try {
-    // Get all users (simplified - in production, would iterate through user list)
-    const entries: AchievementLeaderboardEntry[] = [];
-
-    // For now, leaderboard is built on-demand
-    // In production, would maintain a separate leaderboard cache
-    const leaderboardKey = `achievement-leaderboard:global`;
-    await kv.set(leaderboardKey, { lastUpdated: new Date().toISOString(), entries });
-  } catch {
-    // Silent fail
-  }
-}
-
-export async function getAchievementLeaderboard(limit: number = 100): Promise<any[]> {
-  try {
-    const leaderboardKey = `achievement-leaderboard:global`;
-    const data = await kv.get(leaderboardKey);
-
-    if (data?.entries) {
-      return data.entries.slice(0, limit);
-    }
-
-    return [];
+    const rows = await db.getAchievementLeaderboard(limit);
+    return rows.map((row, index) => ({
+      userId: row.userId,
+      username: row.userName,
+      badgesUnlocked: row.badgesUnlocked,
+      totalXP: row.totalXP,
+      rank: index + 1,
+    }));
   } catch {
     return [];
   }
@@ -92,15 +86,9 @@ export async function filterAchievementsByRarity(rarity: string, limit: number =
 
 export async function getTopAchievers(limit: number = 10): Promise<any[]> {
   try {
-    const leaderboard = await getAchievementLeaderboard(limit * 2);
-    return leaderboard
-      .sort((a: any, b: any) => {
-        if (b.badgesUnlocked !== a.badgesUnlocked) {
-          return b.badgesUnlocked - a.badgesUnlocked;
-        }
-        return b.totalXP - a.totalXP;
-      })
-      .slice(0, limit);
+    // get_achievement_leaderboard already orders by badges then XP — no
+    // need to re-sort what it returned.
+    return await getAchievementLeaderboard(limit);
   } catch {
     return [];
   }
@@ -109,7 +97,7 @@ export async function getTopAchievers(limit: number = 10): Promise<any[]> {
 export async function isUserInAchievementsLeaderboard(userId: string, topN: number = 100): Promise<boolean> {
   try {
     const leaderboard = await getAchievementLeaderboard(topN);
-    return leaderboard.some((entry: any) => entry.userId === userId);
+    return leaderboard.some((entry) => entry.userId === userId);
   } catch {
     return false;
   }
@@ -118,8 +106,8 @@ export async function isUserInAchievementsLeaderboard(userId: string, topN: numb
 export async function getUserAchievementRank(userId: string): Promise<number> {
   try {
     const leaderboard = await getAchievementLeaderboard(10000);
-    const rank = leaderboard.findIndex((entry: any) => entry.userId === userId);
-    return rank >= 0 ? rank + 1 : 999999;
+    const entry = leaderboard.find((e) => e.userId === userId);
+    return entry?.rank ?? 999999;
   } catch {
     return 999999;
   }

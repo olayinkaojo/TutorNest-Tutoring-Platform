@@ -7,7 +7,6 @@ import {
 } from "./badge-service.tsx";
 import {
   getUserStats,
-  updateUserStats,
   getAchievementProgress,
   checkAndAwardAchievements,
 } from "./achievement-service.tsx";
