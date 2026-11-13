@@ -1,9 +1,11 @@
 import { Hono } from 'npm:hono@4';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
-import { verifyAccessToken } from './route-auth.tsx';
+import { verifyAccessToken, requireSelfOrAdmin } from './route-auth.tsx';
 import { PaymentProcessor } from './unified-payment-processor.tsx';
 import { NotificationBroker } from './notification-broker.tsx';
+
+const FLUTTERWAVE_SECRET_KEY = Deno.env.get('FLUTTERWAVE_SECRET_KEY') ?? '';
 
 const app = new Hono();
 
@@ -207,21 +209,18 @@ app.get('/books', async (c) => {
   }
 });
 
-// Get user's purchased books
+// Get user's purchased books. Previously only checked that SOME valid
+// user was authenticated, never that the :userId in the URL was actually
+// them (or an admin) — any logged-in user could read anyone else's book
+// library by swapping the path param.
 app.get('/library/:userId', async (c) => {
   console.log('=== GET /bookshop/library/:userId endpoint called ===');
-  
-  try {
-    const authHeader = c.req.header('Authorization');
-    const accessToken = authHeader?.replace('Bearer ', '');
-    
-    const user = await getUserFromToken(accessToken);
-    if (!user) {
-      return c.json({ success: false, error: 'Unauthorized' }, 401);
-    }
 
+  try {
     const userId = c.req.param('userId');
-    
+    const auth = await requireSelfOrAdmin(c, userId);
+    if (auth instanceof Response) return auth;
+
     // Get user's purchased books from KV store
     const purchasedBookIds = await kv.get(`user_books:${userId}`) as string[] || [];
     
@@ -241,22 +240,32 @@ app.get('/library/:userId', async (c) => {
 });
 
 // ─── Bookshop Payment Initialization ─────────────────────────────────────────
-// Initialize payment for book purchases with Flutterwave
+// Used to call PaymentProcessor.initializeFlutterwavePayment, which hits
+// Flutterwave's hosted-checkout-link API and expects the browser to be
+// redirected back to a `/payment/callback` page afterwards — but no such
+// page exists anywhere in this frontend (confirmed: zero references to
+// "payment/callback" in src/). That flow was unreachable by construction.
+// Switched to the same inline-popup pattern the real booking payment flow
+// already uses (BookSessionWithPayment.tsx -> payments/initiate-plan):
+// no Flutterwave API call is needed at this stage at all — just a
+// reference + a pending record for /purchase/verify to find afterwards.
 app.post('/purchase/initialize', async (c) => {
-  console.log('=== POST /bookshop/purchase/initialize (Flutterwave) ===');
-  
+  console.log('=== POST /bookshop/purchase/initialize ===');
+
   try {
     const authHeader = c.req.header('Authorization');
     const accessToken = authHeader?.replace('Bearer ', '');
-    
+
     const user = await getUserFromToken(accessToken);
     if (!user) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
     }
 
+    if (!FLUTTERWAVE_SECRET_KEY) return c.json({ success: false, error: 'Payment not configured yet' }, 503);
+
     const body = await c.req.json() as { bookIds: string[] };
     const { bookIds } = body;
-    
+
     if (!bookIds || !Array.isArray(bookIds) || bookIds.length === 0) {
       return c.json({ success: false, error: 'Invalid book IDs' }, 400);
     }
@@ -269,51 +278,33 @@ app.post('/purchase/initialize', async (c) => {
 
     const totalPrice = purchasedBooks.reduce((sum, book) => sum + book.price, 0);
     const bookTitles = purchasedBooks.map(b => b.title);
+    const paymentId = crypto.randomUUID();
+    const reference = `BOOKSHOP_${Date.now()}_${crypto.randomUUID().replace(/-/g, '')}`;
 
-    // Initialize Flutterwave payment
-    const paymentResult = await PaymentProcessor.initializeFlutterwavePayment({
-      type: 'bookshop',
-      userId: user.id,
-      email: 'placeholder@knowledgefonsacademy.com', // In production, get from user profile
-      amount: totalPrice,
-      currency: 'GBP',
-      description: `Purchase: ${bookTitles.join(', ')}`,
-      metadata: {
-        customerName: 'Student/Parent',
-        bookIds,
-        bookCount: purchasedBooks.length,
-        bookTitles,
-      },
-    });
-
-    if (!paymentResult.success) {
-      return c.json({ success: false, error: paymentResult.error }, 500);
-    }
-
-    // Store pending purchase
+    // Store pending purchase — nothing is granted until /purchase/verify
+    // confirms real payment for this exact reference/amount.
     const pendingPurchase = {
-      id: paymentResult.paymentId,
+      id: paymentId,
       userId: user.id,
       bookIds,
       bookTitles,
       totalPrice,
-      reference: paymentResult.reference,
+      reference,
       status: 'pending',
       createdAt: new Date().toISOString(),
     };
 
-    await kv.set(`pending_purchase:${paymentResult.paymentId}`, pendingPurchase);
-    await kv.set(`purchase_ref:${paymentResult.reference}`, paymentResult.paymentId);
+    await kv.set(`pending_purchase:${paymentId}`, pendingPurchase);
+    await kv.set(`purchase_ref:${reference}`, paymentId);
 
-    console.log(`[Bookshop] Initialized payment for ${bookIds.length} books: ${paymentResult.reference}`);
+    console.log(`[Bookshop] Initialized payment for ${bookIds.length} books: ${reference}`);
 
     return c.json({
       success: true,
-      paymentId: paymentResult.paymentId,
-      reference: paymentResult.reference,
-      authorizationUrl: paymentResult.authorizationUrl,
+      paymentId,
+      reference,
       amount: totalPrice,
-      currency: 'GBP',
+      currency: 'NGN',
       bookCount: purchasedBooks.length,
     });
   } catch (error) {
@@ -326,11 +317,11 @@ app.post('/purchase/initialize', async (c) => {
 // Verify payment and complete book purchase
 app.post('/purchase/verify/:reference', async (c) => {
   console.log('=== POST /bookshop/purchase/verify/:reference (Flutterwave) ===');
-  
+
   try {
     const authHeader = c.req.header('Authorization');
     const accessToken = authHeader?.replace('Bearer ', '');
-    
+
     const user = await getUserFromToken(accessToken);
     if (!user) {
       return c.json({ success: false, error: 'Unauthorized' }, 401);
@@ -351,6 +342,13 @@ app.post('/purchase/verify/:reference', async (c) => {
     if (!pendingPurchase) {
       return c.json({ success: false, error: 'Purchase record not found' }, 404);
     }
+    if (pendingPurchase.userId !== user.id) {
+      return c.json({ success: false, error: 'Forbidden' }, 403);
+    }
+    if (pendingPurchase.status === 'completed') {
+      // Already granted — idempotent re-confirm (e.g. a retried request).
+      return c.json({ success: true, purchase: pendingPurchase, message: 'Already purchased' });
+    }
 
     // Verify payment with Flutterwave
     const verifyResult = await PaymentProcessor.verifyFlutterwavePayment(reference);
@@ -359,6 +357,28 @@ app.post('/purchase/verify/:reference', async (c) => {
       return c.json({
         success: false,
         error: verifyResult.error || 'Payment verification failed',
+      }, 400);
+    }
+
+    // "Verified" alone only proves SOME payment went through under this
+    // reference — not that it was for the right amount. The inline
+    // checkout popup takes its `amount` from the browser, so anyone
+    // comfortable with devtools could open it for ₦1 against a reference
+    // that actually owes far more. Compare what Flutterwave says was
+    // actually charged against what this pending purchase was created
+    // for (never the client) before granting anything — the same check
+    // confirmPlanPayment does for tutoring-session payments, which this
+    // endpoint never had.
+    const paidAmount = Number(verifyResult.amount);
+    const paidCurrency = verifyResult.currency;
+    if (paidCurrency !== 'NGN' || !(paidAmount >= Number(pendingPurchase.totalPrice))) {
+      console.error(
+        `[Bookshop] Payment mismatch for ${reference} — expected NGN ${pendingPurchase.totalPrice}, ` +
+        `Flutterwave reports ${paidAmount} ${paidCurrency}`
+      );
+      return c.json({
+        success: false,
+        error: 'Payment amount did not match the expected price — no books were granted. Please contact support.',
       }, 400);
     }
 
@@ -378,10 +398,12 @@ app.post('/purchase/verify/:reference', async (c) => {
     };
 
     await kv.set(`purchase:${completedPurchase.id}`, completedPurchase);
-    
-    // Clean up pending purchase
-    await kv.delete(`pending_purchase:${paymentId}`);
-    await kv.delete(`purchase_ref:${reference}`);
+
+    // Mark the pending record completed rather than deleting it — a
+    // retried verify call for the same reference (network hiccup, double
+    // click) can then be recognized as already-done above instead of
+    // 404ing on a since-deleted record.
+    await kv.set(`pending_purchase:${paymentId}`, { ...pendingPurchase, status: 'completed' });
 
     // Create notification
     await NotificationBroker.createNotification(kv,
@@ -405,79 +427,29 @@ app.post('/purchase/verify/:reference', async (c) => {
   }
 });
 
-// Purchase books (LEGACY - kept for backward compatibility, redirect to initialize)
+// Disabled: this was the ONLY checkout endpoint the live frontend actually
+// called (confirmed by audit) — it granted every book in the cart straight
+// into the user's library with zero payment of any kind; `totalPrice` was
+// computed only for a console.log. Any authenticated user could get the
+// entire catalog for free. Real purchases now go through
+// /purchase/initialize -> Flutterwave inline checkout -> /purchase/verify,
+// the same pattern tutoring-session payments already use.
 app.post('/purchase', async (c) => {
-  console.log('=== POST /bookshop/purchase (LEGACY) ===');
-  
-  try {
-    const authHeader = c.req.header('Authorization');
-    const accessToken = authHeader?.replace('Bearer ', '');
-    
-    const user = await getUserFromToken(accessToken);
-    if (!user) {
-      return c.json({ success: false, error: 'Unauthorized' }, 401);
-    }
-
-    const { bookIds } = await c.req.json() as { bookIds: string[] };
-    
-    if (!bookIds || !Array.isArray(bookIds) || bookIds.length === 0) {
-      return c.json({ success: false, error: 'Invalid book IDs' }, 400);
-    }
-
-    // Get user's existing library
-    const existingBooks = await kv.get(`user_books:${user.id}`) as string[] || [];
-    
-    // Add new books to library (avoid duplicates)
-    const updatedBooks = [...new Set([...existingBooks, ...bookIds])];
-    
-    // Save updated library
-    await kv.set(`user_books:${user.id}`, updatedBooks);
-    
-    // Calculate total price
-    const purchasedBooks = SAMPLE_BOOKS.filter(book => bookIds.includes(book.id));
-    const totalPrice = purchasedBooks.reduce((sum, book) => sum + book.price, 0);
-    
-    // Create purchase record
-    const purchase = {
-      id: `purchase_${Date.now()}_${user.id}`,
-      userId: user.id,
-      bookIds,
-      totalPrice,
-      purchaseDate: new Date().toISOString(),
-      status: 'completed',
-    };
-    
-    // Store purchase record
-    await kv.set(`purchase:${purchase.id}`, purchase);
-    
-    console.log(`User ${user.id} purchased ${bookIds.length} books for £${totalPrice.toFixed(2)}`);
-
-    return c.json({
-      success: true,
-      purchase,
-      message: 'Books purchased successfully',
-    });
-  } catch (error) {
-    console.error('Error processing book purchase:', error);
-    return c.json({ success: false, error: 'Failed to process purchase' }, 500);
-  }
+  return c.json(
+    { success: false, error: 'This checkout method is no longer available. Please use the bookshop checkout in the app.' },
+    410,
+  );
 });
 
 // Get purchase history
 app.get('/purchases/:userId', async (c) => {
   console.log('=== GET /bookshop/purchases/:userId endpoint called ===');
-  
-  try {
-    const authHeader = c.req.header('Authorization');
-    const accessToken = authHeader?.replace('Bearer ', '');
-    
-    const user = await getUserFromToken(accessToken);
-    if (!user) {
-      return c.json({ success: false, error: 'Unauthorized' }, 401);
-    }
 
+  try {
     const userId = c.req.param('userId');
-    
+    const auth = await requireSelfOrAdmin(c, userId);
+    if (auth instanceof Response) return auth;
+
     // Get all purchases for this user
     const allPurchases = await kv.getByPrefix(`purchase:`);
     const userPurchases = allPurchases.filter((p: any) => p.userId === userId);

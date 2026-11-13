@@ -6,6 +6,7 @@ import { Badge } from './ui/badge';
 import { ImageWithFallback } from './figma/ImageWithFallback';
 import { Book, ShoppingCart, Search, Star, Filter, Crown, CheckCircle2 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
+import { formatNaira } from '../utils/currency';
 
 interface Book {
   id: string;
@@ -139,34 +140,101 @@ export function Bookshop({ session, subscriptionTier }: BookshopProps) {
     setCart(cart.filter(item => item.id !== bookId));
   };
 
+  const [checkingOut, setCheckingOut] = useState(false);
+
+  // Used to call POST /bookshop/purchase, which granted every book in the
+  // cart straight into the library with zero payment of any kind — fixed
+  // on the backend to actually require and verify a real Flutterwave
+  // payment first. This now follows the same inline-checkout pattern the
+  // tutoring-session booking flow already uses: initialize on the
+  // backend to get a reference, open Flutterwave's inline popup for the
+  // real charge, then ask the backend to verify it before the books are
+  // granted.
   const handleCheckout = async () => {
-    if (!session?.access_token || cart.length === 0) return;
+    if (!session?.access_token || cart.length === 0 || checkingOut) return;
+    setCheckingOut(true);
 
     try {
-      const response = await fetch(
-        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookshop/purchase`,
+      const initRes = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookshop/purchase/initialize`,
         {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${session.access_token}`,
             'Content-Type': 'application/json',
           },
-          body: JSON.stringify({
-            bookIds: cart.map(b => b.id),
-          }),
+          body: JSON.stringify({ bookIds: cart.map(b => b.id) }),
         }
       );
+      const initData = await initRes.json();
+      if (!initRes.ok || !initData.success) {
+        alert(`Checkout failed: ${initData.error || 'Unknown error'}`);
+        return;
+      }
 
-      if (response.ok) {
+      const { reference, amount } = initData;
+      const publicKey =
+        import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY ||
+        'FLWPUBK_TEST-faf29eb495805d5a046cac66366b2eae-X';
+      if (!import.meta.env.VITE_FLUTTERWAVE_PUBLIC_KEY && import.meta.env.PROD) {
+        alert('Payments are not configured. Please contact support.');
+        return;
+      }
+
+      let successTxRef: string | null = null;
+      await new Promise<void>((resolve) => {
+        // @ts-ignore — FlutterwaveCheckout loaded via <script> in index.html
+        const modal = window.FlutterwaveCheckout({
+          public_key: publicKey,
+          tx_ref: reference,
+          amount,
+          currency: 'NGN',
+          payment_options: 'card,banktransfer,ussd,mobilemoney',
+          customer: {
+            email: session.user?.email,
+            name: session.user?.email || 'Customer',
+          },
+          customizations: {
+            title: 'Knowledge Fons Academy Bookshop',
+            description: `${cart.length} book${cart.length > 1 ? 's' : ''}`,
+            logo: 'https://app.knowledgefonsacademy.com/Logo.png',
+          },
+          callback: (response: { status: string; tx_ref: string }) => {
+            if (response.status === 'successful' || response.status === 'completed') {
+              successTxRef = response.tx_ref;
+            }
+            try { modal?.close?.(); } catch (_) {}
+            const frame = document.querySelector('#flwpugpaidiv') as HTMLElement | null;
+            if (frame) frame.style.display = 'none';
+            resolve();
+          },
+          onclose: () => resolve(),
+        });
+      });
+
+      if (!successTxRef) {
+        return;
+      }
+
+      const verifyRes = await fetch(
+        `https://${projectId}.supabase.co/functions/v1/make-server-cbd74580/bookshop/purchase/verify/${successTxRef}`,
+        {
+          method: 'POST',
+          headers: { 'Authorization': `Bearer ${session.access_token}` },
+        }
+      );
+      const verifyData = await verifyRes.json();
+      if (verifyRes.ok && verifyData.success) {
         alert('Purchase successful! Books added to your library.');
         setCart([]);
       } else {
-        const error = await response.json();
-        alert(`Purchase failed: ${error.message || 'Unknown error'}`);
+        alert(`Payment received but could not be confirmed: ${verifyData.error || 'Please contact support with reference: ' + successTxRef}`);
       }
     } catch (error) {
       console.error('Error during checkout:', error);
       alert('Purchase failed. Please try again.');
+    } finally {
+      setCheckingOut(false);
     }
   };
 
@@ -210,9 +278,10 @@ export function Bookshop({ session, subscriptionTier }: BookshopProps) {
           <Button
             variant="outline"
             className="relative"
+            disabled={checkingOut}
             onClick={() => {
               if (cart.length > 0) {
-                const cartSummary = cart.map(b => `${b.title} - £${b.price}`).join('\n');
+                const cartSummary = cart.map(b => `${b.title} - ${formatNaira(b.price)}`).join('\n');
                 if (confirm(`Cart (${cart.length} items):\n\n${cartSummary}\n\nProceed to checkout?`)) {
                   handleCheckout();
                 }
@@ -220,10 +289,10 @@ export function Bookshop({ session, subscriptionTier }: BookshopProps) {
             }}
           >
             <ShoppingCart className="w-5 h-5 mr-2" />
-            Cart ({cart.length})
-            {cart.length > 0 && (
+            {checkingOut ? 'Processing…' : `Cart (${cart.length})`}
+            {cart.length > 0 && !checkingOut && (
               <Badge className="ml-2" style={{ backgroundColor: '#5d9827' }}>
-                £{cart.reduce((sum, book) => sum + book.price, 0).toFixed(2)}
+                {formatNaira(cart.reduce((sum, book) => sum + book.price, 0))}
               </Badge>
             )}
           </Button>
@@ -420,7 +489,7 @@ export function Bookshop({ session, subscriptionTier }: BookshopProps) {
                   </Button>
                 ) : (
                   <>
-                    <span className="text-gray-900">£{book.price.toFixed(2)}</span>
+                    <span className="text-gray-900">{formatNaira(book.price)}</span>
                     <Button
                       variant={cart.find(item => item.id === book.id) ? 'outline' : 'default'}
                       size="sm"
