@@ -9,6 +9,7 @@ import { getIndexedItems } from './kv-index-helpers.tsx';
 import { resolveProfiles, resolveName } from './profile-resolution.tsx';
 import { collectBookingsForUser } from './messaging-access.tsx';
 import { getReportsForBookings } from './reports-notifications-routes.tsx';
+import { normalizeGradeLevel } from './curriculum-routes.tsx';
 
 // Helper function to format timestamp
 function formatTimestamp(timestamp: string): string {
@@ -2587,6 +2588,118 @@ export function adminRoutes(app: Hono, getUserId: (token: string | null) => Prom
       return c.json({ success: true });
     } catch (error: any) {
       console.error('Error deleting admin resource:', error);
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
+  // List resources for the actual audience (parents/students/tutors) —
+  // everything above this point lives under /admin/resources/* and is
+  // blocked for non-admins by the global /admin/* auth middleware in
+  // index.ts, including the download endpoint just below, whose own
+  // internal logic (subscription-tier checks, a free-download limit) was
+  // clearly written for a regular user, not an admin. ResourcesUploader.tsx
+  // (admin) lets an admin upload content indefinitely, but the only
+  // audience-facing screen, ResourcesHub.tsx, was a hardcoded "Coming
+  // Soon" placeholder that never called any endpoint at all — so uploaded
+  // content was structurally unreachable by anyone it was meant for. This
+  // and the download route below are the real, reachable path; they read
+  // the same admin_resource:* records, just without the admin-only gate.
+  app.get('/make-server-cbd74580/resources', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+
+      const gradeLevel = c.req.query('gradeLevel');
+      // A child/student profile's grade can be stored as 'primary_5',
+      // 'year_5', or a few other aliases depending on where it was set
+      // (the same mismatch already found and fixed in curriculum-routes.tsx)
+      // — resources are uploaded with the 'year_X' form only, so comparing
+      // either side without normalizing would silently return zero results
+      // for a real grade level instead of erroring.
+      const normalizedGrade = gradeLevel ? normalizeGradeLevel(gradeLevel) : null;
+      const allResources = await kv.getByPrefix('admin_resource:');
+
+      const resources = allResources
+        .filter((r: any) => !normalizedGrade || normalizeGradeLevel(r.gradeLevel) === normalizedGrade)
+        .filter((r: any) => r.status !== 'rejected')
+        .sort((a: any, b: any) => new Date(b.uploadedAt).getTime() - new Date(a.uploadedAt).getTime())
+        // Strip the base64 file content — a list screen has no business
+        // shipping every resource's full bytes just to render a list.
+        .map((r: any) => ({
+          id: r.id,
+          fileName: r.fileName,
+          fileType: r.fileType,
+          fileSize: r.fileSize,
+          gradeLevel: r.gradeLevel,
+          subject: r.subject,
+          resourceType: r.resourceType,
+          title: r.title,
+          description: r.description,
+          accessControl: r.accessControl,
+          uploadedAt: r.uploadedAt,
+          downloadCount: r.downloadCount || 0,
+        }));
+
+      return c.json({ resources });
+    } catch (error: any) {
+      console.error('Error fetching resources:', error);
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
+  app.get('/make-server-cbd74580/resources/:resourceId/download', async (c) => {
+    try {
+      const accessToken = c.req.header('Authorization')?.split(' ')[1];
+      const userId = await getUserId(accessToken ?? null);
+      if (!userId) {
+        return c.json({ error: 'Unauthorized' }, 401);
+      }
+
+      const resourceId = c.req.param('resourceId');
+      const resource = await kv.get(`admin_resource:${resourceId}`) as any;
+      if (!resource) {
+        return c.json({ error: 'Resource not found' }, 404);
+      }
+
+      const userProfile = await kv.get(`user:${userId}`) as any;
+
+      if (resource.accessControl === 'private') {
+        const subscription = await kv.get(`subscription_parent_${userId}`) as any;
+        if (!subscription || subscription.tierName === 'basic') {
+          if (userProfile?.role !== 'admin') {
+            const usageKey = `resource_usage:${userId}`;
+            const usage = (await kv.get(usageKey)) as any || { count: 0, resources: [] };
+            const FREE_RESOURCE_LIMIT = 5;
+            if (usage.count >= FREE_RESOURCE_LIMIT) {
+              return c.json({ error: 'Free resource limit reached. Please subscribe for unlimited access.' }, 403);
+            }
+            usage.count += 1;
+            usage.resources.push({ resourceId, downloadedAt: new Date().toISOString() });
+            await kv.set(usageKey, usage);
+          }
+        }
+      }
+
+      resource.downloadCount = (resource.downloadCount || 0) + 1;
+      await kv.set(`admin_resource:${resourceId}`, resource);
+
+      const binaryString = atob(resource.fileData);
+      const bytes = new Uint8Array(binaryString.length);
+      for (let i = 0; i < binaryString.length; i++) {
+        bytes[i] = binaryString.charCodeAt(i);
+      }
+
+      return new Response(bytes, {
+        headers: {
+          'Content-Type': resource.fileType,
+          'Content-Disposition': `attachment; filename="${resource.fileName}"`,
+        },
+      });
+    } catch (error: any) {
+      console.error('Error downloading resource:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);
     }
   });

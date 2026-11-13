@@ -20,7 +20,7 @@ const supabase = createClient(
  * on upload. Without this, /grade/:gradeLevel silently returns nothing for any
  * caller using one of those other formats, even though matching curricula exist.
  */
-function normalizeGradeLevel(input: string): string {
+export function normalizeGradeLevel(input: string): string {
   const raw = (input || '').trim().toLowerCase().replace(/\s+/g, '_');
   if (/^year_\d{1,2}$/.test(raw)) return raw;
 
