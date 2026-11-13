@@ -7,14 +7,22 @@ import {
   logActivity,
   getStrugglingSudents,
 } from './class-analytics-service.tsx';
+import { verifyUser } from './route-auth.tsx';
 
 export const analyticsRoutes = new Hono();
+
+// Every endpoint below used to accept a bare client-supplied `X-User-Id`
+// header as proof of identity — anyone could set that header to any value
+// with no token behind it at all. Confirmed unreachable from any live
+// screen today (ClassAnalyticsDashboard.tsx is never imported anywhere),
+// but still directly callable, so fixed to the same verified-token check
+// every other route in this codebase uses.
 
 // ========== CLASS ANALYTICS ENDPOINTS ==========
 
 analyticsRoutes.get('/class/:classId/overview', async (c) => {
   try {
-    const userId = c.req.header('X-User-Id');
+    const userId = await verifyUser(c);
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
     const classId = c.req.param('classId');
@@ -28,7 +36,7 @@ analyticsRoutes.get('/class/:classId/overview', async (c) => {
 
 analyticsRoutes.get('/class/:classId/struggling-students', async (c) => {
   try {
-    const userId = c.req.header('X-User-Id');
+    const userId = await verifyUser(c);
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
     const classId = c.req.param('classId');
@@ -44,7 +52,7 @@ analyticsRoutes.get('/class/:classId/struggling-students', async (c) => {
 
 analyticsRoutes.get('/class/:classId/activity-log', async (c) => {
   try {
-    const userId = c.req.header('X-User-Id');
+    const userId = await verifyUser(c);
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
     const classId = c.req.param('classId');
@@ -60,7 +68,7 @@ analyticsRoutes.get('/class/:classId/activity-log', async (c) => {
 
 analyticsRoutes.get('/student/:studentId/class/:classId/progress', async (c) => {
   try {
-    const userId = c.req.header('X-User-Id');
+    const userId = await verifyUser(c);
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
     const studentId = c.req.param('studentId');
@@ -78,7 +86,7 @@ analyticsRoutes.get('/student/:studentId/class/:classId/progress', async (c) => 
 
 analyticsRoutes.get('/assignment/:assignmentId/analytics', async (c) => {
   try {
-    const userId = c.req.header('X-User-Id');
+    const userId = await verifyUser(c);
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
     const assignmentId = c.req.param('assignmentId');
@@ -94,7 +102,7 @@ analyticsRoutes.get('/assignment/:assignmentId/analytics', async (c) => {
 
 analyticsRoutes.post('/log-activity', async (c) => {
   try {
-    const userId = c.req.header('X-User-Id');
+    const userId = await verifyUser(c);
     if (!userId) return c.json({ error: 'Unauthorized' }, 401);
 
     const { classId, studentId, studentName, action, details } = await c.req.json();
