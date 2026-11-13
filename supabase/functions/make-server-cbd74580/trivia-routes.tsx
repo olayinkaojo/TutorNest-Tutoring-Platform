@@ -18,6 +18,25 @@ async function getTriviaQuestions(): Promise<TriviaBank> {
   return triviaQuestionsCache;
 }
 
+// This used to look up `user_profile:${userId}` / `profile:${userId}` —
+// neither key is ever written anywhere in this codebase (every other
+// profile write uses `user:${userId}` for a direct account or
+// `profile_${role}_${userId}` for a specific role's data — see
+// role-management-routes.tsx). Both lookups always missed, so the
+// leaderboard could never show a real student's name (always fell back to
+// "Student") and the per-student subject filter on /subjects/:grade was
+// dead code that always returned every subject regardless of what the
+// student actually picked.
+async function resolveStudentProfile(userId: string): Promise<any | null> {
+  const direct = await kv.get(`user:${userId}`);
+  if (direct) return direct;
+  const asChild = await kv.get(`child:${userId}`);
+  if (asChild) return asChild;
+  const asStudentRole = await kv.get(`profile_student_${userId}`);
+  if (asStudentRole) return asStudentRole;
+  return await db.getProfile(userId).catch(() => null);
+}
+
 // Get random trivia questions
 app.get('/questions', async (c) => {
   try {
@@ -92,8 +111,25 @@ app.get('/questions', async (c) => {
     const shuffled = [...allQuestions].sort(() => Math.random() - 0.5);
     const selectedQuestions = shuffled.slice(0, Math.min(count, shuffled.length));
 
-    return c.json({ 
+    // One-time quiz session: /submit must present this id and can only use
+    // it once, checked against exactly the question ids issued here. This
+    // is what makes the server-side scoring in /submit actually mean
+    // something — without it, /submit could be called directly and
+    // repeatedly with any questionId/selectedAnswer pairs to farm points
+    // with no need to ever have "played" anything.
+    const quizSessionId = crypto.randomUUID();
+    await kv.set(`trivia_session:${quizSessionId}`, {
+      userId: user.id,
+      grade,
+      subject,
+      questionIds: (selectedQuestions as any[]).map((q: any) => q.id),
+      used: false,
+      createdAt: new Date().toISOString(),
+    });
+
+    return c.json({
       questions: selectedQuestions,
+      quizSessionId,
       accessStatus: accessCheck?.status || 'unknown',
       expiresAt: accessCheck?.expiresAt,
       daysRemaining: accessCheck?.daysRemaining,
@@ -125,7 +161,7 @@ app.post('/submit', async (c) => {
     }
 
     const body = await c.req.json();
-    const { answers, grade, subject, timeSpent } = body;
+    const { answers, grade, subject, timeSpent, quizSessionId } = body;
 
     console.log('Trivia submit: User:', user.id, '| Grade:', grade, '| Subject:', subject, '| Answers:', answers?.length);
 
@@ -146,16 +182,58 @@ app.post('/submit', async (c) => {
       // Fail open - allow submission on error
     }
 
-    // Calculate score
+    // This used to just trust the client's own `isCorrect`/`xpEarned` on
+    // each answer — GET /questions sends the full question object
+    // (correctAnswer included) to the browser for immediate feedback, so
+    // anyone with devtools (or just reading the network response) could
+    // submit any isCorrect/xpEarned values they liked and farm unlimited
+    // XP/leaderboard rank/badges without answering anything. The quiz
+    // session from /questions ties this submission to a specific,
+    // previously-issued, not-yet-used set of question ids, and every
+    // answer is re-scored here against the real question bank using only
+    // questionId + selectedAnswer — the client's isCorrect/xpEarned/
+    // correctAnswer fields are never read.
+    if (!quizSessionId) {
+      return c.json({ error: 'Missing quizSessionId' }, 400);
+    }
+    const quizSession = await kv.get(`trivia_session:${quizSessionId}`) as any;
+    if (!quizSession || quizSession.used || quizSession.userId !== user.id || quizSession.grade !== grade || quizSession.subject !== subject) {
+      return c.json({ error: 'This quiz session is invalid or has already been submitted' }, 400);
+    }
+    const sessionQuestionIds = new Set(quizSession.questionIds as string[]);
+    const seenQuestionIds = new Set<string>();
+    for (const a of answers) {
+      if (!sessionQuestionIds.has(a.questionId) || seenQuestionIds.has(a.questionId)) {
+        return c.json({ error: 'Submission does not match the questions issued for this session' }, 400);
+      }
+      seenQuestionIds.add(a.questionId);
+    }
+    await kv.set(`trivia_session:${quizSessionId}`, { ...quizSession, used: true, submittedAt: new Date().toISOString() });
+
+    const TRIVIA_QUESTIONS = await getTriviaQuestions();
+    const realQuestions = (TRIVIA_QUESTIONS[grade]?.[subject] as any[] | undefined) || [];
+    const realQuestionsById = new Map(realQuestions.map((q: any) => [q.id, q]));
+
+    // Calculate score — entirely from the real answer key, never the client.
     let correctAnswers = 0;
     let totalXP = 0;
-
-    answers.forEach((answer: any) => {
-      if (answer.isCorrect) {
+    const scoredAnswers = answers.map((answer: any) => {
+      const realQuestion = realQuestionsById.get(answer.questionId);
+      const isCorrect = !!realQuestion && answer.selectedAnswer === realQuestion.correctAnswer;
+      const xpEarned = isCorrect ? (realQuestion.xpReward || 0) : 0;
+      if (isCorrect) {
         correctAnswers++;
-        totalXP += answer.xpEarned || 0;
+        totalXP += xpEarned;
       }
+      return {
+        questionId: answer.questionId,
+        selectedAnswer: answer.selectedAnswer,
+        correctAnswer: realQuestion?.correctAnswer,
+        isCorrect,
+        xpEarned,
+      };
     });
+    const answersForStorage = scoredAnswers;
 
     const score = (correctAnswers / answers.length) * 100;
 
@@ -170,7 +248,7 @@ app.post('/submit', async (c) => {
       xpEarned: totalXP,
       timeSpent,
       timestamp: new Date().toISOString(),
-      answers
+      answers: answersForStorage
     };
 
     await kv.set(`trivia_result:${user.id}:${Date.now()}`, triviaResult);
@@ -208,12 +286,11 @@ app.post('/submit', async (c) => {
       userEntry.lastPlayed = new Date().toISOString();
     } else {
       // Get user profile for display
-      const profileKey = `user_profile:${user.id}`;
-      const profile = await kv.get(profileKey);
-      
+      const profile = await resolveStudentProfile(user.id);
+
       userEntry = {
         userId: user.id,
-        userName: profile?.firstName || profile?.full_name || 'Student',
+        userName: profile?.firstName || profile?.fullName || profile?.full_name || profile?.name || 'Student',
         totalXP,
         gamesPlayed: 1,
         averageScore: score,
@@ -350,8 +427,7 @@ app.get('/subjects/:grade', async (c) => {
     }
 
     // Get student profile with their selected subjects
-    const profileKey = `profile:${user.id}`;
-    const profile = await kv.get(profileKey);
+    const profile = await resolveStudentProfile(user.id);
 
     if (!profile) {
       // If no profile found, return all available subjects

@@ -47,6 +47,7 @@ export function TriviaGame({ userId, grade, onXPEarned }: TriviaGameProps) {
   const [selectedSubject, setSelectedSubject] = useState<string>('');
   const [availableSubjects, setAvailableSubjects] = useState<string[]>([]);
   const [questions, setQuestions] = useState<TriviaQuestion[]>([]);
+  const [quizSessionId, setQuizSessionId] = useState<string | null>(null);
   const [currentQuestionIndex, setCurrentQuestionIndex] = useState(0);
   const [selectedAnswer, setSelectedAnswer] = useState<number | null>(null);
   const [answers, setAnswers] = useState<any[]>([]);
@@ -168,6 +169,7 @@ export function TriviaGame({ userId, grade, onXPEarned }: TriviaGameProps) {
       if (response.ok) {
         const data = await response.json();
         setQuestions(data.questions || []);
+        setQuizSessionId(data.quizSessionId || null);
         setGameState('playing');
         setCurrentQuestionIndex(0);
         setAnswers([]);
@@ -298,17 +300,23 @@ export function TriviaGame({ userId, grade, onXPEarned }: TriviaGameProps) {
             answers,
             grade: normalizedGrade,
             subject: selectedSubject,
-            timeSpent
+            timeSpent,
+            quizSessionId,
           })
         }
       );
 
       if (response.ok) {
         const data = await response.json();
-        toast.success(`🎉 Game complete! +${totalXP} XP earned!`);
-        
-        if (onXPEarned && totalXP > 0) {
-          onXPEarned(totalXP);
+        // The server recomputes correctness/XP itself from the real answer
+        // key rather than trusting what this client asserts — use its
+        // number here too, not the client-tracked `totalXP`, so what's
+        // shown always matches what was actually credited.
+        const awardedXP = data.result?.xpEarned ?? totalXP;
+        toast.success(`🎉 Game complete! +${awardedXP} XP earned!`);
+
+        if (onXPEarned && awardedXP > 0) {
+          onXPEarned(awardedXP);
         }
       } else {
         const errorData = await response.json().catch(() => ({ error: 'Unknown error' }));
