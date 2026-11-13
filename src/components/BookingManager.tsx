@@ -66,6 +66,7 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
   const [success, setSuccess] = useState('');
   const [selectedBooking, setSelectedBooking] = useState<Booking | null>(null);
   const [showCancelConfirm, setShowCancelConfirm] = useState(false);
+  const [cancelPreview, setCancelPreview] = useState<{ amount: number; percentage: number } | null>(null);
   const [cancelling, setCancelling] = useState(false);
   const [showPostReport, setShowPostReport] = useState<Booking | null>(null);
   const [showViewReport, setShowViewReport] = useState<Booking | null>(null);
@@ -233,18 +234,27 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
     }
   };
 
-  const calculateRefund = async (booking: Booking): Promise<{ amount: string; percentage: number } | null> => {
-    try {
-      const refundData = await parentAPI.calculateRefund(session.access_token, booking.id);
-      return {
-        amount: refundData.refundAmount.toFixed(2),
-        percentage: refundData.refundPercentage,
-      };
-    } catch (err) {
-      console.error('Error calculating refund:', err);
-      return null;
+  // The on-screen confirmation card below is the one real confirmation
+  // step for cancelling — it used to call this synchronously (no await),
+  // so `refundAmount` was a stray Promise object, `parseFloat()` on it was
+  // always NaN, and the card permanently showed "₦NaN" plus the wrong
+  // full/partial label. Now fetched into state by the effect below instead.
+  useEffect(() => {
+    if (!showCancelConfirm || !selectedBooking) {
+      setCancelPreview(null);
+      return;
     }
-  };
+    let cancelled = false;
+    parentAPI.calculateRefund(session.access_token, selectedBooking.id)
+      .then((data) => {
+        if (!cancelled) setCancelPreview({ amount: data.refundAmount, percentage: data.refundPercentage });
+      })
+      .catch((err) => {
+        console.error('Error calculating refund:', err);
+        if (!cancelled) setCancelPreview({ amount: 0, percentage: 0 });
+      });
+    return () => { cancelled = true; };
+  }, [showCancelConfirm, selectedBooking?.id]);
 
   const handleCancelBooking = async () => {
     if (!selectedBooking) return;
@@ -253,20 +263,7 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
     setError('');
 
     try {
-      // Get refund info from backend before cancelling
-      const refundData = await parentAPI.calculateRefund(session.access_token, selectedBooking.id);
-      
-      // Show confirmation with actual refund amount
-      const confirmed = window.confirm(
-        `Are you sure you want to cancel this booking?\n\nRefund Amount: ₦${refundData.refundAmount.toFixed(2)} (${refundData.refundPercentage}%)`
-      );
-      
-      if (!confirmed) {
-        setCancelling(false);
-        return;
-      }
-
-      // Cancel the booking (backend handles refund calculation)
+      // The card itself is the confirmation step now — cancel directly.
       const response = await parentAPI.cancelBooking(
         session.access_token,
         selectedBooking.id,
@@ -274,7 +271,7 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
       );
 
       if (response.success) {
-        setSuccess(`Booking cancelled successfully. Refund of ₦${response.refundAmount.toFixed(2)} will be processed shortly.`);
+        setSuccess(`Booking cancelled successfully. Refund of ${formatNaira(response.refundAmount)} will be processed shortly.`);
         setShowCancelConfirm(false);
         setSelectedBooking(null);
         await fetchBookings();
@@ -538,8 +535,6 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
   }
 
   if (showCancelConfirm && selectedBooking) {
-    const refundAmount = calculateRefund(selectedBooking);
-    
     return (
       <Card>
         <CardHeader>
@@ -563,12 +558,18 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
 
             <div className="p-4 bg-gray-50 rounded-lg">
               <p className="text-sm font-medium mb-1">Refund Amount</p>
-              <p className="text-gray-700">{formatNaira(parseFloat(refundAmount))}</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {parseFloat(refundAmount) === parseFloat(selectedBooking.price)
-                  ? 'Full refund (cancelled more than 24 hours in advance)'
-                  : 'Partial refund (50% - cancelled within 24 hours)'}
+              <p className="text-gray-700">
+                {cancelPreview ? formatNaira(cancelPreview.amount) : 'Calculating…'}
               </p>
+              {cancelPreview && (
+                <p className="text-xs text-gray-500 mt-1">
+                  {cancelPreview.percentage >= 100
+                    ? 'Full refund (cancelled more than 24 hours in advance)'
+                    : cancelPreview.percentage > 0
+                    ? `Partial refund (${cancelPreview.percentage}% - cancelled within 24 hours)`
+                    : 'No refund (session has already started)'}
+                </p>
+              )}
             </div>
           </div>
 
@@ -585,7 +586,7 @@ export function BookingManager({ session, userRole, userId, studentId }: Booking
             </Button>
             <Button
               onClick={handleCancelBooking}
-              disabled={cancelling}
+              disabled={cancelling || !cancelPreview}
               className="h-12 text-white bg-red-600 hover:bg-red-700"
             >
               {cancelling ? 'Cancelling...' : 'Confirm Cancellation'}

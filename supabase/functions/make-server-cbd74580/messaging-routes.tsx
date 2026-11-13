@@ -2,6 +2,33 @@ import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 
+// Disabled: this is the older, per-booking messaging system. The live chat
+// feature (Chatroom.tsx) has since moved to the conversation-based system in
+// conversations-routes.tsx, which has proper per-user/per-conversation
+// indices, real optimistic-send handling, and in-app notifications. Nothing
+// in the current app calls these routes any more — their only caller,
+// MessageThread.tsx, is not imported by any dashboard — but they were still
+// directly callable by anyone with a valid token. Of particular concern:
+// the attachment "upload" here was never real (see the commented-out body
+// below) — it accepted a file, validated only its size/count, and returned
+// a fabricated URL pointing at nothing, so a sender would believe a file
+// was sent while the recipient could never retrieve it. Disabling rather
+// than fixing, since nothing live depends on this working.
+export const messagingRoutes = (app: Hono, getUserId: Function) => {
+  const disabled = (c: any) =>
+    c.json({ error: 'This messaging endpoint has been retired. Use the in-app chat.' }, 410);
+
+  app.get('/make-server-cbd74580/messages/:bookingId', disabled);
+  app.post('/make-server-cbd74580/messages', disabled);
+  app.post('/make-server-cbd74580/messages/:messageId/report', disabled);
+  app.get('/make-server-cbd74580/admin/message-logs', disabled);
+};
+
+/* Previous implementation, kept for reference — do not re-enable without
+   first replacing the mock attachment upload with a real one (Supabase
+   Storage) and giving /messages/:bookingId a real index instead of
+   kv.getByPrefix('message:') scanning every message on the platform.
+
 function containsContactInfo(content: string): boolean {
   const pattern = /\b(\d{10,}|[\w.-]+@[\w.-]+\.\w+|(?:whatsapp|telegram|facebook|instagram|twitter)\b)/gi;
   return pattern.test(content);
@@ -62,7 +89,7 @@ export const messagingRoutes = (app: Hono, getUserId: Function) => {
       }
 
       const bookingId = c.req.param('bookingId');
-      
+
       // Verify user is part of this booking
       const booking = await kv.get(bookingId) as any;
       if (!booking) {
@@ -331,9 +358,9 @@ export const messagingRoutes = (app: Hono, getUserId: Function) => {
       const allLogs = await kv.getByPrefix('message-log:');
       const allReportLogs = await kv.getByPrefix('message-report-log:');
 
-      return c.json({ 
+      return c.json({
         messageLogs: allLogs,
-        reportLogs: allReportLogs 
+        reportLogs: allReportLogs
       });
     } catch (error: any) {
       console.error('Error fetching message logs:', error);
@@ -341,3 +368,5 @@ export const messagingRoutes = (app: Hono, getUserId: Function) => {
     }
   });
 };
+
+*/

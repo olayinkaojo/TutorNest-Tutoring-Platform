@@ -4,6 +4,11 @@ import * as db from './db.tsx';
 import { requireAdmin, requireSelfOrAdmin, verifyUser, isAdmin } from './route-auth.tsx';
 import { logAuditEvent } from './activity-log.tsx';
 import { processSessionAttendance } from './payment-routes.tsx';
+import { notifyAdmins } from './notification-broker.tsx';
+
+function formatNaira(amount: number): string {
+  return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 const app = new Hono();
 
@@ -445,6 +450,27 @@ app.post('/disputes', async (c) => {
       return c.json({ error: 'Invalid dispute type' }, 400);
     }
 
+    // Nothing previously checked that the caller actually has anything to
+    // do with sessionId — any authenticated user could file a dispute
+    // against an arbitrary session they never attended. That matters
+    // beyond spam: hasOpenDisputeForBooking (payment-routes.tsx) freezes
+    // that session's earnings release the moment a dispute exists, so this
+    // was a way for anyone to freeze any tutor's pay for any session.
+    if (sessionId) {
+      const disputedBooking = await db.getBooking(sessionId).catch(() => null);
+      if (!disputedBooking) {
+        return c.json({ error: 'Session not found' }, 404);
+      }
+      const parentId = (disputedBooking as any).userId;
+      const isParticipant =
+        disputedBooking.tutorId === callerId ||
+        disputedBooking.studentId === callerId ||
+        parentId === callerId;
+      if (!isParticipant) {
+        return c.json({ error: 'You can only file a dispute for a session you were actually part of' }, 403);
+      }
+    }
+
     const disputeId = `dispute_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     const now = new Date().toISOString();
 
@@ -486,6 +512,15 @@ app.post('/disputes', async (c) => {
       severity: 'warning',
       metadata: { disputeId, type, submittedBy, submittedAgainst, sessionId },
     });
+
+    // This never notified anyone — a filed dispute was only discoverable
+    // if an admin happened to poll GET /disputes.
+    await notifyAdmins({
+      type: 'dispute_filed',
+      title: 'New dispute filed',
+      message: `A ${type} dispute was filed against a ${submittedAgainstRole || 'user'}${sessionId ? ` for session ${sessionId}` : ''}.`,
+      actionUrl: '/dashboard/admin/disputes',
+    }).catch(() => {});
 
     return c.json({ success: true, dispute });
   } catch (error) {
@@ -630,7 +665,66 @@ app.patch('/disputes/:disputeId', async (c) => {
       }
     }
 
-    return c.json({ success: true, dispute, attendanceResult });
+    // AdminDisputeHandler.tsx offers "Full Refund (100%)" / "Partial Refund
+    // (50%)" as resolution outcomes, but nothing ever acted on them — an
+    // admin picking either believed money was being returned to the
+    // parent, and it never was. Open a real refund request through the
+    // same admin-approval -> Flutterwave pipeline the booking-cancel flow
+    // uses, scaled to the flat ₦15,000/session rate (every plan prices
+    // every session at exactly that — see PAYMENT_PLANS in
+    // payment-routes.tsx).
+    let refundRequestId: string | null = null;
+    if (
+      dispute.sessionId &&
+      (status === 'resolved' || status === 'closed') &&
+      (outcome === 'refund-100' || outcome === 'refund-50')
+    ) {
+      try {
+        const booking = await db.getBooking(dispute.sessionId);
+        if (booking && (booking as any).paymentId) {
+          const payment = await db.getPaymentById((booking as any).paymentId);
+          if (payment) {
+            const refundPercentage = outcome === 'refund-100' ? 100 : 50;
+            const refundAmount = (15000 * refundPercentage) / 100;
+            refundRequestId = `${Date.now()}_${payment.id}_${dispute.sessionId}`;
+            await kv.set(`refund:${refundRequestId}`, {
+              id: refundRequestId,
+              paymentId: payment.id,
+              bookingId: dispute.sessionId,
+              coveredBookingIds: [dispute.sessionId],
+              userId: payment.userId,
+              tutorId: booking.tutorId,
+              isDbPayment: true,
+              amount: refundAmount,
+              refundPercentage,
+              reason: `Dispute ${disputeId} resolved: ${outcome}`,
+              status: 'pending',
+              reference: payment.reference,
+              createdAt: new Date().toISOString(),
+              requestedAt: new Date().toISOString(),
+            });
+            await logAuditEvent({
+              userId: payment.userId,
+              adminId: auth as string,
+              action: 'refund_requested_from_dispute',
+              category: 'disputes',
+              description: `Dispute ${disputeId} resolved with ${outcome} — refund request ${refundRequestId} of ${formatNaira(refundAmount)} opened for admin approval.`,
+              metadata: { disputeId, refundRequestId, paymentId: payment.id, sessionId: dispute.sessionId, amount: refundAmount },
+            });
+            await notifyAdmins({
+              type: 'system_alert',
+              title: 'Refund request from resolved dispute',
+              message: `Dispute ${disputeId} was resolved with ${outcome === 'refund-100' ? 'a full' : 'a partial'} refund — ${formatNaira(refundAmount)} is pending approval.`,
+              actionUrl: '/dashboard/admin/payments',
+            }).catch(() => {});
+          }
+        }
+      } catch (e: any) {
+        console.warn('Dispute resolution: opening refund request failed (non-fatal):', e.message);
+      }
+    }
+
+    return c.json({ success: true, dispute, attendanceResult, refundRequestId });
   } catch (error) {
     return c.json({ error: 'Failed to update dispute', details: String(error) }, 500);
   }

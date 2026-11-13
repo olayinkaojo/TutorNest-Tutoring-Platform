@@ -1845,34 +1845,52 @@ app.post('/payments/:paymentId/refund', async (c) => {
       return c.json({ error: `Cannot refund ${payment.status} payments` }, 400);
     }
 
-    // Calculate refund amount based on time until session. DB payments store
-    // bookingIds (plural — one per session in the plan); use the first
-    // upcoming one as the reference point, same logic as before.
-    let booking: any = null;
+    // A plan payment (payment.bookingIds) covers every session up front —
+    // e.g. ₦195,000 for 13 sessions — but by the time someone asks for a
+    // refund, some of those sessions may already have happened. Refunding
+    // based on `payment.amount` (the full original charge) would refund
+    // sessions that were already delivered. And `bookingIds[0]` is always
+    // session #1 in date order — for an ongoing plan that's in the past,
+    // so gating the refund policy on "hours until session #1" made the
+    // policy see a negative number and treat every refund as "session
+    // already started" (0%) even when most of the plan was still ahead.
+    // Base the refund on what's actually left: sessions still `confirmed`
+    // and not yet in the past, priced at the flat ₦15,000/session rate
+    // (every plan is priced at exactly that per session — see
+    // PAYMENT_PLANS above), gated by the soonest of THOSE sessions.
+    let remainingBookings: any[] = [];
+    let soonestBooking: any = null;
     if (isDbPayment) {
-      const firstBookingId = (payment.bookingIds ?? [])[0];
-      if (firstBookingId) booking = await db.getBooking(firstBookingId);
+      const allBookings = await Promise.all((payment.bookingIds ?? []).map((id: string) => db.getBooking(id)));
+      const now = Date.now();
+      remainingBookings = allBookings.filter((b) =>
+        b && b.status === 'confirmed' && new Date(`${b.date}T${b.endTime}+01:00`).getTime() > now
+      );
+      remainingBookings.sort((a, b) => `${a.date}T${a.startTime}`.localeCompare(`${b.date}T${b.startTime}`));
+      soonestBooking = remainingBookings[0] ?? null;
     } else {
-      booking = payment.bookingId ? await kv.get(`booking:${payment.bookingId}`) : null;
+      soonestBooking = payment.bookingId ? await kv.get(`booking:${payment.bookingId}`) : null;
+      if (soonestBooking) remainingBookings = [soonestBooking];
+    }
+
+    if (remainingBookings.length === 0) {
+      return c.json({ error: 'No remaining sessions on this plan to refund — they have all already happened or been cancelled.' }, 400);
     }
 
     let refundPercentage = 0;
-    if (booking) {
-      const sessionDateTime = new Date(`${booking.date}T${booking.startTime}+01:00`);
-      const hoursUntilSession = (sessionDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
-      
-      if (hoursUntilSession > 24) {
-        refundPercentage = 100; // Full refund if >24 hours
-      } else if (hoursUntilSession > 0) {
-        refundPercentage = 50; // 50% refund if <24 hours but not started
-      } else {
-        refundPercentage = 0; // No refund if session already started
-      }
+    const sessionDateTime = new Date(`${soonestBooking.date}T${soonestBooking.startTime}+01:00`);
+    const hoursUntilSession = (sessionDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
+
+    if (hoursUntilSession > 24) {
+      refundPercentage = 100; // Full refund if >24 hours
+    } else if (hoursUntilSession > 0) {
+      refundPercentage = 50; // 50% refund if <24 hours but not started
     } else {
-      refundPercentage = 100; // Full refund if no booking found
+      refundPercentage = 0; // No refund if session already started
     }
 
-    const refundAmount = (payment.amount * refundPercentage) / 100;
+    const refundBasis = isDbPayment ? remainingBookings.length * 15000 : Number(payment.amount);
+    const refundAmount = (refundBasis * refundPercentage) / 100;
 
     if (refundAmount === 0) {
       return c.json({ error: 'Session has already started - no refund available' }, 400);
@@ -1891,6 +1909,11 @@ app.post('/payments/:paymentId/refund', async (c) => {
       reason: reason || 'Customer requested refund',
       status: 'pending', // Can be: pending, approved, processed, rejected
       reference: payment.reference,
+      // The specific still-confirmed, not-yet-happened sessions this refund
+      // covers — recorded now so approval cancels exactly these later
+      // rather than re-deriving "what's remaining" at a different point in
+      // time (some may have since been attended).
+      coveredBookingIds: isDbPayment ? remainingBookings.map((b: any) => b.id) : [],
       createdAt: new Date().toISOString(),
       requestedAt: new Date().toISOString(),
     };
@@ -1934,8 +1957,8 @@ app.post('/payments/:paymentId/refund', async (c) => {
 
       if (userEmail) {
         const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
-        const sessionDate = booking?.date
-          ? new Date(`${booking.date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
+        const sessionDate = soonestBooking?.date
+          ? new Date(`${soonestBooking.date}T12:00:00`).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', year: 'numeric' })
           : '';
         const tpl = emailTemplates.refundRequested(
           userName,
@@ -2111,6 +2134,23 @@ app.post('/admin/refunds/:refundId/process', async (c) => {
     refund.processedBy = adminId;
     refund.flutterwaveRefundResponse = refundData.data;
     await kv.set(`refund:${refundId}`, refund);
+
+    // Cancel whatever sessions this refund actually covers. A refund being
+    // *processed* never did this before — a refunded session stayed
+    // 'confirmed', so it could still occupy the tutor's calendar and still
+    // be marked attended and paid out even though the parent already got
+    // their money back. Already-cancelled bookings (e.g. the single-session
+    // cancel flow, which cancels immediately rather than waiting on this
+    // approval step) are skipped — this is just a safety net for coverage
+    // this refund record claims but that hasn't been reflected yet.
+    for (const coveredId of (refund.coveredBookingIds ?? [])) {
+      const coveredBooking = await db.getBooking(coveredId).catch(() => null);
+      if (coveredBooking && coveredBooking.status === 'confirmed') {
+        await db.updateBookingStatus(coveredId, 'cancelled').catch((e: any) =>
+          console.warn(`Failed to cancel booking ${coveredId} after refund ${refundId} (non-fatal):`, e.message)
+        );
+      }
+    }
 
     // Mirror onto the KV payment record when that's where it lives (see the
     // request handler above for why DB-based payments skip this).

@@ -5,6 +5,11 @@ import { sendEmail, emailTemplates } from './email-service.tsx';
 import { collectBookingsForUser } from './messaging-access.tsx';
 import { logAuditEvent } from './activity-log.tsx';
 import { releaseMaturedEarnings } from './payment-routes.tsx';
+import { notifyAdmins } from './notification-broker.tsx';
+
+function formatNaira(amount: number): string {
+  return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 const app = new Hono();
 
@@ -529,37 +534,15 @@ app.post('/bookings/:bookingId/calculate-refund', async (c) => {
       return c.json({ error: 'Only confirmed bookings can have refunds calculated' }, 400);
     }
 
-    // Calculate refund based on cancellation policy
+    const { refundAmount, refundPercentage, policy } = await calculateBookingRefund(booking);
     const bookingDateTime = new Date(`${booking.date}T${booking.startTime}`);
-    const now = new Date();
-    const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-
-    const b = booking as any;
-    const price = parseFloat(String(b.price ?? '0'));
-    let refundPercentage = 0;
-    let refundAmount = '0.00';
-    let policy = '';
-    
-    if (hoursUntilBooking > 24) {
-      refundPercentage = 100;
-      refundAmount = price.toFixed(2);
-      policy = 'Full refund - cancelled >24 hours before booking';
-    } else if (hoursUntilBooking > 0) {
-      refundPercentage = 50;
-      refundAmount = (price * 0.5).toFixed(2);
-      policy = 'Half refund - cancelled <24 hours before booking';
-    } else {
-      refundPercentage = 0;
-      refundAmount = '0.00';
-      policy = 'No refund - booking has already started';
-    }
+    const hoursUntilBooking = (bookingDateTime.getTime() - Date.now()) / (1000 * 60 * 60);
 
     return c.json({
       refundAmount,
       refundPercentage,
       policy,
       bookingId,
-      price: b.price,
       hoursUntilBooking: Math.max(0, hoursUntilBooking).toFixed(2),
     });
   } catch (error: any) {
@@ -620,15 +603,64 @@ app.post('/bookings/:bookingId/cancel', async (c) => {
       cancellationReason: 'Cancelled by user',
     };
 
-    await kv.set(`booking:${bookingId}`, updatedBooking);
+    // This used to always write a KV-only record, even for real (DB-backed,
+    // plan-based) bookings — the Postgres `bookings` row's `status` column
+    // never flipped to 'cancelled', so the admin Sessions view, tutor
+    // dashboard, etc. (everything that reads the real table) kept showing
+    // a cancelled session as still confirmed.
+    if (isKvBooking) {
+      await kv.set(`booking:${bookingId}`, updatedBooking);
+    } else {
+      await db.updateBookingStatus(bookingId, 'cancelled');
+    }
+
+    // If money is actually owed back, open a refund request through the
+    // same admin-approval -> Flutterwave pipeline used for whole-plan
+    // refunds (payment-routes.tsx) — this used to just stamp
+    // refundAmount/refundPercentage onto the booking row and stop there;
+    // nothing ever actually moved the money or told admin a refund was
+    // owed. KV-only (legacy free) bookings have no real payment behind
+    // them, so there's nothing to refund.
+    let refundRecordId: string | null = null;
+    if (!isKvBooking && refundCalc.refundAmount > 0 && (booking as any).paymentId) {
+      const payment = await db.getPaymentById((booking as any).paymentId).catch(() => null);
+      if (payment) {
+        refundRecordId = `${Date.now()}_${(booking as any).paymentId}_${bookingId}`;
+        await kv.set(`refund:${refundRecordId}`, {
+          id: refundRecordId,
+          paymentId: payment.id,
+          bookingId,
+          coveredBookingIds: [bookingId],
+          userId: payment.userId,
+          tutorId: booking.tutorId,
+          isDbPayment: true,
+          amount: refundCalc.refundAmount,
+          refundPercentage: refundCalc.refundPercentage,
+          reason: `Single session cancelled (${refundCalc.policy})`,
+          status: 'pending',
+          reference: payment.reference,
+          createdAt: new Date().toISOString(),
+          requestedAt: new Date().toISOString(),
+        });
+      }
+    }
 
     await logAuditEvent({
       userId: user.id,
       action: 'booking_cancelled',
       category: 'bookings',
-      description: `Booking ${bookingId} cancelled by ${user.id === booking.tutorId ? 'tutor' : 'parent/student'} — refund: ${refundCalc.refundPercentage}%`,
-      metadata: { bookingId, cancelledBy: user.id, refundAmount: refundCalc.refundAmount, refundPercentage: refundCalc.refundPercentage },
+      description: `Booking ${bookingId} cancelled by ${user.id === booking.tutorId ? 'tutor' : 'parent/student'} — refund: ${refundCalc.refundPercentage}% (${formatNaira(refundCalc.refundAmount)})${refundRecordId ? `, refund request ${refundRecordId} opened for admin approval` : ''}`,
+      metadata: { bookingId, cancelledBy: user.id, refundAmount: refundCalc.refundAmount, refundPercentage: refundCalc.refundPercentage, refundRecordId },
     });
+
+    if (refundRecordId) {
+      await notifyAdmins({
+        type: 'system_alert',
+        title: 'Refund request from cancelled session',
+        message: `A session was cancelled (${refundCalc.policy}) — ${formatNaira(refundCalc.refundAmount)} refund is pending approval.`,
+        actionUrl: '/dashboard/admin/payments',
+      }).catch(() => {});
+    }
 
     const dateLabel = formatSessionDate(booking.date);
     const timeOnly = String(booking.startTime).replace(/\s*WAT\s*$/i, '').trim();
@@ -700,6 +732,11 @@ app.post('/bookings/:bookingId/cancel', async (c) => {
     return c.json({
       success: true,
       booking: updatedBooking,
+      // api-client.ts's cancelBooking() reads these at the top level —
+      // they were missing entirely, so `response.refundAmount.toFixed(2)`
+      // threw on every successful cancel in BookingManager.tsx.
+      refundAmount: refundCalc.refundAmount,
+      refundPercentage: refundCalc.refundPercentage,
       message: 'Booking cancelled successfully',
     });
   } catch (error: any) {
@@ -972,31 +1009,35 @@ app.get('/bookings/:ids/reports', async (c) => {
 export default app;
 
 // Helper function to calculate booking refund
-async function calculateBookingRefund(booking: any) {
+// Every session is a flat ₦15,000 regardless of plan (see PAYMENT_PLANS in
+// payment-routes.tsx) — `booking.price` was never set on real (DB-backed,
+// plan-based) bookings (no such column; see db.createBooking's insert), so
+// this used to compute NaN for every real refund. refundAmount is a plain
+// number, not a pre-formatted string — the frontend (BookingManager.tsx)
+// does its own formatting and was calling .toFixed() on what used to
+// already be a string, throwing a TypeError on every cancel attempt.
+const SESSION_PRICE_NGN = 15000;
+
+async function calculateBookingRefund(booking: any): Promise<{ refundAmount: number; refundPercentage: number; policy: string }> {
   const bookingDateTime = new Date(`${booking.date}T${booking.startTime}`);
   const now = new Date();
   const hoursUntilBooking = (bookingDateTime.getTime() - now.getTime()) / (1000 * 60 * 60);
-  
-  const price = parseFloat(booking.price);
+
   let refundPercentage = 0;
-  let refundAmount = '0.00';
   let policy = '';
-  
+
   if (hoursUntilBooking > 24) {
     refundPercentage = 100;
-    refundAmount = price.toFixed(2);
     policy = 'Full refund - cancelled >24 hours before booking';
   } else if (hoursUntilBooking > 0) {
     refundPercentage = 50;
-    refundAmount = (price * 0.5).toFixed(2);
     policy = 'Half refund - cancelled <24 hours before booking';
   } else {
     refundPercentage = 0;
-    refundAmount = '0.00';
     policy = 'No refund - booking has already started';
   }
 
-  return { refundAmount, refundPercentage, policy };
+  return { refundAmount: (SESSION_PRICE_NGN * refundPercentage) / 100, refundPercentage, policy };
 }
 
 // Creates a real Google Calendar event on the tutor's calendar with a Google Meet link.

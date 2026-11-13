@@ -255,8 +255,20 @@ export function Chatroom({ session, userId, userName, userRole, initialContactId
       });
       if (response.ok) {
         const data = await response.json();
-        // Replace optimistic message with real one
-        setMessages(prev => prev.map(m => m.id === optimisticId ? data.message : m));
+        // Replace optimistic message with the real one. The 8s silent poll
+        // (loadMessages) can land between the optimistic update above and
+        // this response and fully replace `messages` from the server —
+        // wiping the optimistic bubble before it existed server-side. If
+        // that happened, `.map` below would find no match and silently
+        // drop the now-confirmed message instead of ever showing it, so
+        // fall back to appending it (de-duped in case the poll already
+        // picked it up too).
+        setMessages(prev => {
+          if (prev.some(m => m.id === optimisticId)) {
+            return prev.map(m => m.id === optimisticId ? data.message : m);
+          }
+          return prev.some(m => m.id === data.message.id) ? prev : [...prev, data.message];
+        });
         loadConversations();
       } else if (response.status === 403) {
         // Check if it's a payment expiration error
