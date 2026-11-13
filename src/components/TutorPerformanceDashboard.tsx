@@ -25,7 +25,7 @@ interface TutorPerformanceDashboardProps {
 interface PerformanceData {
   averageRating: number;
   totalReviews: number;
-  onTimeStartPercentage: number;
+  onTimeStartPercentage: number | null;
   rebookingRate: number;
   reportCompletionRate: number;
   totalSessions: number;
@@ -135,7 +135,13 @@ export function TutorPerformanceDashboard({ session, tutorId }: TutorPerformance
 
   // Calculate metric statuses
   const ratingStatus = getMetricStatus(performanceData.averageRating, { good: 4.5, warning: 4.0 });
-  const onTimeStatus = getMetricStatus(performanceData.onTimeStartPercentage, { good: 95, warning: 85 });
+  // onTimeStartPercentage is null when there's no real attendance-timing
+  // data yet (this platform doesn't track it today) — treat that as
+  // "nothing to warn about" rather than coercing null to 0 and showing a
+  // false "needs improvement" state.
+  const onTimeStatus = performanceData.onTimeStartPercentage === null
+    ? 'good'
+    : getMetricStatus(performanceData.onTimeStartPercentage, { good: 95, warning: 85 });
   const rebookingStatus = getMetricStatus(performanceData.rebookingRate, { good: 80, warning: 60 });
   const reportStatus = getMetricStatus(performanceData.reportCompletionRate, { good: 95, warning: 85 });
 
@@ -188,8 +194,10 @@ export function TutorPerformanceDashboard({ session, tutorId }: TutorPerformance
             <div className="flex items-start justify-between mb-3">
               <div className="flex-1">
                 <p className="text-sm text-gray-600 mb-1">On-Time Start</p>
-                <h2>{performanceData.onTimeStartPercentage}%</h2>
-                <p className="text-xs text-gray-500 mt-1">Out of {performanceData.totalSessions} sessions</p>
+                <h2>{performanceData.onTimeStartPercentage === null ? 'N/A' : `${performanceData.onTimeStartPercentage}%`}</h2>
+                <p className="text-xs text-gray-500 mt-1">
+                  {performanceData.onTimeStartPercentage === null ? 'Not enough data yet' : `Out of ${performanceData.totalSessions} sessions`}
+                </p>
               </div>
               {getStatusIcon(onTimeStatus)}
             </div>

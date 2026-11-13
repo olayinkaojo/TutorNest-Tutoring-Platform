@@ -1,6 +1,38 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
 import { createNotification } from './notification-broker.tsx';
+import { isAdmin } from './route-auth.tsx';
+
+// None of these endpoints previously checked anything beyond "is the
+// caller some valid authenticated user" — never that they were actually
+// the tutor/student/parent/admin the requested data belongs to. Any
+// logged-in user could read another family's session reports/progress or
+// another tutor's private coaching feedback by swapping the URL's id.
+
+async function resolveBooking(bookingId: string): Promise<any | null> {
+  const kvBooking = await kv.get(`booking:${bookingId}`) as any;
+  if (kvBooking) return kvBooking;
+  return await db.getBooking(bookingId).catch(() => null);
+}
+
+function isBookingParticipant(booking: any, userId: string): boolean {
+  const parentId = booking.userId ?? booking.parentId;
+  return booking.tutorId === userId || booking.studentId === userId || parentId === userId;
+}
+
+async function canViewStudentData(callerId: string, studentId: string): Promise<boolean> {
+  if (callerId === studentId) return true;
+  if (await isAdmin(callerId)) return true;
+  const child = await kv.get(`child:${studentId}`) as any;
+  if (child?.parentId === callerId) return true;
+  // Also allow a tutor who has actually had this student — the data being
+  // viewed is built entirely from that tutor's own session reports.
+  const dbBookings = await db.getBookingsByStudentId(studentId).catch(() => []);
+  if (dbBookings.some((b: any) => b.tutorId === callerId)) return true;
+  const kvBookings = await kv.getByPrefix('booking:').catch(() => []) as any[];
+  return kvBookings.some((b: any) => b.studentId === studentId && b.tutorId === callerId);
+}
 
 export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
 
@@ -16,6 +48,21 @@ export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
 
       const bookingId = c.req.param('bookingId');
       const report = await kv.get(`report:${bookingId}`) as any;
+
+      // Prefer the booking as the source of truth for who's allowed to see
+      // this, falling back to the report's own tutorId/studentId/parentId
+      // (which the real report-creation endpoint — reports-notifications-
+      // routes.tsx — stores directly on the record) if the booking can't
+      // be resolved for some reason.
+      const booking = await resolveBooking(bookingId);
+      const participant = booking
+        ? isBookingParticipant(booking, userId)
+        : report
+        ? (report.tutorId === userId || report.studentId === userId || report.parentId === userId)
+        : true; // nothing to protect if neither exists
+      if (!participant && !(await isAdmin(userId))) {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
 
       return c.json({ report: report || null });
     } catch (error: any) {
@@ -138,10 +185,19 @@ export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
       }
 
       const studentId = c.req.param('studentId');
+      if (!(await canViewStudentData(userId, studentId))) {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
 
-      // Get all bookings for student
+      // Bookings created via the real (plan-based) payment flow live in
+      // Postgres — the free single-session booking endpoint that used to
+      // write kv `booking:*` records has been disabled, so that prefix
+      // scan alone misses every real booking made since. Legacy KV
+      // bookings (if any remain) are still merged in.
+      const dbBookings = await db.getBookingsByStudentId(studentId).catch(() => []);
       const allBookings = await kv.getByPrefix('booking:');
-      const studentBookings = allBookings.filter((b: any) => b.studentId === studentId);
+      const kvBookingsForStudent = allBookings.filter((b: any) => b.studentId === studentId && !dbBookings.some((d: any) => d.id === b.id));
+      const studentBookings = [...dbBookings, ...kvBookingsForStudent];
 
       // Get all reports for student
       const allReports = await kv.getByPrefix('report:');
@@ -269,6 +325,10 @@ export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
       if (!userId) {
         return c.json({ error: 'Unauthorized' }, 401);
       }
+      const studentId = c.req.param('studentId');
+      if (!(await canViewStudentData(userId, studentId))) {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
 
       // In production, generate actual PDF
       // For now, return mock data
@@ -297,10 +357,21 @@ export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
       }
 
       const tutorId = c.req.param('tutorId');
+      if (userId !== tutorId && !(await isAdmin(userId))) {
+        return c.json({ error: 'Forbidden' }, 403);
+      }
 
-      // Get all bookings for tutor
+      // Same stale-store fix as /progress/:studentId above — the free
+      // single-session booking endpoint that used to write kv `booking:*`
+      // records was disabled a while ago, so this prefix scan alone has
+      // been missing every real (plan-based) booking since. This is the
+      // live endpoint real tutors see (TutorPerformanceDashboard.tsx,
+      // AdvancedReporting.tsx) — it's been showing zero/stale numbers for
+      // any booking made since that endpoint was disabled.
+      const dbBookings = await db.getBookingsByTutorId(tutorId).catch(() => []);
       const allBookings = await kv.getByPrefix('booking:');
-      const tutorBookings = allBookings.filter((b: any) => b.tutorId === tutorId);
+      const kvBookingsForTutor = allBookings.filter((b: any) => b.tutorId === tutorId && !dbBookings.some((d: any) => d.id === b.id));
+      const tutorBookings = [...dbBookings, ...kvBookingsForTutor];
 
       // Get all reports by tutor
       const allReports = await kv.getByPrefix('report:');
@@ -316,21 +387,27 @@ export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
 
       // Average rating
       const ratings = tutorReviews.map((r: any) => r.rating || 0).filter((r: number) => r > 0);
-      const averageRating = ratings.length > 0 
-        ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length 
+      const averageRating = ratings.length > 0
+        ? ratings.reduce((a: number, b: number) => a + b, 0) / ratings.length
         : 0;
       const totalReviews = ratings.length;
 
-      // On-time start percentage
+      // On-time start percentage. `actualStartTime` is never written
+      // anywhere in this codebase (confirmed by audit) — this used to
+      // default to a hardcoded 100 whenever sessionsWithTime was empty,
+      // which given that field is never populated meant every tutor was
+      // always shown as perfectly punctual regardless of reality. Return
+      // null (no real data) instead of fabricating a number — the
+      // frontend now shows "Not enough data yet" for this.
       const sessionsWithTime = tutorBookings.filter((b: any) => b.actualStartTime);
       const onTimeSessions = sessionsWithTime.filter((b: any) => {
-        const scheduled = new Date(b.date).getTime();
+        const scheduled = new Date(`${b.date}T${b.startTime}+01:00`).getTime();
         const actual = new Date(b.actualStartTime).getTime();
         return Math.abs(actual - scheduled) <= 5 * 60 * 1000; // Within 5 minutes
       });
-      const onTimeStartPercentage = sessionsWithTime.length > 0 
-        ? Math.round((onTimeSessions.length / sessionsWithTime.length) * 100) 
-        : 100;
+      const onTimeStartPercentage = sessionsWithTime.length > 0
+        ? Math.round((onTimeSessions.length / sessionsWithTime.length) * 100)
+        : null;
 
       // Re-booking rate
       const studentBookingCounts: { [key: string]: number } = {};
@@ -339,22 +416,30 @@ export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
       });
       const studentsWithMultipleBookings = Object.values(studentBookingCounts).filter((count: any) => count > 1).length;
       const totalStudents = Object.keys(studentBookingCounts).length;
-      const rebookingRate = totalStudents > 0 
-        ? Math.round((studentsWithMultipleBookings / totalStudents) * 100) 
+      const rebookingRate = totalStudents > 0
+        ? Math.round((studentsWithMultipleBookings / totalStudents) * 100)
         : 0;
 
-      // Report completion rate
+      // Report completion rate. Two real bugs here, not just a timezone
+      // skew: (1) report.completedAt doesn't exist on a real report
+      // record — the live report-creation endpoint (reports-notifications-
+      // routes.tsx) stores `submittedAt` — so this was computing
+      // `NaN - sessionEnd`, which is never <= anything, so a report was
+      // NEVER counted as on-time no matter how promptly it was filed.
+      // (2) `new Date(b.date)` parses a bare YYYY-MM-DD as UTC midnight
+      // (1am WAT) rather than the session's real WAT start time, which
+      // for an afternoon session understated how much of the 48h window
+      // had elapsed by ~12-14 hours on top of bug (1).
       const completedSessions = tutorBookings.filter((b: any) => b.status === 'completed');
       const sessionsWithReports = completedSessions.filter((b: any) => {
         const report = tutorReports.find((r: any) => r.bookingId === b.id);
         if (!report) return false;
-        // Check if completed within 48 hours
-        const sessionEnd = new Date(b.date).getTime() + (b.duration || 60) * 60 * 1000;
-        const reportTime = new Date(report.completedAt).getTime();
+        const sessionEnd = new Date(`${b.date}T${b.startTime}+01:00`).getTime() + (b.duration || 60) * 60 * 1000;
+        const reportTime = new Date(report.submittedAt || report.completedAt).getTime();
         return (reportTime - sessionEnd) <= 48 * 60 * 60 * 1000;
       });
-      const reportCompletionRate = completedSessions.length > 0 
-        ? Math.round((sessionsWithReports.length / completedSessions.length) * 100) 
+      const reportCompletionRate = completedSessions.length > 0
+        ? Math.round((sessionsWithReports.length / completedSessions.length) * 100)
         : 100;
 
       // Response time (mock - in production, track actual message response times)
@@ -386,9 +471,13 @@ export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
         )
       ).slice(0, 5);
 
-      // Improvement areas based on metrics
+      // Improvement areas based on metrics. onTimeStartPercentage can be
+      // null (no real attendance-timing data) — `null < 95` is true in JS
+      // (null coerces to 0), so this must check for a real number first
+      // or every tutor would get flagged for punctuality with zero
+      // evidence either way.
       const improvementAreas: string[] = [];
-      if (onTimeStartPercentage < 95) {
+      if (onTimeStartPercentage !== null && onTimeStartPercentage < 95) {
         improvementAreas.push('Improve punctuality for session starts');
       }
       if (reportCompletionRate < 95) {
@@ -411,7 +500,7 @@ export const progressAnalyticsRoutes = (app: Hono, getUserId: Function) => {
         });
       }
 
-      if (onTimeStartPercentage < 95) {
+      if (onTimeStartPercentage !== null && onTimeStartPercentage < 95) {
         coachingTips.push({
           id: 'tip-punctuality',
           category: 'Punctuality',

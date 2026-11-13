@@ -32,7 +32,7 @@ interface AdvancedReportingProps {
 interface TutorPerformanceData {
   averageRating: number;
   totalReviews: number;
-  onTimeStartPercentage: number;
+  onTimeStartPercentage: number | null;
   rebookingRate: number;
   reportCompletionRate: number;
   totalSessions: number;
@@ -121,7 +121,7 @@ export function AdvancedReporting({ userId, userType, accessToken }: AdvancedRep
         ['Total Reviews', String(data.totalReviews)],
         ['Total Sessions', String(data.totalSessions)],
         ['Active Students', String(data.activeStudents)],
-        ['On-Time Start %', `${data.onTimeStartPercentage}%`],
+        ['On-Time Start %', data.onTimeStartPercentage === null ? 'Not enough data yet' : `${data.onTimeStartPercentage}%`],
         ['Re-booking Rate', `${data.rebookingRate}%`],
         ['Report Completion Rate', `${data.reportCompletionRate}%`],
       ];
@@ -229,8 +229,10 @@ export function AdvancedReporting({ userId, userType, accessToken }: AdvancedRep
               <p className="text-sm text-gray-600">On-Time Start</p>
               <Award className="w-4 h-4 text-blue-600" />
             </div>
-            <h2 className="mb-1">{data.onTimeStartPercentage}%</h2>
-            <p className="text-xs text-gray-600">of sessions started on time</p>
+            <h2 className="mb-1">{data.onTimeStartPercentage === null ? 'N/A' : `${data.onTimeStartPercentage}%`}</h2>
+            <p className="text-xs text-gray-600">
+              {data.onTimeStartPercentage === null ? 'Not enough data yet' : 'of sessions started on time'}
+            </p>
           </CardContent>
         </Card>
       </div>
