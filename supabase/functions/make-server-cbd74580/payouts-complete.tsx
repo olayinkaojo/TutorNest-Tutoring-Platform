@@ -3,7 +3,57 @@ import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { verifyAccessToken } from './route-auth.tsx';
 import { releaseMaturedEarnings } from './payment-routes.tsx';
-import { createNotification } from './notification-broker.tsx';
+import { notifyAdmins } from './notification-broker.tsx';
+
+const FLUTTERWAVE_SECRET_KEY = Deno.env.get('FLUTTERWAVE_SECRET_KEY') ?? '';
+
+function normalizeName(name: string): string[] {
+  return name
+    .toUpperCase()
+    .replace(/[^A-Z\s]/g, ' ')
+    .split(/\s+/)
+    .filter((w) => w.length > 1);
+}
+
+// A tutor's name on their bank account rarely matches what they typed
+// character-for-character (different word order, middle names/initials
+// included or not), so this checks for enough word overlap rather than an
+// exact match — strict enough to catch "wrong account entirely," not so
+// strict it rejects every real match.
+function namesLikelyMatch(resolvedName: string, statedName: string): boolean {
+  const resolved = new Set(normalizeName(resolvedName));
+  const stated = normalizeName(statedName);
+  if (resolved.size === 0 || stated.length === 0) return false;
+  const overlap = stated.filter((w) => resolved.has(w)).length;
+  return overlap >= Math.min(2, stated.length);
+}
+
+// Resolves a Nigerian bank account number to the real account holder name
+// on file at the bank, via Flutterwave. Nothing previously verified a
+// tutor's bank details against anything — a typo'd account number or bank
+// code went straight through to a real transfer with zero destination
+// check, undetectable until the tutor complained their money never
+// arrived (it would have gone to whoever actually holds that account).
+async function resolveBankAccountName(accountNumber: string, bankCode: string): Promise<{ resolvedName: string | null; error?: string }> {
+  if (!FLUTTERWAVE_SECRET_KEY) return { resolvedName: null, error: 'Payment provider not configured' };
+  try {
+    const res = await fetch('https://api.flutterwave.com/v3/accounts/resolve', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ account_number: accountNumber, account_bank: bankCode }),
+    });
+    const data = await res.json() as { status: string; message?: string; data?: { account_name?: string } };
+    if (data.status !== 'success' || !data.data?.account_name) {
+      return { resolvedName: null, error: data.message || 'Could not resolve this account number with that bank' };
+    }
+    return { resolvedName: data.data.account_name };
+  } catch (e: any) {
+    return { resolvedName: null, error: e.message || 'Bank account resolution failed' };
+  }
+}
 
 const payoutsComplete = new Hono();
 
@@ -113,6 +163,8 @@ payoutsComplete.get('/bank-account', async (c) => {
         accountHolder: bankAccount.accountHolder,
         accountLast4: bankAccount.accountNumber?.slice(-4),
         verified: bankAccount.verified || false,
+        resolvedAccountName: bankAccount.resolvedAccountName || null,
+        verificationError: bankAccount.verificationError || null,
       } : null,
     });
   } catch (error: any) {
@@ -141,13 +193,24 @@ payoutsComplete.post('/bank-account', async (c) => {
       return c.json({ error: 'Invalid account number' }, 400);
     }
 
-    // Store securely (in production, encrypt this)
+    // `verified` used to just be hardcoded false forever — nothing anywhere
+    // ever flipped it true, and the admin payout-processing endpoint never
+    // even checked it, so it was pure decoration. Actually resolve the
+    // account against the bank via Flutterwave now, and only mark it
+    // verified if the name on file is a plausible match for what the
+    // tutor typed — this is the one real check standing between a typo
+    // and sending real money to a stranger.
+    const { resolvedName, error: resolveError } = await resolveBankAccountName(accountNumber, bankCode);
+    const verified = !!resolvedName && namesLikelyMatch(resolvedName, accountHolder);
+
     const bankAccount = {
       bankName,
       accountNumber,
       accountHolder,
       bankCode,
-      verified: false,
+      verified,
+      resolvedAccountName: resolvedName,
+      verificationError: resolvedName ? null : resolveError,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -156,12 +219,17 @@ payoutsComplete.post('/bank-account', async (c) => {
 
     return c.json({
       success: true,
-      message: 'Bank account saved. Verification pending.',
+      message: verified
+        ? 'Bank account saved and verified.'
+        : resolvedName
+        ? `Bank account saved, but the name on the account ("${resolvedName}") doesn't match what you entered — please double-check and re-save, or contact support.`
+        : `Bank account saved, but could not be verified: ${resolveError || 'account could not be resolved'}. You won't be able to request a payout until this is fixed.`,
       account: {
         bankName,
         accountHolder,
         accountLast4: accountNumber.slice(-4),
-        verified: false,
+        verified,
+        resolvedAccountName: resolvedName,
       },
     });
   } catch (error: any) {
@@ -197,10 +265,16 @@ payoutsComplete.post('/request', async (c) => {
       return c.json({ error: `Minimum payout amount is ₦${settings.minimumAmount}` }, 400);
     }
 
-    // Check if bank account exists
+    // Check if bank account exists and has actually been verified against
+    // the bank — an unverified account (Flutterwave couldn't resolve a
+    // matching name, or verification simply never ran) could be a typo'd
+    // account number pointing at a stranger's account.
     const bankAccount = (await kv.get(`bank_account:${userId}`)) as any;
     if (!bankAccount) {
       return c.json({ error: 'Please add a bank account before requesting payout' }, 400);
+    }
+    if (!bankAccount.verified) {
+      return c.json({ error: 'Your bank account could not be verified. Please re-check your account number and bank, then save it again.' }, 400);
     }
 
     await releaseMaturedEarnings(userId);
@@ -226,19 +300,16 @@ payoutsComplete.post('/request', async (c) => {
       },
     });
 
-    // Send notification to admins
+    // Send notification to admins. actionUrl used to point at
+    // /admin/dashboard?tab=payouts, which doesn't match this app's real
+    // route (/dashboard/admin/payouts) — clicking it went nowhere useful.
     const tutorProfile = (await kv.get(`user:${userId}`)) as any || {};
-    const adminUsers = (await kv.getByPrefix('user:')) as any[];
-    const admins = adminUsers.filter((u: any) => u.role === 'admin');
-    for (const admin of admins) {
-      await createNotification(kv, {
-        userId: admin.id,
-        type: 'payout_request',
-        title: 'New Payout Request',
-        message: `${tutorProfile.full_name || 'A tutor'} has requested a payout of ₦${amount}`,
-        actionUrl: `/admin/dashboard?tab=payouts`,
-      });
-    }
+    await notifyAdmins({
+      type: 'payout_request',
+      title: 'New Payout Request',
+      message: `${tutorProfile.full_name || tutorProfile.fullName || 'A tutor'} has requested a payout of ₦${amount}`,
+      actionUrl: '/dashboard/admin/payouts',
+    }).catch(() => {});
 
     return c.json({
       success: true,

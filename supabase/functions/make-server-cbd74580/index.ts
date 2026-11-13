@@ -205,6 +205,7 @@ const CRON_ONLY_ADMIN_PATHS = new Set([
   `${ROUTE_PREFIX}/admin/check-compliance`,
   `${ROUTE_PREFIX}/admin/check-payment-failures`,
   `${ROUTE_PREFIX}/admin/check-overdue-reports`,
+  `${ROUTE_PREFIX}/admin/check-pending-payouts`,
 ]);
 
 app.use(`${ROUTE_PREFIX}/admin/*`, async (c, next) => {

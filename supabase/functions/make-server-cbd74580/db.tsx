@@ -524,6 +524,32 @@ export async function finalizeTutorPayout(tutorId: string, amount: number): Prom
 }
 
 /**
+ * Reverses a payout that was reported successfully initiated but later
+ * turned out to have actually failed at the bank (Flutterwave transfer
+ * status flips to FAILED after the fact) — puts the reserved amount back
+ * into available_balance and undoes the total_payouts credit that
+ * finalizeTutorPayout already recorded for it.
+ */
+export async function reverseFailedPayout(tutorId: string, amount: number): Promise<void> {
+  if (amount <= 0) return;
+  const current = await getTutorBalance(tutorId);
+  const { error } = await db()
+    .from('tutor_balance')
+    .upsert(
+      {
+        tutor_id: tutorId,
+        pending_balance: current.pending_balance ?? 0,
+        available_balance: (current.available_balance ?? 0) + amount,
+        total_earnings: current.total_earnings ?? 0,
+        total_payouts: Math.max(0, (current.total_payouts ?? 0) - amount),
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'tutor_id' },
+    );
+  if (error) throw new Error(error.message);
+}
+
+/**
  * Claws back `amount` from a tutor's balance when a refund is processed —
  * pending first (money never actually cleared for withdrawal), then
  * available. Whatever's left after both are exhausted is a shortfall: money

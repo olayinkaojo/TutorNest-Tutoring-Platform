@@ -4,6 +4,10 @@
 # job), so the System Alerts tab was permanently empty regardless of what
 # conditions it was designed to catch.
 #
+# Also reconciles payouts stuck at 'processing' (see check-pending-payouts
+# in payment-routes.tsx) — nothing else ever moved a successful payout to
+# 'completed', so every "Completed" total downstream was permanently wrong.
+#
 # Requires a repository secret SUPABASE_PROJECT_REF (already used by
 # deploy-edge.yml) and a new one, CRON_SECRET, whose value must also be set
 # as the Supabase Edge Function secret of the same name
@@ -38,4 +42,10 @@ jobs:
         run: >
           curl -sf -X POST
           "https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/make-server-cbd74580/admin/check-overdue-reports"
+          -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"
+
+      - name: Reconcile pending payouts against Flutterwave
+        run: >
+          curl -sf -X POST
+          "https://${{ secrets.SUPABASE_PROJECT_REF }}.supabase.co/functions/v1/make-server-cbd74580/admin/check-pending-payouts"
           -H "x-cron-secret: ${{ secrets.CRON_SECRET }}"

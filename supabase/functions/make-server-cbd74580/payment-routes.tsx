@@ -803,6 +803,17 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
 
     const bankDetails = payout.bankDetails as any;
 
+    // Defense in depth: /tutors/payouts/request already refuses to create
+    // a payout against an unverified bank account, but a tutor could
+    // change their bank details to something unverified in the window
+    // between requesting and an admin processing it. This endpoint never
+    // checked verification at all — a typo'd account number or bank code
+    // went straight to a real transfer with zero destination check.
+    const currentBankAccount = await kv.get(`bank_account:${payout.tutorId}`) as any;
+    if (!currentBankAccount?.verified) {
+      return c.json({ error: 'This tutor’s bank account is not verified — resolve that before processing this payout.' }, 400);
+    }
+
     // Create transfer recipient on Flutterwave
     const recipientResponse = await fetch('https://api.flutterwave.com/v3/beneficiaries', {
       method: 'POST',
@@ -882,6 +893,30 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
     // Finalize: the reserved amount is now actually out the door.
     await db.finalizeTutorPayout(payout.tutorId, payout.amount);
 
+    // A tutor previously had no way to learn their payout was sent except
+    // by reopening their dashboard and noticing — reject already emailed
+    // + notified (below), success never did either.
+    try {
+      const tutorProfile = (await kv.get(`user:${payout.tutorId}`) as any) || await db.getProfile(payout.tutorId).catch(() => null);
+      await createNotification(kv, {
+        userId: payout.tutorId,
+        type: 'payout_processed',
+        title: 'Payout sent',
+        message: `Your payout of ${formatNaira(payout.amount)} is on its way to your bank account.`,
+        actionUrl: '/dashboard/tutor/payouts',
+      });
+      if (tutorProfile?.email) {
+        const dashboardBase = Deno.env.get('FRONTEND_URL') || Deno.env.get('VITE_APP_URL') || 'https://app.knowledgefonsacademy.com';
+        await sendEmail({
+          to: tutorProfile.email,
+          subject: 'Your payout is on its way',
+          html: `<p>Hi ${tutorProfile.fullName || tutorProfile.name || 'there'},</p><p>A payout of <strong>${formatNaira(payout.amount)}</strong> has been sent to your bank account on file. It may take a little while to reflect, depending on your bank.</p><p><a href="${dashboardBase}/dashboard">View your dashboard</a></p>`,
+        }).catch((e) => console.warn('payout processed email (non-fatal):', e));
+      }
+    } catch (e: any) {
+      console.warn('Payout processed notification (non-fatal):', e.message);
+    }
+
     return c.json({
       success: true,
       payout: {
@@ -893,6 +928,75 @@ app.post('/admin/payouts/:payoutId/process', async (c) => {
   } catch (error: any) {
     console.error('Error processing payout:', error);
     return c.json({ error: error.message || 'Failed to process payout' }, 500);
+  }
+});
+
+// Cron-only: re-verify every payout still stuck at 'processing' against
+// Flutterwave's real transfer status. Nothing previously ever moved a
+// payout from 'processing' to 'completed' — no webhook, no polling — so
+// every successful payout stayed 'processing' forever, and anything
+// reading status === 'completed' (AdminPayoutsManager's "Completed" stat,
+// a tutor's 360-view totalPaidOut) was permanently wrong even after real
+// money had gone out. See .github/workflows/system-alert-checks.yml.
+app.post('/admin/check-pending-payouts', async (c) => {
+  try {
+    const expected = Deno.env.get('CRON_SECRET');
+    const provided = c.req.header('x-cron-secret');
+    if (!expected || provided !== expected) {
+      return c.json({ error: 'Unauthorized' }, 401);
+    }
+    if (!FLUTTERWAVE_SECRET_KEY) return c.json({ error: 'Payment not configured yet' }, 503);
+
+    const processingPayouts = await db.listAllPayouts('processing');
+    let completed = 0;
+    let failed = 0;
+    let stillPending = 0;
+
+    for (const payout of processingPayouts) {
+      if (!payout.transferId) { stillPending++; continue; }
+      try {
+        const res = await fetch(`https://api.flutterwave.com/v3/transfers/${payout.transferId}`, {
+          headers: { 'Authorization': `Bearer ${FLUTTERWAVE_SECRET_KEY}` },
+        });
+        const data = await res.json() as { status: string; data?: { status?: string } };
+        const transferStatus = data.data?.status;
+
+        if (transferStatus === 'SUCCESSFUL') {
+          await db.updatePayout(payout.id, { status: 'completed' });
+          completed++;
+        } else if (transferStatus === 'FAILED') {
+          await db.updatePayout(payout.id, { status: 'failed' });
+          await db.reverseFailedPayout(payout.tutorId, payout.amount).catch((e: any) =>
+            console.warn(`Failed to reverse balance for failed payout ${payout.id} (non-fatal):`, e.message)
+          );
+          await logAuditEvent({
+            userId: payout.tutorId,
+            action: 'payout_failed_after_initiation',
+            category: 'payments',
+            description: `Payout ${payout.id} of ${formatNaira(payout.amount)} was reported successful by Flutterwave at initiation but later failed — balance restored, needs review.`,
+            severity: 'critical',
+            metadata: { payoutId: payout.id, tutorId: payout.tutorId, amount: payout.amount, transferId: payout.transferId },
+          });
+          await notifyAdmins({
+            type: 'payout_failed',
+            title: 'Payout failed after initiation',
+            message: `Payout ${payout.id} (${formatNaira(payout.amount)}) failed at the bank after initially succeeding — tutor's balance has been restored.`,
+            actionUrl: '/dashboard/admin/payouts',
+          }).catch(() => {});
+          failed++;
+        } else {
+          stillPending++;
+        }
+      } catch (e: any) {
+        console.warn(`Error checking payout ${payout.id} status (non-fatal):`, e.message);
+        stillPending++;
+      }
+    }
+
+    return c.json({ success: true, checked: processingPayouts.length, completed, failed, stillPending });
+  } catch (error: any) {
+    console.error('Error checking pending payouts:', error);
+    return c.json({ error: error.message || 'Failed to check pending payouts' }, 500);
   }
 });
 
