@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '.
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from './ui/dialog';
 import { toast } from 'sonner@2.0.3';
 import { projectId } from '../utils/supabase/info.tsx';
+import { formatNaira } from '../utils/currency';
 import { FileText, Download, TrendingUp, DollarSign, Calendar, Plus } from 'lucide-react';
 
 interface TaxReport {
@@ -376,20 +377,20 @@ export function TaxReportsManager({ adminId, accessToken }: TaxReportsManagerPro
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div>
                             <p className="text-sm text-muted-foreground">Total Revenue</p>
-                            <p className="text-lg font-medium">£{report.totalRevenue.toFixed(2)}</p>
+                            <p className="text-lg font-medium">{formatNaira(report.totalRevenue)}</p>
                           </div>
                           <div>
                             <p className="text-sm text-muted-foreground">Total VAT</p>
-                            <p className="text-lg font-medium">£{report.totalVAT.toFixed(2)}</p>
+                            <p className="text-lg font-medium">{formatNaira(report.totalVAT)}</p>
                           </div>
                           <div>
                             <p className="text-sm text-muted-foreground">Net Revenue</p>
                             <p className="text-lg font-medium text-green-600">
-                              £{report.netRevenue.toFixed(2)}
+                              {formatNaira(report.netRevenue)}
                             </p>
                           </div>
                           <div>
-                            <p className="text-sm text-muted-foreground">Invoices</p>
+                            <p className="text-sm text-muted-foreground">Payments</p>
                             <p className="text-lg font-medium">{report.invoiceCount}</p>
                           </div>
                         </div>
@@ -397,8 +398,7 @@ export function TaxReportsManager({ adminId, accessToken }: TaxReportsManagerPro
                         {report.totalRefunds > 0 && (
                           <div className="mt-4 p-3 bg-orange-50 border border-orange-200 rounded">
                             <p className="text-sm">
-                              <span className="font-medium">Refunds:</span> £
-                              {report.totalRefunds.toFixed(2)}
+                              <span className="font-medium">Refunds:</span> {formatNaira(report.totalRefunds)}
                             </p>
                           </div>
                         )}
@@ -406,8 +406,7 @@ export function TaxReportsManager({ adminId, accessToken }: TaxReportsManagerPro
                         {report.totalDiscounts > 0 && (
                           <div className="mt-2 p-3 bg-blue-50 border border-blue-200 rounded">
                             <p className="text-sm">
-                              <span className="font-medium">Discounts:</span> £
-                              {report.totalDiscounts.toFixed(2)}
+                              <span className="font-medium">Discounts:</span> {formatNaira(report.totalDiscounts)}
                             </p>
                           </div>
                         )}
@@ -415,13 +414,13 @@ export function TaxReportsManager({ adminId, accessToken }: TaxReportsManagerPro
                         {/* Breakdown by Tier */}
                         {Object.keys(report.breakdown.byTier).length > 0 && (
                           <div className="mt-4">
-                            <h4 className="text-sm font-medium mb-2">Revenue by Tier</h4>
+                            <h4 className="text-sm font-medium mb-2">Revenue by Plan</h4>
                             <div className="grid grid-cols-3 gap-2">
                               {Object.entries(report.breakdown.byTier).map(([tier, data]) => (
                                 <div key={tier} className="p-2 bg-muted rounded text-sm">
                                   <p className="font-medium capitalize">{tier}</p>
                                   <p className="text-muted-foreground">
-                                    £{data.revenue.toFixed(2)} ({data.count})
+                                    {formatNaira(data.revenue)} ({data.count})
                                   </p>
                                 </div>
                               ))}

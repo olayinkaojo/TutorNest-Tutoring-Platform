@@ -430,6 +430,18 @@ dailyVideoRoutes(app, getUserId);
 // Register coupons and credits routes
 app.route('/make-server-cbd74580', couponsCreditsRoutes);
 
+// Register invoice routes BEFORE tax-invoicing-routes (below) — both define
+// handlers for /invoices/create, /invoices/user/:userId and
+// /invoices/:invoiceId, and Hono matches the first-registered handler for a
+// given path. tax-invoicing-routes.tsx's versions of those three read/write
+// KV keys (invoice_<id>, user_invoices_<userId> — underscore) that nothing
+// real ever writes to; the real payment flow (payment-routes.tsx) writes
+// invoice:<id> / user_invoices:<userId> (colon), which only this file's
+// handlers read. Mounting tax-invoicing-routes first meant every real
+// invoice was permanently unreachable through its own per-user/per-id
+// endpoints — only /invoices/admin/all (non-colliding) ever worked.
+app.route('/make-server-cbd74580/invoices', invoiceRoutes);
+
 // Register tax and invoicing routes
 app.route('/make-server-cbd74580', taxInvoicingRoutes);
 
@@ -493,8 +505,8 @@ app.route('/make-server-cbd74580', paymentRoutes);
 // Register payout routes (tutor payouts dashboard)
 app.route('/make-server-cbd74580/tutor/payouts', payoutsComplete);
 
-// Register invoice routes
-app.route('/make-server-cbd74580/invoices', invoiceRoutes);
+// (invoiceRoutes is registered earlier, before taxInvoicingRoutes — see
+// that comment for why order matters here.)
 
 // Routes extracted to separate files
 app.route('/make-server-cbd74580', signupRoutes);

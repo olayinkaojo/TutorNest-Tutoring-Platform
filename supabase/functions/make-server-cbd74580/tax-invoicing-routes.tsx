@@ -1,9 +1,20 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
 import { requireAdmin, requireSelfOrAdmin, verifyUser, isAdmin } from './route-auth.tsx';
 import { logAuditEvent } from './activity-log.tsx';
 
 const app = new Hono();
+
+const PAYMENT_PLAN_LABELS: Record<string, string> = {
+  trial: 'Trial Session',
+  once_weekly: 'Once a Week (1 Term)',
+  twice_weekly: 'Twice a Week (1 Term)',
+};
+
+function formatNaira(amount: number): string {
+  return `₦${amount.toLocaleString('en-NG', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
+}
 
 // Type definitions
 interface VATRate {
@@ -74,8 +85,12 @@ interface TaxReport {
   createdBy: string;
 }
 
-// VAT rates for different jurisdictions
+// VAT rates for different jurisdictions. This platform is Nigerian — every
+// real invoice should be NGN at Nigeria's rate, not falling back to UK VAT
+// on a GBP invoice, which is what happened for every Nigerian user before
+// Nigeria had an entry here at all.
 const VAT_RATES: VATRate[] = [
+  { country: 'Nigeria', countryCode: 'NG', rate: 7.5, type: 'standard' },
   { country: 'United Kingdom', countryCode: 'GB', rate: 20, type: 'standard' },
   { country: 'Ireland', countryCode: 'IE', rate: 23, type: 'standard' },
   { country: 'France', countryCode: 'FR', rate: 20, type: 'standard' },
@@ -94,7 +109,7 @@ const VAT_RATES: VATRate[] = [
 // Helper: Get VAT rate by country code
 function getVATRate(countryCode: string): VATRate {
   const rate = VAT_RATES.find(r => r.countryCode === countryCode);
-  return rate || { country: 'United Kingdom', countryCode: 'GB', rate: 20, type: 'standard' }; // Default to UK
+  return rate || { country: 'Nigeria', countryCode: 'NG', rate: 7.5, type: 'standard' }; // Default to Nigeria — this is a Nigerian platform
 }
 
 // Helper: Calculate VAT
@@ -231,7 +246,7 @@ app.post('/invoices/create', async (c) => {
       totalDiscounts,
       creditsApplied: creditsApplied || 0,
       total,
-      currency: 'GBP',
+      currency: 'NGN',
       status: 'issued',
       issueDate: now.toISOString(),
       dueDate: dueDate.toISOString(),
@@ -465,57 +480,52 @@ app.post('/tax/reports/generate', async (c) => {
       return c.json({ success: false, error: 'Missing required fields' }, 400);
     }
 
-    // Fetch all invoices in the date range. kv.getByPrefix() already
-    // returns unwrapped values, not {key, value} pairs — mapping .value
-    // off each item produced `undefined`, which then crashed the next
-    // .filter() on inv.issueDate (always a 500).
-    const allInvoicesData = await kv.getByPrefix('invoice_inv_');
-    const invoices: Invoice[] = allInvoicesData
-      .filter(inv => {
-        const invoiceDate = new Date(inv.issueDate);
-        return invoiceDate >= new Date(startDate) && invoiceDate <= new Date(endDate) && inv.status === 'paid';
-      });
+    // This used to read invoice_inv_* KV records — but those are only ever
+    // written by this same file's own /invoices/create, which nothing in
+    // the real payment flow (payment-routes.tsx) ever calls. So this
+    // report always summed zero real invoices, regardless of how much
+    // revenue the platform actually took in. Real revenue lives in the
+    // `payments` table (written by confirmPlanPayment in
+    // payment-routes.tsx) — use that instead.
+    const allPayments = await db.getAllPaymentsForAdmin();
+    const rangeStart = new Date(startDate);
+    const rangeEnd = new Date(endDate);
+    const paymentsInRange = allPayments.filter((p: any) => {
+      if (p.status !== 'successful') return false;
+      const paidAt = new Date(p.confirmedAt || p.createdAt);
+      return paidAt >= rangeStart && paidAt <= rangeEnd;
+    });
 
-    // Calculate totals
-    let totalRevenue = 0;
-    let totalVAT = 0;
-    let totalDiscounts = 0;
-    const byCountry: Record<string, { revenue: number; vat: number; count: number }> = {};
+    const totalRevenue = paymentsInRange.reduce((sum: number, p: any) => sum + Number(p.amount || 0), 0);
+    // Nigeria's VAT (7.5%) — prices quoted to parents are treated as
+    // VAT-inclusive (no separate VAT line is charged at checkout), so this
+    // backs the VAT component out of the total rather than adding it on
+    // top, for remittance reporting purposes.
+    const vatRateInfo = getVATRate('NG');
+    const totalVAT = totalRevenue - totalRevenue / (1 + vatRateInfo.rate / 100);
+
     const byTier: Record<string, { revenue: number; count: number }> = {};
-
-    for (const invoice of invoices) {
-      totalRevenue += invoice.total;
-      totalVAT += invoice.vatAmount;
-      totalDiscounts += invoice.totalDiscounts;
-
-      // By country (using VAT rate as proxy)
-      const countryKey = `${invoice.vatRate}%`;
-      if (!byCountry[countryKey]) {
-        byCountry[countryKey] = { revenue: 0, vat: 0, count: 0 };
-      }
-      byCountry[countryKey].revenue += invoice.total;
-      byCountry[countryKey].vat += invoice.vatAmount;
-      byCountry[countryKey].count += 1;
-
-      // By tier
-      if (invoice.tierName) {
-        if (!byTier[invoice.tierName]) {
-          byTier[invoice.tierName] = { revenue: 0, count: 0 };
-        }
-        byTier[invoice.tierName].revenue += invoice.total;
-        byTier[invoice.tierName].count += 1;
-      }
+    for (const payment of paymentsInRange) {
+      const planLabel = PAYMENT_PLAN_LABELS[payment.planType] || payment.planType || 'Unknown plan';
+      if (!byTier[planLabel]) byTier[planLabel] = { revenue: 0, count: 0 };
+      byTier[planLabel].revenue += Number(payment.amount || 0);
+      byTier[planLabel].count += 1;
     }
 
-    // Get refunds in the period (from refund manager)
-    const refundsData = await kv.getByPrefix('refund_');
-    const refunds = refundsData
-      .filter(ref => {
-        const refundDate = new Date(ref.processedAt || ref.requestedAt);
-        return refundDate >= new Date(startDate) && refundDate <= new Date(endDate) && ref.status === 'completed';
-      });
+    // Get refunds in the period — refund:<id> (colon) is the real key
+    // every refund flow in this codebase writes to (payment-routes.tsx,
+    // booking-routes.tsx, reviews-disputes-routes.tsx); this used to read
+    // `refund_` (underscore, never written anywhere) and check
+    // status === 'completed' (the real status string is 'processed'), so
+    // it always summed zero refunds regardless of how many were processed.
+    const refundsData = await kv.getByPrefix('refund:');
+    const refunds = refundsData.filter((ref: any) => {
+      const refundDate = new Date(ref.processedAt || ref.requestedAt);
+      return refundDate >= rangeStart && refundDate <= rangeEnd && ref.status === 'processed';
+    });
 
-    const totalRefunds = refunds.reduce((sum, ref) => sum + (ref.amount || 0), 0);
+    const totalRefunds = refunds.reduce((sum: number, ref: any) => sum + (ref.amount || 0), 0);
+    const totalDiscounts = 0; // No discount/coupon system feeds real payments today.
     const netRevenue = totalRevenue - totalRefunds;
 
     const report: TaxReport = {
@@ -525,12 +535,12 @@ app.post('/tax/reports/generate', async (c) => {
       endDate,
       totalRevenue: Math.round(totalRevenue * 100) / 100,
       totalVAT: Math.round(totalVAT * 100) / 100,
-      totalDiscounts: Math.round(totalDiscounts * 100) / 100,
+      totalDiscounts,
       totalRefunds: Math.round(totalRefunds * 100) / 100,
       netRevenue: Math.round(netRevenue * 100) / 100,
-      invoiceCount: invoices.length,
+      invoiceCount: paymentsInRange.length,
       breakdown: {
-        byCountry,
+        byCountry: {},
         byTier
       },
       createdAt: new Date().toISOString(),
@@ -540,13 +550,13 @@ app.post('/tax/reports/generate', async (c) => {
     // Save report
     await kv.set(`tax_report_${report.id}`, report);
 
-    console.log(`Tax report generated for ${startDate} to ${endDate}. Net revenue: £${netRevenue.toFixed(2)}`);
+    console.log(`Tax report generated for ${startDate} to ${endDate}. Net revenue: ${formatNaira(netRevenue)}`);
 
     await logAuditEvent({
       userId: adminId,
       action: 'tax_report_generated',
       category: 'tax',
-      description: `Tax report generated (${reportType}, ${startDate} to ${endDate}) — net revenue £${netRevenue.toFixed(2)}`,
+      description: `Tax report generated (${reportType}, ${startDate} to ${endDate}) — net revenue ${formatNaira(netRevenue)}`,
       metadata: { reportId: report.id, reportType, startDate, endDate, netRevenue },
     });
 
@@ -591,46 +601,67 @@ app.post('/tax/export', async (c) => {
       return c.json({ success: false, error: 'Missing date range' }, 400);
     }
 
-    // Fetch all invoices in the date range
-    const allInvoicesData = await kv.getByPrefix('invoice_inv_');
-    const invoices: Invoice[] = allInvoicesData
-      .filter(inv => {
-        const invoiceDate = new Date(inv.issueDate);
-        return invoiceDate >= new Date(startDate) && invoiceDate <= new Date(endDate);
-      });
+    // Same dead data source as /tax/reports/generate above — real revenue
+    // lives in the `payments` table, not invoice_inv_* KV records nothing
+    // real ever writes. See that handler's comment for the full story.
+    const allPayments = await db.getAllPaymentsForAdmin();
+    const rangeStart = new Date(startDate);
+    const rangeEnd = new Date(endDate);
+    const paymentsInRange = allPayments
+      .filter((p: any) => {
+        if (p.status !== 'successful') return false;
+        const paidAt = new Date(p.confirmedAt || p.createdAt);
+        return paidAt >= rangeStart && paidAt <= rangeEnd;
+      })
+      .sort((a: any, b: any) => new Date(a.confirmedAt || a.createdAt).getTime() - new Date(b.confirmedAt || b.createdAt).getTime());
 
-    // Sort by date
-    invoices.sort((a, b) => new Date(a.issueDate).getTime() - new Date(b.issueDate).getTime());
+    const vatRateInfo = getVATRate('NG');
+
+    const rows = await Promise.all(paymentsInRange.map(async (p: any) => {
+      const payer = (await kv.get(`user:${p.userId}`).catch(() => null)) as any || await db.getProfile(p.userId).catch(() => null);
+      const name = payer?.fullName || payer?.full_name || payer?.name || 'Unknown';
+      const email = payer?.email || 'Unknown';
+      const total = Number(p.amount || 0);
+      const vatAmount = total - total / (1 + vatRateInfo.rate / 100);
+      return {
+        reference: p.reference,
+        date: new Date(p.confirmedAt || p.createdAt).toLocaleDateString('en-GB'),
+        name,
+        email,
+        description: PAYMENT_PLAN_LABELS[p.planType] || p.planType || 'Unknown plan',
+        subtotal: (total - vatAmount).toFixed(2),
+        vatRate: `${vatRateInfo.rate}%`,
+        vatAmount: vatAmount.toFixed(2),
+        total: total.toFixed(2),
+        status: p.status,
+      };
+    }));
 
     // Format as CSV
     const csvHeaders = [
-      'Invoice Number',
+      'Payment Reference',
       'Date',
       'Customer Name',
       'Customer Email',
       'Description',
-      'Subtotal',
-      'Discounts',
+      'Subtotal (excl. VAT)',
       'VAT Rate',
       'VAT Amount',
       'Total',
       'Status',
-      'Payment Method'
     ];
 
-    const csvRows = invoices.map(inv => [
-      inv.invoiceNumber,
-      new Date(inv.issueDate).toLocaleDateString('en-GB'),
-      inv.userName,
-      inv.userEmail,
-      inv.items.map(item => item.description).join('; '),
-      inv.subtotal.toFixed(2),
-      inv.totalDiscounts.toFixed(2),
-      `${inv.vatRate}%`,
-      inv.vatAmount.toFixed(2),
-      inv.total.toFixed(2),
-      inv.status,
-      inv.paymentMethod || 'N/A'
+    const csvRows = rows.map(r => [
+      r.reference,
+      r.date,
+      r.name,
+      r.email,
+      r.description,
+      r.subtotal,
+      r.vatRate,
+      r.vatAmount,
+      r.total,
+      r.status,
     ]);
 
     const csvContent = [
@@ -642,8 +673,8 @@ app.post('/tax/export', async (c) => {
       userId: auth as string,
       action: 'tax_export',
       category: 'tax',
-      description: `Accounting data exported (${startDate} to ${endDate}) — ${invoices.length} invoice(s)`,
-      metadata: { startDate, endDate, recordCount: invoices.length },
+      description: `Accounting data exported (${startDate} to ${endDate}) — ${rows.length} payment(s)`,
+      metadata: { startDate, endDate, recordCount: rows.length },
     });
 
     return c.json({
@@ -651,7 +682,7 @@ app.post('/tax/export', async (c) => {
       format: 'csv',
       filename: `tutornest_accounting_${startDate}_to_${endDate}.csv`,
       content: csvContent,
-      recordCount: invoices.length
+      recordCount: rows.length
     });
   } catch (error) {
     console.error('Error exporting accounting data:', error);
