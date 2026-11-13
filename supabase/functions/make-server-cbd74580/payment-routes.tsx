@@ -8,6 +8,7 @@ import { buildIcsContent, createCalendarDownloadLink, buildWeeklyRRule } from '.
 import { createDailyRoom } from './daily-video-routes.tsx';
 import { createGoogleCalendarEvent } from './google-calendar-routes.tsx';
 import { createNotification, notifyAdmins } from './notification-broker.tsx';
+import { isActionRestricted } from './sanctions-routes.tsx';
 
 const app = new Hono();
 
@@ -1234,6 +1235,22 @@ app.post('/payments/initiate-plan', async (c) => {
     if (!plan) return c.json({ error: 'Invalid plan type. Must be trial, once_weekly, or twice_weekly.' }, 400);
     if (!tutorId || !startDate || !startTime || !email) {
       return c.json({ error: 'tutorId, startDate, startTime and email are required' }, 400);
+    }
+
+    // Nothing on this path previously checked sanctions at all — a
+    // suspended/banned parent or tutor could keep booking exactly as if
+    // nothing had happened (confirmed by audit: the dedicated enforcement
+    // endpoint had zero callers anywhere in the app). Check both sides —
+    // either one being restricted means this booking can't go ahead.
+    const [payerRestriction, tutorRestriction] = await Promise.all([
+      isActionRestricted(userId, 'booking'),
+      isActionRestricted(tutorId, 'booking'),
+    ]);
+    if (payerRestriction.restricted) {
+      return c.json({ error: `You're unable to book sessions right now (${payerRestriction.sanction.sanctionType.replace(/_/g, ' ')}).`, code: 'ACCOUNT_SANCTIONED' }, 403);
+    }
+    if (tutorRestriction.restricted) {
+      return c.json({ error: 'This tutor is currently unavailable for new bookings.', code: 'TUTOR_SANCTIONED' }, 403);
     }
 
     if (!FLUTTERWAVE_SECRET_KEY) return c.json({ error: 'Payment not configured yet' }, 503);

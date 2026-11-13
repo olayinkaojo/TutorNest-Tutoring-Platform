@@ -11,6 +11,8 @@ import {
   type MessagingChannel,
 } from './messaging-access.tsx';
 import { createNotification } from './notification-broker.tsx';
+import { isActionRestricted } from './sanctions-routes.tsx';
+import { moderateAndLog } from './content-moderation-routes.tsx';
 
 async function requireAdminProfile(userId: string): Promise<any | null> {
   const profile = ((await kv.get(`user:${userId}`)) as any) ?? (await db.getProfile(userId));
@@ -19,11 +21,6 @@ async function requireAdminProfile(userId: string): Promise<any | null> {
 }
 
 const MAX_MESSAGE_LENGTH = 8000;
-
-function containsContactInfo(content: string): boolean {
-  const pattern = /\b(\d{10,}|[\w.-]+@[\w.-]+\.\w+|(?:whatsapp|telegram|facebook|instagram|twitter)\b)/gi;
-  return pattern.test(content);
-}
 
 // ── Secondary indices ────────────────────────────────────────────────────
 // Without these, listing a user's conversations or reading one thread meant
@@ -333,14 +330,36 @@ export const conversationsRoutes = (app: Hono, getUserId: Function) => {
 
       const receiverId = parts.find((id: string) => id !== userId) as string;
 
-      if (containsContactInfo(content)) {
+      // Nothing on this path previously checked sanctions at all — a
+      // suspended/banned user could keep messaging exactly as if nothing
+      // had happened (confirmed by audit: the dedicated enforcement
+      // endpoint had zero callers anywhere in the app).
+      const { restricted, sanction } = await isActionRestricted(userId, 'messaging');
+      if (restricted) {
+        return c.json({
+          error: `You're unable to send messages right now (${sanction.sanctionType.replace(/_/g, ' ')}).`,
+          code: 'ACCOUNT_SANCTIONED',
+          expiresAt: sanction.expiresAt,
+        }, 403);
+      }
+
+      // Runs the real moderation engine (content-moderation-routes.tsx)
+      // instead of this file's own, weaker, contact-info-only regex —
+      // confirmed by audit that the real engine (keyword list + severity
+      // scoring + an admin-reviewable queue) never saw any real message
+      // traffic before this, because this handler had its own separate,
+      // narrower check that didn't log anywhere admins could see it.
+      const messageId = `conv-message:${Date.now()}-${Math.random().toString(36).substring(2, 11)}`;
+      const moderation = await moderateAndLog(content, 'message', userId, messageId);
+      if (!moderation.allowed) {
         return c.json({
           error: 'Personal contact information detected. Please use the in-app messaging system.',
+          violations: moderation.violations,
         }, 400);
       }
 
       const message = {
-        id: `conv-message:${Date.now()}-${Math.random().toString(36).substring(2, 11)}`,
+        id: messageId,
         conversationId,
         senderId: userId,
         senderName: typeof senderName === 'string' && senderName.trim() ? senderName.trim() : 'User',

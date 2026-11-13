@@ -27,7 +27,7 @@ const CONTACT_PATTERNS = [
 ];
 
 // Content moderation function
-function moderateContent(text: string, type: 'message' | 'bio' | 'profile'): {
+export function moderateContent(text: string, type: 'message' | 'bio' | 'profile'): {
   allowed: boolean;
   violations: string[];
   severity: 'low' | 'medium' | 'high';
@@ -74,6 +74,53 @@ function moderateContent(text: string, type: 'message' | 'bio' | 'profile'): {
   };
 }
 
+// Logs a moderation check and (if there were violations) opens a queue
+// item — shared by the HTTP endpoint below and by direct in-process calls
+// from conversations-routes.tsx. Moving real message traffic through this
+// instead of a separate, weaker local check (confirmed by audit:
+// conversations-routes.tsx had its own contact-info-only regex that never
+// touched this log/queue at all) is what makes the admin moderation queue
+// actually reflect real traffic.
+export async function moderateAndLog(
+  content: string,
+  type: 'message' | 'bio' | 'profile',
+  userId: string,
+  contextId?: string,
+): Promise<ReturnType<typeof moderateContent>> {
+  const result = moderateContent(content, type);
+
+  const logId = `moderation-log:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+  await kv.set(logId, {
+    id: logId,
+    userId,
+    content,
+    type,
+    contextId,
+    result,
+    timestamp: new Date().toISOString(),
+  });
+
+  if (result.violations.length > 0) {
+    const queueId = `moderation-queue:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    await kv.set(queueId, {
+      id: queueId,
+      userId,
+      content,
+      type,
+      contextId,
+      violations: result.violations,
+      severity: result.severity,
+      status: result.allowed ? 'flagged' : 'blocked',
+      timestamp: new Date().toISOString(),
+      reviewedBy: null,
+      reviewedAt: null,
+      outcome: null,
+    });
+  }
+
+  return result;
+}
+
 // Moderate content endpoint
 app.post('/moderate', async (c) => {
   try {
@@ -90,38 +137,7 @@ app.post('/moderate', async (c) => {
       return c.json({ error: 'Content and type required' }, 400);
     }
 
-    const result = moderateContent(content, type);
-
-    // Log moderation check
-    const logId = `moderation-log:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-    await kv.set(logId, {
-      id: logId,
-      userId,
-      content,
-      type,
-      contextId,
-      result,
-      timestamp: new Date().toISOString(),
-    });
-
-    // If violations detected, create moderation queue item
-    if (result.violations.length > 0) {
-      const queueId = `moderation-queue:${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
-      await kv.set(queueId, {
-        id: queueId,
-        userId,
-        content,
-        type,
-        contextId,
-        violations: result.violations,
-        severity: result.severity,
-        status: result.allowed ? 'flagged' : 'blocked',
-        timestamp: new Date().toISOString(),
-        reviewedBy: null,
-        reviewedAt: null,
-        outcome: null,
-      });
-    }
+    const result = await moderateAndLog(content, type, userId, contextId);
 
     return c.json(result);
   } catch (error: any) {
@@ -194,6 +210,23 @@ app.post('/queue/:itemId/review', async (c) => {
     };
 
     await kv.set(itemId, updatedItem);
+
+    // Previously, "remove-content" only logged an admin's opinion — the
+    // flagged message stayed exactly as-is, fully visible and servable in
+    // the conversation it came from. If this item came from a real
+    // message (contextId is the message's own conv-message:<id>, now set
+    // by conversations-routes.tsx), actually redact it.
+    if (actionTaken === 'remove-content' && (item as any).type === 'message' && typeof (item as any).contextId === 'string' && (item as any).contextId.startsWith('conv-message:')) {
+      const flaggedMessage = await kv.get((item as any).contextId) as any;
+      if (flaggedMessage) {
+        await kv.set((item as any).contextId, {
+          ...flaggedMessage,
+          content: '[Message removed by moderator]',
+          moderationRemoved: true,
+          moderationRemovedAt: new Date().toISOString(),
+        });
+      }
+    }
 
     // If action taken, record strike or sanction
     if (actionTaken && actionTaken !== 'no-action') {

@@ -1,8 +1,92 @@
 import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
+import * as db from './db.tsx';
 import { requireAdmin, requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
+import { createNotification } from './notification-broker.tsx';
+import { sendEmail } from './email-service.tsx';
 
 const app = new Hono();
+
+// Every other profile write in this codebase uses `user:${userId}`, not
+// `user_${userId}` — this file was the one exception, so a sanction's
+// activeSanction/sanctionStatus flags were being written to a key nothing
+// ever reads, and the `if (user)` guard silently skipped the write on top
+// of that (the key almost never exists). Net effect: sanctions were
+// recorded but never actually landed anywhere enforcement could see them.
+const userKeyFor = (userId: string) => `user:${userId}`;
+
+/**
+ * Returns the caller's active, not-yet-expired sanction, or null. Also the
+ * single place that lazily expires a stale sanction (mirrors the
+ * self-healing pattern used elsewhere in this codebase for system alerts)
+ * so every caller — the enforcement check below, the admin list, the
+ * user's own sanction history — sees consistent status without each one
+ * reimplementing the expiry check.
+ */
+export async function getActiveSanction(userId: string): Promise<any | null> {
+  const allSanctions = await kv.getByPrefix('sanction:');
+  const now = new Date();
+  for (const sanction of allSanctions as any[]) {
+    if (sanction.userId !== userId || sanction.status !== 'active') continue;
+    if (sanction.expiresAt && new Date(sanction.expiresAt) < now) {
+      sanction.status = 'expired';
+      await kv.set(sanction.id, sanction).catch(() => {});
+      await kv.set(userKeyFor(userId), {
+        ...((await kv.get(userKeyFor(userId))) as any ?? {}),
+        activeSanction: null,
+        sanctionStatus: null,
+      }).catch(() => {});
+      continue;
+    }
+    return sanction;
+  }
+  return null;
+}
+
+/**
+ * Real enforcement check — this is what was missing entirely. Sanctions
+ * were being created and shown in the admin UI, but nothing on the
+ * messaging-send or booking-initiation hot paths ever called this (or the
+ * old dead /check-restriction endpoint, which had zero callers anywhere in
+ * the app) before this fix, so a suspended/banned user could keep
+ * messaging and booking exactly as if nothing had happened.
+ */
+export async function isActionRestricted(
+  userId: string,
+  action: 'messaging' | 'booking' | 'profile_edit',
+): Promise<{ restricted: boolean; sanction: any | null }> {
+  const sanction = await getActiveSanction(userId);
+  if (!sanction) return { restricted: false, sanction: null };
+  const restrictions: string[] = sanction.restrictions || [];
+  const restricted = restrictions.includes('all') || restrictions.includes(action);
+  return { restricted, sanction: restricted ? sanction : null };
+}
+
+async function notifySanctionedUser(
+  userId: string,
+  title: string,
+  message: string,
+): Promise<void> {
+  try {
+    await createNotification(kv, {
+      userId,
+      type: 'account_sanctioned',
+      title,
+      message,
+      priority: 'high',
+    });
+    const profile = ((await kv.get(userKeyFor(userId))) as any) ?? (await db.getProfile(userId).catch(() => null));
+    if (profile?.email) {
+      await sendEmail({
+        to: profile.email,
+        subject: title,
+        html: `<p>Hi ${profile.fullName || profile.name || 'there'},</p><p>${message}</p><p>If you believe this is a mistake, you can file an appeal from your account settings.</p>`,
+      }).catch((e) => console.warn('Sanction notification email (non-fatal):', e));
+    }
+  } catch (e: any) {
+    console.warn('Sanction notification (non-fatal):', e.message);
+  }
+}
 
 // Sanction types and durations
 const SANCTION_CATALOGUE = {
@@ -98,7 +182,7 @@ app.post('/', async (c) => {
     await kv.set(sanctionId, sanction);
 
     // Update user record
-    const userKey = `user_${userId}`;
+    const userKey = userKeyFor(userId);
     const user = await kv.get(userKey);
     if (user) {
       await kv.set(userKey, {
@@ -107,6 +191,12 @@ app.post('/', async (c) => {
         sanctionStatus: 'active',
       });
     }
+
+    await notifySanctionedUser(
+      userId,
+      `Account action: ${catalogue.name}`,
+      `${catalogue.description}. Reason: ${reason}.${expiresAt ? ` This expires on ${new Date(expiresAt).toLocaleDateString('en-GB')}.` : ''}`,
+    );
 
     return c.json({ success: true, sanction });
   } catch (error: any) {
@@ -155,51 +245,30 @@ app.get('/user/:userId', async (c) => {
   }
 });
 
-// Check if user can perform action
+// Check if user can perform action. This had zero callers anywhere in the
+// app before this fix (confirmed by audit) — real enforcement now also
+// happens inline via isActionRestricted() in conversations-routes.tsx
+// (messaging) and payment-routes.tsx (booking initiation), which don't
+// need an extra HTTP round-trip since they run in the same process. This
+// endpoint stays for any client that wants to check before attempting an
+// action. It used to call c.req.json() twice on the same request (once for
+// an "authBody", again for the real body) — the second call would have
+// thrown on a real request body stream, which is likely *why* nothing
+// ever ended up calling this successfully.
 app.post('/check-restriction', async (c) => {
   try {
-    const authBody = await c.req.json();
-    const auth = await requireSelfOrAdmin(c, authBody?.userId);
+    const body = await c.req.json();
+    const { userId, action } = body;
+    const auth = await requireSelfOrAdmin(c, userId);
     if (auth instanceof Response) return auth;
-    const accessToken = c.req.header('Authorization')?.split(' ')[1];
-    if (!accessToken) {
-      return c.json({ error: 'Unauthorized' }, 401);
-    }
 
-    const { userId, action } = await c.req.json();
-
-    const allSanctions = await kv.getByPrefix('sanction:');
-    const now = new Date();
-    
-    const activeSanction = allSanctions.find((sanction: any) => {
-      if (sanction.userId !== userId || sanction.status !== 'active') {
-        return false;
-      }
-      
-      // Check if expired
-      if (sanction.expiresAt && new Date(sanction.expiresAt) < now) {
-        sanction.status = 'expired';
-        kv.set(sanction.id, sanction);
-        return false;
-      }
-      
-      return true;
-    });
-
-    if (!activeSanction) {
-      return c.json({ allowed: true, reason: null });
-    }
-
-    const restrictions = activeSanction.restrictions || [];
-    
-    // Check if action is restricted
-    const isRestricted = restrictions.includes('all') || restrictions.includes(action);
+    const { restricted, sanction } = await isActionRestricted(userId, action);
 
     return c.json({
-      allowed: !isRestricted,
-      reason: isRestricted ? activeSanction.reason : null,
-      sanctionType: isRestricted ? activeSanction.sanctionType : null,
-      expiresAt: isRestricted ? activeSanction.expiresAt : null,
+      allowed: !restricted,
+      reason: restricted ? sanction.reason : null,
+      sanctionType: restricted ? sanction.sanctionType : null,
+      expiresAt: restricted ? sanction.expiresAt : null,
     });
   } catch (error: any) {
     console.error('Error checking restriction:', error);
@@ -272,7 +341,7 @@ app.post('/:sanctionId/appeal/review', async (c) => {
 
     // If approved, update user record
     if (outcome === 'approved') {
-      const userKey = `user_${(sanction as any).userId}`;
+      const userKey = userKeyFor((sanction as any).userId);
       const user = await kv.get(userKey);
       if (user) {
         await kv.set(userKey, {
@@ -282,6 +351,14 @@ app.post('/:sanctionId/appeal/review', async (c) => {
         });
       }
     }
+
+    await notifySanctionedUser(
+      (sanction as any).userId,
+      outcome === 'approved' ? 'Your appeal was approved' : 'Your appeal was denied',
+      outcome === 'approved'
+        ? 'Your account sanction has been lifted.'
+        : `Your appeal was reviewed and denied.${reviewNotes ? ` Note: ${reviewNotes}` : ''}`,
+    );
 
     return c.json({ success: true, sanction: updatedSanction });
   } catch (error: any) {
