@@ -2,6 +2,7 @@ import { Hono } from 'npm:hono@4';
 import { createClient } from 'jsr:@supabase/supabase-js@2';
 import * as kv from './kv_store.tsx';
 import { getProfilesByRole } from './db.tsx';
+import { tutorTeachesLevelBucket } from './grade-levels.tsx';
 
 const tutorSearchRoutes = new Hono();
 
@@ -28,6 +29,74 @@ const getUserId = async (accessToken: string | null): Promise<string | null> => 
     return null;
   }
 };
+
+const WEEKDAYS = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+const WEEKEND = ['Saturday', 'Sunday'];
+const DAY_ABBR: Record<string, string> = {
+  Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri', Saturday: 'Sat', Sunday: 'Sun',
+};
+const EVENING_START_MINUTES = 17 * 60;
+
+const toMinutes = (hhmm: string): number => {
+  const [h, m] = String(hhmm || '').split(':').map(Number);
+  return Number.isFinite(h) ? h * 60 + (Number.isFinite(m) ? m : 0) : NaN;
+};
+
+/**
+ * Collapses a tutor's saved weekly schedule (`availability:<id>`, written by
+ * TutorAvailabilityManager.tsx — { schedule: { Monday: { enabled, slots:
+ * [{start,end}] }, ... } }) into the coarse filter tags the search UI
+ * offers ('weekdays-daytime' | 'weekdays-evenings' | 'weekends') plus a
+ * short human summary like "Mon–Fri 09:00–17:00 · Sat 10:00–14:00".
+ * A tutor with no saved schedule gets no tags, so they're excluded by any
+ * availability filter rather than assumed to be free.
+ */
+function summarizeSchedule(record: any): { tags: string[]; summary: string | null } {
+  const schedule = record?.schedule;
+  if (!schedule || typeof schedule !== 'object') return { tags: [], summary: null };
+
+  const tags = new Set<string>();
+  const activeDays: { day: string; slots: string }[] = [];
+
+  for (const day of [...WEEKDAYS, ...WEEKEND]) {
+    const entry = schedule[day];
+    const slots: any[] = entry?.enabled && Array.isArray(entry.slots) ? entry.slots : [];
+    const valid = slots.filter((s) => !Number.isNaN(toMinutes(s?.start)) && !Number.isNaN(toMinutes(s?.end)));
+    if (valid.length === 0) continue;
+
+    if (WEEKEND.includes(day)) {
+      tags.add('weekends');
+    } else {
+      for (const s of valid) {
+        if (toMinutes(s.start) < EVENING_START_MINUTES) tags.add('weekdays-daytime');
+        if (toMinutes(s.end) > EVENING_START_MINUTES) tags.add('weekdays-evenings');
+      }
+    }
+    activeDays.push({ day, slots: valid.map((s) => `${s.start}–${s.end}`).join(', ') });
+  }
+
+  if (activeDays.length === 0) return { tags: [], summary: null };
+
+  // Group consecutive days that share identical slots: Mon–Fri 09:00–17:00
+  const groups: { days: string[]; slots: string }[] = [];
+  for (const { day, slots } of activeDays) {
+    const last = groups[groups.length - 1];
+    const allDays = [...WEEKDAYS, ...WEEKEND];
+    const consecutive = last && allDays.indexOf(day) === allDays.indexOf(last.days[last.days.length - 1]) + 1;
+    if (last && consecutive && last.slots === slots) last.days.push(day);
+    else groups.push({ days: [day], slots });
+  }
+  const summary = groups
+    .map((g) => {
+      const label = g.days.length >= 3
+        ? `${DAY_ABBR[g.days[0]]}–${DAY_ABBR[g.days[g.days.length - 1]]}`
+        : g.days.map((d) => DAY_ABBR[d]).join(', ');
+      return `${label} ${g.slots}`;
+    })
+    .join(' · ');
+
+  return { tags: [...tags], summary };
+}
 
 // Search tutors with filters
 tutorSearchRoutes.get('/search/tutors', async (c) => {
@@ -78,11 +147,29 @@ tutorSearchRoutes.get('/search/tutors', async (c) => {
     // with the real number before anything below filters or sorts by it.
     tutors = await Promise.all(tutors.map(async (tutor: any) => {
       const tutorId = tutor.id ?? tutor.userId;
-      const stats = tutorId ? await kv.get(`tutor:rating:${tutorId}`) as any : null;
+      const [stats, schedule] = tutorId
+        ? await Promise.all([
+            kv.get(`tutor:rating:${tutorId}`) as Promise<any>,
+            kv.get(`availability:${tutorId}`) as Promise<any>,
+          ])
+        : [null, null];
+      const { tags: availabilityTags, summary: availabilitySummary } = summarizeSchedule(schedule);
       return {
         ...tutor,
         rating: stats ? stats.averageRating : null,
         reviewCount: stats ? stats.totalReviews : 0,
+        // The signup form writes `dbs_checked` (snake_case); every filter and
+        // badge downstream read `dbsChecked`/`dbsStatus`, so no tutor ever
+        // showed as DBS-cleared and the "DBS only" filter returned nobody.
+        // This is the tutor's own declaration at signup, reviewed by admin
+        // as part of verification — not an independent check by us.
+        dbsChecked: tutor.dbs_checked === true || tutor.dbsChecked === true || tutor.dbsStatus === 'verified',
+        // Real weekly schedule from TutorAvailabilityManager (availability:<id>),
+        // which told tutors "your availability will be visible to parents when
+        // they search" — nothing ever surfaced it until now. The old filter
+        // compared a `tutor.availability` string that no tutor record has.
+        availabilityTags,
+        availabilitySummary,
         // Platform flat rate (see PAYMENT_PLANS in payment-routes.tsx) —
         // overridden here rather than trusted from whatever's on the raw
         // profile, since tutors no longer set this themselves and older
@@ -109,15 +196,14 @@ tutorSearchRoutes.get('/search/tutors', async (c) => {
     }
 
     if (level) {
-      tutors = tutors.filter((tutor: any) =>
-        tutor.yearGroups?.includes(level)
-      );
+      // Was `tutor.yearGroups?.includes(level)` — a field no live tutor
+      // record has (they store `classes`), so any level filter returned
+      // nobody. See grade-levels.tsx.
+      tutors = tutors.filter((tutor: any) => tutorTeachesLevelBucket(tutor, level));
     }
 
     if (availability) {
-      tutors = tutors.filter((tutor: any) =>
-        tutor.availability === availability || tutor.availability === 'flexible'
-      );
+      tutors = tutors.filter((tutor: any) => tutor.availabilityTags.includes(availability));
     }
 
     // A min/max price filter used to live here — removed along with the
@@ -137,9 +223,7 @@ tutorSearchRoutes.get('/search/tutors', async (c) => {
     }
 
     if (dbsRequired) {
-      tutors = tutors.filter((tutor: any) =>
-        tutor.dbsStatus === 'verified'
-      );
+      tutors = tutors.filter((tutor: any) => tutor.dbsChecked === true);
     }
 
     // Sort by rating (descending) and response rate

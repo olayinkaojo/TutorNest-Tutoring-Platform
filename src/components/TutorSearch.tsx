@@ -9,6 +9,13 @@ import { Badge } from './ui/badge';
 import { Avatar, AvatarFallback, AvatarImage } from './ui/avatar';
 import { TutorProfileModal } from './TutorProfileModal';
 import {
+  LEVEL_BUCKETS,
+  formatYear,
+  studentYearFromGradeLevel,
+  tutorTeachesBucket,
+  tutorTeachesYear,
+} from '../utils/gradeLevels';
+import {
   Search,
   Filter,
   Star,
@@ -32,6 +39,9 @@ interface TutorSearchProps {
   session: any;
   studentProfile?: any;
   activeChildId?: string | null;
+  /** Selected child's stored grade code (e.g. 'primary_2') — enables the "child's year" level filter. */
+  childGradeLevel?: string | null;
+  childFirstName?: string | null;
   onStartConversation?: (tutorId: string, tutorName: string) => void;
   onBookSession?: (tutor: any) => void;
 }
@@ -42,14 +52,23 @@ const SUBJECTS = [
   'Hausa', 'Yoruba', 'Igbo',
 ];
 
+// Level filter. The old options were UK buckets ('Primary (Year 1-6)',
+// 'KS3 (Year 7-9)', ...) matched with a plain substring test against
+// tutor.levels / tutor.classes — but live tutors store classes like
+// 'Primary 2 (P2) / Year 2', which never contain that bucket string, so
+// picking ANY level returned "No tutors match your filters" every time.
+// Now matched by year number (see src/utils/gradeLevels.ts), with an extra
+// "this child's year" option when a child is selected.
+const CHILD_YEAR_FILTER = 'child-year';
 const LEVELS = [
   { value: 'all-levels', label: 'All Levels' },
-  { value: 'Primary (Year 1-6)', label: 'Primary (Yr 1–6)' },
-  { value: 'KS3 (Year 7-9)', label: 'KS3 (Yr 7–9)' },
-  { value: 'GCSE (Year 10-11)', label: 'GCSE (Yr 10–11)' },
-  { value: 'A-Level (Year 12-13)', label: 'A-Level (Yr 12–13)' },
-  { value: 'University Level', label: 'University' },
+  ...LEVEL_BUCKETS.map(b => ({ value: b.key, label: b.label })),
 ];
+
+// Signup stores the tutor's DBS/police-clearance declaration as `dbs_checked`
+// (snake_case); /search/tutors now normalises it to `dbsChecked`, but the raw
+// field is accepted too in case a tutor arrives via another list.
+const hasDbs = (t: any) => t?.dbsChecked === true || t?.dbs_checked === true || t?.dbsStatus === 'verified';
 
 const SORT_OPTIONS = [
   { value: 'rating', label: 'Highest Rated' },
@@ -71,6 +90,8 @@ export function TutorSearch({
   session,
   studentProfile,
   activeChildId,
+  childGradeLevel,
+  childFirstName,
   onStartConversation,
   onBookSession,
 }: TutorSearchProps) {
@@ -86,6 +107,12 @@ export function TutorSearch({
   });
   const [allTutors, setAllTutors] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
+  // The selected child's year, if their grade is known — powers the
+  // "<child>'s year" level option.
+  const childYear = studentYearFromGradeLevel(childGradeLevel);
+  const childYearLabel = childYear !== null
+    ? `${childFirstName ? `${childFirstName}'s year` : 'Child’s year'} (${formatYear(childYear)})`
+    : null;
   const [invitedTutors, setInvitedTutors] = useState<Set<string>>(new Set());
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -169,32 +196,32 @@ export function TutorSearch({
       ));
     }
 
-    if (filters.level !== 'all-levels') {
-      list = list.filter(t =>
-        t.levels?.some((l: string) => l.includes(filters.level)) ||
-        t.gradeLevel?.includes(filters.level) ||
-        t.classes?.some((c: string) => c.includes(filters.level))
-      );
+    if (filters.level === CHILD_YEAR_FILTER) {
+      if (childYear !== null) list = list.filter(t => tutorTeachesYear(t, childYear));
+    } else if (filters.level !== 'all-levels') {
+      list = list.filter(t => tutorTeachesBucket(t, filters.level));
     }
 
+    // Backed by the tutor's real weekly schedule (availabilityTags is
+    // computed server-side in /search/tutors). Previously compared against a
+    // `tutor.availability` string no tutor record has — always empty.
     if (filters.availability !== 'any-time') {
-      list = list.filter(t => {
-        const avail = (t.availability || '').toLowerCase();
-        return avail.includes(filters.availability) || avail.includes('flexible');
-      });
+      list = list.filter(t => Array.isArray(t.availabilityTags) && t.availabilityTags.includes(filters.availability));
     }
 
+    // Tutors with no reviews yet have rating === null and are excluded by any
+    // minimum — "4+ stars" means proven 4+, not unproven.
     if (filters.minRating !== 'any-rating') {
       const min = parseFloat(filters.minRating);
       list = list.filter(t => (t.rating || 0) >= min);
     }
 
     if (filters.dbsOnly) {
-      list = list.filter(t => t.dbsStatus === 'verified' || t.dbsChecked);
+      list = list.filter(t => hasDbs(t));
     }
 
     return sortTutors(list, sortBy);
-  }, [allTutors, keyword, selectedSubject, filters, sortBy]);
+  }, [allTutors, keyword, selectedSubject, filters, sortBy, childYear]);
 
   const results = filteredTutors();
 
@@ -261,7 +288,7 @@ export function TutorSearch({
                 {tutor.totalLessons > 0 && (
                   <span className="text-xs text-gray-400">{tutor.totalLessons} lessons</span>
                 )}
-                {(tutor.dbsStatus === 'verified' || tutor.dbsChecked) && (
+                {hasDbs(tutor) && (
                   <Badge className="text-[10px] px-1.5 py-0 h-5" style={{ backgroundColor: '#5d982715', color: '#5d9827', border: 'none' }}>
                     <Shield className="w-2.5 h-2.5 mr-0.5" />
                     DBS
@@ -300,10 +327,10 @@ export function TutorSearch({
 
           {/* Availability / experience row */}
           <div className="flex items-center gap-3 text-xs text-gray-500 mb-4">
-            {tutor.availability && (
-              <span className="flex items-center gap-1">
+            {tutor.availabilitySummary && (
+              <span className="flex items-center gap-1" title="Weekly availability set by the tutor">
                 <Clock className="w-3 h-3" />
-                {tutor.availability}
+                {tutor.availabilitySummary}
               </span>
             )}
             {tutor.experienceYears && (
@@ -457,6 +484,9 @@ export function TutorSearch({
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
+                    {childYearLabel && (
+                      <SelectItem value={CHILD_YEAR_FILTER}>{childYearLabel}</SelectItem>
+                    )}
                     {LEVELS.map(l => (
                       <SelectItem key={l.value} value={l.value}>{l.label}</SelectItem>
                     ))}
@@ -475,7 +505,6 @@ export function TutorSearch({
                     <SelectItem value="weekdays-daytime">Weekdays (Daytime)</SelectItem>
                     <SelectItem value="weekdays-evenings">Weekdays (Evenings)</SelectItem>
                     <SelectItem value="weekends">Weekends</SelectItem>
-                    <SelectItem value="flexible">Flexible</SelectItem>
                   </SelectContent>
                 </Select>
               </div>
@@ -504,7 +533,7 @@ export function TutorSearch({
                   onChange={e => setFilters(f => ({ ...f, dbsOnly: e.target.checked }))}
                   className="w-4 h-4 rounded accent-purple-600"
                 />
-                <span className="text-sm text-gray-700">DBS verified tutors only</span>
+                <span className="text-sm text-gray-700">Holds DBS / police clearance</span>
               </label>
               <button
                 className="ml-auto text-xs text-gray-500 hover:text-gray-700 underline"

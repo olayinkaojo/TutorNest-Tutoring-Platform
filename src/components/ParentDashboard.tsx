@@ -264,10 +264,12 @@ export function ParentDashboard({
       });
       setSoonSession(soon || null);
 
-      // Stats scope: if a specific child is active, show only their numbers
-      const relevantBookings = activeChildId
-        ? (allBookingsData[children.findIndex(c => c.id === activeChildId)]?.bookings || [])
-        : allBookingsData.flatMap((d: any) => d.bookings || []);
+      // Stats scope: the whole family. These cards used to show only the
+      // selected child's numbers, so a parent with one lesson booked per
+      // child saw "1 lesson, ₦15,000" instead of "2 lessons, ₦30,000" and
+      // read it as a bug. Per-child upcoming/done counts already sit on
+      // each child's card below, so the headline cards now total everyone.
+      const relevantBookings = allBookingsFlat;
 
       // Filter by selected years and months
       const filteredBookings = relevantBookings.filter((b: any) => {
@@ -298,7 +300,7 @@ export function ParentDashboard({
     } catch (error) {
       console.error('Error calculating stats:', error);
     }
-  }, [children, session, activeChildId, selectedYears, selectedMonths]);
+  }, [children, session, selectedYears, selectedMonths]);
 
   // Calculate stats when children data, filter, or active child changes
   useEffect(() => {
@@ -456,6 +458,14 @@ export function ParentDashboard({
       currentProgress: child.progress || 0,
     };
   });
+
+  // The Overview tab's child cards show a "Lessons" count — the raw child
+  // record has no such field, so it always rendered 0. Merge in the live
+  // completed-session count fetched above.
+  const childrenWithCounts = children.map(child => ({
+    ...child,
+    completedLessons: childSessionCounts[child.id]?.completed ?? child.completedLessons ?? 0,
+  }));
 
   const activeChild = children.find(c => c.id === activeChildId);
 
@@ -700,7 +710,7 @@ export function ParentDashboard({
         ) : children.length > 0 ? (
           <div className="mb-6">
             <p className="text-sm text-gray-500 mb-3">
-              Stats above reflect the <strong>selected child</strong>. Click a card to switch.
+              Stats above cover <strong>all your children</strong> for the selected period. Click a child to choose who you’re finding tutors and booking lessons for.
             </p>
             <ChildProfileSwitcher
               children={childProfilesForSwitcher}
@@ -842,7 +852,7 @@ export function ParentDashboard({
                 completedLessons={stats.completedLessons}
                 onFindTutors={() => setActiveTab('find-tutors')}
                 onOpenPayments={() => setActiveTab('payments')}
-                children={children}
+                children={childrenWithCounts}
                 loadingChildren={loadingChildren}
                 session={session}
                 activeChildId={activeChildId}
@@ -942,6 +952,8 @@ export function ParentDashboard({
                     <TutorSearch
                       session={session}
                       activeChildId={activeChildId}
+                      childGradeLevel={activeChild?.gradeLevel}
+                      childFirstName={activeChild?.firstName}
                       onStartConversation={() => {
                         toast.info('You can message a tutor once you’ve booked a session with them.');
                       }}

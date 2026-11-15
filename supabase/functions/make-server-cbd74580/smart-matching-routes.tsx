@@ -5,6 +5,7 @@ import { getProfile, getProfilesByRole } from './db.tsx';
 const app = new Hono();
 
 import { requireSelfOrAdmin, verifyUser } from './route-auth.tsx';
+import { studentYearFromGradeLevel, tutorYearsTaught } from './grade-levels.tsx';
 
 // Smart Matching Algorithm
 //
@@ -134,67 +135,31 @@ function calculateSubjectMatch(student: any, tutor: any): number {
   return Math.min(25, (matchPercentage * 20) + bonusPoints);
 }
 
-// Maps a child's grade level to the same broad level buckets tutors select
-// from on their profile (see tutor.yearGroups, collected by
-// TutorProfileForm.tsx). The real value stored at student.gradeLevel is the
-// code AddChildDialog.tsx's Select writes (e.g. 'primary_3', 'secondary_8',
-// 'sixth_form_12' — confirmed by reading that form directly), not a literal
-// "Year N" string. An earlier version of this mapping only recognised
-// "Year N" strings, which nothing in the live product ever actually sends —
-// making Level Match silently neutral for every single match, exactly the
-// kind of always-neutral dimension this file was just rewritten to remove.
-// "Year N" is still accepted as a fallback in case some other caller (e.g. a
-// DB profile) ever provides it directly.
-const GRADE_LEVEL_CODE_MAP: Record<string, string> = {
-  // No dedicated tutor bucket exists below Primary — nursery-age children
-  // are mapped to the Primary bucket as the closest realistic fit.
-  nursery_1: 'Primary (Year 1-6)',
-  nursery_2: 'Primary (Year 1-6)',
-  nursery_3: 'Primary (Year 1-6)',
-  primary_1: 'Primary (Year 1-6)',
-  primary_2: 'Primary (Year 1-6)',
-  primary_3: 'Primary (Year 1-6)',
-  primary_4: 'Primary (Year 1-6)',
-  primary_5: 'Primary (Year 1-6)',
-  primary_6: 'Primary (Year 1-6)',
-  secondary_7: 'KS3 (Year 7-9)',
-  secondary_8: 'KS3 (Year 7-9)',
-  secondary_9: 'KS3 (Year 7-9)',
-  secondary_10: 'GCSE (Year 10-11)',
-  secondary_11: 'GCSE (Year 10-11)',
-  // No dedicated tutor bucket above A-Level exists either — Post-Secondary
-  // is mapped to A-Level as the closest fit.
-  sixth_form_12: 'A-Level (Year 12-13)',
-  sixth_form_13: 'A-Level (Year 12-13)',
-};
-
-const YEAR_GROUP_LEVELS: [string[], string][] = [
-  [['Year 1', 'Year 2', 'Year 3', 'Year 4', 'Year 5', 'Year 6'], 'Primary (Year 1-6)'],
-  [['Year 7', 'Year 8', 'Year 9'], 'KS3 (Year 7-9)'],
-  [['Year 10', 'Year 11'], 'GCSE (Year 10-11)'],
-  [['Year 12', 'Year 13'], 'A-Level (Year 12-13)'],
-];
-
-function mapGradeLevelToBucket(gradeLevel: string): string {
-  if (GRADE_LEVEL_CODE_MAP[gradeLevel]) return GRADE_LEVEL_CODE_MAP[gradeLevel];
-  for (const [years, level] of YEAR_GROUP_LEVELS) {
-    if (years.includes(gradeLevel)) return level;
-  }
-  return '';
-}
-
+// Level Match compares the child's actual year (from the 'primary_3' /
+// 'secondary_8' codes AddChildDialog.tsx writes) against the years a tutor
+// has said they teach. This used to read only tutor.yearGroups — a field
+// that, as of Nov 2026, 0 of 111 real tutor records have. Live tutors store
+// `classes` ('Primary 2 (P2) / Year 2', 'JSS 1 / Year 7', ...) instead, so
+// this dimension sat out of every single real match. See grade-levels.tsx
+// for the shared normalisation that reads both shapes.
 function calculateLevelMatch(student: any, tutor: any): DimensionResult {
-  const studentLevel = mapGradeLevelToBucket(student.gradeLevel || student.yearGroup || '');
-  const tutorLevels: string[] = tutor.yearGroups || [];
+  const studentYear = studentYearFromGradeLevel(student.gradeLevel || student.yearGroup || '');
+  const tutorYears = tutorYearsTaught(tutor);
 
   // One side hasn't specified a level — nothing to actually compare, so
   // this dimension sits out of the percentage entirely rather than
   // contributing a guessed half-mark that's identical for every pair.
-  if (!studentLevel || tutorLevels.length === 0) {
+  if (studentYear === null || tutorYears.size === 0) {
     return { score: 0, max: 15, applicable: false };
   }
 
-  return { score: tutorLevels.includes(studentLevel) ? 15 : 0, max: 15, applicable: true };
+  if (tutorYears.has(studentYear)) return { score: 15, max: 15, applicable: true };
+  // Adjacent year (e.g. a Year 3 child, tutor lists Year 2 and Year 4) is a
+  // realistic partial fit rather than a hard miss.
+  if (tutorYears.has(studentYear - 1) || tutorYears.has(studentYear + 1)) {
+    return { score: 8, max: 15, applicable: true };
+  }
+  return { score: 0, max: 15, applicable: true };
 }
 
 function calculateScheduleMatch(student: any, tutor: any): DimensionResult {

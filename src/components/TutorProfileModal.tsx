@@ -203,10 +203,10 @@ export function TutorProfileModal({
                       <Star className="w-3 h-3 mr-1 fill-current" />
                       {averageRating} ({reviews.length} reviews)
                     </Badge>
-                    {tutor.dbsStatus === 'verified' && (
+                    {(tutor.dbsChecked === true || tutor.dbs_checked === true || tutor.dbsStatus === 'verified') && (
                       <Badge style={{ backgroundColor: '#5d9827' }}>
                         <Shield className="w-3 h-3 mr-1" />
-                        DBS Verified
+                        DBS / Police clearance
                       </Badge>
                     )}
                     {tutor.isTopRated && (
@@ -278,11 +278,20 @@ export function TutorProfileModal({
                 <div>
                   <p className="text-sm font-medium text-gray-600 mb-2">Grade Levels</p>
                   <div className="flex flex-wrap gap-2">
-                    {tutor.yearGroups?.map((group: string) => (
-                      <Badge key={group} variant="outline">
-                        {group}
-                      </Badge>
-                    )) || <p className="text-sm text-gray-500">Not specified</p>}
+                    {/* Live tutors store `classes` ('Primary 2 (P2) / Year 2'); only
+                        the older profile form wrote `yearGroups`. Reading just the
+                        latter showed "Not specified" for essentially every tutor. */}
+                    {(() => {
+                      const levels: string[] = [
+                        ...(Array.isArray(tutor.classes) ? tutor.classes : []),
+                        ...(Array.isArray(tutor.yearGroups) ? tutor.yearGroups : []),
+                      ];
+                      return levels.length > 0
+                        ? levels.map((group: string) => (
+                            <Badge key={group} variant="outline">{group}</Badge>
+                          ))
+                        : <p className="text-sm text-gray-500">Not specified</p>;
+                    })()}
                   </div>
                 </div>
               </div>
@@ -313,8 +322,18 @@ export function TutorProfileModal({
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="capitalize font-medium">{tutor.availability || 'Flexible'}</p>
-                  <p className="text-xs text-gray-600 mt-1">Response time: {tutor.responseTime || '< 1 hour'}</p>
+                  {/* Was `tutor.availability || 'Flexible'` plus a hardcoded
+                      "Response time: < 1 hour" — neither field exists on any
+                      tutor record, so every tutor showed the same invented
+                      "Flexible / < 1 hour". availabilitySummary is the tutor's
+                      real weekly schedule (see /search/tutors). */}
+                  <p className="font-medium">{tutor.availabilitySummary || 'Not set yet'}</p>
+                  {!tutor.availabilitySummary && (
+                    <p className="text-xs text-gray-600 mt-1">This tutor hasn’t published a weekly schedule — you’ll see open slots when you book.</p>
+                  )}
+                  {tutor.responseTime && (
+                    <p className="text-xs text-gray-600 mt-1">Response time: {tutor.responseTime}</p>
+                  )}
                 </CardContent>
               </Card>
             </div>
