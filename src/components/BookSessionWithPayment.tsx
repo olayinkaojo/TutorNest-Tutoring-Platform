@@ -9,36 +9,66 @@ import { projectId, publicAnonKey } from '../utils/supabase/info';
 import { formatRawTimeWAT, WAT_TIMEZONE } from '../utils/timezone';
 
 // ─── Fixed plan definitions ────────────────────────────────────────────────
+// Mirror of PAYMENT_PLANS in payment-routes.tsx (the server is the source of
+// truth for price — this list only drives the cards). Every plan is the same
+// ₦15,000 per session; monthly plans were added from parent feedback so a
+// family can pay month by month instead of a whole term up front.
+type Billing = 'once' | 'monthly' | 'term';
 const PLANS = [
   {
     id: 'trial',
     planType: 'trial' as const,
     name: 'Trial Session',
-    description: 'Try one session before committing to a full term.',
+    description: 'Try one session before committing to a plan.',
     price: 15_000,
     sessions: 1,
     sessionsPerWeek: 1,
     weeks: 1,
+    billing: 'once' as Billing,
+  },
+  {
+    id: 'once_weekly_monthly',
+    planType: 'once_weekly_monthly' as const,
+    name: 'Once a Week · Monthly',
+    description: '1 session per week, paid one month (4 weeks) at a time.',
+    price: 60_000,
+    sessions: 4,
+    sessionsPerWeek: 1,
+    weeks: 4,
+    billing: 'monthly' as Billing,
+  },
+  {
+    id: 'twice_weekly_monthly',
+    planType: 'twice_weekly_monthly' as const,
+    name: 'Twice a Week · Monthly',
+    description: '2 sessions per week, paid one month (4 weeks) at a time.',
+    price: 120_000,
+    sessions: 8,
+    sessionsPerWeek: 2,
+    weeks: 4,
+    billing: 'monthly' as Billing,
   },
   {
     id: 'once_weekly',
     planType: 'once_weekly' as const,
-    name: 'Once a Week',
+    name: 'Once a Week · Term',
     description: '1 session per week for a full 13-week term.',
     price: 195_000,
     sessions: 13,
     sessionsPerWeek: 1,
     weeks: 13,
+    billing: 'term' as Billing,
   },
   {
     id: 'twice_weekly',
     planType: 'twice_weekly' as const,
-    name: 'Twice a Week',
+    name: 'Twice a Week · Term',
     description: '2 sessions per week for a full 13-week term.',
     price: 390_000,
     sessions: 26,
     sessionsPerWeek: 2,
     weeks: 13,
+    billing: 'term' as Billing,
   },
 ];
 
@@ -308,14 +338,14 @@ export function BookSessionWithPayment({
         {/* Value-prop banner */}
         <div className="mb-4 p-3 bg-purple-50 border border-purple-200 rounded-lg text-center">
           <p className="text-sm text-purple-800">
-            <strong>Save with a session bundle.</strong> Multi-session plans include priority scheduling and a dedicated tutor relationship.
+            <strong>Same ₦15,000 per session on every plan.</strong> Pay monthly for flexibility, or lock in a full term so your child keeps the same tutor and slot all term long.
           </p>
         </div>
 
         {/* Plans grid */}
-        <div className="grid md:grid-cols-3 gap-4 mt-1">
+        <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4 mt-1">
           {PLANS.map((plan, index) => {
-            const isPopular = plan.planType === 'once_weekly';
+            const isPopular = plan.planType === 'once_weekly_monthly';
             const isBestValue = plan.planType === 'twice_weekly';
             const isProcessing = processing === plan.id;
             const perSession = Math.round(plan.price / plan.sessions);
@@ -345,9 +375,9 @@ export function BookSessionWithPayment({
                     <CardHeader className="pb-2.5">
                   <CardTitle className="text-lg flex items-center gap-2">
                     {plan.name}
-                    {plan.planType === 'trial' && (
-                      <span className="text-[10px] font-normal text-gray-500 border border-gray-300 rounded px-1.5 py-0.5 leading-none">One-off lesson</span>
-                    )}
+                    <span className="text-[10px] font-normal text-gray-500 border border-gray-300 rounded px-1.5 py-0.5 leading-none whitespace-nowrap">
+                      {plan.billing === 'once' ? 'One-off lesson' : plan.billing === 'monthly' ? 'Billed monthly' : 'Billed per term'}
+                    </span>
                   </CardTitle>
                     <CardDescription className="text-xs min-h-0 sm:min-h-[2.5rem]">{plan.description}</CardDescription>
                 </CardHeader>
@@ -396,7 +426,9 @@ export function BookSessionWithPayment({
                         <TrendingUp className="w-4 h-4 text-orange-600 mt-0.5 shrink-0" />
                           <div className="text-[11px] sm:text-xs leading-relaxed">
                           <div className="font-semibold">Progress tracking</div>
-                          <div className="text-muted-foreground">Monitor improvement over the term</div>
+                          <div className="text-muted-foreground">
+                            {plan.billing === 'monthly' ? 'Session reports every lesson; rebook each month' : 'Monitor improvement over the term'}
+                          </div>
                         </div>
                       </div>
                     )}

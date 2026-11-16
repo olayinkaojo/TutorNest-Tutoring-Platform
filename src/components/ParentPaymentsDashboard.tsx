@@ -658,7 +658,10 @@ function ReceiptsPanel({
 function formatPlanType(t?: string): string {
   if (!t) return '';
   const map: Record<string, string> = {
-    trial: 'Trial', once_weekly: 'Weekly', twice_weekly: '2×/Week', db: 'Plan',
+    trial: 'Trial',
+    once_weekly_monthly: 'Weekly · Monthly', twice_weekly_monthly: '2×/Week · Monthly',
+    once_weekly: 'Weekly · Term', twice_weekly: '2×/Week · Term',
+    db: 'Plan',
   };
   return map[t] || t;
 }

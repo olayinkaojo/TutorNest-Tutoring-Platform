@@ -49,3 +49,4 @@ financial-data-backup-*.json
 financial-data-wipe-applied-*.json
 .vercel
 .env*
+.qa-walkthrough/

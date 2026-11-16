@@ -8,6 +8,8 @@ const app = new Hono();
 
 const PAYMENT_PLAN_LABELS: Record<string, string> = {
   trial: 'Trial Session',
+  once_weekly_monthly: 'Once a Week (Monthly)',
+  twice_weekly_monthly: 'Twice a Week (Monthly)',
   once_weekly: 'Once a Week (1 Term)',
   twice_weekly: 'Twice a Week (1 Term)',
 };

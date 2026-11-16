@@ -17,11 +17,18 @@ const FLUTTERWAVE_ENCRYPTION_KEY = Deno.env.get('FLUTTERWAVE_ENCRYPTION_KEY') ??
 const FLUTTERWAVE_WEBHOOK_SECRET = Deno.env.get('FLUTTERWAVE_WEBHOOK_SECRET') ?? '';
 const PLATFORM_FEE_PERCENTAGE = 20;
 
-// Fixed payment plan definitions (prices in NGN)
+// Fixed payment plan definitions (prices in NGN). Every plan is the same
+// flat ₦15,000 per session (see src/constants/pricing.ts) — plans differ
+// only in how many sessions are bought up front. Monthly plans (4 weeks)
+// were added Nov 2026 from parent feedback: a full 13-week term is a big
+// single outlay, and paying month by month is what families asked for.
+// Keep the frontend twin (PLANS in BookSessionWithPayment.tsx) in step.
 const PAYMENT_PLANS: Record<string, { price: number; sessions: number; sessionsPerWeek: number; weeks: number; name: string }> = {
-  trial:        { price: 15_000,  sessions: 1,  sessionsPerWeek: 1, weeks: 1,  name: 'Trial Session' },
-  once_weekly:  { price: 195_000, sessions: 13, sessionsPerWeek: 1, weeks: 13, name: 'Once a Week (1 Term)' },
-  twice_weekly: { price: 390_000, sessions: 26, sessionsPerWeek: 2, weeks: 13, name: 'Twice a Week (1 Term)' },
+  trial:                { price: 15_000,  sessions: 1,  sessionsPerWeek: 1, weeks: 1,  name: 'Trial Session' },
+  once_weekly_monthly:  { price: 60_000,  sessions: 4,  sessionsPerWeek: 1, weeks: 4,  name: 'Once a Week (Monthly)' },
+  twice_weekly_monthly: { price: 120_000, sessions: 8,  sessionsPerWeek: 2, weeks: 4,  name: 'Twice a Week (Monthly)' },
+  once_weekly:          { price: 195_000, sessions: 13, sessionsPerWeek: 1, weeks: 13, name: 'Once a Week (1 Term)' },
+  twice_weekly:         { price: 390_000, sessions: 26, sessionsPerWeek: 2, weeks: 13, name: 'Twice a Week (1 Term)' },
 };
 
 function addMinutesToTime(time: string, mins: number): string {
@@ -39,8 +46,12 @@ function generateBookingDates(startDate: Date, sessionsCount: number, sessionsPe
       cur.setDate(cur.getDate() + 7);
     }
   } else {
-    // Twice weekly: session 1 on start date, session 2 three days later, repeat each week
-    for (let week = 0; week < 13; week++) {
+    // Twice weekly: session 1 on start date, session 2 three days later,
+    // repeat each week. The week count used to be hardcoded to 13 (the
+    // only twice-weekly plan at the time) — a 4-week monthly plan would
+    // have silently created 26 sessions for an 8-session payment.
+    const weeks = Math.ceil(sessionsCount / 2);
+    for (let week = 0; week < weeks; week++) {
       const first = new Date(startDate);
       first.setDate(startDate.getDate() + week * 7);
       dates.push(new Date(first));
@@ -1232,7 +1243,7 @@ app.post('/payments/initiate-plan', async (c) => {
     const { planType, tutorId, studentId, startDate, startTime, subject, email } = body;
 
     const plan = PAYMENT_PLANS[planType as string];
-    if (!plan) return c.json({ error: 'Invalid plan type. Must be trial, once_weekly, or twice_weekly.' }, 400);
+    if (!plan) return c.json({ error: `Invalid plan type. Must be one of: ${Object.keys(PAYMENT_PLANS).join(', ')}.` }, 400);
     if (!tutorId || !startDate || !startTime || !email) {
       return c.json({ error: 'tutorId, startDate, startTime and email are required' }, 400);
     }
