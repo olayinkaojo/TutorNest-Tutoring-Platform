@@ -34,7 +34,9 @@ jobs:
 
       - uses: supabase/setup-cli@v1
         with:
-          version: latest
+          # Pinned: resolving "latest" calls the GitHub API, which rate-limited
+          # and failed a production deploy on 2026-11-18. Bump deliberately.
+          version: 3.1.0
 
       - name: Set DEPLOY_SHA for /health
         run: >
