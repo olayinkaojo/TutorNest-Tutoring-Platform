@@ -13,6 +13,7 @@ import { Hono } from 'npm:hono@4';
 import * as kv from './kv_store.tsx';
 import * as db from './db.tsx';
 import { logAuditEvent } from './activity-log.tsx';
+import { createGoogleMeetSpace, isGoogleMeetConfigured, jitsiFallbackLink } from './google-meet.tsx';
 
 const app = new Hono();
 
@@ -26,7 +27,55 @@ const DAILY_API_BASE = 'https://api.daily.co/v1';
 // unrecorded Jitsi link instead of real Daily.co video. Flip this back to
 // `true` once the Daily plan is upgraded — that's the entire restore step,
 // nothing else in this file needs to change.
+//
+// Nov 2026: a card is now on file with Daily (their API requires one even on
+// the free plan). Cloud recording is the only Daily feature on this account
+// that costs money beyond the free participant-minutes, so this MUST stay
+// false until the owner explicitly decides to pay for recording. It is the
+// only switch — nothing else in the codebase asks Daily to record.
 const CLOUD_RECORDING_ENABLED = false;
+
+// Admin-controlled switch (KV), set from Admin → Recordings → Video provider.
+// 'meet' sends every join to the Google Meet backup instead of Daily — for
+// an outage like Nov 18 2026, when Daily issued join tokens fine but blocked
+// the call itself ("Missing payment method"), which the API can't detect.
+const VIDEO_OVERRIDE_KEY = 'video:provider_override';
+type VideoProvider = 'daily' | 'meet';
+
+async function getVideoOverride(): Promise<VideoProvider> {
+  const v = await kv.get(VIDEO_OVERRIDE_KEY).catch(() => null) as any;
+  return v?.provider === 'meet' ? 'meet' : 'daily';
+}
+
+/**
+ * The backup room for a booking — one per plan (keyed by paymentId, same
+ * "one room for every session of the plan" rule as Daily), created on first
+ * use and reused after. Meet when configured, otherwise Jitsi.
+ */
+async function getOrCreateBackupLink(booking: any): Promise<{ url: string; provider: 'google_meet' | 'jitsi' }> {
+  const planKey = booking.paymentId || booking.id;
+  const kvKey = `video_backup_room:${planKey}`;
+  const existing = await kv.get(kvKey).catch(() => null) as any;
+  if (existing?.url) return { url: existing.url, provider: existing.provider };
+
+  let url: string | null = null;
+  let provider: 'google_meet' | 'jitsi' = 'google_meet';
+  if (isGoogleMeetConfigured()) url = await createGoogleMeetSpace();
+  if (!url) {
+    provider = 'jitsi';
+    url = jitsiFallbackLink(planKey);
+  }
+  await kv.set(kvKey, { url, provider, createdAt: new Date().toISOString() });
+  await logAuditEvent({
+    userId: booking.tutorId,
+    action: 'session_room_backup_used',
+    category: 'bookings',
+    description: `Backup video room (${provider === 'google_meet' ? 'Google Meet' : 'Jitsi'}) created for plan ${planKey}.`,
+    severity: 'warning',
+    metadata: { bookingId: booking.id, paymentId: booking.paymentId, provider },
+  }).catch(() => {});
+  return { url, provider };
+}
 
 // How long a finished recording stays available before an admin has to act.
 // Not indefinite by design — NDPA/GDPR both treat indefinite retention of a
@@ -140,7 +189,20 @@ export default function dailyVideoRoutes(mainApp: Hono, getUserId: (token: strin
         return c.json({ error: 'You are not part of this session' }, 403);
       }
 
-      if (!booking.meetLink) return c.json({ error: 'No video room set up for this session yet' }, 400);
+      // Backup path: admin switched to Meet, or this booking never got a
+      // Daily room (created while Daily was unreachable). These open in a
+      // new tab — external: true — rather than the in-app iframe: Meet
+      // refuses to be embedded, and embedded meet.jit.si calls are cut off
+      // after 5 minutes.
+      const isDailyLink = !!booking.meetLink && /daily\.co\//.test(booking.meetLink);
+      const override = await getVideoOverride();
+      if (override === 'meet' || !isDailyLink) {
+        const backup = isDailyLink || !booking.meetLink
+          ? await getOrCreateBackupLink(booking)
+          : { url: booking.meetLink as string, provider: (/meet\.google\.com/.test(booking.meetLink) ? 'google_meet' : 'jitsi') as 'google_meet' | 'jitsi' };
+        return c.json({ roomUrl: backup.url, recorded: false, external: true, provider: backup.provider });
+      }
+
       const roomName = extractRoomName(booking.meetLink);
       if (!roomName) return c.json({ error: 'Invalid room link on this booking' }, 500);
 
@@ -157,16 +219,85 @@ export default function dailyVideoRoutes(mainApp: Hono, getUserId: (token: strin
         // remember to press — see the module comment above.
         startRecording: isTutor,
       });
-      if (!token) return c.json({ error: 'Could not create a join link. Please try again.' }, 502);
+      if (!token) {
+        // Daily refused the token (outage, account problem) — don't strand a
+        // live lesson; fall through to the backup room instead.
+        console.warn(`join-token: Daily token failed for booking ${bookingId}, using backup room`);
+        const backup = await getOrCreateBackupLink(booking);
+        return c.json({ roomUrl: backup.url, recorded: false, external: true, provider: backup.provider });
+      }
 
       // Tell the truth here — SessionCallModal shows a different message to
       // users depending on this flag, and it was previously hardcoded `true`
       // even while recording was silently disabled account-wide.
-      return c.json({ roomUrl: `${booking.meetLink}?t=${token}`, recorded: CLOUD_RECORDING_ENABLED });
+      return c.json({ roomUrl: `${booking.meetLink}?t=${token}`, recorded: CLOUD_RECORDING_ENABLED, external: false, provider: 'daily' });
     } catch (error: any) {
       console.error('Error creating session join token:', error);
       return c.json({ error: error.message || 'Internal server error' }, 500);
     }
+  });
+
+  // ── Admin: video provider status + switch ─────────────────────────────────
+  // Under /admin/*, so the global admin middleware in index.ts guards these.
+  app.get('/make-server-cbd74580/admin/video-provider', async (c) => {
+    try {
+      const provider = await getVideoOverride();
+      // Read Daily's own domain config so the admin can see, from inside our
+      // app, that nothing on the Daily account is set to record by default.
+      let dailyDomainRecording: string | null = null;
+      let dailyReachable = false;
+      try {
+        const res = await fetch(`${DAILY_API_BASE}/`, { headers: dailyHeaders() });
+        if (res.ok) {
+          const data = await res.json() as any;
+          dailyReachable = true;
+          dailyDomainRecording = data?.config?.enable_recording ?? null;
+        }
+      } catch { /* reported as unreachable */ }
+      return c.json({
+        provider,
+        googleMeetConfigured: isGoogleMeetConfigured(),
+        cloudRecordingEnabledInApp: CLOUD_RECORDING_ENABLED,
+        dailyReachable,
+        dailyDomainRecording,
+      });
+    } catch (error: any) {
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
+  app.post('/make-server-cbd74580/admin/video-provider', async (c) => {
+    try {
+      const adminId = await getUserId(c.req.header('Authorization')?.split(' ')[1] ?? null);
+      const { provider } = await c.req.json() as { provider?: string };
+      if (provider !== 'daily' && provider !== 'meet') {
+        return c.json({ error: "provider must be 'daily' or 'meet'" }, 400);
+      }
+      await kv.set(VIDEO_OVERRIDE_KEY, { provider, updatedAt: new Date().toISOString(), updatedBy: adminId });
+      await logAuditEvent({
+        userId: adminId ?? 'unknown',
+        action: 'video_provider_switched',
+        category: 'bookings',
+        description: `Video provider switched to ${provider === 'meet' ? 'Google Meet backup' : 'Daily.co'}.`,
+        severity: provider === 'meet' ? 'warning' : 'info',
+        metadata: { provider, googleMeetConfigured: isGoogleMeetConfigured() },
+      }).catch(() => {});
+      return c.json({ success: true, provider, googleMeetConfigured: isGoogleMeetConfigured() });
+    } catch (error: any) {
+      return c.json({ error: error.message || 'Internal server error' }, 500);
+    }
+  });
+
+  // Creates one throwaway Meet space to prove the Workspace setup works,
+  // without touching any booking.
+  app.post('/make-server-cbd74580/admin/video-provider/test-meet', async (c) => {
+    if (!isGoogleMeetConfigured()) {
+      return c.json({ success: false, error: 'Google Meet is not configured yet (secrets missing).' }, 400);
+    }
+    const url = await createGoogleMeetSpace();
+    return url
+      ? c.json({ success: true, meetingUri: url })
+      : c.json({ success: false, error: 'Google rejected the request — check the service account, delegation scope, and that the Meet API is enabled. Details are in the edge function logs.' }, 502);
   });
 
   // ── Webhook: Daily tells us when a recording has finished processing ──────

@@ -7,6 +7,7 @@ import { logAuditEvent } from './activity-log.tsx';
 import { buildIcsContent, createCalendarDownloadLink, buildWeeklyRRule } from './calendar-ics.tsx';
 import { createDailyRoom } from './daily-video-routes.tsx';
 import { createGoogleCalendarEvent } from './google-calendar-routes.tsx';
+import { createGoogleMeetSpace, isGoogleMeetConfigured, jitsiFallbackLink } from './google-meet.tsx';
 import { createNotification, notifyAdmins } from './notification-broker.tsx';
 import { isActionRestricted } from './sanctions-routes.tsx';
 
@@ -1468,16 +1469,21 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
   let recordedSessions = true;
   if (!meetLink) {
     recordedSessions = false;
-    const roomSlug = payment.reference.replace('TNP_', '').slice(0, 16).toLowerCase();
-    meetLink = `https://meet.jit.si/Knowledge Fons Academy-${roomSlug}`;
-    console.warn(`Daily unavailable — using unrecorded Jitsi fallback for payment ${payment.id}`);
+    // Backup order: Google Meet on the platform's own Workspace account
+    // (see google-meet.tsx), then Jitsi as the account-free last resort.
+    // The old Jitsi URL had literal spaces in it ("Knowledge Fons Academy-…"),
+    // which isn't a valid link.
+    const meetBackup = isGoogleMeetConfigured() ? await createGoogleMeetSpace() : null;
+    const provider = meetBackup ? 'Google Meet' : 'Jitsi';
+    meetLink = meetBackup ?? jitsiFallbackLink(payment.reference.replace('TNP_', ''));
+    console.warn(`Daily unavailable — using ${provider} backup room for payment ${payment.id}`);
     await logAuditEvent({
       userId: payment.tutorId,
       action: 'session_room_fallback_unrecorded',
       category: 'bookings',
-      description: `Daily.co room creation failed for payment ${payment.id} — sessions fell back to an unrecorded Jitsi room.`,
+      description: `Daily.co room creation failed for payment ${payment.id} — sessions use a ${provider} backup room instead (not recorded).`,
       severity: 'warning',
-      metadata: { paymentId: payment.id },
+      metadata: { paymentId: payment.id, provider },
     });
   }
 
@@ -1524,6 +1530,10 @@ async function confirmPlanPayment(reference: string): Promise<{ sessionsCreated:
         endDateTime: `${firstDate}T${endTime}:00`,
         location: meetLink,
         recurrenceRule: rrule,
+        // createGoogleCalendarEvent adds a Google Meet link by default. Here
+        // the event already carries the real join link above, so a second,
+        // unrelated Meet link on the tutor's calendar just competed with it.
+        addMeet: false,
       });
       if (!result.success) {
         console.warn(`Google Calendar sync skipped for tutor ${payment.tutorId} (non-fatal):`, result.error);

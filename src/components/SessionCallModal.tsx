@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Loader2, AlertCircle, X, ShieldAlert } from 'lucide-react';
+import { Loader2, AlertCircle, X, ShieldAlert, ExternalLink, Video } from 'lucide-react';
 import { Button } from './ui/button';
 import { Alert, AlertDescription } from './ui/alert';
 import { projectId } from '../utils/supabase/info';
@@ -19,6 +19,11 @@ interface SessionCallModalProps {
 export function SessionCallModal({ bookingId, accessToken, onClose }: SessionCallModalProps) {
   const [roomUrl, setRoomUrl] = useState<string | null>(null);
   const [recorded, setRecorded] = useState(true);
+  // Backup rooms (Google Meet / Jitsi) can't run inside this window — Meet
+  // refuses to be embedded and embedded Jitsi calls are cut off after 5
+  // minutes — so the server marks them external and they open in a new tab.
+  const [external, setExternal] = useState(false);
+  const [provider, setProvider] = useState<string>('daily');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -35,6 +40,8 @@ export function SessionCallModal({ bookingId, accessToken, onClose }: SessionCal
         if (!cancelled) {
           setRoomUrl(data.roomUrl);
           setRecorded(data.recorded !== false);
+          setExternal(data.external === true);
+          setProvider(data.provider || 'daily');
         }
       } catch (err: any) {
         if (!cancelled) setError(err.message || 'Failed to join session');
@@ -53,7 +60,9 @@ export function SessionCallModal({ bookingId, accessToken, onClose }: SessionCal
             <ShieldAlert className="w-4 h-4 text-amber-600 flex-shrink-0" />
             {recorded
               ? 'This session is recorded for safeguarding and quality assurance.'
-              : "This session isn't being recorded right now (temporary issue) — it will still take place normally."}
+              : external
+                ? 'Today’s lesson is running on our backup video service and isn’t recorded.'
+                : 'This session isn’t being recorded.'}
           </div>
           <Button size="sm" variant="ghost" onClick={onClose}>
             <X className="w-4 h-4" />
@@ -71,6 +80,27 @@ export function SessionCallModal({ bookingId, accessToken, onClose }: SessionCal
                 <AlertCircle className="h-4 w-4" />
                 <AlertDescription>{error}</AlertDescription>
               </Alert>
+            </div>
+          ) : roomUrl && external ? (
+            <div className="absolute inset-0 flex items-center justify-center p-8">
+              <div className="bg-white rounded-lg p-8 max-w-md text-center space-y-4">
+                <Video className="w-10 h-10 mx-auto text-[#625d9c]" />
+                <h3 className="text-lg font-semibold">
+                  Today’s lesson opens in {provider === 'google_meet' ? 'Google Meet' : 'a new tab'}
+                </h3>
+                <p className="text-sm text-gray-600">
+                  Our main video service is unavailable right now, so this lesson is running on our backup.
+                  It opens in a new tab. Allow camera and microphone when asked.
+                </p>
+                <Button
+                  className="w-full text-white"
+                  style={{ backgroundColor: '#5d9827' }}
+                  onClick={() => window.open(roomUrl, '_blank', 'noopener,noreferrer')}
+                >
+                  <ExternalLink className="w-4 h-4 mr-2" />
+                  Join lesson
+                </Button>
+              </div>
             </div>
           ) : roomUrl ? (
             <iframe

@@ -12,6 +12,7 @@ import {
   Loader2
 } from 'lucide-react';
 import { projectId } from '../utils/supabase/info';
+import { SessionCallModal } from './SessionCallModal';
 import { parseWAT, bookingDateLabel, timeUntilWAT, formatRawTimeWAT } from '../utils/timezone';
 
 interface UpcomingLesson {
@@ -44,6 +45,11 @@ export function UpcomingLessonsCard({
 }: UpcomingLessonsCardProps) {
   const [lessons, setLessons] = useState<UpcomingLesson[]>([]);
   const [loading, setLoading] = useState(true);
+  // "Join" used to window.open() the raw room link. Daily rooms are
+  // private, so without the per-person join token from
+  // /sessions/:id/join-token Daily turned the person away — only the
+  // Bookings tab's Join actually worked. Now goes through the same modal.
+  const [callBookingId, setCallBookingId] = useState<string | null>(null);
 
   useEffect(() => {
     if (session?.access_token) {
@@ -222,7 +228,7 @@ export function UpcomingLessonsCard({
                       <Button
                         size="sm"
                         className="bg-[#5d9827] hover:bg-[#4a7a1f] flex-shrink-0"
-                        onClick={() => window.open(lesson.googleMeetLink, '_blank')}
+                        onClick={() => setCallBookingId(lesson.id)}
                       >
                         <Video className="w-4 h-4 mr-2" />
                         Join
@@ -248,6 +254,13 @@ export function UpcomingLessonsCard({
           </div>
         )}
       </CardContent>
+      {callBookingId && session?.access_token && (
+        <SessionCallModal
+          bookingId={callBookingId}
+          accessToken={session.access_token}
+          onClose={() => setCallBookingId(null)}
+        />
+      )}
     </Card>
   );
 }

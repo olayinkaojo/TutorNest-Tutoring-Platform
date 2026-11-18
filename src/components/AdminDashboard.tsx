@@ -59,6 +59,7 @@ const AdminSessionsViewer = lazy(() => import('./admin/AdminSessionsViewer').the
 const DocumentAuditTrail = lazy(() => import('./admin/DocumentAuditTrail').then(m => ({ default: m.DocumentAuditTrail })));
 const ChatSafeguardingViewer = lazy(() => import('./admin/ChatSafeguardingViewer').then(m => ({ default: m.ChatSafeguardingViewer })));
 const RecordingsViewer = lazy(() => import('./admin/RecordingsViewer').then(m => ({ default: m.RecordingsViewer })));
+const VideoProviderPanel = lazy(() => import('./admin/VideoProviderPanel').then(m => ({ default: m.VideoProviderPanel })));
 const RealSessionReportsList = lazy(() => import('./RealSessionReportsList').then(m => ({ default: m.RealSessionReportsList })));
 
 interface UserProfile {
@@ -666,7 +667,10 @@ export function AdminDashboard({
           <TabsContent value="recordings">
             {session && (
               <Suspense fallback={<TabFallback />}>
-                <RecordingsViewer accessToken={session.access_token} />
+                <div className="space-y-6">
+                  <VideoProviderPanel accessToken={session.access_token} />
+                  <RecordingsViewer accessToken={session.access_token} />
+                </div>
               </Suspense>
             )}
           </TabsContent>
